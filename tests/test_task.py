@@ -51,8 +51,8 @@ printf env > "$target/.venv/marker"
 ''')
         return repo
 
-    def call(self, *args, ok=True):
-        result = subprocess.run([str(MAM), "--root", str(self.root), "task", *args], capture_output=True, text=True)
+    def call(self, *args, command="task", ok=True):
+        result = subprocess.run([str(MAM), "--root", str(self.root), command, *args], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0 if ok else 2, result.stdout + result.stderr)
         return json.loads(result.stdout if ok else result.stderr)
 
@@ -60,7 +60,7 @@ printf env > "$target/.venv/marker"
         return self.call("create", "--title", "test task")["id"]
 
     def add(self, task, repo="multi-agent-manager", ok=True):
-        return self.call("workspace", "add", task, "--repo", repo, "--base", self.git(self.projects / repo, "rev-parse", "main"), ok=ok)
+        return self.call("add", task, "--repo", repo, "--base", self.git(self.projects / repo, "rev-parse", "main"), command="workspace", ok=ok)
 
     def publish(self, task, kind="task"):
         return self.call("publish", task, "--file", kind)["revision"]
@@ -300,8 +300,18 @@ printf env > "$target/.venv/marker"
         before = (record.read_bytes(), record.stat().st_mtime_ns)
         self.assertEqual(self.call("status", task)["repos"], data["repos"])
         self.assertEqual(self.call("list", "--archived")[0]["repos"], data["repos"])
-        self.call("job", "list", "--task", task)
+        self.call("list", "--task", task, command="job")
         self.assertEqual((record.read_bytes(), record.stat().st_mtime_ns), before)
+
+    def test_job_and_workspace_are_top_level_only(self):
+        for command, description in (("job", "register, query and archive process records"),
+                                     ("workspace", "manage repository worktrees and their environments")):
+            help_result = subprocess.run([str(MAM), "--root", str(self.root), command, "--help"], capture_output=True, text=True)
+            self.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
+            self.assertIn(description, help_result.stdout)
+            old = subprocess.run([str(MAM), "--root", str(self.root), "task", command, "--help"], capture_output=True, text=True)
+            self.assertEqual(old.returncode, 2, old.stdout + old.stderr)
+        self.assertEqual(self.call("list", command="job"), {"jobs": [], "needs_verification": []})
 
     def test_tampered_paths_and_symlink_workspace_rejected(self):
         task = self.task()
