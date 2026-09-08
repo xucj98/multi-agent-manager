@@ -13,6 +13,8 @@
 
 ## 独立验证
 
+用户最新追加：管理库 .worklogs 已删除，README已移除保留旧日志的说明。源码验收仍固定48d188b；文档额外读取 main 上最新README及删除提交，不必为这一纯文档变更重新安装环境或重跑已通过代码测试。验证现行管理入口统一使用.tasks。报告注明实际依据的最新本任务发布版本。
+
 1. 从文档出发，通过 task workspace add 在自己的UUID目录分别创建 agent-workflow 和 robot-bridge 两库完整环境；不复用作者工作区。固定输入 base 如上，使用各库三参数本地入口。记录安装结果、解释器真实可用、editable及共享软链接归属。
 2. 在自己的管理库worktree跑完整标准库测试。在本机和 ssh wuwen-1 使用同一共享 .venv 执行管理CLI帮助/只读查询及 robot-bridge CPU基础smoke。无GPU，不操作现用正式实验、现用环境或数据实体。
 3. 只启动自己的短时CPU测试进程，本机和wuwen-1各一个，实际通过CLI job add登记到本任务，验证running→stopped→archived；真实App Server查询自己的agent状态。测试停止/清理后记录结果并归档job。不要用新server或伪造agent状态冒充现场验证。
