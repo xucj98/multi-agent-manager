@@ -21,3 +21,13 @@
 按 main 上发布的本任务和 docs/task-management-design.zh-CN.md 实施。报告写回稳定管理库本任务目录 report.md，首行 task_revision: <所依据任务的完整 commit>，随后写完成/未完成、workspace、各库完整交付 commit、验证结论与成果位置。工具可用后通过 CLI 发布；代码只在自己的 worktree 提交。
 
 先读管理库 AGENTS.md，跨库先读目标库 AGENTS.md 及对应规范。追加要求只以 Manager 发布后的任务文件为准。自身测试产生的文件及进程自行清理，保留待 Manager 归档的工作区。无需 GPU，不修改现用训练/评测环境和进程。没有常驻服务、自动唤醒、额外权限系统、环境 provenance 或旧 CLI 兼容层。
+
+## 已集成的验收版本
+
+以下为Manager集成到原仓库当前开发分支的固定base：
+- RMBench: `1ba3b5d8e5dbb4085f33688d7b5b612ff35165f1`
+- opendm: `d3b7d10ed6df5225466681f33f09afadf76b9a53`
+- openpi: `3503e471622badfbb3d60686ac3d14a090766980`
+- robot-bridge: `c4848e1bab4083ad6944ce641ef72c1287451439`
+
+可以开始创建：本轮先在自己的UUID workspace 使用robot-bridge三参数.local入口实际构建，分支 task/2f47abe2-c693-413d-85cf-60057350244f。CLI尚未就绪，本轮初始化例外允许该本地入口，由Manager在bootstrap清单登记。CPU检查本机+wuwen-1，不占GPU。之后空白验收用agent-workflow+robot-bridge验证CLI多库创建归档，避免重复安装重型环境。
