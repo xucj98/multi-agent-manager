@@ -1,12 +1,13 @@
-# Agent 协作入口
+# 本集群的 agent 协作入口
 
-本仓库维护跨项目任务分配、workspace 生命周期和轻量管理工具。先读 `README.md`；对其他代码库开展工作前，读取该库的 `AGENTS.md`，再按任务读取相关开发、实验或环境规范。
+本仓库管理本机与 wuwen-1 的任务；两者共享 `/mnt/public` 下的代码、数据和环境。操作见 [README.md](README.md)，接口见 [CLI 说明](docs/task-management-design.zh-CN.md)。
 
-- 讨论、只读调查、状态监控直接读取已有资料。需要隔离代码版本或修改代码时使用分配的独享 workspace；需要执行项目代码时才准备该库独立环境。
-- 同一任务继续使用自己的 workspace。各库 worktree 和共享软链接由各库脚本维护，公共工具登记负责人、目录和运行依赖。
-- Manager 分配目标、修改范围、目标分支、验证与交付条件；跨库任务列出实际涉及的库。用户在当前任务中的明确指令优先。
-- 修改管理工具时使用标准库和现有 Git/环境入口；变更删除逻辑必须验证路径边界、软链接、未提交改动和活跃任务保护。
-- 正式实验遵循实验所属库的规范。RMBench 的评测产物归 `RMBench/eval_result/<exp-group>/<run>`，实验说明归 `RMBench/experiments/<exp-group>`。
-- 交付前提交有价值的代码和文档，保留简短结论，处理 smoke 与临时文件。Manager 接收成果后回收 workspace；长任务未结束时明确运行依赖及接手负责人。
-- 集群路径和任务登记位于 gitignored 的 `.local/`；有价值的跨库工作结论写入 `.worklogs/`。环境创建不新增一套 provenance 或实验 metadata。
-- 文档使用中文，以新读者可独立操作为目标；说明当前操作和适用条件。不要把一次性任务状态混入长期操作手册。
+- Manager 创建并发布 `.tasks/<uuid>/task.md`，启动执行者并绑定 agent ID。执行者先读取已发布任务要求及版本，再读取涉及代码库的 AGENTS.md 与相关规范。
+- 实施、review 和实验都是任务，由执行者完成。执行者通过工具在自己的 UUID workspace 按需创建各库 worktree，分支统一为 `task/<uuid>`。
+- 管理仓库的任务文件共享编辑：Manager 写 task.md，执行者写自己的 report.md。main 是已发布版本，工作目录修改是草稿，发布统一通过 CLI。追加要求先发布，再通知执行者。
+- 简报注明所依据的任务版本、完成与未完成内容、workspace、交付 commits 和验证结论。review 依据固定版本的任务要求、简报与代码，在自己的 workspace 验证。
+- 长时间运行的进程由执行者登记，结束后按任务要求处理并归档该进程记录。Manager 查询需要介入的进程，通知已停止执行的负责人继续工作。
+- 临时文件和 smoke 按任务及业务库规范处理。Manager 决定任务归档时，工具移除登记的 worktree、独立环境和工作分支，保留共享实体与任务记录。
+- 本仓库工具使用 Python 标准库。代码修改与独立代码 review 使用自己的 worktree；任务说明和简报在共享管理目录编辑。业务算法、GPU使用及实验产物规则由任务和所属库规定。
+
+本轮首次实施在 CLI 就绪前由 Manager 初始化任务登记和发布；CLI 就绪后统一使用新入口。
