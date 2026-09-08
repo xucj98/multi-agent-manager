@@ -2,7 +2,7 @@ task_revision: 38073292eb672242a668adf52f18483a19c0669b
 
 完成：实现 `probe_process` 与 `probe_agents` 的只读运行时查询模块，并覆盖本地 `/proc`、受控 SSH、App Server Unix WebSocket 握手和 JSON-RPC `thread/read(includeTurns=false)` 查询。进程身份记录 host、boot_id 和 start_ticks；PID 身份变化、目标不存在和 zombie 均返回 stopped，访问失败返回 unknown。远端固定 Python 查询先以 `kill(pid, 0)` 确认 PID，再读取 `/proc/<pid>/stat`，将不存在与存在但不可读分别映射为 stopped 和 unknown。App Server 查询复用单个连接，按线程区分 RPC 错误、传输错误与超时。
 
-未完成：无。管理 CLI 尚未集成到稳定管理库，本报告作为共享目录草稿，待工具可用后按流程发布。
+未完成：无。报告已通过管理 CLI 发布。
 
 workspace：`/mnt/public/xcj/Projects/workspace/91ba98dd-3356-493a-98e9-a5e9ea94f04b`
 
