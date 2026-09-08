@@ -2,18 +2,7 @@
 
 管理 agent 的任务、workspace 和长任务进程。所有 agent、代码修改和管理命令在本机运行；GPU 作业可通过 SSH 在 `wuwen-1` 运行，由本机查询进程。两端共享 `/mnt/public`，`wuwen-1` 无需安装 MAM。
 
-## 安装与更新
-
-本机已安装 pipx，以下命令安装 main 上已提交的版本，更新时再次执行：
-
-```bash
-pipx install --force 'multi-agent-manager @ git+file:///mnt/public/xcj/Projects/multi-agent-manager@main'
-pipx ensurepath --force
-export PATH="$PATH:/root/.local/bin"
-mam --help
-```
-
-`ensurepath` 为后续终端保存 PATH，`export` 让当前终端立即生效。命令入口位于 `/root/.local/bin/mam`，可以从任意目录调用。程序使用 pipx 的独立环境，管理资料保存在固定位置：
+[安装与更新](docs/install.md)。`mam` 可以从任意目录调用，默认管理资料位置如下；`--root <目录>` 可覆盖管理根目录，日常无需指定。
 
 ```text
 Projects/multi-agent-manager/
@@ -58,7 +47,7 @@ mam task status <uuid>
 
 ```bash
 mam task --help
-mam task job --help
+mam job --help
 mam task archive --help
 ```
 
