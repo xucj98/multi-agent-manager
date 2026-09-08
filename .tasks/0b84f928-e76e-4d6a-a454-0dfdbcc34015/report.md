@@ -1,4 +1,4 @@
-task_revision: 4e4b04bad1c464020506ababdf9d3fb12a8fcabf
+task_revision: f56923512683df094455cebd0e55ec9ebfb2e5aa
 
 # 场景与时序审阅
 
@@ -128,3 +128,13 @@ wash-cup 仍只待用户确认标注空白区间的 input/serial-conditioning �
 workspace、各库交付 commit：按任务限制未创建 workspace/worktree；无业务库提交。
 
 验证结果与成果位置：本报告；审阅对象为固定 commit `c4d5b3590a84670ad5cf8dcfa21d0263e5441abf` 的 `docs/design/shared-memory-schema-and-scheduler.zh-CN.md`。
+
+## 最终收口复核（b17f6c5）
+
+通过。本轮仅核对 `b17f6c53ffbc1030972a9820cf592f28b937d501` 的最小修订，未重复源码、数据或训练调查。
+
+- §6 以真实观测映射坐标计算 `t′`；部分执行时仍代入 lag/offset 公式，索引越界即暂停自动推理并报错，不会把计划 15 帧误当实际进度，也不会改取最后执行 index。
+- drawer 强制输入真值被明确为历史训练的 teacher-forcing gap。部署和普通 replay 继续只反馈模型 prediction，不引入 effective-input-frame 或其他标注真值通道；evaluator 分区记录该差异且不声称该区间完全对齐。
+- §7 明确锁定时快照语义值、每轮 `prepare()` 重建 lock overrides，并只消费非锁定的一次性 override；reset/takeover 新 epoch 从保留人工 context 或初值开始。
+
+此前报告的最后一项文本阻断已由上述裁决消除。剩余待用户决定的仅是 wash-cup 标注空白区间处理。
