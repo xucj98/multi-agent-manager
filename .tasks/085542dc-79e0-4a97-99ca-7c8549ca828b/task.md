@@ -13,3 +13,6 @@
 ## 第二轮定向复核
 固定审阅 robot-bridge commit dfc487d 的同一路径文档。第一轮三项阻断已接受：schema 内容/hash 单向校验；新增由 train config 导出的 inference_config 直接构造模型/transform，不依赖配置注册名；明确旧 drawer converter/backend/replay 迁移范围。接受具体 MemoryContext 与轻量数据契约包；删去无依据 Python 版本要求。
 请只检查上述修订是否闭合、是否引入重复配置/实现不可行；尤其检查 schema/representation 与运行 feedback 策略边界：训练不绑定部署环境，采样提交策略在 scheduler run config。最多指出仍阻断实施的三项，或明确通过，避免扩展框架和新范围。将第二轮结论追加到 report，更新 task_revision 并发布；只读固定 commit，不创建环境。
+
+## 用户最新澄清（覆盖冲突要求）
+wash-cup 仅保留：存在子任务标注文件、无 label6、标签1–5各出现恰好一次的 episode；顺序不限。Manager 正在核对 full-state target 是 chunk-level 还是 frame-level。不能再把 accepted-first 默认当必须保留的正确算法；请在第二轮结论中标明时序表须以实际训练监督核对后修订。此数据/训练取证由 Manager 负责，不重复调查。其余定向复核继续。
