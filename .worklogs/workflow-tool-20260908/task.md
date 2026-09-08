@@ -31,3 +31,5 @@ workspace：`/mnt/public/xcj/Projects/workspace/workflow-tool-20260908`，代码
 用临时真实 Git 仓库验证：正常登记/交付/接收/归档，报告或说明缺失拒绝，待验收拒绝，活跃 job 拒绝，重复 workspace 拒绝，dirty/untracked 保护，ignored 共享软链接目标保留，真实 ignored checkpoint 拒绝，外层 temp 不自动删除，路径含空格，失败后重试。测试完成自行删除临时测试文件。
 
 先完成可运行版本及测试，提交后给 Manager 和独立 reviewer 精确 commit；在本目录 report.md 写完成情况、workspace、worktree 完整 commit、测试结论和任何限制。自身 workspace 待 Manager 验收后由新工具归档。
+
+报告写入上述稳定管理仓库目录，由 Manager 统一提交进 Git；作者仅在自己的代码 worktree 提交实现，不在原管理仓库暂存其他文件。

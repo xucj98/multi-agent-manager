@@ -30,3 +30,5 @@ workspace：`/mnt/public/xcj/Projects/workspace/workflow-env-entry-20260908`，�
 先做 bash 语法、help/缺参、路径含空格、已有目录或分支拒绝、正确 source-root、旧 README 不存在时的检查。对未改变的重型依赖安装不重复全量验证；独立 reviewer 会用最终入口实际创建 robot-bridge 环境并做 CPU 检查。
 
 提交各库改动，将完成情况、剩余问题、workspace、每库完整 commit、验证结果和私有入口位置写入本目录 `report.md`。测试临时文件和 smoke 由你自行处理；Manager 接收并归档时移除 workspace，报告及提交保留。
+
+报告写入上述稳定管理仓库目录，由 Manager 统一提交进 Git；作者仅在自己的代码 worktree 提交实现，不在原管理仓库暂存其他文件。

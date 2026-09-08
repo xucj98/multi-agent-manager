@@ -23,3 +23,5 @@
 本目录 `report.md` 写验收完成/未完成、review对应的每库完整commit、自己的workspace与worktree commit、运行过的检查和限制。你自行处理测试产生的临时文件，Manager 接收后归档移除workspace。
 
 不修改实现代码，不迁移旧eval结果，不碰现用环境和活跃任务。不重复建立报告副本或多个验收workspace。
+
+报告写入上述稳定管理仓库目录，由 Manager 统一提交进 Git；作者仅在自己的代码 worktree 提交实现，不在原管理仓库暂存其他文件。
