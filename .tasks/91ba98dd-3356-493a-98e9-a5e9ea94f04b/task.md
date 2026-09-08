@@ -1,6 +1,6 @@
 # 进程与 App Server 只读查询模块
 
-执行者：待绑定（gpt-5.6-terra max）。任务 UUID：91ba98dd-3356-493a-98e9-a5e9ea94f04b。workspace：/mnt/public/xcj/Projects/workspace/91ba98dd-3356-493a-98e9-a5e9ea94f04b，代码 worktree 为其下 agent-workflow；分支 task/91ba98dd-3356-493a-98e9-a5e9ea94f04b；目标 main。
+执行者：Erdos（gpt-5.6-terra max，agent 01a08160-52bc-70e1-81a6-9af5125ea787）。任务 UUID：91ba98dd-3356-493a-98e9-a5e9ea94f04b。workspace：/mnt/public/xcj/Projects/workspace/91ba98dd-3356-493a-98e9-a5e9ea94f04b，代码 worktree 为其下 agent-workflow；分支 task/91ba98dd-3356-493a-98e9-a5e9ea94f04b；目标 main。
 
 ## 范围
 
