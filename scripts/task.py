@@ -358,7 +358,7 @@ def job_list(store, args):
             if row["probe"]["status"] not in ("running", "stopped"):
                 uncertain.append(row)
             elif row["status"] == "stopped":
-                if row["agent_state"]["status"] in ("unknown", "systemError") or row["agent_state"].get("error"):
+                if row["agent_state"]["status"] == "unknown" or row["agent_state"].get("error"):
                     uncertain.append(row)
                 elif row["agent_state"]["status"] != "active":
                     selected.append(row)
