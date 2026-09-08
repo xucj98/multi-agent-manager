@@ -9,3 +9,5 @@
 完成标准：CLI及所依赖入口可实际创建/登记/查询/发布/归档；多个真实repo软链环境与本机/远端CPU基础检查；并发发布及删除边界测试；真实进程/App Server查询；空白agent按文档完成闭环；简报保存，工作区与自身临时产物清理。
 
 用户追加：AGENTS.md 和 README.md 由 Manager 亲自修订，待实现稳定后定稿；必须由空白 subagent 审阅清晰、简洁、无冲突。
+
+独立审阅发现的文档收尾范围：RMBench docs/guidelines/rmbench.md 与 robot-bridge configs/benchmark/unified_sim/README.zh-CN.md、docs/design/unified-sim-real-runtime.md、docs/tutorials/drawer-offline.zh-CN.md、docs/tutorials/rmbench-benchmark-runner.zh-CN.md 仍引用已删除 .local/README.zh-CN.md，Manager 在最终文档修改时修正为现行入口；历史.worklogs不改。

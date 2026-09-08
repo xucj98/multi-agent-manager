@@ -31,3 +31,5 @@
 - robot-bridge: `c4848e1bab4083ad6944ce641ef72c1287451439`
 
 可以开始创建：本轮先在自己的UUID workspace 使用robot-bridge三参数.local入口实际构建，分支 task/2f47abe2-c693-413d-85cf-60057350244f。CLI尚未就绪，本轮初始化例外允许该本地入口，由Manager在bootstrap清单登记。CPU检查本机+wuwen-1，不占GPU。之后空白验收用agent-workflow+robot-bridge验证CLI多库创建归档，避免重复安装重型环境。
+
+初审两项旧README引用问题已交Manager纳入文档收尾；它们不阻止根据已发布固定base进行真实CPU构建验收。报告最后区分代码/环境验收结论与尚待Manager修正文档的事项。
