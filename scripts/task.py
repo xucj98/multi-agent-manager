@@ -280,13 +280,14 @@ def publish(store, args):
                 _, path, _ = live(store, data, name, record)
                 delivery[name] = head(path)
             report = {"task_revision": revision, "commits": delivery}
+        path = f".tasks/{args.task}/{args.file}.md"
         existing = optional_doc(store, args.task, args.file)
         if existing and existing["content"].encode() == content:
             if report is not None and (not data["report"] or report["commits"] != data["report"]["commits"]):
                 raise Error("delivery HEAD changed; update the report draft before publishing")
+            git(store.root, "update-index", "--add", "--cacheinfo", "100644", existing["blob"], path)
             return {"id": args.task, "file": args.file, "revision": existing["revision"], "unchanged": True}
         parent = head(store.root, "main")
-        path = f".tasks/{args.task}/{args.file}.md"
         with tempfile.TemporaryDirectory(prefix="task-publish-") as temporary:
             env = {**os.environ, "GIT_INDEX_FILE": str(Path(temporary) / "index")}
             git(store.root, "read-tree", parent, env=env)
@@ -299,6 +300,9 @@ def publish(store, args):
             data["report"] = {**report, "revision": commit}
             data["status"] = "pending"
         store.write(data)
+        # Update only this entry; Git locks the shared index and keeps other entries.
+        # Use the published blob so an edit made during publication stays a draft.
+        git(store.root, "update-index", "--add", "--cacheinfo", "100644", blob, path)
     return {"id": args.task, "file": args.file, "revision": commit, "report": report}
 
 
