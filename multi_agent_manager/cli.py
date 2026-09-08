@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Local task records, Git publication and conservative workspace archival."""
 from __future__ import annotations
 
@@ -15,7 +14,8 @@ import sys
 import tempfile
 import uuid
 
-REPOS = ("agent-workflow", "RMBench", "opendm", "openpi", "robot-bridge")
+DEFAULT_ROOT = Path("/mnt/public/xcj/Projects/multi-agent-manager")
+REPOS = ("multi-agent-manager", "RMBench", "opendm", "openpi", "robot-bridge")
 
 
 class Error(RuntimeError):
@@ -308,13 +308,15 @@ def publish(store, args):
 
 def runtime():
     try:
-        import job_runtime
+        from . import job_runtime
     except ImportError as exc:
-        raise Error("scripts/job_runtime.py is required for process queries") from exc
+        raise Error("multi_agent_manager.job_runtime is required for process queries") from exc
     return job_runtime
 
 
 def refresh_jobs(data):
+    if data["status"] == "archived":
+        return
     for job in data["jobs"]:
         if job["status"] == "archived":
             continue
@@ -348,7 +350,8 @@ def job_list(store, args):
         with store.lock(item["id"]):
             data = store.read(item["id"])
             refresh_jobs(data)
-            store.write(data)
+            if data["status"] != "archived":
+                store.write(data)
             rows.extend({"task": data["id"], "agent": data["agent"], **job} for job in data["jobs"])
     agents = runtime().probe_agents(sorted({row["agent"] for row in rows if row["agent"]})) if rows else {}
     selected, uncertain = [], []
@@ -394,7 +397,8 @@ def status(store, args):
     with store.lock(args.task):
         data = store.read(args.task)
         refresh_jobs(data)
-        store.write(data)
+        if data["status"] != "archived":
+            store.write(data)
     docs = {kind: optional_doc(store, args.task, kind) for kind in ("task", "report")}
     drafts = {}
     for kind, document in docs.items():
@@ -508,59 +512,61 @@ def archive(store, args):
 
 
 def parser():
-    cli = argparse.ArgumentParser(description=__doc__)
-    cli.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1], help="management checkout (tests may supply a temporary root)")
-    sub = cli.add_subparsers(dest="command", required=True)
+    cli = argparse.ArgumentParser(prog="mam", description="Manage local cluster tasks, workspaces and processes.",
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    cli.add_argument("--root", type=Path, default=DEFAULT_ROOT, help="stable management checkout")
+    task = cli.add_subparsers(required=True).add_parser("task", help="manage tasks, publications, workspaces and jobs")
+    sub = task.add_subparsers(dest="command", required=True)
     p = sub.add_parser("create", help="register UUID, drafts and empty workspace")
-    p.add_argument("--title", required=True)
-    p.add_argument("--review")
+    p.add_argument("--title", required=True, help="short task title")
+    p.add_argument("--review", help="source task UUID; fix its published task/report and commits")
     p.set_defaults(func=create)
     p = sub.add_parser("bind", help="bind one execution agent")
-    p.add_argument("task")
-    p.add_argument("--agent", required=True)
+    p.add_argument("task", help="task UUID")
+    p.add_argument("--agent", required=True, help="execution agent ID; one active task per agent")
     p.set_defaults(func=bind)
-    w = sub.add_parser("workspace").add_subparsers(required=True)
+    w = sub.add_parser("workspace", help="manage repository worktrees and their environments").add_subparsers(required=True)
     p = w.add_parser("add", help="create a repository worktree using its local environment entry")
-    p.add_argument("task")
-    p.add_argument("--repo", choices=REPOS, required=True)
-    p.add_argument("--base", required=True)
+    p.add_argument("task", help="task UUID")
+    p.add_argument("--repo", choices=REPOS, required=True, help="source repository")
+    p.add_argument("--base", required=True, help="base commit for the task branch")
     p.set_defaults(func=workspace_add)
     p = sub.add_parser("show", help="read a published document")
-    p.add_argument("task")
-    p.add_argument("--file", choices=("task", "report"), default="task")
-    p.add_argument("--revision")
+    p.add_argument("task", help="task UUID")
+    p.add_argument("--file", choices=("task", "report"), default="task", help="published document (default: task)")
+    p.add_argument("--revision", help="published commit to read; defaults to main")
     p.set_defaults(func=lambda s, a: published(s, a.task, a.file, a.revision))
     p = sub.add_parser("publish", help="publish only one draft to main using an isolated index")
-    p.add_argument("task")
-    p.add_argument("--file", choices=("task", "report"), required=True)
+    p.add_argument("task", help="task UUID")
+    p.add_argument("--file", choices=("task", "report"), required=True, help="draft to publish; reports require task_revision on the first line")
     p.set_defaults(func=publish)
     p = sub.add_parser("list", help="list registered task records")
     group = p.add_mutually_exclusive_group()
-    group.add_argument("--archived", action="store_true")
-    group.add_argument("--all", action="store_true")
+    group.add_argument("--archived", action="store_true", help="show only archived tasks")
+    group.add_argument("--all", action="store_true", help="include archived tasks")
     p.set_defaults(func=lambda s, a: [d for d in s.all() if a.all or (d["status"] == "archived") == a.archived])
     p = sub.add_parser("status", help="query jobs, versions, drafts and archive progress")
-    p.add_argument("task")
+    p.add_argument("task", help="task UUID")
     p.set_defaults(func=status)
     p = sub.add_parser("archive", help="remove owned worktrees and task branches; retain task records")
-    p.add_argument("task")
-    p.add_argument("--note", required=True)
+    p.add_argument("task", help="task UUID")
+    p.add_argument("--note", required=True, help="purpose, result or reason for this operation")
     p.set_defaults(func=archive)
-    jobs = sub.add_parser("job").add_subparsers(required=True)
-    p = jobs.add_parser("add")
-    p.add_argument("task")
-    p.add_argument("--note", required=True)
-    p.add_argument("--host", required=True)
-    p.add_argument("--pid", type=int, required=True)
+    jobs = sub.add_parser("job", help="register, query and archive process records").add_subparsers(required=True)
+    p = jobs.add_parser("add", help="register a running process with its startup identity")
+    p.add_argument("task", help="task UUID")
+    p.add_argument("--note", required=True, help="purpose, result or reason for this operation")
+    p.add_argument("--host", required=True, help="host running the process")
+    p.add_argument("--pid", type=int, required=True, help="running process ID")
     p.set_defaults(func=job_add)
-    p = jobs.add_parser("list")
-    p.add_argument("--task")
-    p.add_argument("--status", choices=("running", "stopped", "archived", "all"))
-    p.add_argument("--attention", action="store_true")
+    p = jobs.add_parser("list", help="query process and agent states; never wake agents")
+    p.add_argument("--task", help="filter jobs by task UUID")
+    p.add_argument("--status", choices=("running", "stopped", "archived", "all"), help="filter jobs; default excludes archived records")
+    p.add_argument("--attention", action="store_true", help="show stopped jobs with inactive agents; list unknowns separately")
     p.set_defaults(func=job_list)
-    p = jobs.add_parser("archive")
-    p.add_argument("job")
-    p.add_argument("--note", required=True)
+    p = jobs.add_parser("archive", help="record the handling of a stopped process; retain history")
+    p.add_argument("job", help="job UUID")
+    p.add_argument("--note", required=True, help="purpose, result or reason for this operation")
     p.set_defaults(func=job_archive)
     return cli
 
@@ -576,7 +582,3 @@ def main(argv=None):
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
     return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

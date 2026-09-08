@@ -14,10 +14,7 @@ from pathlib import Path
 from unittest import mock
 
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-from scripts import job_runtime as runtime
+from multi_agent_manager import job_runtime as runtime
 
 
 def _take(connection: socket.socket, size: int) -> bytes:
