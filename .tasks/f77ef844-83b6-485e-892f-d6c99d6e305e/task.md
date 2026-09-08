@@ -47,3 +47,9 @@
 ## 查询契约补充
 
 进程 probe 的 status 是判断依据：stopped 的 error 字段可以说明不存在、zombie、PID身份变化等停止原因，不代表查询失败；只有 unknown 才表示不能确认。核心不得因 stopped 带诊断文本而不更新状态或阻止 job/task archive。远端查询必须区分“进程不存在”和“存在但不可读”：权限/读取失败返回 unknown，不能把单个 -r 检查失败一律当 stopped。
+
+## 发布暂存区修订
+
+Manager 修订此前对共享 index 的过度约束：应保留其他文件的 staged 内容和所有工作目录草稿，但本次已发布文件的 index entry 应同步到发布版本。当前 runtime report 发布后，稳定管理库 git status 同时显示该 report 为 staged 删除与 untracked，后续普通提交可能删除已发布报告。
+
+请修复 publish 的正常与 unchanged 两条路径：只同步本次文件的 index entry，不 reset 整个 index、不覆盖工作目录。追加真实 Git 回归：其他文件 staged 内容保留，并发发布无丢失，发布后正常代码提交不会删除/回退任务文件。已有报告的异常 index 可用修复后的 unchanged publish 定向恢复，不写兼容层。修复完成后通过你的 worktree CLI 发布本任务要求（unchanged）和你的最终报告。Manager 负责其余已发布报告的定向同步及代码合入。
