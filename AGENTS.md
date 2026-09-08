@@ -4,7 +4,7 @@
 
 - Manager 为每个 subagent 创建任务、编辑并发布要求，再启动执行者并绑定 agent ID。每个 subagent 对应一个未归档任务及其 UUID workspace；Manager 自己的工作无需创建任务。
 - 执行者先用 `mam task show` 读取发布要求和版本，再阅读涉及库的 `AGENTS.md` 及任务所需规范。追加要求由 Manager 写入任务、发布后通知执行者。
-- 修改代码和独立代码 review 通过 `mam task workspace add` 创建各库 worktree。
+- 修改代码和独立代码 review 通过 `mam workspace add` 创建各库 worktree。
 - 管理仓库共享 checkout：Manager 编辑 task.md，执行者编辑自己的 report.md。main 是发布版本，工作目录改动是草稿；任务和简报通过 CLI 发布。
 - 执行者按 README 的格式交付简报。review 使用固定版本的任务、简报和代码，在自己的 workspace 验证。
 - 工作记录统一放在本库 `.tasks/`；各业务库保留自己的规范和实验记录。

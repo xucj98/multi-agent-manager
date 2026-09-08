@@ -26,7 +26,7 @@ mam task bind <uuid> --agent <agent-id>
 
 ```bash
 mam task show <uuid>
-mam task workspace add <uuid> --repo robot-bridge --base <commit>
+mam workspace add <uuid> --repo robot-bridge --base <commit>
 ```
 
 执行者编辑返回路径中的 report.md，首行使用实际依据的任务版本：
