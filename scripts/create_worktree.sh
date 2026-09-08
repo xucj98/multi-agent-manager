@@ -15,7 +15,7 @@ source_root=${source_root%/.git}
 [[ "$(realpath -m -- "$workspace")" = "$workspace" ]] || exit 2
 [[ "$branch" == task/* && -x "$python" && "$python" == /mnt/public/* ]] || exit 2
 base=$(git -C "$source_root" rev-parse --verify "$base^{commit}")
-worktree="$workspace/agent-workflow"
+worktree="$workspace/multi-agent-manager"
 mkdir -p -- "$workspace"
 if [[ -e "$worktree" || -L "$worktree" ]]; then
   [[ ! -L "$worktree" && -f "$worktree/.git" && ! -L "$worktree/.git" ]] || exit 2
@@ -31,4 +31,5 @@ git -C "$worktree" check-ignore -q .venv/ || {
   exit 2
 }
 "$python" -m venv "$worktree/.venv"
-"$worktree/.venv/bin/python" -c 'import argparse, fcntl, json, subprocess; print("agent-workflow stdlib smoke passed")'
+"$worktree/.venv/bin/python" -m pip install --no-deps --editable "$worktree"
+"$worktree/.venv/bin/python" -B "$worktree/.venv/bin/mam" --root "$source_root" task list
