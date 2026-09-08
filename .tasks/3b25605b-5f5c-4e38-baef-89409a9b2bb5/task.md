@@ -18,6 +18,7 @@
 1. 从文档出发，通过 task workspace add 在自己的UUID目录分别创建 agent-workflow 和 robot-bridge 两库完整环境；不复用作者工作区。固定输入 base 如上，使用各库三参数本地入口。记录安装结果、解释器真实可用、editable及共享软链接归属。
 2. 在自己的管理库worktree跑完整标准库测试。在本机和 ssh wuwen-1 使用同一共享 .venv 执行管理CLI帮助/只读查询及 robot-bridge CPU基础smoke。无GPU，不操作现用正式实验、现用环境或数据实体。
 3. 只启动自己的短时CPU测试进程，本机和wuwen-1各一个，实际通过CLI job add登记到本任务，验证running→stopped→archived；真实App Server查询自己的agent状态。测试停止/清理后记录结果并归档job。不要用新server或伪造agent状态冒充现场验证。
+   共享状态的主机定位也需核对：从另一台机器查询时仍应查询进程原本的主机，特别是登记host=localhost/local之后换主机读取的情况。用自己的短进程确认是否存在误判，若有问题给最小证据与修复建议，不自行改实现。无需重复已通过的其他验证。
 4. 独立review源码及真实Git测试，核对发布不会丢失他人草稿/暂存、不回退main任务；show固定版本及report关联；多库归档按登记分支而非任意当前分支、保留共享目标、dirty和活跃进程保护、失败可继续。测试使用自清理临时Git fixture。可通过本轮任务的最终Manager归档再次核对真实多库删除；你先发布报告并保留workspace待验收。
 5. 本任务自行清理smoke产物/pycache/测试进程，发布report：首行实际任务revision，完成/未完成、两库workspace及完整HEAD、验证命令与结果、问题列表（严重度、证据和必要性）。有阻塞就报告具体问题，不擅自扩大功能或修改公共文档。报告必须区分通过、未覆盖、限制，不用“暂未发现”冒称验证。
 
