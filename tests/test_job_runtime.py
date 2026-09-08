@@ -145,11 +145,25 @@ class ProcessProbeTests(unittest.TestCase):
         command = run.call_args.args[0]
         self.assertEqual(command[0], "ssh")
         self.assertEqual(command[5:7], ["--", "wuwen-1"])
-        self.assertIn("/proc/123/stat", command[-1])
+        self.assertIn("python3 -c", command[-1])
+        self.assertTrue(command[-1].endswith(" 123"))
         with mock.patch.object(runtime.subprocess, "run") as run:
             invalid = runtime.probe_process("wuwen-1; echo unsafe", 123)
         self.assertEqual(invalid["status"], "unknown")
         run.assert_not_called()
+
+    def test_remote_missing_and_unreadable_processes_are_distinguished(self) -> None:
+        responses = [
+            subprocess.CompletedProcess(["ssh"], 4, stdout="", stderr=""),
+            subprocess.CompletedProcess(["ssh"], 5, stdout="", stderr="permission denied"),
+        ]
+        with mock.patch.object(runtime.subprocess, "run", side_effect=responses):
+            missing = runtime.probe_process("wuwen-1", 123)
+            unreadable = runtime.probe_process("wuwen-1", 124)
+        self.assertEqual(missing["status"], "stopped")
+        self.assertEqual(missing["error"], "process not found")
+        self.assertEqual(unreadable["status"], "unknown")
+        self.assertIn("cannot be accessed", unreadable["error"])
 
 
 class AgentProbeTests(unittest.TestCase):
