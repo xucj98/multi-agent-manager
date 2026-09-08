@@ -27,3 +27,7 @@ probe_agents(agent_ids: list[str], socket_path: str | None = None) -> dict[str, 
 按 main 上发布的本任务和 docs/task-management-design.zh-CN.md 实施。报告写回稳定管理库本任务目录 report.md，首行 task_revision: <所依据任务的完整 commit>，随后写完成/未完成、workspace、各库完整交付 commit、验证结论与成果位置。工具可用后通过 CLI 发布；代码只在自己的 worktree 提交。
 
 先读管理库 AGENTS.md，跨库先读目标库 AGENTS.md 及对应规范。追加要求只以 Manager 发布后的任务文件为准。自身测试产生的文件及进程自行清理，保留待 Manager 归档的工作区。无需 GPU，不修改现用训练/评测环境和进程。没有常驻服务、自动唤醒、额外权限系统、环境 provenance 或旧 CLI 兼容层。
+
+## 查询契约补充
+
+进程 probe 的 status 是判断依据：stopped 的 error 字段可以说明不存在、zombie、PID身份变化等停止原因，不代表查询失败；只有 unknown 才表示不能确认。核心不得因 stopped 带诊断文本而不更新状态或阻止 job/task archive。远端查询必须区分“进程不存在”和“存在但不可读”：权限/读取失败返回 unknown，不能把单个 -r 检查失败一律当 stopped。
