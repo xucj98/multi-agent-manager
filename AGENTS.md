@@ -8,5 +8,5 @@
 - 修改管理工具时使用标准库和现有 Git/环境入口；变更删除逻辑必须验证路径边界、软链接、未提交改动和活跃任务保护。
 - 正式实验遵循实验所属库的规范。RMBench 的评测产物归 `RMBench/eval_result/<exp-group>/<run>`，实验说明归 `RMBench/experiments/<exp-group>`。
 - 交付前提交有价值的代码和文档，保留简短结论，处理 smoke 与临时文件。Manager 接收成果后回收 workspace；长任务未结束时明确运行依赖及接手负责人。
-- 集群路径和任务登记位于 gitignored 的 `.local/`；有价值的跨库工作结论写入 `.worklogs/`。环境创建不新增一套 provenance 或实验 metadata。
+- 四个业务库的集群路径由各库 gitignored 的 `.local/create_worktree.sh` 提供；本管理仓库的任务登记单独位于 `.local/tasks/`，有价值的跨库工作结论写入 `.worklogs/`。环境创建不新增一套 provenance 或实验 metadata。
 - 文档使用中文，以新读者可独立操作为目标；说明当前操作和适用条件。不要把一次性任务状态混入长期操作手册。

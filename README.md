@@ -58,7 +58,7 @@ bash .local/create_worktree.sh <base-commit> <new-branch-name> <workspace-root>
 
 最后一个参数是 agent workspace 根目录，脚本创建其下的本库目录。需要两个库时分别调用各库入口，传入同一 workspace 根目录。目标目录或分支已存在时停止，由负责人检查已有任务状态。
 
-本地入口固定本集群 uv、cache、Python、wheel 与稳定共享源路径，调用受 Git 管理的本库脚本。本机和 wuwen-1 共享这份入口；其他集群维护自己的版本。安装后的基础检查由库脚本定义；GPU smoke 和正式实验由任务明确安排。
+本地入口固定本集群 uv、cache、Python、wheel 与稳定共享源路径，调用受 Git 管理的本库脚本。它只校验并转发三个位置参数及固定安装参数，worktree 创建、共享软链接与安装逻辑仍在本库受 Git 管理的脚本中。本机和 wuwen-1 共享这份入口；其他集群维护自己的版本。安装后的基础检查由库脚本定义；GPU smoke 和正式实验由任务明确安排。
 
 只需代码时可使用 `git worktree add` 创建并登记，不必安装环境。共享数据、checkpoint 和正式结果由各库脚本链接到稳定实体；`.venv` 与 editable 源码属于当前 worktree。
 
@@ -86,6 +86,6 @@ bash .local/create_worktree.sh <base-commit> <new-branch-name> <workspace-root>
 
 ## 记录与完成
 
-`.local/` 保存当前机器的任务登记，不进入 Git；实验信息引用已有正式产物。跨库工作中值得保留的决定和问题结论写入 `.worklogs/`，按任务更新一份简短记录。
+本管理仓库的 `.local/tasks/` 保存任务登记，不进入 Git。这与四个业务库仅保存本地创建入口的 `.local/` 分开；实验信息引用已有正式产物。跨库工作中值得保留的决定和问题结论写入 `.worklogs/`，按任务更新一份简短记录。
 
 任务完成包括成果接收与临时工作区清理。普通 smoke、重复报告、失败已定位的临时重试产物和环境检查产物及时删除。需要继续保留的目录明确负责人、原因和结束条件。
