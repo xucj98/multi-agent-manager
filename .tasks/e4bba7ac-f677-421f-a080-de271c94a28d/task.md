@@ -10,7 +10,7 @@
 
 用户追加：AGENTS.md 和 README.md 由 Manager 亲自修订，待实现稳定后定稿；必须由空白 subagent 审阅清晰、简洁、无冲突。
 
-独立审阅发现的文档收尾范围：RMBench docs/guidelines/rmbench.md 与 robot-bridge configs/benchmark/unified_sim/README.zh-CN.md、docs/design/unified-sim-real-runtime.md、docs/tutorials/drawer-offline.zh-CN.md、docs/tutorials/rmbench-benchmark-runner.zh-CN.md 仍引用已删除 .local/README.zh-CN.md，Manager 在最终文档修改时修正为现行入口；历史.worklogs不改。
+独立审阅发现的文档收尾范围：RMBench docs/guidelines/rmbench.md 与 robot-bridge configs/benchmark/unified_sim/README.zh-CN.md、docs/design/unified-sim-real-runtime.md、docs/tutorials/drawer-offline.zh-CN.md、docs/tutorials/rmbench-benchmark-runner.zh-CN.md 仍引用已删除 .local/README.zh-CN.md，Manager 在最终文档修改时修正为现行入口。
 
 用户最新文档分层要求：各业务库 AGENTS.md 不包含集中工作日志路径、.worklogs/.tasks管理路径或“跨库工作前读取目标库AGENTS”的公共流程。这些统一归 agent-workflow/AGENTS.md。各库只保留本库职责、必读文档及开发/实验约定；不得将旧.worklogs路径机械替换成.tasks后继续留在业务库。
 
