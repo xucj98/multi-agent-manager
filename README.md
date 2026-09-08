@@ -27,9 +27,9 @@ mam task publish <uuid> --file task
 mam task bind <uuid> --agent <agent-id>
 ```
 
-任务正文写目标、范围、交付和验收要求。UUID 与 workspace 路径由 CLI 提供，无需在正文重复。追加要求必须写入任务、发布后通知执行者。
+`task.md` 正文写目标、范围、交付和验收要求。UUID 与 workspace 路径由 CLI 提供，无需在正文重复。追加要求必须写入 `task.md`、发布后通知执行者。
 
-Review 通过 `mam task create --title "…" --review <source-uuid>` 固定源任务的要求、简报和代码版本。Manager 验收时同时检查成果和实际工具调用轨迹，关注无目的的搜索、重复读取、路径猜测和不必要的环境创建。验收后用 `mam task archive <uuid> --note "…"` 归档，删除任务的 worktree、环境和分支，保留记录及软链接指向的共享数据。
+Review 通过 `mam task create --title "…" --review <source-uuid>` 固定源任务的要求、简报和代码版本。验收后用 `mam task archive <uuid> --note "…"` 归档，该命令将同时删除任务的 worktree、环境和分支。
 
 ## 执行与交付
 
