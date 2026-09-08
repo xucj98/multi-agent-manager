@@ -75,7 +75,7 @@ printf env > "$target/.venv/marker"
         (self.root / "code.py").write_text("staged = True\n")
         self.git(self.root, "add", "code.py")
         (self.root / "code.py").write_text("unstaged = True\n")
-        index = (self.root / ".git/index").read_bytes()
+        index = self.git(self.root, "ls-files", "--stage", "--", "code.py", ".gitignore")
         draft_bytes = self.store.doc(draft, "task").read_bytes()
         commands = [[sys.executable, "-B", str(SCRIPT), "--root", str(self.root), "publish", task, "--file", "task"] for task in (first, second)]
         processes = [subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for command in commands]
@@ -84,10 +84,75 @@ printf env > "$target/.venv/marker"
             self.assertEqual(process.returncode, 0, stderr)
         for task in (first, second):
             self.assertIn("test task", self.git(self.root, "show", f"main:.tasks/{task}/task.md"))
-        self.assertEqual((self.root / ".git/index").read_bytes(), index)
+        self.assertEqual(self.git(self.root, "ls-files", "--stage", "--", "code.py", ".gitignore"), index)
+        for task in (first, second):
+            path = f".tasks/{task}/task.md"
+            self.assertEqual(self.git(self.root, "show", f":{path}"), self.git(self.root, "show", f"main:{path}"))
+            self.assertEqual(self.git(self.root, "status", "--porcelain", "--", path), "")
         self.assertEqual((self.root / "code.py").read_text(), "unstaged = True\n")
         self.assertEqual(self.store.doc(draft, "task").read_bytes(), draft_bytes)
         self.assertEqual(self.git(self.root, "show", "main:code.py"), "original = True")
+        self.git(self.root, "commit", "-m", "ordinary code commit after publication")
+        for task in (first, second):
+            self.assertIn("test task", self.git(self.root, "show", f"main:.tasks/{task}/task.md"))
+        self.assertEqual(self.git(self.root, "show", "main:code.py"), "staged = True")
+
+    def test_publish_unchanged_repairs_only_its_index_entry(self):
+        task, other = self.task(), self.task()
+        task_revision = self.publish(task)
+        report_revision = self.report(task, task_revision)
+        self.git(self.root, "add", "code.py", str(self.store.doc(other, "task")))
+        (self.root / "code.py").write_text("staged = True\n")
+        self.git(self.root, "add", "code.py")
+        (self.root / "code.py").write_text("unstaged = True\n")
+        self.store.doc(other, "task").write_text("other task draft\n")
+        other_index = self.git(self.root, "ls-files", "--stage", "--", "code.py", f".tasks/{other}/task.md")
+        for kind, revision in (("task", task_revision), ("report", report_revision)):
+            path = f".tasks/{task}/{kind}.md"
+            published_bytes = self.store.doc(task, kind).read_bytes()
+            for damage in ("deleted", "stale"):
+                with self.subTest(kind=kind, damage=damage):
+                    if damage == "deleted":
+                        self.git(self.root, "update-index", "--force-remove", "--", path)
+                    else:
+                        blob = self.git(self.root, "rev-parse", "HEAD:code.py")
+                        self.git(self.root, "update-index", "--add", "--cacheinfo", "100644", blob, path)
+                    before = self.git(self.root, "rev-parse", "main")
+                    result = self.call("publish", task, "--file", kind)
+                    self.assertTrue(result["unchanged"])
+                    self.assertEqual(result["revision"], revision)
+                    self.assertEqual(self.git(self.root, "rev-parse", "main"), before)
+                    self.assertEqual(self.git(self.root, "show", f":{path}"), published_bytes.decode().strip())
+                    self.assertEqual(self.git(self.root, "status", "--porcelain", "--", path), "")
+                    self.assertEqual(self.store.doc(task, kind).read_bytes(), published_bytes)
+        self.assertEqual(self.git(self.root, "ls-files", "--stage", "--", "code.py", f".tasks/{other}/task.md"), other_index)
+        self.assertEqual((self.root / "code.py").read_text(), "unstaged = True\n")
+        self.assertEqual(self.store.doc(other, "task").read_text(), "other task draft\n")
+        self.git(self.root, "commit", "-m", "ordinary commit after index repair")
+        self.assertEqual(self.call("show", task)["revision"], task_revision)
+        self.assertEqual(self.call("show", task, "--file", "report")["revision"], report_revision)
+
+    def test_publish_keeps_concurrent_edit_as_unstaged_draft(self):
+        task = self.task()
+        revision = self.publish(task)
+        self.report(task, revision)
+        for kind in ("task", "report"):
+            with self.subTest(kind=kind):
+                path = self.store.doc(task, kind)
+                content = path.read_text() + "Published update.\n"
+                path.write_text(content)
+                original_git = cli.git
+                def edit_during_commit(repo, *args, **kwargs):
+                    if args[0] == "commit-tree":
+                        path.write_text(content + "Later draft.\n")
+                    return original_git(repo, *args, **kwargs)
+                with patch.object(cli, "git", side_effect=edit_during_commit):
+                    cli.publish(self.store, types.SimpleNamespace(task=task, file=kind))
+                relative = f".tasks/{task}/{kind}.md"
+                self.assertEqual(self.git(self.root, "show", f":{relative}"), content.strip())
+                self.assertEqual(self.git(self.root, "show", f"main:{relative}"), content.strip())
+                self.assertEqual(path.read_text(), content + "Later draft.\n")
+                self.assertEqual(self.git(self.root, "diff", "--cached", "--", relative), "")
 
     def test_versions_reports_and_review_do_not_drift(self):
         task = self.task()
