@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/task.py"
+sys.path.insert(0, str(SCRIPT.parent))
 spec = importlib.util.spec_from_file_location("task_cli", SCRIPT)
 cli = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cli)
@@ -90,6 +91,7 @@ printf env > "$target/.venv/marker"
 
     def test_versions_reports_and_review_do_not_drift(self):
         task = self.task()
+        worktree = Path(self.add(task)["path"])
         revision = self.publish(task)
         self.call("publish", task, "--file", "report", ok=False)
         report = self.report(task, revision)
@@ -104,6 +106,7 @@ printf env > "$target/.venv/marker"
         self.assertTrue(self.call("status", task)["requirements_changed"])
         self.assertEqual(self.store.doc(review["id"], "task").read_text(), fixed)
         self.assertEqual(review["review"]["report_revision"], report)
+        self.assertEqual(review["review"]["commits"]["agent-workflow"], self.git(worktree, "rev-parse", "HEAD"))
         self.assertIn("test task", self.call("show", task, "--revision", revision)["content"])
         self.call("create", "--title", "bad review", "--review", self.task(), ok=False)
 
@@ -209,6 +212,28 @@ printf env > "$target/.venv/marker"
         self.call("archive", task, "--note", "unsafe", ok=False)
         self.assertTrue((self.root / "code.py").exists())
 
+    def test_real_process_runtime_contract(self):
+        try:
+            process_runtime = cli.runtime()
+        except cli.Error:
+            self.skipTest("parallel job_runtime module has not been integrated")
+        task = self.task()
+        child = subprocess.Popen([sys.executable, "-c", "import sys; sys.stdin.read()"], stdin=subprocess.PIPE)
+        try:
+            args = types.SimpleNamespace(task=task, note="owned smoke", host="localhost", pid=child.pid)
+            job = cli.job_add(self.store, args)
+            self.assertEqual(job["status"], "running")
+            child.stdin.close()
+            child.wait(timeout=10)
+            self.assertEqual(process_runtime.probe_process("localhost", child.pid, job["identity"])["status"], "stopped")
+            saved = cli.job_archive(self.store, types.SimpleNamespace(job=job["id"], note="test exited"))
+            self.assertEqual(saved["status"], "archived")
+            cli.archive(self.store, types.SimpleNamespace(task=task, note="smoke complete"))
+        finally:
+            if child.poll() is None:
+                child.terminate()
+                child.wait(timeout=10)
+
     def test_job_identity_attention_and_history(self):
         task = self.task()
         self.call("bind", task, "--agent", "agent-1")
@@ -228,6 +253,10 @@ printf env > "$target/.venv/marker"
             self.assertEqual(result["needs_verification"][0]["checked_at"], "first")
             process.update(status="stopped", error="process identity changed")
             self.assertEqual(len(cli.job_list(self.store, query)["jobs"]), 2)
+            agent["status"] = "systemError"
+            self.assertEqual(len(cli.job_list(self.store, query)["jobs"]), 2)
+            agent["status"] = "unknown"
+            self.assertEqual(len(cli.job_list(self.store, query)["needs_verification"]), 2)
             agent["status"] = "active"
             self.assertFalse(cli.job_list(self.store, query)["jobs"])
             cli.job_archive(self.store, types.SimpleNamespace(job=one["id"], note="results saved"))
