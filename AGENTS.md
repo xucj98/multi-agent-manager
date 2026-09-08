@@ -1,6 +1,6 @@
 # 本集群的 agent 协作入口
 
-本仓库服务于本机和 `wuwen-1`。两者共享 `/mnt/public` 下的代码、数据、解释器和缓存；进程在实际运行的主机查询。操作见 [README.md](README.md)，完整接口见 [CLI 说明](docs/task-management-design.zh-CN.md)。
+所有 agent、代码修改和管理命令都在本机运行。本机与 `wuwen-1` 共享 `/mnt/public` 下的代码、数据、解释器和缓存；GPU 作业可通过 SSH 在 `wuwen-1` 运行，由本机管理工具查询其进程。操作见 [README.md](README.md)，完整接口见 [CLI 说明](docs/task-management-design.zh-CN.md)。
 
 ## 任务与工作区
 
