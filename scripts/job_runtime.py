@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import socket
 import subprocess
 from datetime import datetime, timezone
@@ -18,6 +19,34 @@ APP_SERVER_TIMEOUT_SECONDS = 3.0
 DEFAULT_SOCKET_PATH = "/root/.codex/app-server-control/app-server-control.sock"
 _IDENTITY_KEYS = ("host", "boot_id", "start_ticks")
 _SAFE_REMOTE_HOST = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@-]*\Z")
+_REMOTE_PROC_SCRIPT = """
+import os
+import sys
+
+pid = int(sys.argv[1])
+try:
+    os.kill(pid, 0)
+except ProcessLookupError:
+    raise SystemExit(4)
+except OSError:
+    raise SystemExit(5)
+try:
+    with open('/proc/sys/kernel/random/boot_id', encoding='ascii') as handle:
+        boot_id = handle.read().strip()
+except OSError:
+    raise SystemExit(5)
+try:
+    with open(f'/proc/{pid}/stat', encoding='utf-8') as handle:
+        stat = handle.read()
+except FileNotFoundError:
+    raise SystemExit(4)
+except OSError:
+    raise SystemExit(5)
+if not boot_id:
+    raise SystemExit(5)
+print(boot_id)
+print(stat, end='')
+"""
 _AGENT_STATUSES = {"active", "idle", "notLoaded", "systemError"}
 
 
@@ -84,11 +113,7 @@ def _read_local_process(host: str, pid: int) -> tuple[dict[str, Any], str] | Non
 def _read_remote_process(host: str, pid: int) -> tuple[dict[str, Any], str] | None:
     if not _SAFE_REMOTE_HOST.fullmatch(host):
         raise _ProbeError("invalid remote host")
-    remote_command = (
-        "boot=$(cat /proc/sys/kernel/random/boot_id) || exit 3; "
-        f"[ -r /proc/{pid}/stat ] || exit 4; "
-        f'printf "%s\\n" "$boot"; cat /proc/{pid}/stat'
-    )
+    remote_command = f"python3 -c {shlex.quote(_REMOTE_PROC_SCRIPT)} {pid}"
     command = [
         "ssh",
         "-o",
@@ -114,6 +139,8 @@ def _read_remote_process(host: str, pid: int) -> tuple[dict[str, Any], str] | No
         raise _ProbeError(f"cannot run SSH: {exc}") from exc
     if completed.returncode == 4:
         return None
+    if completed.returncode == 5:
+        raise _ProbeError("remote process cannot be accessed")
     if completed.returncode != 0:
         detail = completed.stderr.strip().replace("\n", " ")
         raise _ProbeError(f"SSH query failed ({completed.returncode}): {detail or 'no detail'}")
