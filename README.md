@@ -16,7 +16,7 @@
     <repo>/                    # 分支 task/<uuid>，含独立 .venv
 ```
 
-repo 可选 `RMBench`、`opendm`、`openpi`、`robot-bridge`、`agent-workflow`。各库保留自己的安装脚本和软链接规则；本地 `.local/create_worktree.sh` 提供本集群路径。旧 `.worklogs/` 保留历史内容，新任务写入 `.tasks/`。
+repo 可选 `RMBench`、`opendm`、`openpi`、`robot-bridge`、`agent-workflow`。各库保留自己的安装脚本和软链接规则；本地 `.local/create_worktree.sh` 提供本集群路径。任务要求和工作记录统一写入 `.tasks/`。
 
 ## 创建和执行任务
 
