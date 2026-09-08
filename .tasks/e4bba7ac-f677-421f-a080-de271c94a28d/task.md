@@ -13,3 +13,5 @@
 独立审阅发现的文档收尾范围：RMBench docs/guidelines/rmbench.md 与 robot-bridge configs/benchmark/unified_sim/README.zh-CN.md、docs/design/unified-sim-real-runtime.md、docs/tutorials/drawer-offline.zh-CN.md、docs/tutorials/rmbench-benchmark-runner.zh-CN.md 仍引用已删除 .local/README.zh-CN.md，Manager 在最终文档修改时修正为现行入口；历史.worklogs不改。
 
 用户最新文档分层要求：各业务库 AGENTS.md 不包含集中工作日志路径、.worklogs/.tasks管理路径或“跨库工作前读取目标库AGENTS”的公共流程。这些统一归 agent-workflow/AGENTS.md。各库只保留本库职责、必读文档及开发/实验约定；不得将旧.worklogs路径机械替换成.tasks后继续留在业务库。
+
+用户追加清理：删除 agent-workflow/.worklogs 整个旧日志目录，包括未提交的旧报告；从现行文档移除保留旧日志的说明，新记录统一使用 .tasks。已提交记录可从Git历史读取，无需迁入新目录。
