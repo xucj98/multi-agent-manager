@@ -15,3 +15,5 @@
 用户最新文档分层要求：各业务库 AGENTS.md 不包含集中工作日志路径、.worklogs/.tasks管理路径或“跨库工作前读取目标库AGENTS”的公共流程。这些统一归 agent-workflow/AGENTS.md。各库只保留本库职责、必读文档及开发/实验约定；不得将旧.worklogs路径机械替换成.tasks后继续留在业务库。
 
 用户追加清理：删除 agent-workflow/.worklogs 整个旧日志目录，包括未提交的旧报告；从现行文档移除保留旧日志的说明，新记录统一使用 .tasks。已提交记录可从Git历史读取，无需迁入新目录。
+
+运行边界：所有agent、代码修改和管理CLI均在本机，只有训练、评估或其他GPU作业通过SSH在wuwen-1运行。管理工具从本机查询两端进程，无需在wuwen-1安装。用户正在讨论名称Multi-Agent Manager（MAM）与pipx安装；命名和安装尚未实施。
