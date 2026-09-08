@@ -338,7 +338,7 @@ def probe_agents(agent_ids: list[str], socket_path: str | None = None) -> dict[s
             websocket,
             1,
             "initialize",
-            {"clientInfo": {"name": "agent-workflow", "title": "Agent workflow", "version": "1.0"}},
+            {"clientInfo": {"name": "multi-agent-manager", "title": "Multi-agent manager", "version": "1.0"}},
         )
         websocket.send_text(json.dumps({"method": "initialized", "params": {}}, separators=(",", ":")))
         for request_id, agent_id in enumerate(agent_ids, start=2):
