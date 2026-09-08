@@ -1,20 +1,21 @@
-# 本集群的 agent 工作区管理
+# 本集群的 agent 任务管理
 
-这里集中管理任务分工、workspace 和工作日志。各代码库维护自己的开发规范、worktree 脚本和实验记录。
+这里集中保存任务说明与结果简报，查看任务状态，并在任务归档时移除 workspace。各代码库维护自己的开发规范、worktree 脚本和实验记录。
 
 ## 当前集群
 
 本机与 `wuwen-1` 共享 `/mnt/public` 文件系统。`/mnt/public/xcj/Projects` 下的代码、数据、缓存和环境在两台机器上使用相同路径；修改共享文件会同时影响两边。
 
-两台机器的进程和 GPU 使用情况分别检查。进程在启动它的机器上查询，本开发机不一定能看到其他开发机占用 GPU 的进程。
+进程和 GPU 使用情况分别在对应机器上检查。本开发机不一定能看到其他开发机占用 GPU 的进程。
 
 ```text
 /mnt/public/xcj/Projects/
   agent-workflow/
-    AGENTS.md
-    README.md
-    .worklogs/              # Git 管理的工作日志
-    .local/tasks/          # Git 忽略的任务登记
+    .worklogs/
+      <task-id>/
+        task.md            # Manager 维护的当前任务要求
+        report.md          # 执行 agent 提交的结果简报
+    .local/tasks/          # Git 忽略的管理状态
   workspace/
     <task-id>/
       RMBench/             # 只建立任务需要的库
@@ -27,94 +28,78 @@
   robot-bridge/
 ```
 
-本仓库只服务当前集群。各库 `.local/create_worktree.sh` 固定本集群所需路径，两台机器共用；每个 worktree 仍有自己的 `.venv` 和 editable 安装。
+本仓库只服务当前集群。四库 `.local/create_worktree.sh` 提供各自固定路径的本地入口，两台机器共用；每个 worktree 有自己的 `.venv` 和 editable 安装。
 
-## 分工与阅读规范
+## 任务说明
 
-Manager 为每个分配的任务确定唯一 `<task-id>`，workspace 目录和工作日志使用同一名称。分配时填写以下内容：
+Manager 分配唯一的 `<task-id>`，先写 `.worklogs/<task-id>/task.md`，再通知 subagent 开工。文件进入 Git，至少包含：
 
 ```text
-目标与交付物：
-负责人：
-涉及的库、base commit、新建工作分支、合入分支、允许修改的范围：
-workspace：
-必读规范：
-验证要求：
-实验组、run、结果路径、GPU、监控负责人（实验任务填写）：
+目标与交付要求
+负责人
+涉及的库、base commit、新建工作分支、合入分支
+允许修改的范围
+独享 workspace
+必读规范
+验证与清理要求
+实验组、run、结果位置、GPU、监控责任（实验任务填写）
 ```
 
-开始在一个库工作前先读它的 `AGENTS.md`，再按任务阅读其中列出的规范。读过且没有变化的内容无需重复阅读。跨库协作规则由 Manager 在分工时提供，不依赖相邻目录自动加载。
+追加或修改要求时，Manager 先更新并提交任务文件，再通知 agent 阅读。当前要求保留在任务正文，历史变化通过 Git 查看；对话用于通知和讨论。
 
-讨论、只读调查和状态监控直接读取已有资料。代码修改和独立代码 review 使用自己的 worktree；文档修改只需代码 worktree。只有需要执行项目代码时，才准备该库独立环境。
+每个 agent 开工前读取自己的任务说明，进入某个库前读取该库的 `AGENTS.md` 及相关规范。已经读过且没有变化的内容无需重复阅读。
 
-## 创建工作区
+## 工作区
 
-原仓库是 `/mnt/public/xcj/Projects` 下的 `RMBench`、`openpi`、`opendm` 和 `robot-bridge`，不在 `workspace` 下。在相应原仓库根目录调用三个参数的本地入口：
+讨论、只读调查和状态监控直接读取已有资料。代码实施和独立代码 review 使用自己的 worktree；文档修改只需代码 worktree。需要执行项目代码时再安装环境。
+
+原仓库是 `/mnt/public/xcj/Projects` 下的四个库，不在 `workspace` 下。需要完整环境时，从相应原仓库根目录调用：
 
 ```bash
 bash .local/create_worktree.sh <base-commit> <new-branch-name> <workspace-root>
 ```
 
-第三个参数为 `/mnt/public/xcj/Projects/workspace/<task-id>`，脚本创建其下的本库目录。需要多个库时分别调用各库入口，传入同一个 workspace 根目录。目标目录或分支已存在时停止，先确认是否已有相应工作区。
+第三个参数为 `/mnt/public/xcj/Projects/workspace/<task-id>`，脚本创建其下的本库目录。多库任务分别调用各库入口，传入同一个 workspace 根目录。同一任务继续使用已有 workspace。
 
-`.local/create_worktree.sh` 不进 Git，只填写固定的 uv、cache、Python、wheel 等路径并转发参数。各库受 Git 管理的脚本负责创建 worktree、建立本库共享软链接和安装环境。公共工具负责登记与回收。
+本地入口不进 Git，只填写本集群安装参数并调用本库受 Git 管理的创建脚本；后者负责 worktree、共享软链接和环境安装。只需源码时使用 `git worktree add`，无需安装环境。
 
-只需代码时使用 `git worktree add`，无需安装环境。创建后由 Manager 通过本仓库管理工具登记任务与目录；同一任务的修复、后续检查继续使用已有 workspace。
+创建后由 Manager 登记任务与 workspace。数据、checkpoint 和正式结果实体留在稳定源目录，worktree 按本库规则建立软链接。
 
-数据、checkpoint 和正式结果实体留在稳定源目录，worktree 中按本库规则建立软链接。环境安装后的基础检查由库脚本定义，实验 smoke 按所属库的要求执行。
+## 结果简报与 review
 
-## 管理工具
+执行 agent 在 `.worklogs/<task-id>/report.md` 写简短报告并提交，至少包含：
 
-以下命令从 `/mnt/public/xcj/Projects/agent-workflow` 执行，使用系统 Python，不需要创建环境。
-
-```bash
-python3 scripts/ws.py register <task-id> --owner <agent-id> --workspace /mnt/public/xcj/Projects/workspace/<task-id>
-python3 scripts/ws.py status
-python3 scripts/ws.py status <task-id>
+```text
+完成情况，以及未完成事项或已知限制
+workspace 绝对路径
+每个 worktree 的代码库名称和完整 commit id
+执行的验证及结果
+正式成果位置
+临时文件是否已处理，是否还有运行依赖
 ```
 
-登记已有 workspace 中各库的 worktree。`status` 不传任务编号时列出全部登记任务。状态保存在原管理仓库 `.local/tasks/`，从管理仓库的 worktree 调用时也使用同一处登记。
+简报中的 commit 是该 worktree 的交付版本，不是后续 cherry-pick 生成的合入 commit。实验配置、metadata 和结果仍保存在实验所属库，简报通过链接引用。
 
-运行训练、评测或常驻服务前，为其登记一条占用记录；负责人确认任务结束后解除。`--pin` 填写主机与能识别该次进程的描述，工具不根据 PID 自动判断进程是否结束。
+Manager 为 review agent 单独创建任务说明，引用被 review 的任务要求、结果简报、各库 commit，以及自己的独享 workspace。review agent 独立检查或复现，结束后也提交自己的结果简报。发现问题时，Manager 将修复要求补入实施任务说明后再通知作者。
 
-```bash
-python3 scripts/ws.py job start <task-id> <job-name> --pin 'wuwen-1:进程PID及启动时间'
-python3 scripts/ws.py job finish <task-id> <job-name> --by <agent-id>
-python3 scripts/ws.py handoff <task-id> --from <old-agent-id> --to <new-agent-id>
-```
+## 状态与归档
 
-交付时记录各 worktree 当前 HEAD。Manager 接收后为每个库明确提供对应的交付 commit，再执行回收。这里填写 worktree 的交付 commit，不是 cherry-pick 后生成的合入 commit。
+任务状态用于区分工作中、待接收、已接收和已归档；它由负责人和 Manager 更新，不代表自动探测 agent 的实时运行状态。
 
-```bash
-python3 scripts/ws.py deliver <task-id> --by <agent-id>
-python3 scripts/ws.py accept <task-id> --manager <manager-id> --commit <repo-name>=<delivery-commit>
-python3 scripts/ws.py close <task-id>
-```
+归档前确认成果已接收、临时文件已由负责人处理、运行依赖已结束或交接。归档移除登记的 worktree、独立环境和空的 workspace 外层目录，保留任务说明、结果简报与提交引用。遇到未处理文件或未提交改动时停止，由负责人处理。
 
-涉及多个库时重复 `--commit`，例如 `--commit RMBench=<sha> --commit openpi=<sha>`。仍有占用记录、未验收成果或未处理文件时，回收会停止并说明原因。按提示处理后重试，不直接强制删除整个目录。
+smoke、实验结果和其他临时文件的清理属于执行任务。管理工具不扫描或代删这些文件，也不沿软链接删除共享数据。
 
-## 交付与清理
+## 长任务
 
-负责人交付代码 commit、验证结论和正式成果位置，Manager 接收后回收 workspace。待验收目录需有明确负责人和后续安排。
+训练、评测或服务启动后登记主机、进程身份、结果目录和依赖的 worktree。交接时明确接手负责人；远端不可达视为状态未知，agent 停止不代表进程结束。
 
-smoke 检查通过后，在工作日志中保留简短结论与必要复跑信息，正式实验前处理临时视频、测试 checkpoint 和调试文件。正式实验需要的记录保存到正式产物中，后续步骤不依赖已经清理的 smoke 目录。
+常规检查每两小时一次，完成、失败和实验规定的中间检查点按任务要求处理。监控不创建新的 workspace。
 
-回收前确认代码改动已经提交并接收、临时文件已经处理、运行任务已经结束。工具只处理登记的工作区，移除 Git worktree 和独立环境后清理外层目录；软链接指向的共享实体继续保留。
+自动唤醒需要实际可用并经过验证的调度入口，本工具不负责定时启动 agent。
 
-存在未提交改动、未知文件或仍在使用的目录时，先由负责人处理并说明保留原因。agent 异常退出时，由 Manager 接管；agent 停止不代表训练或评测进程已经结束。
+## 工作记录
 
-## 长任务与交接
+后续所有任务说明与简报集中在本仓库 `.worklogs/`；各库已有历史工作日志保留原位。每项任务维护一份当前说明和一份简报，不重复复制大日志、代码或实验产物。
 
-登记运行任务的主机、进程身份、结果目录和所依赖的 worktree。任务交接时同时转交监控责任；远端不可达视为状态未知。
-
-常规检查每两小时一次，完成、失败和实验规定的中间检查点由负责人处理。监控读取已有结果，不创建新 workspace。
-
-自动唤醒 agent 需要实际可用并经过验证的调度入口；本工具只登记任务和回收目录，不负责定时启动 agent。
-
-## 工作日志
-
-后续所有任务的工作日志集中在 `.worklogs/<task-id>.md`，每项任务更新同一份文件，记录决定、问题结论、交付和清理情况。各库已有历史工作日志保留原位，新任务从这里开始记录。
-
-实验所属库继续保存正式命令、配置、metadata、结果及实验说明，工作日志通过链接引用。环境创建不额外记录安装参数或依赖清单。
-
-`.local/tasks/` 只保存管理工具需要的负责人、目录、交付和运行依赖信息，不进入 Git。
+环境创建不额外记录安装参数或依赖清单。`.local/tasks/` 只保存工具需要的任务状态、负责人、目录、交付与运行依赖信息，不进入 Git。
