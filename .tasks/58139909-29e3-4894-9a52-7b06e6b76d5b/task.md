@@ -6,7 +6,7 @@
 
 - 源任务：cb5e5ca6-1562-4355-b815-891b479eab8c，要求版本 d6afa84cfe80604733fb5d22b6a74e2a120b28f1，简报版本 db9aa792377fbeb0dba1db7540f05aebcf353d86；用 `mam task show` 的 `--revision`、`--file` 读取。
 - 代码：fa79410c72469974f6462f12adf2467eb9b5b744。
-- 最终 AGENTS/README：7f374ffd9ddbe1d31f8166cff479b2a30089e741；安装与设计说明延续 043861a 的内容。
+- 最终 AGENTS/README：d8a251d592512e76028f4d3fe6b1b435b916a04e（包含 7f374ff 的按需阅读整理，并补齐启动时 status 查询工作区、show 查询发布要求）；安装与设计说明延续 043861a 的内容。
 
 ## 验收
 
