@@ -39,3 +39,7 @@
 按 main 上发布的本任务和 docs/task-management-design.zh-CN.md 实施。报告写回稳定管理库本任务目录 report.md，首行 task_revision: <所依据任务的完整 commit>，随后写完成/未完成、workspace、各库完整交付 commit、验证结论与成果位置。工具可用后通过 CLI 发布；代码只在自己的 worktree 提交。
 
 先读管理库 AGENTS.md，跨库先读目标库 AGENTS.md 及对应规范。追加要求只以 Manager 发布后的任务文件为准。自身测试产生的文件及进程自行清理，保留待 Manager 归档的工作区。无需 GPU，不修改现用训练/评测环境和进程。没有常驻服务、自动唤醒、额外权限系统、环境 provenance 或旧 CLI 兼容层。
+
+## 归档接口补充裁决
+
+统一 archive 也承接取消任务：允许 Manager 归档尚未绑定执行者或尚未发布 report 的任务；不以简报、验收或合入状态作为代码 gate。安全删除检查仍属于具体操作本身。请覆盖空任务创建后直接归档，以及存在已提交独占分支但无 report 的归档；不要继承旧 ws.py 的交付/接收前置条件。
