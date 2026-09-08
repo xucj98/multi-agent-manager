@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import importlib.util
 import json
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -10,11 +10,10 @@ import types
 import unittest
 from unittest.mock import patch
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts/task.py"
-sys.path.insert(0, str(SCRIPT.parent))
-spec = importlib.util.spec_from_file_location("task_cli", SCRIPT)
-cli = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(cli)
+from multi_agent_manager import cli
+
+ROOT = Path(__file__).resolve().parents[1]
+MAM = Path(sys.executable).with_name("mam")
 
 
 class TaskTests(unittest.TestCase):
@@ -22,7 +21,7 @@ class TaskTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="task tests with spaces ")
         self.addCleanup(self.temp.cleanup)
         self.projects = Path(self.temp.name) / "Projects"
-        self.root = self.source("agent-workflow")
+        self.root = self.source("multi-agent-manager")
         self.store = cli.Store(self.root)
 
     def git(self, repo, *args):
@@ -53,14 +52,14 @@ printf env > "$target/.venv/marker"
         return repo
 
     def call(self, *args, ok=True):
-        result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--root", str(self.root), *args], capture_output=True, text=True)
+        result = subprocess.run([str(MAM), "--root", str(self.root), "task", *args], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0 if ok else 2, result.stdout + result.stderr)
         return json.loads(result.stdout if ok else result.stderr)
 
     def task(self):
         return self.call("create", "--title", "test task")["id"]
 
-    def add(self, task, repo="agent-workflow", ok=True):
+    def add(self, task, repo="multi-agent-manager", ok=True):
         return self.call("workspace", "add", task, "--repo", repo, "--base", self.git(self.projects / repo, "rev-parse", "main"), ok=ok)
 
     def publish(self, task, kind="task"):
@@ -77,7 +76,7 @@ printf env > "$target/.venv/marker"
         (self.root / "code.py").write_text("unstaged = True\n")
         index = self.git(self.root, "ls-files", "--stage", "--", "code.py", ".gitignore")
         draft_bytes = self.store.doc(draft, "task").read_bytes()
-        commands = [[sys.executable, "-B", str(SCRIPT), "--root", str(self.root), "publish", task, "--file", "task"] for task in (first, second)]
+        commands = [[str(MAM), "--root", str(self.root), "task", "publish", task, "--file", "task"] for task in (first, second)]
         processes = [subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for command in commands]
         for process in processes:
             stdout, stderr = process.communicate(timeout=20)
@@ -171,7 +170,7 @@ printf env > "$target/.venv/marker"
         self.assertTrue(self.call("status", task)["requirements_changed"])
         self.assertEqual(self.store.doc(review["id"], "task").read_text(), fixed)
         self.assertEqual(review["review"]["report_revision"], report)
-        self.assertEqual(review["review"]["commits"]["agent-workflow"], self.git(worktree, "rev-parse", "HEAD"))
+        self.assertEqual(review["review"]["commits"]["multi-agent-manager"], self.git(worktree, "rev-parse", "HEAD"))
         self.assertIn("test task", self.call("show", task, "--revision", revision)["content"])
         self.call("create", "--title", "bad review", "--review", self.task(), ok=False)
 
@@ -242,7 +241,7 @@ printf env > "$target/.venv/marker"
         self.call("archive", task, "--note", "done", ok=False)
         self.assertFalse(first.exists())
         self.assertTrue(second.exists())
-        self.assertTrue(self.call("status", task)["repos"]["agent-workflow"]["removed"])
+        self.assertTrue(self.call("status", task)["repos"]["multi-agent-manager"]["removed"])
         self.git(self.projects / "robot-bridge", "worktree", "unlock", str(second))
         self.call("archive", task, "--note", "retry")
         self.assertFalse(second.parent.exists())
@@ -250,18 +249,59 @@ printf env > "$target/.venv/marker"
     def test_real_stdlib_environment_entry_and_linked_defaults(self):
         scripts = self.root / "scripts"
         scripts.mkdir()
-        implementation = SCRIPT.parent
+        implementation = ROOT / "scripts"
         for name in ("create_worktree.sh", "local_create_worktree.sh"):
             (scripts / name).write_bytes((implementation / name).read_bytes())
-        self.git(self.root, "add", "scripts")
+        shutil.copytree(ROOT / "multi_agent_manager", self.root / "multi_agent_manager", ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copyfile(ROOT / "pyproject.toml", self.root / "pyproject.toml")
+        self.git(self.root, "add", "scripts", "multi_agent_manager", "pyproject.toml")
         self.git(self.root, "commit", "-m", "environment entry")
         (self.root / ".local/create_worktree.sh").write_bytes((scripts / "local_create_worktree.sh").read_bytes())
         task = self.task()
         path = Path(self.add(task)["path"])
-        subprocess.run([str(path / ".venv/bin/python"), "-c", "import argparse, fcntl, json"], check=True)
+        command = [str(path / ".venv/bin/python"), "-B", str(path / ".venv/bin/mam"), "--root", str(self.root), "task", "status", task]
+        self.assertEqual(json.loads(subprocess.check_output(command, cwd=self.temp.name))["id"], task)
         self.assertEqual(cli.Store(path).root, self.root)
         self.call("archive", task, "--note", "stdlib smoke finished")
         self.assertFalse(path.parent.exists())
+
+    def test_regular_install_runs_without_source_or_git_cwd(self):
+        source = Path(self.temp.name) / "package source"
+        source.mkdir()
+        shutil.copytree(ROOT / "multi_agent_manager", source / "multi_agent_manager", ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copyfile(ROOT / "pyproject.toml", source / "pyproject.toml")
+        environment = Path(self.temp.name) / "installed env"
+        subprocess.run([sys.executable, "-m", "venv", str(environment)], check=True, capture_output=True)
+        python = environment / "bin/python"
+        subprocess.run([str(python), "-m", "pip", "install", "--no-deps", str(source)], check=True, capture_output=True)
+        shutil.rmtree(source)
+        command = str(environment / "bin/mam")
+        help_text = subprocess.check_output([command, "--help"], cwd="/tmp", text=True)
+        self.assertIn(str(cli.DEFAULT_ROOT), help_text)
+        archive_help = subprocess.check_output([command, "task", "archive", "--help"], cwd="/tmp", text=True)
+        self.assertIn("remove owned worktrees and task branches", " ".join(archive_help.split()))
+        self.assertEqual(cli.DEFAULT_ROOT, Path("/mnt/public/xcj/Projects/multi-agent-manager"))
+        rows = subprocess.check_output([command, "--root", str(self.root), "task", "list"], cwd="/tmp")
+        self.assertEqual(json.loads(rows), [])
+        installed = subprocess.check_output([str(python), "-I", "-c",
+            "import multi_agent_manager; print(multi_agent_manager.__file__)"], cwd="/tmp", text=True)
+        self.assertTrue(Path(installed.strip()).is_relative_to(environment))
+        old = subprocess.run([command, "list"], cwd="/tmp", capture_output=True)
+        self.assertEqual(old.returncode, 2)
+
+    def test_archived_records_keep_historical_paths(self):
+        task = self.task()
+        self.call("archive", task, "--note", "historical task")
+        data = self.store.read(task)
+        data["repos"]["agent-workflow"] = {"source": str(self.projects / "agent-workflow"),
+            "path": str(Path(data["workspace"]) / "agent-workflow"), "removed": True}
+        self.store.write(data)
+        record = self.store.state / f"{task}.json"
+        before = (record.read_bytes(), record.stat().st_mtime_ns)
+        self.assertEqual(self.call("status", task)["repos"], data["repos"])
+        self.assertEqual(self.call("list", "--archived")[0]["repos"], data["repos"])
+        self.call("job", "list", "--task", task)
+        self.assertEqual((record.read_bytes(), record.stat().st_mtime_ns), before)
 
     def test_tampered_paths_and_symlink_workspace_rejected(self):
         task = self.task()
@@ -330,7 +370,7 @@ printf env > "$target/.venv/marker"
             saved = self.store.read(task)
             cli.refresh_jobs(saved)
             self.assertEqual(saved["jobs"][0]["status"], "archived")
-            self.assertEqual(saved["jobs"][1]["status"], "running")
+            self.assertEqual(saved["jobs"][1]["status"], "stopped")
 
 
 if __name__ == "__main__":
