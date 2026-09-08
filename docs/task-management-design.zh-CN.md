@@ -36,7 +36,7 @@ Projects/workspace/<uuid>/
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
 | `task show <uuid> [--file task\|report] [--revision <commit>]` | 所有人 | 返回已发布的文件内容及版本；默认读取 main 上的 task.md，也可读取指定 commit |
-| `task publish <uuid> --file task\|report` | 文件负责人 | 加锁，将指定文件的草稿单独提交到 main，返回发布 commit；保留其他草稿及共享暂存区；发布 report 时关联简报中注明的任务版本，状态改为“待验收” |
+| `task publish <uuid> --file task\|report` | 文件负责人 | 加锁，将指定文件的草稿单独提交到 main，返回发布 commit；同步本次文件的暂存内容，保留其他文件的暂存内容及所有草稿；发布 report 时关联简报中注明的任务版本，状态改为“待验收” |
 | `task list [--archived\|--all]` | 所有人 | 默认列出未归档任务的标题、UUID、agent 和状态；参数可选择已归档或全部任务 |
 | `task status <uuid>` | 所有人 | 显示任务及简报版本、简报依据的任务版本、workspace、各库分支与交付 commit 和归档结果；查询本任务各 job 的用途、状态和处理记录；提示草稿，以及当前要求与简报所依据的要求是否不同 |
 
