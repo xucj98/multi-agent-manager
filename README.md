@@ -14,17 +14,22 @@ Projects/workspace/<uuid>/<repo>/
 
 ## 任务管理
 
-Manager 为每个 subagent 创建任务，填写返回路径中的 task.md，再发布要求、启动 agent 并绑定；每个 subagent 对应一个未归档任务及其 workspace。
+Manager 为每个 subagent 创建任务；每个 subagent 对应一个未归档任务及其 workspace。
 
 ```bash
 mam task create --title "任务名称"
+```
+
+用编辑工具直接填写本管理仓库的 `.tasks/<uuid>/task.md`（`create` 返回的 `task_file`），写好后再发布、启动 agent 并绑定：
+
+```bash
 mam task publish <uuid> --file task
 mam task bind <uuid> --agent <agent-id>
 ```
 
 任务正文写目标、范围、交付和验收要求。UUID 与 workspace 路径由 CLI 提供，无需在正文重复。追加要求必须写入任务、发布后通知执行者。
 
-Review 通过 `mam task create --title "…" --review <source-uuid>` 固定源任务的要求、简报和代码版本。Manager 验收简报后，用 `mam task archive <uuid> --note "…"` 归档，删除任务的 worktree、环境和分支，保留记录及软链接指向的共享数据。
+Review 通过 `mam task create --title "…" --review <source-uuid>` 固定源任务的要求、简报和代码版本。Manager 验收时同时检查成果和实际工具调用轨迹，关注无目的的搜索、重复读取、路径猜测和不必要的环境创建。验收后用 `mam task archive <uuid> --note "…"` 归档，删除任务的 worktree、环境和分支，保留记录及软链接指向的共享数据。
 
 ## 执行与交付
 
@@ -37,7 +42,7 @@ mam task show <uuid>
 
 以 CLI 返回的路径和发布要求为准。管理仓库共享 checkout：Manager 编辑 task.md，执行者编辑自己的 report.md；main 为发布版本，工作目录修改为草稿，均通过 `mam task publish` 发布。
 
-完成后，清理任务要求的 smoke 和临时文件，在 report.md 写明：
+完成后，清理任务要求的 smoke 和临时文件，用编辑工具直接填写本管理仓库的 `.tasks/<uuid>/report.md`，内容如下：
 
 ```text
 task_revision: <mam task show 返回的 revision>
@@ -46,7 +51,7 @@ workspace、各库交付 commit：……
 验证结果与成果位置：……
 ```
 
-用 `mam task publish <uuid> --file report` 发布简报，保留工作区待 Manager 归档。工作记录统一放在本库 `.tasks/`，各业务库保留自己的规范和实验记录。
+这两个 Markdown 文件都在共享管理仓库中编辑；`mam task publish` 提交已经写好的文件。用 `mam task publish <uuid> --file report` 发布简报，保留工作区待 Manager 归档。工作记录统一放在本库 `.tasks/`，各业务库保留自己的规范和实验记录。
 
 ## 工作区
 
