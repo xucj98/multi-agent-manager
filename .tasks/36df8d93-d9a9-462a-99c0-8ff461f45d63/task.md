@@ -15,6 +15,8 @@
 5. 空白阅读AGENTS/README/CLI帮助，判断是否简洁、职责清晰、存在歧义或重复到影响使用。设计文档未被修改，也未被要求阅读。若发现问题给出具体位置、复现或阅读障碍，由Manager/原作者修复。
 6. 发布简短report：task_revision、完成/未完成、workspace及完整交付HEAD、实际命令/结果、问题或限制。保留自己的clean worktree待Manager验收归档；不自行删workspace。报告区分通过/未覆盖，不扩展功能或验证范围。
 
+7. 安装验收追加：用户交互Bash无法找到mam，Manager已从不含/root/.local/bin的初始PATH复现，将补齐本机持久PATH并提交README安装说明。收到修复commit后，只读审阅新增文档，并用干净初始PATH分别启动交互non-login及login Bash，从/tmp验证command -v mam和mam --help；不能只依赖工具进程继承的PATH。系统配置由Manager修改，你不改全局环境；已完成代码回归不用重复。报告引用最新发布任务revision，并分别列原代码base和文档修复commit。
+
 以上为你的执行要求。以下为源任务与交付的固定参考，非本轮新增实施要求。
 
 ---
