@@ -8,10 +8,12 @@
 
 ```bash
 pipx install --force 'multi-agent-manager @ git+file:///mnt/public/xcj/Projects/multi-agent-manager@main'
+pipx ensurepath --force
+export PATH="$PATH:/root/.local/bin"
 mam --help
 ```
 
-命令入口位于 `/root/.local/bin/mam`，可以从任意目录调用。程序使用 pipx 的独立环境，管理资料保存在固定位置：
+`ensurepath` 为后续终端保存 PATH，`export` 让当前终端立即生效。命令入口位于 `/root/.local/bin/mam`，可以从任意目录调用。程序使用 pipx 的独立环境，管理资料保存在固定位置：
 
 ```text
 Projects/multi-agent-manager/
