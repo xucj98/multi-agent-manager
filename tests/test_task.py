@@ -278,6 +278,8 @@ printf env > "$target/.venv/marker"
         command = str(environment / "bin/mam")
         help_text = subprocess.check_output([command, "--help"], cwd="/tmp", text=True)
         self.assertIn(str(cli.DEFAULT_ROOT), help_text)
+        archive_help = subprocess.check_output([command, "task", "archive", "--help"], cwd="/tmp", text=True)
+        self.assertIn("remove owned worktrees and task branches", " ".join(archive_help.split()))
         self.assertEqual(cli.DEFAULT_ROOT, Path("/mnt/public/xcj/Projects/multi-agent-manager"))
         rows = subprocess.check_output([command, "--root", str(self.root), "task", "list"], cwd="/tmp")
         self.assertEqual(json.loads(rows), [])
