@@ -1,76 +1,23 @@
-# Agent 工作区管理
+# 本集群的 agent 任务管理
 
-本仓库管理多代码库协作中的任务归属、workspace 创建与回收。每个代码库维护自己的开发约定、环境安装及共享目录规则。
+工具以 Git 管理任务要求和结果简报，以本地登记记录 workspace、执行者和长任务进程。当前正在实施，完整接口见 [CLI 说明](docs/task-management-design.zh-CN.md)。
 
-## 职责
+## 集群与目录
 
-| 位置 | 维护内容 |
-| --- | --- |
-| 本仓库 | 分工、任务登记、运行依赖、交付和回收 |
-| 各库 `AGENTS.md` | 项目职责、必读规范和操作入口 |
-| 各库受 Git 管理的 worktree 脚本 | 本库 worktree、共享软链接、独立环境及必要检查 |
-| 各库 `.local/create_worktree.sh` | 当前集群的固定路径和安装参数，Git 忽略 |
-| 各库实验目录 | 正式实验命令、配置、metadata、结果和结论 |
+本机与 wuwen-1 共享 `/mnt/public` 下的代码、数据、解释器和缓存；进程在实际运行主机查询。四个业务库各自维护 `.local/create_worktree.sh`，负责本库独立环境及数据、模型、结果软链接。
 
-公共规则由 Manager 在任务分配中提供，进入目标库后读取该库入口。一个工作区可包含多个独立 Git 仓库，公共规则不会因为目录相邻而自动加载。
+管理仓库为 `/mnt/public/xcj/Projects/agent-workflow`。任务文件位于 `.tasks/<uuid>/task.md` 和 `report.md`，管理状态位于 gitignored 的 `.local/tasks/`；workspace 为 `/mnt/public/xcj/Projects/workspace/<uuid>/`。历史工作记录保留在 `.worklogs/`，新任务统一使用 `.tasks/`。
 
-## 任务准备
+## 使用流程
 
-讨论、只读调查和监控无需创建 worktree 或环境。代码实施和独立代码 review 使用各自的 workspace；文档修改只需代码 worktree。需要运行项目代码时再准备独立环境。
+Manager 创建任务、编辑并发布要求，启动执行者后绑定 agent ID。执行者读取发布版本，再根据任务说明按需创建代码库 worktree。大家直接编辑各自负责的 task.md 或 report.md，通过 CLI 单独发布到 main；读取发布版本无需切换共享工作目录。
 
-Manager 分配任务时明确：目标和交付物、负责人、仓库与修改范围、base commit 与目标分支、workspace、验证要求。实验任务另列实验组、run、结果归属、GPU 和监控责任。
+长时间运行的进程登记为 job。工具查询进程与执行者状态；已停止但尚未处理的进程由执行者收尾并归档。Manager 通过 attention 筛选找到执行者也已停止工作的待处理进程。
 
-```text
-Projects/
-  agent-workflow/
-  workspace/
-    <task-role-id>/
-      RMBench/
-      openpi/
-      opendm/
-      robot-bridge/
-```
+执行者完成后发布简报，Manager 安排独立 review、集成成果并决定何时归档。任务归档移除登记的 worktree、独立环境和本地任务分支，保留任务资料、进程记录及共享软链接指向的实体。
 
-只创建任务需要的库。原仓库是稳定入口；同一任务的修复和后续验证继续使用已有 workspace。review 固定待审 commit，使用 reviewer 自己的 workspace。
+## 简报格式
 
-## 创建 worktree
+report.md 首行填写 `task_revision: <通过 show 取得的完整 commit>`，正文写完成/未完成、workspace、各库完整交付 commit、验证结果与成果位置。实验详细记录按所属库要求保存，简报引用其位置。
 
-各库从原仓库根目录调用本地入口，传入三个参数：
-
-```bash
-bash .local/create_worktree.sh <base-commit> <new-branch-name> <workspace-root>
-```
-
-最后一个参数是 agent workspace 根目录，脚本创建其下的本库目录。需要两个库时分别调用各库入口，传入同一 workspace 根目录。目标目录或分支已存在时停止，由负责人检查已有任务状态。
-
-本地入口固定本集群 uv、cache、Python、wheel 与稳定共享源路径，调用受 Git 管理的本库脚本。本机和 wuwen-1 共享这份入口；其他集群维护自己的版本。安装后的基础检查由库脚本定义；GPU smoke 和正式实验由任务明确安排。
-
-只需代码时可使用 `git worktree add` 创建并登记，不必安装环境。共享数据、checkpoint 和正式结果由各库脚本链接到稳定实体；`.venv` 与 editable 源码属于当前 worktree。
-
-## 生命周期
-
-任务经历工作中、待验收、已接收并清理三个阶段。负责人交付代码 commit、验证结论及正式成果位置，Manager 接收后执行回收。待验收目录只在有明确后续验收时保留。
-
-运行中的训练或评测单独登记主机、进程身份、结果目录和所依赖的 worktree。agent 交接时转交监控责任；依赖它的 job 未结束时保留必要目录。远端不可达视为状态未知。
-
-回收前确认有价值改动已提交并接收或明确保留、运行依赖已结束、临时文件已处理。使用 Git 移除 worktree，随后清除独立环境和 workspace 外层目录。共享软链接只删除链接本身，正式实体继续保留在稳定位置。工具只处理登记的路径；异常中断留下的未登记目录先核实归属。
-
-## 实验与 smoke
-
-实验执行前读取所属库实验规范。RMBench 新评测的物理产物统一写入 `RMBench/eval_result/<exp-group>/<run>`，对应说明进入 `RMBench/experiments/<exp-group>`；robot-bridge 通过仿真器接口记录结果。
-
-当前 RMBench 正式评测前，完成一个包含两次 rollout 的 smoke：一次开启视频、一次关闭视频。检查视频、配置及 metadata 等产物后，保留简短验收结论和必要的复跑信息，清理临时视频、训练 checkpoint 和调试产物，再固定 commit 并启动正式 run。实验启动校验依赖保留的验收记录，而非已清理的 smoke 目录。
-
-正式实验沿用各库的 `command.txt`、commit、config 和逐步继承 metadata 约定。环境创建仅提供操作便利，不新增调用参数、解释器或依赖版本台账。
-
-## 长任务
-
-常规状态检查每两小时一次，完成、失败及实验规定的中间检查点由任务负责人处理。监控读取已有进程和结果，不为每次检查创建 workspace。
-
-自动定时唤醒需要经过验证的调度入口；仅在提示词中约定不能保证 agent 恢复执行。登记清楚下一次检查和接手负责人，使用实际可用的调度方式。首版 workspace 工具不代替训练调度器。
-
-## 记录与完成
-
-`.local/` 保存当前机器的任务登记，不进入 Git；实验信息引用已有正式产物。跨库工作中值得保留的决定和问题结论写入 `.worklogs/`，按任务更新一份简短记录。
-
-任务完成包括成果接收与临时工作区清理。普通 smoke、重复报告、失败已定位的临时重试产物和环境检查产物及时删除。需要继续保留的目录明确负责人、原因和结束条件。
+实际可运行命令将在实现集成后补齐。
