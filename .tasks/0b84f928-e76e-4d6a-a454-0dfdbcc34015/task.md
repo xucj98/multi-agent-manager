@@ -20,3 +20,7 @@
 
 ## 用户最新澄清（覆盖冲突要求）
 wash-cup 仅保留：存在子任务标注文件、无 label6、标签1–5各出现恰好一次的 episode；顺序不限。Manager 正在核对 full-state target 是 chunk-level 还是 frame-level。不能再把 accepted-first 默认当必须保留的正确算法；请在第二轮结论中标明时序表须以实际训练监督核对后修订。此数据/训练取证由 Manager 负责，不重复调查。其余定向复核继续。
+
+## 最终定向复核版本
+请以 robot-bridge c4d5b35 的方案为准，替代 dfc487d。Manager 源码核对：drawer converter memory_supervision_for_target_frames 输入通常 target[t−query_stride]、输出逐帧 target[t]，但 execution 区间有强制覆盖；RMBench full converter 输入frame t、输出frame t+1。因而 accepted-first 不一定是bug，但仅在query间隔与训练lag对齐时成立。方案增加 target_offset/input_lag 和索引公式，不再无条件保留 first。数据新规则扫描候选172集，已写文档。
+只做最终文本和公式/锁定契约复核，不重复数据扫描或广泛代码调查。若无阻断，报告说明通过且待用户确认空白区间处理；若有，提供最小修正文案。
