@@ -9,3 +9,5 @@ Manager亲自修订AGENTS和README；具体打包/CLI实现及独立review交给
 实施任务5896e59c-e3e8-4043-b6b6-ba6e81f3a7db在自己的worktree准备支持新名称的Python包/命令与环境入口。Manager集成后，使用迁移前已发布CLI归档该实施worktree及分支；确认管理库无linked worktree再移动稳定目录。迁移不创建长期旧路径alias或兼容层；历史已归档任务中的旧路径按历史保存。通过pipx普通安装已提交代码，避免editable安装跟随共享checkout草稿变化。原有.tasks及.local/tasks保留。
 
 完成标准：mam task list/status等现有接口可从任意目录运行；本机pipx安装入口位于/root/.local/bin；独立工作区创建和任务/报告发布、job查询、归档仍通过；空白执行者从最终简短文档完成实际闭环并审阅清晰/简洁/无冲突；实现测试通过；本轮临时产物和workspace及时归档。正式GPU实验及其结果不动。失败问题按任务要求迭代，追加要求先写任务并发布。
+
+安装验收追加：用户交互终端出现 mam: command not found。Manager核对入口和Bash初始化，补齐本机持久PATH并更新README安装步骤；用不继承工具PATH的新交互shell验证，向用户说明当前已打开终端的刷新命令。空白验收覆盖这一实际使用场景。
