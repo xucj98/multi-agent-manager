@@ -24,3 +24,8 @@ wash-cup 仅保留：存在子任务标注文件、无 label6、标签1–5各�
 ## 最终定向复核版本
 请以 robot-bridge c4d5b35 的方案为准，替代 dfc487d。Manager 源码核对：drawer converter memory_supervision_for_target_frames 输入通常 target[t−query_stride]、输出逐帧 target[t]，但 execution 区间有强制覆盖；RMBench full converter 输入frame t、输出frame t+1。因而 accepted-first 不一定是bug，但仅在query间隔与训练lag对齐时成立。方案增加 target_offset/input_lag 和索引公式，不再无条件保留 first。数据新规则扫描候选172集，已写文档。
 只做最终文本和公式/锁定契约复核，不重复数据扫描或广泛代码调查。若无阻断，报告说明通过且待用户确认空白区间处理；若有，提供最小修正文案。
+
+## Manager 对最后阻断的裁决与收口
+最新 robot-bridge HEAD 文档提交（git log -1 确认 docs: clarify legacy supervision gaps and feedback lifecycle）补齐：真实 t′ 不使用计划间隔；部分执行仍代入lag公式，越界暂停报错，不进行无效重复query。takeover/reset新epoch使用已保留人工context/初值启动新链。锁值prepare重建且只消费非锁定一次性覆盖。
+拒绝建议的 per-query effective input frame 元数据：drawer execution 覆盖是基于训练标注的teacher forcing，部署不可知，增加该真值通道违反普通offline隔离。文档明确记录既有train-infer差异，普通推理仍反馈模型预测，evaluator分区记录，不承诺强制覆盖区间精确对齐；不为旧模型重写算法。另t′=t+k时公式是k−15，不能同时假设t′=t+15但实际只推进k帧。
+请仅复核以上裁决是否消除文案冲突，若通过追加简短结论并发布，不再扩展调查。
