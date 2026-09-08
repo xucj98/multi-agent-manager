@@ -1,7 +1,7 @@
-task_revision: 6ba1885432181ba73657ed18b1bee48d6a79ef9e
-完成与未完成：已完成固定草案及第二轮的架构定向复核；full-state 时序训练取证按最新要求留给 Manager。未修改业务代码、未创建环境或 worktree。
+task_revision: c9f0a7eedf29eef1ddb92fec9888556f72dd3460
+完成与未完成：已完成固定草案、第二轮架构复核及最终文本/公式/锁定契约复核；未修改业务代码、未创建环境或 worktree。
 workspace、各库交付 commit：无业务代码交付。取证基线为 robot-bridge `0095a3f`、OpenPI `71c80db`；RMBench 当前只读证据为 `e0bcc0c02d957d51bb1b073410447fc3213c7126`。
-验证结果与成果位置：第一轮以 `git show 2196483` 读取草案；第二轮以 `git show dfc487d` 及其 diff 定点对照上述源码、配置和既有测试路径。full-state target 的时序训练证据由 Manager 核对，本审阅未重复调查。本任务规定不运行训练、GPU 或代码测试。本文件为成果。
+验证结果与成果位置：第一轮以 `git show 2196483` 读取草案；第二轮以 `git show dfc487d` 及其 diff 定点对照上述源码、配置和既有测试路径；最终只复核 `git show c4d5b35` 的文本、公式与锁定契约，未重复数据扫描或训练取证。本任务规定不运行训练、GPU 或代码测试。本文件为成果。
 
 # 审阅结论
 
@@ -64,7 +64,7 @@ OpenPI `training/checkpoint_metadata.py` 虽保存 `train_config.yaml` 和 `data
 
 ## 需要用户实验语义选择
 
-用户最新澄清已固定 wash-cup episode 筛选：必须有子任务标注文件、没有 label 6，且标签 1–5 各恰好出现一次；步骤顺序不限，不再作为待确认项。full-state target 是 chunk-level 还是 frame-level 由 Manager 的实际训练监督取证确定；该结果会决定 §6 反馈表的 full-state 条目。连续字段的 `null` 继续表示未知，必须由 representation 显式编码，不能以物理零点替代。
+wash-cup episode 筛选已固定：必须有子任务标注文件、没有 label 6，且标签 1–5 各恰好出现一次；步骤顺序不限。Manager 的训练取证已由 `c4d5b35` 写为 `target_offset/input_lag` 和逐帧索引关系，已不再是待确认项。剩余用户确认仅为标注空白是否保留 action supervision、屏蔽 memory supervision，并以最近已标注 phase/initial 构造输入。连续字段的 `null` 继续表示未知，必须由 representation 显式编码，不能以物理零点替代。
 
 ## 压缩记录
 
@@ -82,3 +82,13 @@ OpenPI `training/checkpoint_metadata.py` 虽保存 `train_config.yaml` 和 `data
 - §6 明确区分表示事实（监督时点、history lag、cadence）和 scheduler run config 的取样/提交策略；`MemoryContext` 的 pending query、epoch、policy-index→执行位置映射仅是运行状态，不会写回 checkpoint。Manager 的训练证据确定 full-state 输出索引与 target 的关系后，才可在既有 scheduler YAML `params` 固化相应策略，并在启动时按 checkpoint cadence 校验；无需新增 server RPC 或通用框架。
 - 该归属与现有实现相容：`scripts/run_scheduler.py` 已把 run config 传给各 scheduler，`policy/server.py` 的 `infer(dict)` 可透传扩展 memory 字段；`scheduler/openpi_simulation.py` 的 `logical_step` 路径和 `SchedulerBase.after_execute()` 分别证明 executed 与 accepted 两类机制可实现，但不构成选择 `accepted-first` 的训练正确性证据。连续 full-state 的 raw feedback 仍由 adapter/context 保存，类别投影只可用于分类显示或旧验收。
 - §7 对具体共享 `MemoryContext` 补足状态读取和 set/lock，不再承诺可插拔接口；§8 将普通 replay 与 oracle 分开，避免 evaluator 真值进入普通模型输入。wash-cup 的筛选条件已按最新任务澄清固定。
+
+## 最终文本、公式与锁定契约复核（robot-bridge `c4d5b35`）
+
+结论：**通过，无阻断项。** `c4d5b35` 已把此前待定的 full-state 反馈判定改为由训练时间关系推导，不再把 `accepted-first` 当作默认正确算法。
+
+- 公式闭合：若 query `t` 的逐帧输出第 `i` 项表示 `m[t + target_offset + i]`，下一 query `t′` 所需输入为 `m[t′ − input_lag]`，令两者相等即得 `i=t′−input_lag−t−target_offset`。文中要求统一用重采样后的 policy 帧坐标、索引越界报错而非 clamp，足以避免把不同 query 节奏混为同一策略。
+- 表中 drawer 的 `input=m[t−15]`、`target=m[t+i]` 在 `t′=t+15` 时得到 `i=0`；RMBench 的 `input=m[t]`、`target=m[t+i+1]` 在执行 `k` 步后得到 `i=k−1`。两者不再共享无条件的 first 规则。final review 仅核对 Manager 写入的关系与公式一致，未重复训练或数据取证。
+- `target_offset`、`input_lag`、cadence 是表示/训练事实，写入 checkpoint inference metadata；scheduler run config 只选择何时依执行证据提交符合该索引的 pending context。两侧没有重复维护同一时序规则。
+- 锁定契约闭合：`locked_fields` 是 `overrides` 子集，adapter 只对锁定字段覆写返回 context 的编码；一次性覆盖只改变输入并保留到同 epoch feedback 提交后消费。scheduler 的 epoch/pending/执行位置映射仍是运行状态，不进入 checkpoint，也不要求新 RPC。连续 full-state raw feedback 未被 UI 分类投影改写。
+- §4 已按最新规则写成 172 个候选及固定五集 manifest 的生成条件；此次未验证该扫描数。实施前唯一保留的用户语义确认仍是标注空白区间的 action/memory supervision 处理，见 §4 与 §11。
