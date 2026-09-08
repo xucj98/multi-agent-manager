@@ -63,6 +63,36 @@ bash .local/create_worktree.sh <base-commit> <new-branch-name> <workspace-root>
 
 数据、checkpoint 和正式结果实体留在稳定源目录，worktree 中按本库规则建立软链接。环境安装后的基础检查由库脚本定义，实验 smoke 按所属库的要求执行。
 
+## 管理工具
+
+以下命令从 `/mnt/public/xcj/Projects/agent-workflow` 执行，使用系统 Python，不需要创建环境。
+
+```bash
+python3 scripts/ws.py register <task-id> --owner <agent-id> --workspace /mnt/public/xcj/Projects/workspace/<task-id>
+python3 scripts/ws.py status
+python3 scripts/ws.py status <task-id>
+```
+
+登记已有 workspace 中各库的 worktree。`status` 不传任务编号时列出全部登记任务。状态保存在原管理仓库 `.local/tasks/`，从管理仓库的 worktree 调用时也使用同一处登记。
+
+运行训练、评测或常驻服务前，为其登记一条占用记录；负责人确认任务结束后解除。`--pin` 填写主机与能识别该次进程的描述，工具不根据 PID 自动判断进程是否结束。
+
+```bash
+python3 scripts/ws.py job start <task-id> <job-name> --pin 'wuwen-1:进程PID及启动时间'
+python3 scripts/ws.py job finish <task-id> <job-name> --by <agent-id>
+python3 scripts/ws.py handoff <task-id> --from <old-agent-id> --to <new-agent-id>
+```
+
+交付时记录各 worktree 当前 HEAD。Manager 接收后为每个库明确提供对应的交付 commit，再执行回收。这里填写 worktree 的交付 commit，不是 cherry-pick 后生成的合入 commit。
+
+```bash
+python3 scripts/ws.py deliver <task-id> --by <agent-id>
+python3 scripts/ws.py accept <task-id> --manager <manager-id> --commit <repo-name>=<delivery-commit>
+python3 scripts/ws.py close <task-id>
+```
+
+涉及多个库时重复 `--commit`，例如 `--commit RMBench=<sha> --commit openpi=<sha>`。仍有占用记录、未验收成果或未处理文件时，回收会停止并说明原因。按提示处理后重试，不直接强制删除整个目录。
+
 ## 交付与清理
 
 负责人交付代码 commit、验证结论和正式成果位置，Manager 接收后回收 workspace。待验收目录需有明确负责人和后续安排。
