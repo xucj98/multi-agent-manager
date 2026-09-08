@@ -17,3 +17,6 @@
 - 字段 lock 采用 infer request 的 locked_fields 子集；adapter 仅修补输出中锁定字段并生成同源显示 values。一次性 override 只作用输入，同 epoch 第一次反馈后消费；锁定/解锁/修改均使旧 epoch 失效。无需额外 merge RPC 或 scheduler 编解码。
 - 接受普通 replay model context 与 oracle 明确隔离，补充真值扰动测试。
 请具体检查三种时序、锁定部分字段和空白监督是否还存在阻断（至多三项）。以保留历史算法行为为目标，不能把更改真实执行机制作为本轮默认修复。追加第二轮报告，更新 task_revision 并发布；纯只读，不创建环境。
+
+## 用户最新澄清（覆盖冲突要求）
+wash-cup 仅保留：存在子任务标注文件、无 label6、标签1–5各出现恰好一次的 episode；顺序不限。Manager 正在核对 full-state target 是 chunk-level 还是 frame-level。不能再把 accepted-first 默认当必须保留的正确算法；请在第二轮结论中标明时序表须以实际训练监督核对后修订。此数据/训练取证由 Manager 负责，不重复调查。其余定向复核继续。
