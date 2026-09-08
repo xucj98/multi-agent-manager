@@ -28,7 +28,14 @@ Review 通过 `mam task create --title "…" --review <source-uuid>` 固定源�
 
 ## 执行与交付
 
-执行者以 `mam task show <uuid>` 返回的已发布要求为准。管理仓库共享 checkout：Manager 编辑 task.md，执行者编辑自己的 report.md；main 为发布版本，工作目录修改为草稿，均通过 `mam task publish` 发布。
+启动 prompt 提供 task ID。执行者先查询登记的 workspace、各库 worktree 路径，再读取已发布要求与版本：
+
+```bash
+mam task status <uuid>
+mam task show <uuid>
+```
+
+以 CLI 返回的路径和发布要求为准。管理仓库共享 checkout：Manager 编辑 task.md，执行者编辑自己的 report.md；main 为发布版本，工作目录修改为草稿，均通过 `mam task publish` 发布。
 
 完成后，清理任务要求的 smoke 和临时文件，在 report.md 写明：
 
