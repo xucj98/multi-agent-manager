@@ -7,7 +7,7 @@
 本机已安装 pipx，以下命令安装 main 上已提交的版本，更新时再次执行：
 
 ```bash
-pipx install --force 'git+file:///mnt/public/xcj/Projects/multi-agent-manager@main'
+pipx install --force 'multi-agent-manager @ git+file:///mnt/public/xcj/Projects/multi-agent-manager@main'
 mam --help
 ```
 
