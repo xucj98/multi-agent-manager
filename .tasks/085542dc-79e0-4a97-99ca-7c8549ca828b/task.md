@@ -9,3 +9,7 @@
 读源码仅围绕发现的缺口取证，不做全库搜索或重复读取；正文≤300行，应能指导实施。质疑要给出具体失败场景、所在节及最小修正；允许结论为删除一项设计。不要泛泛建议更多抽象/版本机制/参数。汇报要区分阻断实现、可简化、需要用户实验语义选择。报告用任务规定的report.md发布；Manager会逐项裁决，第二轮通过更新任务再次通知。workspace暂留等待复核。
 
 专门审阅：三份配置是否有重复/循环依赖；memory-spec新package是否值得，是否能更简单；policy adapter与scheduler职责是否可实现；schema真机/仿真共用位置；checkpoint自包含与旧格式迁移；新增字段/编码需要改哪些文件；历史drawer converter/offline依赖能否迁出。逐个评估提出的概念/接口是否必要，提出具体删减替代。场景的执行时序细节由另一位reviewer负责，你不用重复完整推演。至少对比现有文件路径/依赖，优先指出最影响实施的5项以内问题，其余压缩记录。
+
+## 第二轮定向复核
+固定审阅 robot-bridge commit dfc487d 的同一路径文档。第一轮三项阻断已接受：schema 内容/hash 单向校验；新增由 train config 导出的 inference_config 直接构造模型/transform，不依赖配置注册名；明确旧 drawer converter/backend/replay 迁移范围。接受具体 MemoryContext 与轻量数据契约包；删去无依据 Python 版本要求。
+请只检查上述修订是否闭合、是否引入重复配置/实现不可行；尤其检查 schema/representation 与运行 feedback 策略边界：训练不绑定部署环境，采样提交策略在 scheduler run config。最多指出仍阻断实施的三项，或明确通过，避免扩展框架和新范围。将第二轮结论追加到 report，更新 task_revision 并发布；只读固定 commit，不创建环境。
