@@ -1,4 +1,4 @@
-task_revision: 428ce8ca0d0a0472c2df3073ea8e7b5296f214ca
+task_revision: 4e4b04bad1c464020506ababdf9d3fb12a8fcabf
 
 # 场景与时序审阅
 
@@ -92,3 +92,39 @@ wash-cup 的空白标注除“target mask=false、物理 action 保留”外，�
 workspace、各库交付 commit：按任务限制未创建 workspace/worktree；无业务库提交。
 
 验证结果与成果位置：报告在本文件；取证包括 `robot_bridge/scheduler/{base,openpi,openpi_offline,openpi_simulation}.py`、`robot_bridge/robot/controllers/{base,x2robot_offline}.py`、OpenPI `models/pi0.py` 和 `policies/arx_policy.py` 的固定提交内容。
+
+## 第二轮最终定向复核（c4d5b35）
+
+本轮只复核 `robot-bridge` `c4d5b3590a84670ad5cf8dcfa21d0263e5441abf` 的设计文本、任务中给出的 drawer/RMBench 时间关系，以及字段锁定契约；未重复数据扫描、源码/训练 target 取证，也未创建 worktree、环境或运行训练。
+
+§6 新增的常规索引公式成立：若 query `t` 的第 `i` 个逐帧输出表示 `m[t + target_offset + i]`，下一 query 需要 `m[t′ - input_lag]`，则 `i=t′-input_lag-t-target_offset`。因此 drawer 的 `input_lag=15,target_offset=0,t′=t+15` 取 `i=0`；RMBench 的 `input_lag=0,target_offset=1,t′=t+k` 取 `i=k-1`。这正确地把 accepted-first 改为仅在训练时间关系对齐时可用，而不是默认正确。
+
+| 路径 | 最终文案复核 |
+|---|---|
+| drawer full-state 常规区间 | 通过：15 帧 query 间隔时首个 context 与训练输入对齐。 |
+| RMBench full-state | 通过：`k` 个已执行 policy step 对应第 `k-1` 个 context。 |
+| serial-soft | 通过：选择由该模型的 query lag/offset 决定，接受事件与物理完成分开记录。 |
+
+### 阻断：强制覆盖区间和部分执行仍没有唯一的选取规则
+
+所在：§6 第 139–154 行、§7 第 171 行。
+
+`input_lag` 是固定表示参数，但 drawer 表已说明部分 execution 区间强制覆盖输入。这些 query 的有效输入时刻不一定是 `t-input_lag`；当前文字只说“不能据此保证一致”，没有说明 scheduler 应使用哪个输入坐标或无匹配时如何处理。与此同时，§7 无条件规定“部分执行以 controller 已报告的执行位置为准”。例如正常 drawer query 从 `t` 到 `t+15`，但实际只执行 `k<15` 步时，§6 公式要求为下一次训练式输入选择 `i=0`，§7 又可能要求按 `k` 选择，真机还没有新增进度回执来消除该歧义。实现者可能错误回灌第 `k-1` 个 context，或在强制覆盖区间继续沿用首个 context。
+
+最小修正文案可替换 §7 的部分执行句，并补在 §6 表后：
+
+> 对强制覆盖输入区间，表示元数据须记录该 query 的有效 input frame（或 effective input_lag）；选择公式使用该值。无匹配输出时丢弃 pending 并重新 query，不取首项或 clamp。仅 `execution-position` 策略按 controller 已报告的执行位置选择（如 RMBench）；`training-lag` 策略按 §6 的 query 坐标和有效输入坐标选择，部分执行位置不得覆盖该选择。
+
+锁定字段的主契约可行：`locked_fields ⊆ overrides`，adapter 只编码锁定字段并从同一 raw context 解码 UI values，故不会对未锁定连续段做 scheduler 侧重编码。为避免一次性 override 消费后被误解为解除锁，建议在 §7 `prepare()` 说明一件实现细节：锁定时快照当前语义值，并在每轮 `prepare()` 将每个持久锁值重新写入请求 `overrides`；只有非锁定的一次性 override 在同 epoch 首次反馈提交后消费，解锁才移除该持久值。这不需要额外 RPC 或 raw merge。
+
+wash-cup 仍只待用户确认标注空白区间的 input/serial-conditioning 处理；标签筛选规则和“172 集”计数未在本轮重新调查。
+
+## 本轮交付与验证
+
+完成：对最终文案的公式、三种反馈路径和锁定契约做了定向复核，并给出一项可直接落文档的阻断修正。
+
+未完成：未修改业务代码或设计草案，未运行测试、GPU 或训练；强制覆盖区间的有效输入坐标与部分执行策略需先按上述文本固定，空白区间处理仍待用户确认。
+
+workspace、各库交付 commit：按任务限制未创建 workspace/worktree；无业务库提交。
+
+验证结果与成果位置：本报告；审阅对象为固定 commit `c4d5b3590a84670ad5cf8dcfa21d0263e5441abf` 的 `docs/design/shared-memory-schema-and-scheduler.zh-CN.md`。
