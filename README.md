@@ -14,7 +14,7 @@ Projects/workspace/<uuid>/<repo>/
 
 ## 最短流程
 
-Manager 创建任务，用编辑工具填写返回路径中的 task.md，再发布要求、启动 agent 并绑定：
+Manager 为 subagent 创建任务，用编辑工具填写返回路径中的 task.md，再发布要求、启动 agent 并绑定：
 
 ```bash
 mam task create --title "任务名称"
