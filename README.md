@@ -16,7 +16,7 @@
     .worklogs/              # Git 管理的工作日志
     .local/tasks/          # Git 忽略的任务登记
   workspace/
-    <task-role-id>/
+    <task-id>/
       RMBench/             # 只建立任务需要的库
       openpi/
       opendm/
@@ -31,12 +31,12 @@
 
 ## 分工与阅读规范
 
-Manager 分配任务时填写以下内容：
+Manager 为每个分配的任务确定唯一 `<task-id>`，workspace 目录和工作日志使用同一名称。分配时填写以下内容：
 
 ```text
 目标与交付物：
 负责人：
-涉及的库、base commit、目标分支、允许修改的范围：
+涉及的库、base commit、新建工作分支、合入分支、允许修改的范围：
 workspace：
 必读规范：
 验证要求：
@@ -49,17 +49,17 @@ workspace：
 
 ## 创建工作区
 
-各库在原仓库根目录提供三个参数的本地入口：
+原仓库是 `/mnt/public/xcj/Projects` 下的 `RMBench`、`openpi`、`opendm` 和 `robot-bridge`，不在 `workspace` 下。在相应原仓库根目录调用三个参数的本地入口：
 
 ```bash
 bash .local/create_worktree.sh <base-commit> <new-branch-name> <workspace-root>
 ```
 
-第三个参数为 `/mnt/public/xcj/Projects/workspace/<task-role-id>`，脚本创建其下的本库目录。需要多个库时分别调用各库入口，传入同一个 workspace 根目录。目标目录或分支已存在时停止，先确认是否已有相应工作区。
+第三个参数为 `/mnt/public/xcj/Projects/workspace/<task-id>`，脚本创建其下的本库目录。需要多个库时分别调用各库入口，传入同一个 workspace 根目录。目标目录或分支已存在时停止，先确认是否已有相应工作区。
 
 `.local/create_worktree.sh` 不进 Git，只填写固定的 uv、cache、Python、wheel 等路径并转发参数。各库受 Git 管理的脚本负责创建 worktree、建立本库共享软链接和安装环境。公共工具负责登记与回收。
 
-只需代码时使用 `git worktree add`，无需安装环境。创建后登记任务与目录；同一任务的修复、后续检查继续使用已有 workspace。
+只需代码时使用 `git worktree add`，无需安装环境。创建后由 Manager 通过本仓库管理工具登记任务与目录；同一任务的修复、后续检查继续使用已有 workspace。
 
 数据、checkpoint 和正式结果实体留在稳定源目录，worktree 中按本库规则建立软链接。环境安装后的基础检查由库脚本定义，实验 smoke 按所属库的要求执行。
 
