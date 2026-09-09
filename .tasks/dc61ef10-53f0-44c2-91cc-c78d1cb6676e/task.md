@@ -1,0 +1,21 @@
+# Memory v1：BF16仅模型保存与checkpoint路径自包含加载
+
+## 目标和边界
+
+从训练集成任务ad6bb77e拆出保存/恢复部分并行实施。用mam workspace add在本task创建openpi worktree，base=0f37cfc1ae42e4703b741f0f05fd1e3c58c87e89，读本库AGENTS/涉及文档。你只改src/openpi/training/checkpoints.py、checkpoint_metadata.py、src/openpi/policies/policy_config.py及对应定向tests/必要说明；training/config.py、scripts/train.py、data_loader、模型/transform都由ad6bb任务负责，你不重复编辑。packages/openpi-client不改。不派agent，不用GPU，先给小改动预计行数。
+
+用户授权单卡batch32、20k、仅最终20k模型权重约12GB(BF16)+必要assets/metadata。只保存模型已有save_full_state=False可用；优先复用它，不重建一套export工具。你实现实际保存cast及自包含恢复，完整50step GPU验收由training owner合入后做。
+
+## 交付契约
+
+1. 沿现有Orbax保存路径，只对推理params副本的浮点叶子按显式dtype导出，不改变训练内部FP32参数/优化器状态。TrainConfig增加save_dtype: Literal['bfloat16','float32']|None，由training owner在其独占config.py添加；None保持参数dtype，首批配置显式bfloat16。你save_state已经拿到config，直接使用config.save_dtype，不新建平行CLI/export命令。字段未合入前可用带save_dtype的测试输入或最小临时验证对象；不要getattr fallback把真正集成问题掩盖。
+2. save_full_state=False时只有params/assets/metadata，无optimizer/train_state/EMA另一份权重；只保存最终20k由训练入口设置save_interval/keep_period等，training owner负责。检查真实Orbax保存后的浮点dtype、目录树、restore shape/值与cast参考；微型真实pytree即可CPU完成此项，不能把它冒充6B模型12GB实测。FP32选项同样roundtrip，metadata不能误记原训练dtype为存盘dtype。
+3. 新memory配置只保存一个resolved memory_config权威对象，训练owner会给准确TrainConfig位置；先与其通过Manager同步接口，避免把resolved对象同时写model_spec/policy_info/其他副本。现有metadata/train_config.yaml和assets norm链复用；把原始YAML路径/训练labels目录暂时不可访问后，仅给checkpoint路径仍可恢复模型/fields/norm/输入协议，不能在推理create data_config时打开LeRobot训练数据。原有无memory_config checkpoint加载路径保留，不写全历史格式转换兼容框架。
+4. policy_config.py要与新训练归一化顺序一致：机器人shared stats先归一化，one-hot memory在后面identity追加；推理输出先正确逆变换机器人坐标再按shared spec解码memory，不能重复norm或把robot14维stats广播到memory。数据/训练owner将提供所需transform入口，你复用，不实现第二套encoder或写入其文件。server metadata提供同一个resolved config供runtime，只是运行时透传，不额外保存副本。
+5. conversion→train metadata沿已有接口继承command/commit/config，不复制代码、不增加runtime重复信息。任何dataset路径在普通推理不应该是必需资源；不足给具体调用链并修最小loader边界。
+
+## 验证和收尾
+
+先CPU真实Orbax save/restore、dtype不改原参数、自包含metadata roundtrip与独立加载配置；保留旧metadata相关测试。提交小可review commit，报告改动行数/测试和仍需集成的字段或transform接口；完整大模型加载由ad6bb负责。若遇到跨写集需求，给明确建议交Manager，不自行改对方代码。
+
+report用当前task_revision，写本workspace/commit、验证、未完成及可复跑命令，publish。清理CPU tiny checkpoint/temp，仅保留代码和简报待独立review。没有正式GPU/长任务授权。
