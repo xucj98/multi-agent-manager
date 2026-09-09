@@ -38,3 +38,9 @@
 full输入current reference/推理cache、t+j+1预测、chunk_completed/last_executed；serial previous lag30/当前t目标/selected query反馈。数据筛选label6、缺标注、不是1..5各一次整集排除，合法次序可变；全部172训练、固定5ep offline；无标注行只mask memory，不丢机器人训练行。确认各配置的初始化/缺GT/mask与core一致。metadata633只复核变更范围及实际sidecar更新即可。
 
 将数据可用与训练模型可用分开：你给数据/配置GO，不宣称尚未实现的训练wire全通过。小样本通过就及时发布stage报告，让全172正式转换与其他训练准备并行。
+
+## M+1尾行修复已到：46e619e
+
+在已审a75基础上，作者94d9927使wash source path显式，46e619e补terminal memory row。复用原worktree，增量审这两个commit并核对已更新低维sample，按你7f4d74e报告中ep0末raw2408 label5/true及ep1末raw2989 unknown/false两边界验证，机器人/query保持M、无动作二次移位；只复核此次低维变更与路径参数，已通过的视频不重新解码。取得完整SHA由git读取。
+
+通过后及时发布数据层GO，使全172转换启动，不等待训练GPU/live。正式转换产物完成后再做数量/metadata及必要低维读回。本次不重建环境、不占GPU。
