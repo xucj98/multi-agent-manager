@@ -8,6 +8,8 @@
 
 ## 交付契约
 
+已确定并行接口（training owner承诺，代码将由其交付）：TrainConfig.memory_config: Mapping[str, Any]|None是唯一resolved对象；memory_config_path只做训练输入便利，__post_init__解析后立即清空，不依赖原文件恢复。新TrainConfig.create_data_config(*, training: bool)->DataConfig只构造现有data factory与memory transforms、不读LeRobot rows/labels/sidecar；policy_config使用training=False。输入keys沿state/actions/images/prompt，推理另接memory_input_ids。机器人Normalize后AttachMemoryAfterNormalize追加identity one-hot，再与weights共同pad；输出MemoryOutputs先解码identity memory并剥离对应坐标，随后现有Unnormalize只恢复机器人坐标。由于memory本身identity，这与“memory解码前完成其逆变换”一致，勿再额外归一化。后端policy.metadata从TrainConfig.memory_config在运行时透传一份，checkpoint文件中不重复存policy_metadata.memory_config。接口未合入前，可给本任务最小CPU测试配置临时方法，不提交重复实现；提供patch/commit后由训练owner合入实际factory验证。
+
 1. 沿现有Orbax保存路径，只对推理params副本的浮点叶子按显式dtype导出，不改变训练内部FP32参数/优化器状态。TrainConfig增加save_dtype: Literal['bfloat16','float32']|None，由training owner在其独占config.py添加；None保持参数dtype，首批配置显式bfloat16。你save_state已经拿到config，直接使用config.save_dtype，不新建平行CLI/export命令。字段未合入前可用带save_dtype的测试输入或最小临时验证对象；不要getattr fallback把真正集成问题掩盖。
 2. save_full_state=False时只有params/assets/metadata，无optimizer/train_state/EMA另一份权重；只保存最终20k由训练入口设置save_interval/keep_period等，training owner负责。检查真实Orbax保存后的浮点dtype、目录树、restore shape/值与cast参考；微型真实pytree即可CPU完成此项，不能把它冒充6B模型12GB实测。FP32选项同样roundtrip，metadata不能误记原训练dtype为存盘dtype。
 3. 新memory配置只保存一个resolved memory_config权威对象，训练owner会给准确TrainConfig位置；先与其通过Manager同步接口，避免把resolved对象同时写model_spec/policy_info/其他副本。现有metadata/train_config.yaml和assets norm链复用；把原始YAML路径/训练labels目录暂时不可访问后，仅给checkpoint路径仍可恢复模型/fields/norm/输入协议，不能在推理create data_config时打开LeRobot训练数据。原有无memory_config checkpoint加载路径保留，不写全历史格式转换兼容框架。
