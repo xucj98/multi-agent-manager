@@ -19,3 +19,7 @@
 # 交付
 
 按MAM流程读取发布要求。只编辑自己的report.md，包含task_revision、完成/未知、workspace（只读无worktree/commit）、关键证据；发布report后结束。无需创建新临时资料；若有自建临时文件，交付前清理。等待Manager归档。
+
+# 开工约束补充
+
+wash-cup外部标注1..5各恰好一次，但顺序可变。请在既有状态选择入口定位时顺带核对：是否把字段0/phase硬编码为只能停留或前进一类。不同任务的phase顺序应由任务协议决定，不能由字段名自动推断。只报告当前代码事实，不实施修复。Manager已确认共享主openpi没有.venv/bin/python，RMBench解释器两机可见；环境准备使用既有worktree入口，暂不创建。
