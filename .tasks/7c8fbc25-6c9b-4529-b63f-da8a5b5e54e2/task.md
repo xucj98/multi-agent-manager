@@ -10,6 +10,9 @@
 
 # Memory v1：数据适配与wash-cup转换
 
+首批八卡所需sim配置除已有四份P2 full外，还包含rearrange serial fixed lag30/current query target和rearrange no-memory。请沿同一sim sidecar/bindings给两份英文可运行YAML；serial时序规则与本任务wash serial一致，但字段使用rearrange三字段，no-memory用memory=[]及空updates。只增加对应配置，模型实现仍归训练owner。不会要求扩其它三个任务后才能先启动这六项。
+
+
 ## 阶段事实后的Manager裁定
 
 文件归属：新sim adapter、其tests和rearrange/put-back运行YAML放examples/rmbench/及其memory_configs/；wash保持examples/x2robot/。不要将RMBench适配代码塞在x2robot目录下。尚未提交的新文件直接移到正确目录并调整import即可，不增加公共框架，也不为搬路径重复转换数据。
