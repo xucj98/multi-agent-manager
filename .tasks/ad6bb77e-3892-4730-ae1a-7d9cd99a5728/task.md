@@ -63,3 +63,7 @@ checkpoint_metadata.save保留实际command/cwd/git commit、train config和上�
 先CPU阶段固定commit送review，可与后续GPU smoke并行。适用旧tests及上述真实条件/loss/自包含联通检查通过后，在本机GPU1跑实际base的50step训练、保存、仅checkpoint恢复，并核对返回wire keys/shapes。base在/mnt/public/cache/openpi/openpi-assets/checkpoints/pi05_base。先检查GPU1实际显存；只占GPU1，本机GPU0跑F0，远端八卡留正式单卡训练。未核验路径不要填卡凑数。
 
 报告当前commit、task_revision、workspace、CPU/GPU实际命令/结果/产物及剩余项/耗时预估。先发布CPU交付，不必等整个GPU链路才送review。GPU1释放时通知Manager以便F0并行。自己清理被正式实验替代的smoke和临时文件；长于1小时的进程登记MAM job。不自行派agent。
+
+## 首批正式训练调度补充
+
+论文计划06a3139已明确：若wash-cup数据在sim可开跑时仍未通过验收，远端GPU6/7先执行rearrange full per-frame/repeated-endpoint配对seed1。这是已有Q2重复，不增加实验数；wash验收后优先安排下一批空闲卡。初始六个seed0 sim不受wash或live修复阻塞。正式训练仍在CPU独立review与GPU1实际50step链路通过、Manager发开跑通知后启动。
