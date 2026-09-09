@@ -1,6 +1,10 @@
 # Memory v1：统一配置与openpi训练接入
 # 目标
 
+# 用户最新数据约束
+
+用户明确RMBench新训练与转换只用demo_clean_state源，demo_clean缺metadata/详细子任务标注，不作为数据fallback。训练接入模板和metadata验收要保留这个来源区别；实际路径由资产/data任务提供。与wash-cup命名无关。
+
 在独立openpi实现首批实验可用的统一memory配置、训练样本与模型接入。用户已经授权施工/开跑；你负责代码，不直接启动正式训练。Manager掌握研究方向和合入，另有agent负责数据转换与robot-bridge。优先最小可审查实现，不构造通用DSL/插件系统。
 
 # 工作区与写入范围
