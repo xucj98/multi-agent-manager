@@ -1,3 +1,9 @@
+## Sim binding接口收敛（4815273后的Manager裁定）
+
+4815273正确恢复了额外raw最后帧，但新增的manifest.tail_append协议当前训练adapter不支持。不要再实现一套tail_append扩展/解释器。采用既有sidecar绑定：sidecar直接保存等长M+1的series（phase/属性及robot_action_target），机器人前M行逐值拷贝converted action[:14]，第M行重复末动作；availability也M+1。图像/robot state及query仍来自原LeRobot的M行，query范围不变；初末行逐值测试不能省。这里只有低维数组复制，图像和原数据不复制，不会新采样不存在的query。MemoryBindings用source=sidecar指向robot_action_target，semantics=action_at_row、offset0；训练层移除仅允许robot source=column的无必要限制，保留不能绑定observation state与禁止二次移位检查。这样不修改已验收core API，也不新增tail_append schema/第二种补尾配置。
+
+适配器里的账号绝对DEFAULT_LEROBOT_ROOT/RMBENCH_DATA_ROOT/ARTIFACT_ROOT删除；源路径由明确参数传入，输出默认路径若需要则从本openpi项目根构造。相对参数按项目根解析。完整实验命令可写本集群绝对路径。路径检查不依赖作者workspace，shared产物写入原openpi的data软链目标。请data owner以独立增量commit更新，training owner沿既有sidecar reader直接使用。
+
 # Memory v1：openpi训练模型与checkpoint集成
 # 目标
 
