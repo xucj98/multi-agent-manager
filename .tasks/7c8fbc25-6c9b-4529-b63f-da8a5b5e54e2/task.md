@@ -1,3 +1,7 @@
+## 2026-09-10 独立review后的优先级与阻塞修复
+
+先交付examples/rmbench的sim bindings及正式YAML独立commit，让训练与review继续；wash修复可随后推进。James已确认wash master v2的视频与pose/action source索引漂移：ep0 face q23为46对43，q765为1515对1527，q1205为2387对2407，最大20 raw frame。其报告见任务3e78bfec-0cb7-41f4-ab7c-e002adf50c88/report.md。v2不能用于训练。视频、状态、next master action及标注必须共用真实可审计的时间/source mapping；不能仅改offset，亦不能继续复用不同时间轴的视频。保留原始时间与选择依据，先小样本独立核验后完成正确的新输出。提交前在raw/converted逐帧比对两集、多相机、开头/中段/尾部，除了shape还要验证视觉帧与pose/action索引相同。不要为省重编码成本牺牲时间对齐。请报告sim独立commit和wash修复预计耗时。
+
 # Memory v1：数据适配与wash-cup转换
 
 ## 阶段事实后的Manager裁定
