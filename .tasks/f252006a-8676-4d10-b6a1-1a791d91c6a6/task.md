@@ -41,4 +41,6 @@ Manager对de79cce的修订要求：模块1480行、合计1838行明显高于450+
 
 设计文件同步交付：在你workspace提供一个针对论文 docs/memory_config/memory.schema.yaml 的最小patch（不直接改共享论文库），包含一期实际新增的initial输入、empty memory、target.validity all_in_bounds及loss_reduction等字段，使P2/无memory/aux配置可按类型校验。另给1份P2两臂英文YAML最小差异示例供Manager整合；数据实际绑定由data/train owner承担。只为实际实现同步已有规格，不再发明一个平行schema或第二套执行规则。
 
+示例澄清：上句“两臂”指实验的两个比较组（per-frame vs repeated endpoint），不是左右机械臂。当前p2_two_arm.example.yaml写成left_phase/right_phase且输入initial，是aux对照，不能作为P2示例交付。请提供两份可单独load的英文YAML，单个phase即可，input当前reference（首帧initial）/infer cache、相同H50/K30、同一公共mask和固定H归约、同一机器人target（可绑定已经对齐robot_action offset0），两组只改phase target从offset1/stride1到offset30/stride0；都在chunk完成读取第30行。不要虚构机器人左右独立阶段。论文patch不需加入无任何$ref使用的episode_availability定义：availability是adapter runtime数据接口，在说明文档解释即可，不能让config schema冒充验证了episode数组。
+
 先CPU测试：字段顺序/重复和无memory、单字段wash及多字段drawer/rearrange、可变顺序phase不被限制、公共mask/固定分母、metadata roundtrip。代码量先给预估，再报告新增/删除行；避免大兼容脚手架。GPU短smoke待Manager分配，当前不占GPU。先交可供依赖方使用的契约commit，再完成训练实现commit；全量验证适用部分后report记录commit/测试/不足并发布。不得修改共享checkout或他人环境。过程中需求有歧义及时给Manager具体选项，不阻塞可独立实现部分。长程序若后续获分配超过1小时，用mam job登记。任务完清理自己的smoke/临时文件，不删除正式资产；不自行派agent。
