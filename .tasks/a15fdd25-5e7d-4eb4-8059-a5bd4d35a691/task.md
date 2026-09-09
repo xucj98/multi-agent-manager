@@ -1,3 +1,11 @@
+## 恢复F0：固定候选bc84203，完整入口先准备
+
+请恢复原workspace，把bridge固定到bc842036e3735390f35fe1138aa7b19f5ae2f95b（fd38513→92b365c→bc84203；删除临时client代理，以build_policy_obs=None跳过终止infer），OpenPI仍58d6f2155acc3af03017677bb3f536101e6699f4。只拿这条F0候选，不合后续live进度或新memory wire改动。Pascal正在做该几行增量复核；收到Manager无阻塞确认后可smoke。
+
+先补齐完整smoke/正式100入口、四份配置、README与候选固定版本检查，然后才跑smoke；不能smoke后才新增正式入口，导致source_content_hash改变而失配。保持完整recorder配置/source检查。每个row2rollout（一video一no-video）smoke→确认产物→commit→该row100，依row30/20/1/50，GPU0单卡串行；其它CPU准备可以同步。报告实际可复制命令与source身份检查，不通过放宽门禁解决。
+
+当前允许准备完整入口，GPU smoke等待本候选review结论；正式100需smoke通过后Manager发通知。未来同一scope只需一次阶段正式放行，不另向用户请求。超过1小时正式进程必须nohup/可靠脱离短工具会话并mam job登记host/PID；50个时自己记录检查，阶段结束说明下次监控时机。整个F0完成前不改运行代码；结果与MAM报告可正常写。
+
 ## F0 smoke匹配与终止query裁定
 
 保留recorder当前完整配置匹配检查。四个row配置分别在自己的100ep之前运行一个2rollout smoke（一video一no-video），然后固定该配置提交开跑；不新增selector白名单，不放宽门禁代码。只允许GPU0，按row30/20/1/50依次执行。先前“只做row30即可覆盖其余三行”的预期不作为当前验收。
