@@ -1,11 +1,12 @@
-task_revision: 4a361aad54b1227584800736402c8e07ecb98492
+task_revision: 28a7fc3aa572fe22d5804f8e6fce3fc7d7122532
 
 # 正式 eval 结果归并与清理交付
 
 ## 完成与未完成
 
 已完成：将正式评测结果归并为 RMBench 下恰好三组、5+9+1 个 formal run；清理
-RMBench 旧 eval/smoke/重复入口和 `robot-bridge/eval_result`；更新三份实验 README。
+RMBench 旧 eval/smoke/重复入口和 `robot-bridge/eval_result`；更新三份实验 README，
+补齐 baseline/百分点比较、checkpoint 和发布模型身份信息。
 没有未完成的 formal run，也没有重新评测或占用 GPU。
 
 三个最终绝对路径：
@@ -42,8 +43,9 @@ episode JSON，但其完整 diagnostics 是对应的真实 episode 记录。
 
 - MAM workspace：`/mnt/public/xcj/Projects/workspace/65c5f4dc-5ee6-4125-ac56-43e5db00c495`
 - RMBench worktree：`/mnt/public/xcj/Projects/workspace/65c5f4dc-5ee6-4125-ac56-43e5db00c495/RMBench`
-- RMBench branch/commit：`task/65c5f4dc-5ee6-4125-ac56-43e5db00c495` /
-  `8be4ec9982304edb52f2895f845e1d74aa0c1791`（`记录正式评测结果归并`）
+- RMBench branch/交付 commit：`task/65c5f4dc-5ee6-4125-ac56-43e5db00c495` /
+  `681a928e266818bb430674c547b6458793bda227`（`补充正式评测实验身份`）
+- 前序归并文档提交：`8be4ec9982304edb52f2895f845e1d74aa0c1791`（`记录正式评测结果归并`）
 - robot-bridge 没有代码或 Git 文档修改；共享 `eval_result` 的原地迁移已由任务授权。
 
 ## 文件完整性与迁移映射
