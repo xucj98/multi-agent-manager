@@ -67,3 +67,7 @@ checkpoint_metadata.save保留实际command/cwd/git commit、train config和上�
 ## 首批正式训练调度补充
 
 论文计划06a3139已明确：若wash-cup数据在sim可开跑时仍未通过验收，远端GPU6/7先执行rearrange full per-frame/repeated-endpoint配对seed1。这是已有Q2重复，不增加实验数；wash验收后优先安排下一批空闲卡。初始六个seed0 sim不受wash或live修复阻塞。正式训练仍在CPU独立review与GPU1实际50step链路通过、Manager发开跑通知后启动。
+
+## CPU交付后的分工
+
+ffa308d5485a2c8222d3e7735b08723c6e93a237已送Banach独立review。真实transforms→MemoryContext联通由已有双库workspace的Einstein负责、Pascal复核；你继续共享norm、实际loader与GPU1的真实base50step保存恢复，检查policy wire keys/shape，不为这项测试再创建bridge环境或等待live小修。完整schema规范不变；任何发现及时固定小commit给review。
