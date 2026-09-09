@@ -1,3 +1,9 @@
+## F0 smoke匹配与终止query裁定
+
+保留recorder当前完整配置匹配检查。四个row配置分别在自己的100ep之前运行一个2rollout smoke（一video一no-video），然后固定该配置提交开跑；不新增selector白名单，不放宽门禁代码。只允许GPU0，按row30/20/1/50依次执行。先前“只做row30即可覆盖其余三行”的预期不作为当前验收。
+
+你发现terminal trace next_query=false但公共循环仍额外infer的问题已交runtime owner做小修，且交reviewer复核。目标是在OpenPISimulationScheduler现有路径中对terminal跳过真实policy infer，不改SchedulerBase通用循环/真机循环。拿明确修复commit后更新入口固定版本；先继续交准备阶段report，不擅自按fd38513跑正式。
+
 ## 恢复执行：F0明确接口与资源裁定
 
 runtime commit已到：robot-bridge fd38513adb5ba171327358f70f55f88059de49d2。使用你本task bridge独立分支合入此commit；openpi可合主库58d6f2155acc3af03017677bb3f536101e6699f4并使用自己的editable环境。接口为OpenPISimulationScheduler.params.legacy_full_feedback_selector，支持{kind: index, value: 0|19|29|49}和{kind: last_executed}。F0保留旧checkpoint原字段/归一化/模型，不强行将其转为新memory_config；该显式selector仅控制旧full反馈行。准备四个固定K30/H50配置和诊断，先row30。独立runtime reviewer正在复核，收到Manager确认F0无阻塞后才运行新入口的一个2rollout smoke，检查一次video/一次no-video和metadata；通过后提交完整正式配置再启动100仍等Manager通知。
