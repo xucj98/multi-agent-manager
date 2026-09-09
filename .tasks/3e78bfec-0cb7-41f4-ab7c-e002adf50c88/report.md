@@ -1,4 +1,73 @@
-task_revision: b46616e1efd03c474dde2570695e499fab0c0df4
+task_revision: 4fda7e37ecb0e064856b1ea8ccc229b687c6224c
+
+**当前阶段结论：wash 数据层 GO，解锁全172正式转换**
+
+46e619e 的低维 M+1 修复通过，上一阶段7f4d74e发现的末帧标签缺失P2关闭。94d9927的显式source参数及项目相对路径解析通过。本轮不重解码已通过的视频，也未重跑sim100集；沿用已验收的视频/pose映射和full/serial配置。正式172集产物完成后仍需数量、metadata及必要低维读回复核；本次GO不代表全量产物或训练模型wire已验收，不宣称整个数据任务完成。
+
+复用工作区 /mnt/public/xcj/Projects/workspace/3e78bfec-0cb7-41f4-ab7c-e002adf50c88/openpi，从已审a75d173依次fast-forward：
+
+- 94d9927f22f18d15e91fbe69b9bb7fa5ce494502：source参数显式，source/output/config相对路径按项目根解析。
+- 46e619e6db6bcd4f9d5d11d31b82e5f51e8522a0：完整terminal memory row，当前审查HEAD。
+
+两份低维样本直接读取稳定共享路径：/mnt/public/xcj/Projects/openpi/data/lerobot/wash_cup_x1pro_s2m_memory_v1/all_2_15hz_s2m_master_v3_source_frame_aligned_smoke。meta/memory/command.txt记录实际46e619e完整commit、cwd、显式dataset-root及--refresh-low-dim-sidecar-only，使用新full_current_feedback YAML。conversion.json为format_version4、episode memory为version2。
+
+| 核验边界 | ep0：真实末帧有GT | ep1：真实末帧无GT |
+| --- | --- | --- |
+| query M / sidecar行数 | 1216 / 1217 | 1509 / 1510 |
+| 最后selected raw index | 2408 | 2989 |
+| raw label5半开范围 | [1710,2409) | [1440,2970) |
+| sidecar末phase / availability | label_5 / true | unknown / false |
+| full(q=M-30)有效phase位置 | 30（此前错误为29） | 20，其余真实缺GT位置mask0 |
+| full(q=M-1)有效phase位置 | 1（此前错误为0） | 0，保留正确无GT屏蔽 |
+| 最后query serial target mask | true | false |
+
+独立核验直接从raw subtasks半开区间重新展开两个episode完整selected索引对应标签，M+1 phase及availability全部与更新后sidecar一致。robot_action_target的前M行逐值等于既有Parquet actions，第M行重复末action；2,725行actions仍等于下一selected raw master14，state等于当前selected raw follow14，float32误差0。Parquet中的phase/availability保持sidecar前M行，frame_index仍0..M-1；query source/action indices分别等于完整selected mapping[:-1]/[1:]。新selected_source_frame_indices/timestamps完整M+1，旧query/action映射仍M，未新增不存在的query或二次动作移位。
+
+对两集q=0/M-30/M-1调用既有core full与serial API，机器人50行targets均等于原actions按末行clamp，robot weights全1；无效phase dense及14:20权重全0。ep0首query full有效42、ep1为28，说明缺GT处理保留；此前核验过的full/serial输入/反馈配置未在本次改变。converter.build_dataset仍按memory.source_frame_indices的M行写Parquet，observation_and_next_action_rows还逐值检查sidecar前M动作与next master一致及尾动作repeat，代码与落盘样本一致。
+
+路径核验：dataset_root=None立即报显式缺source错误；默认output_base=data/lerobot，解析到本树共享data目标，不再写死账号路径。切换cwd到/tmp后，项目相对source/output/config仍解析正确，full YAML可由公共parser载入。未调用refresh入口或任何视频工具；这里只读取作者已经刷新的低维产物。
+
+本轮未发现剩余数据侧阻塞。CPU定向检查：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 CUDA_VISIBLE_DEVICES='' JAX_PLATFORMS=cpu .venv/bin/python -m pytest -q -p no:cacheprovider examples/x2robot/test_wash_cup_memory_adapter.py examples/x2robot/test_wash_cup_memory_config.py
+# 14 passed in 8.24s
+git diff --check a75d173..HEAD
+```
+
+关键边界最小复现，在上述审查worktree执行，不打开视频：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 CUDA_VISIBLE_DEVICES='' JAX_PLATFORMS=cpu .venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+import numpy as np
+import pyarrow.parquet as pq
+from openpi_client.memory_config import EpisodeMemoryData, load_memory_config
+root = Path('data/lerobot/wash_cup_x1pro_s2m_memory_v1/all_2_15hz_s2m_master_v3_source_frame_aligned_smoke')
+c = load_memory_config('examples/x2robot/memory_configs/wash_cup_phase_full_current_feedback.yaml')
+for e in json.loads((root/'meta/memory/raw_episode_memory.json').read_text())['episodes']:
+    i = e['episode_index']
+    mem = e['memory']
+    a = pq.read_table(root/'data/chunk-000'/f'episode_{i:06d}.parquet', columns=['actions'])['actions'].to_pylist()
+    m = len(a)
+    ep = EpisodeMemoryData(series=mem['series'], availability=mem['availability'])
+    assert all(len(v) == m+1 for v in ep.series.values())
+    assert len(ep.availability['phase']) == m+1
+    np.testing.assert_array_equal(ep.series['robot_action_target'][:-1], a)
+    np.testing.assert_array_equal(ep.series['robot_action_target'][-1], a[-1])
+    print(i, m, ep.series['phase'][-1], ep.availability['phase'][-1],
+          [int(c.make_training_sample(ep, q).target_mask.sum()) for q in (m-30, m-1)])
+# 0 1216 label_5 True [30, 1]
+# 1 1509 unknown False [20, 0]
+PY
+```
+
+未修改交付代码，未占GPU，未运行转换/训练或派agent；本轮独立检查使用内联脚本，不留临时脚本/cache，worktree继续保留。下面为历史阶段记录，旧P2阻塞已由本节关闭。
+
+---
+
+**历史阶段报告：7f4d74e5b4200114e4e8e2c7d1e66b7b22202aa3（task revision b46616e1efd03c474dde2570695e499fab0c0df4）**
 
 **恢复后的 wash 阶段结论**
 
