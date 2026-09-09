@@ -1,4 +1,10 @@
 # Memory实验：评测入口、旧full时序锚点与开跑准备
+
+## 下一阶段清单（等待Manager恢复agent并发开跑通知）
+
+论文计划F0已明确：同一个旧rearrange full 30k，H50、K30，所有memory字段统一分别读取row1/20/30/50，共四个100ep run，成对初始seed一致。文中row为1-based，因此schema index.value分别0/19/29/49；last_executed在实际k=30时对应row30。先排row30/20，本机GPU0/1各一个串行100ep，完成后row1/50；正式启动前Manager会重新确认资源。使用同一runtime commit与明确的旧full等价schema/config，不能某一臂悄悄走不同解码/归一化。row50是模型对未来时刻的预测，不读取未来GT。记录实际执行k、所选行和各字段before/after语义；中途终止不伪造下一query。
+
+目前已完成旧入口smoke，仅作加载/产物锚点；新selector/trace代码集成后按同一路径完成必要2rollout（一次video一次no-video）smoke与独立review，固定commit后才能正式跑。这个清单是已授权实验的安排，不是要求当前闭合agent自行开始。RMBench保存两个层级目录及逐步metadata要求不变，50条人工检查偏差>10个百分点并记录，不按成绩丢弃不利run。
 # 目标
 
 # 用户最新数据约束
