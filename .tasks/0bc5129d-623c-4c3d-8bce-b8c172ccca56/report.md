@@ -1,11 +1,11 @@
-task_revision: 8a554f2c2383cc4ace5ef5c6915df2ba06577ef1
+task_revision: be14f517c506b6e8281f4733275abb2e77d7fdd3
 
 # bc842036：F0 / legacy RMBench simulation 独立 CPU 验收通过，可开始 GPU smoke
 
 审查候选与工作区：
 
 - F0 候选：`bc842036e3735390f35fe1138aa7b19f5ae2f95b`（`fix: skip terminal simulation inference in base`）。
-- F0 审阅基线：`b247332`，是将该 terminal patch 合入 `fd38513` 的等价 cherry-pick；二者稳定 patch-id 同为 `d09ba4ad09d83d1181b47ec6109bb006f24ceb45`。作出本 F0 判断时后继仅为 live controller 增量 `281e0a7`；当前审阅树 HEAD `967ba14` 还后接新 schema runtime 增量 `f84edbd` 的等价 cherry-pick（patch-id `d3b9dbe1bebf60c7d06b20a0eb74f7bfc534b514`）。两项后继均不纳入 `bc842036` 的 F0 判断。
+- F0 审阅基线：`b247332`，是将该 terminal patch 合入 `fd38513` 的等价 cherry-pick；二者稳定 patch-id 同为 `d09ba4ad09d83d1181b47ec6109bb006f24ceb45`。作出本 F0 判断时后继仅为 live controller 增量 `281e0a7`；该阶段审阅树 HEAD `967ba14` 还后接新 schema runtime 增量 `f84edbd` 的等价 cherry-pick（patch-id `d3b9dbe1bebf60c7d06b20a0eb74f7bfc534b514`）。两项后继均不纳入 `bc842036` 的 F0 判断。
 - 按任务要求只读核对的 OpenPI worktree：`/mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/openpi`，`58d6f2155acc3af03017677bb3f536101e6699f4`。
 
 本报告只放行旧 full checkpoint 的 F0 simulation CPU gate。未修改作者实现，未启动 GPU、真机或 rollout；GPU smoke/100 rollout 仍由独立 eval 任务执行。
@@ -72,6 +72,8 @@ bridge 审阅 HEAD `87fbc9c` 是 `78e1b4a49677d7aef50b0915076a465a4523ba5b` 的�
 - **drain 后跳 latency 的 P1 已关闭。** 两类 scheduler 在 build_obs_request 记录本轮是否同步 drain，并把 action 起点及 future 查询按有效 latency=0 处理；非 drain 仍保持 latency_step。独立运行 `CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/robot/controllers/test_execution_progress.py tests/scheduler/test_memory_v1_schedulers.py tests/scheduler/test_openpi_takeover.py` 为 **48 passed in 15.01s**，含同步/异步 action slice、末行发送及原 takeover 回归。
 
 - **末行 handoff 的 P1 部分修复，仍阻塞 live synchronous 验收。** 78e1b4a 增加 accepted endpoint 的最后一次真实发送，正常运行最终计数可达 K；但两个 controller 的 `_wait` 仍只检查 `action_queue.count_after(observation_base)`，没有等待该观察时间基上的 handoff 完成。独立 CPU 复现使用真实 `execute`、X1 `_exec_loop` / X1Pro `exec_worker_main` 和真实 `get_obs`，只把设备发送函数用 event 暂缓返回：一个合法单行 chunk 的终点已到期，传感器 buffer 时间戳已推进；发送尚未完成时 `get_obs(wait_condition={action_queue_remaining:0})` 已返回。X1 返回用时0.05ms、X1Pro 0.04ms，二者均为 `scheduled_remaining=0`，但 `execution_progress={completed:0,queued:1}`。释放 event 后线程正常退出，未使用硬件。`MemoryContext.observe()` 又无条件清 `_await_observation`，scheduler 随后仍可生成下一次 infer 输入，故“最终会发送末行”不等于“同步 query 前已获得 K 行证据”。修复需把同步 query 放行与本次观察对应的实际 handoff 绑定，并保留原异步语义。该复现不以排期时间冒充执行，也不要求硬件 ACK。
+
+- **live P1：延迟 tick 跨端点时，handoff 次数被误映射成连续轨迹前缀。** 两 controller 均用真实 execute 接收3个目标（每行14维，依次全1/全2/全3，间隔20ms），延迟90ms才运行真实 X1 loop / X1Pro worker，随后再观察50ms。两者都只成功发送 `[3.0]`（轨迹第3个目标），tracker 为 `{completed:1,queued:2}`；真实 MemoryContext（H50/K3、action_completed/last_executed、预测前3行分别1/2/3）却得到 `actual_k=1`、消费 `model_index=0`、cache `[1]`，仍列出后两行待完成。没有被选为 before 的前两个 timestamp 永久留在 tracker pending；目前 timestamp-only 的 wait 则会提前返回，若仅改成等待 queued=0 将卡住。根因是 exact-timestamp 事件累计“处理次数”与 Context 所假定的连续已执行前缀不同。修复应以成功 handoff 及其轨迹位置表述进度，保留实时插值允许跳过中间端点的行为；不建议事后补发过期动作，不以墙钟或 SDK 发送次数替代 policy row。仅阻塞 live，sim/训练不受影响。
 
 - **新 wire 实际跨库 CPU 联通正在复核。** 已使用正式 ffa308d，后续证据覆盖真实 tokenizer / policy input-output transforms / MemoryContext。旧58d6的缺接口是已替代的历史基线，不重复测试，也不计作新训练增量的实现缺陷。
 
