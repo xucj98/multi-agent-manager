@@ -4,7 +4,7 @@
 
 # 输入
 
-使用mam task status返回workspace下review_v2/的只读快照；SHA256SUMS固定本次输入。先读docs/MEMORY_CONFIG.zh-CN.md，再读docs/memory_config/memory.schema.yaml与五个实例。两个SAMPLES/SWAP_T文档是解释，FRAMEWORK是研究背景。不要读取其他review任务的报告或母对话。
+使用mam task status返回workspace下review_v3/的只读快照；SHA256SUMS固定本次输入。先读docs/MEMORY_CONFIG.zh-CN.md，再读docs/memory_config/memory.schema.yaml与五个实例。两个SAMPLES/SWAP_T文档是解释，FRAMEWORK是研究背景。不要读取其他review任务的报告或母对话。
 
 这是文档终审，已提供独享快照；无需代码worktree或新环境。仅需只读文件和少量CPU推演。可用 /mnt/public/xcj/Projects/RMBench/.venv/bin/python 中现有yaml/jsonschema。禁止修改文件、依赖环境、启动GPU实验或扩大扫描范围。
 
@@ -17,3 +17,7 @@
 # 本次追加
 
 review_v2替代review作为交付基准；仅MEMORY_CONFIG第7节新增按阶段做能力检查：普通推理无需训练标签，显式reference路径才要求在线GT，UI无需加载模型。其余文件未变。已完成的核验可复用，只追加核对这段，再依据最新task_revision发布report。
+
+# 终审意见修订后的定向复核
+
+review_v3为最终基准。Manager采纳两条意见：target_time在结构层要求offset>=0并禁止lag，覆盖memory目标与robot_target；online_time在结构层禁止lag，覆盖reference输入与反馈。只有训练输入可带lag。在线reference使用输入越界规则，固定历史offset仍允许。仅MEMORY_CONFIG与memory.schema.yaml变化，五实例不变。请定向复核这两处修复及五实例仍通过，其他已完成核验复用，不再扩展新功能。按最新task_revision更新report保留原发现与修复结论，然后发布。
