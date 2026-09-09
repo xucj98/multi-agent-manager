@@ -1,16 +1,31 @@
-task_revision: e842ba3262ad44843df572897a953a37571dd8c1
+task_revision: 482b78a2c7d024a06010c96426a77f51bde17605
 
-阶段回报（2026-09-10）
+阶段回报（2026-09-10，sim binding 优先）
 
-- wash-cup 扫描 244 集：合格 172，剔除 72。剔除原因非互斥：缺标注 16、含 label6 28、label1–5 不是各一个有效区间 56。合格次序为 `1>2>3>4>5` 120 集、`2>1>3>4>5` 52 集。
-- `availability=false` 表示该对齐源帧不落在原始 `subtasks` 的任一半开区间，因此没有 phase GT；不能将 `unknown` 或 initial 静默作为该行监督。172 集均有内部及尾部空白，160 集另有前缀空白；15 Hz 产物有 13,404 行 `availability=false`。
+- wash-cup 已扫 244 集：合格 172，排除 72；原因非互斥为缺 annotation 16、含 label6 28、labels 1--5 不是各一个有效区间 56。合格顺序为 `1>2>3>4>5` 120 集、`2>1>3>4>5` 52 集。
+- `availability=false` 表示该对齐源帧不在原始 `subtasks` 任一半开区间中，即无 phase GT；它必须输入 initial、memory target mask/weight=0，不能静默作为 initial/unknown 类监督。172 个合格 episode 均有内部或尾部 gap，160 个还有前缀 gap；15 Hz 产物共 13,404 行 false。
+- wash S2M 已确认原错误为将 `follow_*` 同时用作 state/action。正确语义为当前 `follow[14]` state 到下一对齐帧 `master[14]` action；同一 raw frame 的两个 14 维向量逐值不同。`all_172_15hz` 仍暂停作为训练资产，修复将输出独立目录。
 
-S2M 阻塞已确认，`all_172_15hz` 暂停为训练资产：
+rearrange/put-back 当前可核验事实：
 
-- 根因在 `wash_cup_memory_adapter.load_s2m_trajectory`：它只解析 `follow_*`，再将同一数组复制给 `state` 和 `action`。此前 follower 逐值误差为零只能证明错误地复制成功，不能证明 S2M action 正确。
-- 旧 drawer 的准确转换提交 `3f7086271dbe49100323496218caf0ed69b761b3` 先拼接 `follow[14] + master[14]`；state 取前 14 个 slave/follower 值，action 取后 14 个 master 值。其输出循环将 `action[frame_index + 1, :14]` 写为当前 LeRobot 行 action，故语义是 follow state 于当前对齐帧 → master action 于下一对齐帧。对应 S2M policy metadata 为 `slave_state_dim=14`、`master_action_dim=14`。
-- 同一 drawer raw episode `drawer_sorting_lhy_0811@MASTER_SLAVE_MODE@2026_08_11_09_40_52` 的 frame 0（布局为左 pos/rot/gripper、右 pos/rot/gripper）给出直接反例：`follow=[-0.0022402577,-0.00025041853,-0.0029526813,0.072363025,0.093465416,-0.036769467,-0.010490417,-0.0010313406,0.0077726826,0.0092162838,0.0064907609,-0.040642711,0.031675495,-0.036049843]`；`master=[-0.0023880005,-0.00051593781,-0.001124382,0.086008182,0.082037862,-0.050148726,0,0.00010603666,0.0080337524,0.0057678223,0.0018346971,-0.054676536,0.040369338,0]`。两组均为 14 维但逐值不同。
-- 修复正在本任务 worktree 实施：分离 follow state 和 master action 字段/验证，保留现有 `source_indices[:-1]` 到 `source_indices[1:]` 的下一对齐时间关系，更新 conversion metadata 为两套字段和明确 action 语义，并增加会拒绝 follower-as-action 的定向测试。修复后只写独立新输出目录；不重解码视频。
+- 已恢复的 converted 数据均由 `demo_clean_state` 产生：rearrange 50 ep/20,103 frame，put-back 50 ep/17,588 frame。小 metadata 与 edge report 已可读；asset 的 100 HDF5 核验给出 `raw_N=converted_N+1`，state 首两行、action 首行和末两行均 max error 0。
+- `observation.key_state_target_ids[t]` 是 raw/current truth at `t`；`observation.key_state_input_ids[t]` 是 legacy `t-20`，绝不绑定为 current truth。rearrange target transition 例为 140/210/254，legacy input 为 20/160/230/274；put-back target 为 138/247，legacy input 为 158/267。
+- converted `action[t,:14]` 已是 raw `q(t+1)`。binding 必须为 `action_at_row`、`offset: 0`，不能再次 offset 1；两套 P2 配置的机器人目标相同。
 
-- API 增量 `0f37cfc1ae42e4703b741f0f05fd1e3c58c87e89` 已 cherry-pick 到本任务 worktree。转换已保存 `memory_phase_available` 和 raw sidecar availability；训练绑定将使用 `EpisodeMemoryData.availability={"phase": ...}`，让 API 对缺 GT 输入 initial、逐字段 target mask/weight 为零，同时保留 robot action 监督。
-- sim 已恢复的 converted 数据仍确认来自 `demo_clean_state`：rearrange 50 集/20,103 帧，put-back 50 集/17,588 帧。asset owner 已恢复每任务的 `scene_info.json`、`language_annotation.json`、`metadata/robot_edge_samples.json` 和 `robot_edge_comparison.json`；源端 100 个 HDF5 的检查报告 `raw_N=converted_N+1`，state 首两行、action 首行及末两行的最大误差均为 0。现正只读核对 current target、lagged input、事件和 action `offset=0` 绑定；raw 尾部/事件不再是等待大文件的硬阻塞。
+给 training owner 的精确 binding：
+
+```text
+state = column(observation.state, semantics=observation_at_row, start=0, stop=14)
+images = {cam_high: observation.images.cam_high,
+          cam_left_wrist: observation.images.cam_left_wrist,
+          cam_right_wrist: observation.images.cam_right_wrist}
+robot_action_target = column(action, semantics=action_at_row, start=0, stop=14)
+field = sidecar(series.<field>, semantics=current_truth, encoding=labels)
+availability[field] = sidecar(availability.<field>, semantics=availability_at_row)
+```
+
+当前 prototype 的具体 blocker（不可静默降级）：每个 converted episode 有 M 个 loader row/action、但 P2 query `M-1` 的 `phase(t+1)` 需要已恢复 raw 第 M 个 label；robot tail 应重复 converted 最后一个 action。`MemoryDataAdapter.build_episode` 目前要求 action 和所有 series 等长，且 `MemoryBindings.validate` 禁止 robot target source=sidecar；`tail` 仅读为 scalar，当前 API 不用它扩展 series。因此侧车 M+1 truth 无法与 action column M 同时绑定。
+
+建议 training owner 在通用 binding 层实现一次性 tail append：读 M 个 column/sidecar 值后，按 `tail.<series>` 追加恢复 raw final label、availability true，按 `tail.robot_action_target` 追加 action[-1]；loader 仍只对 M 个 converted row 取 query。这样 P2 末 query 使用真实 `t+1` label，且 robot 维度保持 action offset 0。不要以 M-1 clamp 标签替代原始尾帧。
+
+本任务正在生成两个任务的 M+1 sidecar、binding manifest 和全量 100 episode audit；未开始 GPU 训练。
