@@ -1,3 +1,9 @@
+## Sim binding接口收敛（4815273后的Manager裁定）
+
+4815273正确恢复了额外raw最后帧，但新增的manifest.tail_append协议当前训练adapter不支持。不要再实现一套tail_append扩展/解释器。采用既有sidecar绑定：sidecar直接保存等长M+1的series（phase/属性及robot_action_target），机器人前M行逐值拷贝converted action[:14]，第M行重复末动作；availability也M+1。图像/robot state及query仍来自原LeRobot的M行，query范围不变；初末行逐值测试不能省。这里只有低维数组复制，图像和原数据不复制，不会新采样不存在的query。MemoryBindings用source=sidecar指向robot_action_target，semantics=action_at_row、offset0；训练层移除仅允许robot source=column的无必要限制，保留不能绑定observation state与禁止二次移位检查。这样不修改已验收core API，也不新增tail_append schema/第二种补尾配置。
+
+适配器里的账号绝对DEFAULT_LEROBOT_ROOT/RMBENCH_DATA_ROOT/ARTIFACT_ROOT删除；源路径由明确参数传入，输出默认路径若需要则从本openpi项目根构造。相对参数按项目根解析。完整实验命令可写本集群绝对路径。路径检查不依赖作者workspace，shared产物写入原openpi的data软链目标。请data owner以独立增量commit更新，training owner沿既有sidecar reader直接使用。
+
 ## 2026-09-10 独立review后的优先级与阻塞修复
 
 先交付examples/rmbench的sim bindings及正式YAML独立commit，让训练与review继续；wash修复可随后推进。James已确认wash master v2的视频与pose/action source索引漂移：ep0 face q23为46对43，q765为1515对1527，q1205为2387对2407，最大20 raw frame。其报告见任务3e78bfec-0cb7-41f4-ab7c-e002adf50c88/report.md。v2不能用于训练。视频、状态、next master action及标注必须共用真实可审计的时间/source mapping；不能仅改offset，亦不能继续复用不同时间轴的视频。保留原始时间与选择依据，先小样本独立核验后完成正确的新输出。提交前在raw/converted逐帧比对两集、多相机、开头/中段/尾部，除了shape还要验证视觉帧与pose/action索引相同。不要为省重编码成本牺牲时间对齐。请报告sim独立commit和wash修复预计耗时。
