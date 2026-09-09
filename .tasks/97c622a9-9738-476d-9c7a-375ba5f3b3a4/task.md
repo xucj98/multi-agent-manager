@@ -26,3 +26,11 @@ Manager 已亲自完成第一稿。独立检查这套 schema 是否能成为实�
 在MAM的report.md写简报并通过CLI发布：task_revision、完成/未完成、workspace、阅读文件SHA、论文HEAD（注明新稿不在HEAD内）、按重要程度列出的具体问题（文件行号、原因、最小建议），最后说明是否可作为下一轮用户讨论的框架。最多五个主要问题，次要措辞合并列举；若没有实质问题明确说明。
 
 Manager 会自己修订正文；你的职责是独立审阅。完成后结束本轮，等待Manager需要时追问，workspace由Manager验收归档。
+
+## 本轮定向复核追加
+
+Manager已依据首次报告修订同一文件，现SHA256为`3b6e0f3c7baf0e25e34c3b21e67034dda338de65c944c03d6c25bd7c64d36e55`。只复核原五项意见是否已处理，不重新展开完整审阅：同步P1/P2要求继续query前完成K，episode提前结束仍进入成功率统计但没有下一反馈；P1收窄为组合协议探索；P2明确不同损失时域/难度/重复权重，并把endpoint-only控制留给需要归因时；P3收窄为字段设计对照。
+
+第5项补充证据允许读取同目录的`run_index.csv`，仅查询`pi05_rearrange_state_token_boundary_ablation/serial_soft_seed42@`这八行即可。23/25、35/49、64/81、38/54对应K15/20/30/50，train seed42与同一checkpoint已在正文补明，eval版本不完全一致和本地缺权重也已注明。这不是shared fixed20 seed42的24/26。
+
+请在原report保留初审发现，追加定向复核结论并将task_revision更新为本次发布revision，再发布report。无须再次全量读guidelines、背景文件、Git历史或原始run；有未解决实质问题只简述，否则说明五项已处理、可供用户讨论。
