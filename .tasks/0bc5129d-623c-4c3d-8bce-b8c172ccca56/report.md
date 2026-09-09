@@ -1,106 +1,63 @@
-task_revision: 28c446150ca33eb7112ccd57ed438d9c0860da23
+task_revision: c84dfba0fe3b7b935ae6645526a7ba95a13773fa
 
-# 起始提交独立 runtime 审查（非最终验收）
-
-审查范围仅为 `robot-bridge` 的 `bb908c66c17fd2f081c98265228376c3ff2fc3e6`
-（controller execution progress）和
-`22a5c6cc54f46daf0e025fa3f7fdbd1f07a2f6a8`（checkpoint
-`memory_config` 透传）。scheduler / MemoryContext / UI 增量尚未收到，
-因此以下不是完整验收结论。
+# fd38513：F0 / legacy RMBench simulation 阶段审结（非最终 runtime 验收）
 
 审查 HEAD / 工作区：
 
-- `22a5c6cc54f46daf0e025fa3f7fdbd1f07a2f6a8`
+- `robot-bridge`：`fd38513adb5ba171327358f70f55f88059de49d2`
 - `/mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/robot-bridge`
-- worktree 干净；未修改交付实现、未启动 GPU 或真机程序。
+- 另按任务要求创建并只读核对 `openpi` worktree：
+  `/mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/openpi`
+  at `58d6f2155acc3af03017677bb3f536101e6699f4`。
 
-## 阻塞 scheduler 反馈接入的发现
+本阶段只审旧 full checkpoint 的 F0 legacy simulation 路径、selector、progress/trace 和 terminal 边界。未修改作者实现、未启动 GPU、真机或 rollout；四行 smoke 和正式 100 rollout 仍归独立 eval 任务。
 
-1. **P1：`execution_progress.completed` 不是实际执行的行数。**
-   `ExecutionProgressTracker.observe()` 只按排程 timestamp 是否小于
-   observation timestamp 累加（`robot_bridge/robot/controllers/execution_progress.py:46-57`）。
-   x1 / x1pro 在 `execute()` 入队时立即登记这些 timestamp，而不是在执行线程
-   调用发送动作后登记（x1 `controller.py:414-431`，x1pro
-   `controller.py:432-457`）。两条真实执行循环都只有同时存在 `before` 和
-   `after` 锚点才调用发送动作（x1 `controller.py:237-257`；x1pro
-   `exec_worker.py:133-145`）。
+## 结论
 
-   CPU 最小复现用未初始化硬件的真实循环、替换发送函数为计数器：一个合法
-   `(1, 14)` chunk 在 timestamp 后分别得到 x1 / x1pro
-   `executor_calls=0`，但 tracker 都返回
-   `{"completed": 1, "queued": 0}`。因此若 scheduler 用 completed delta
-   消费 policy row，会在完全未发出该动作的情况下提交 phase / memory；末行、
-   短 chunk 和部分执行尤其直接受影响。计数需要明确降级为“排程已越过观测时间基”的
-   证据，或改为能和执行线程实际尝试发送相对应的证据；无论采用哪种，scheduler
-   不能把当前字段当作实际已处理 policy row。
+**legacy H50/K30 selector / progress 没有阻塞；当前 F0 不可放行的唯一 simulation 阻塞是 terminal observation 仍额外调用一次 policy `infer`。**
 
-2. **P1：takeover 的 cut 仍可让旧 autonomous proposal 进入执行器，新增
-   tracker 会把它记成完成。** `clear_actions()` 用 wall-clock `cut` 仅删除
-   timestamp 大于 cut 的条目（tracker `drop_after()` 位于
-   `execution_progress.py:59-67`，x1pro 的 worker marker 位于
-   `exec_worker.py:117-126`）。执行器滞后时，已过排程时间但尚未被 worker
-   处理的旧条目保留；下一个 post-cut 条目到来后，它们仍会作为插值的 `before`。
-   
-   CPU 复现按真实 x1pro worker FIFO 放入：已执行 anchor=0、旧条目=100、cut、
-   新条目=3。首个 post-cut 调用的值为 `95.23934173583984`（8 次调用），表明
-   旧 proposal 仍参与执行，而不是仅保留实际历史 anchor。独立 tracker 复现也显示，
-   对 `cut - 1s` 的尚未执行条目，`drop_after(cut)` 返回 0，随后观测报告
-   completed=1。根本 cut 行为早于本提交，但 `bb908c6` 使它成为反馈误消费和
-   “接管/reset 不消费旧 proposal”要求的直接 blocker。后续 scheduler 不能以
-   当前 completed delta 证明旧 chunk 已安全清除。
+因此，在作者交付并通过 terminal 局部修复前，不启动 rows 1/20/30/50 的各 2 rollout smoke，也不进入每行 100 rollout。修复只需局限于 simulation scheduler 的 terminal 分支；不应等待三项 live controller P1 一并解决。正式 recorder 的原完整配置检查保持，不加入新的白名单或兼容豁免。
 
-3. **P1：completed 未绑定到返回观察的时间基，跨请求会提前消费。** x1/x1pro
-   都以本次 `get_obs` 所需 buffer 的最小 timestamp 调用全局、可变的 tracker
-   （x1 `controller.py:324-368`；x1pro `controller.py:311-361`）。带图像与
-   不带图像的请求时间基不同，控制 UI / 对齐 / 其它客户端的无图请求可先以较新的
-   state timestamp 推进 tracker，之后 scheduler 的带图像观察仍拿到已推进的
-   completed 值。最小输入 `enqueue([5]); observe(6); observe(4)` 的结果为
-   `completed=1`、`completed=1`。后一次图像对齐观察实际仍早于 action timestamp，
-   却被配上已消费的行。锁只保护数据结构，不能保护 observation-to-feedback
-   关联；接入时需要把进度快照和生成它的同一观察时间基绑定，或禁止无关查询改变
-   scheduler 的反馈证据。
+## 已检查、可接受的 F0 行为
 
-## 已确认可用的起始部分
+1. **旧 checkpoint 保持 legacy 路径。** 无 `memory_config` 的 `full_state` 不进入 `MemoryContext` / 新 schema 解码；其状态输入、密集输出切片和原有 one-hot 归一化仍由 `OpenPiSimulationScheduler` 的 legacy 路径处理。新 selector 只允许 legacy full-state；含 `memory_config` 的 checkpoint 会拒绝这个诊断参数，避免改变新 schema 的 metadata 事实源。
 
-- `OpenPiBackend.get_metadata()` 对新 checkpoint 原样透传
-  `memory_config`，旧 checkpoint 不新增该字段（
-  `robot_bridge/policy/backends/openpi.py:402-415`）。相应单元测试确认
-  identity 保持和 legacy omission；这条路径没有重解释旧 `memory` metadata，
-  符合 legacy 可比性要求。
-- Mock 的 completed 是同步执行的 policy rows；RMBench 的 completed 取
-  `take_action_cnt`，每次 `_drain_to()` 正好调用一次 `take_action`，terminal
-  时清空尾部。新增的 early-terminal 测试正确覆盖了 3 行队列只完成 2 行、
-  `queued=0` 的情况。
-- Offline controller 的 completed 是 `_current_frame`，即 policy-row target
-  timeline，而非 render/substep；但它在 episode 切换时回到 0，并以
-  `offline_dataset_status="ep_init"` 标识边界。后续 scheduler 必须先清 pending
-  / baseline，再解释该计数，不能把它当跨 episode 单调计数；`dataset_done`
-  返回也不含 execution_progress，不能伪造下一次 query。
-- 真机 metadata 的 unit 标为 `control_commands`，不是 `policy_rows`，方向正确；
-  scheduler 仍须显式保存 chunk 到 command/row 的映射，不能仅使用 raw counter。
+2. **H50/K30 基线正确。** 默认或显式 `{kind: last_executed}` 在实际完整执行 K=30 时选择 model index 29（人类 row 30）。选择从实际 `logical_step` 前进的 executed prefix 导出，未把 render/substep 当作 policy row。
 
-## 验证
+3. **四种 row 诊断使用一条统一规则。** `{kind: index, value: 0|19|29|49}` 分别对应 rows 1/20/30/50；同一 raw output row 先被选出，再被用于所有 legacy dense memory fields 的既有投影。row 50 仍是模型预测而非 GT，trace 明确标记 `was_executed: false`，不会伪装为已执行行。
 
-- `.venv/bin/python scripts/worktree_env_smoke.py`：通过。
-- `tests/robot/controllers/test_execution_progress.py`
-  `tests/robot/controllers/test_rmbench_simulation.py`
-  `tests/robot/controllers/x1pro/test_buffers.py`
-  `tests/policy/test_openpi_metadata.py`
-  及相关 OpenPi / takeover / simulation scheduler CPU tests：
-  `87 passed, 1 skipped, 1 deselected`（`CUDA_VISIBLE_DEVICES=''`）。
-- 同一完整选择集未排除测试时为 `87 passed, 1 skipped, 1 failed`。失败的是
-  `tests/scheduler/test_openpi_simulation.py::test_real_controller_images_through_scheduler_loop`：
-  测试以 `object.__new__` 创建 scheduler 而未设置
-  `_policy_reset_pending`，但 `SchedulerBase.run_iteration()` 已读取它。
-  相关 base/test 行由早于审查范围的 `f01586b7` 引入，且 bb908c6 / 22a5c6c
-  均未改动这些路径，故记录为既有、与本次两提交无关的测试装配失败。
-- 未进行真机硬件、SDK 真实反馈或 GPU rollout 验证；CPU fake SDK 复现不能宣称
-  真机通过。
+4. **trace 的实际执行和 terminal 表达正确。** 接受 chunk 后，以 `logical_step - source_step` 计算 `actual_k`；terminal 前仅执行 10 行的例子记录 `actual_k: 10`，且 `next_query: false`。在直接调用 scheduler hook 的路径，terminal `build_act_request()` 返回 `None`，不会生成 execute request。
 
-## 未完成与后续
+5. **边界校验明确。** selector 越出 H50 会在初始化时报错；不足以容纳 selector 的模型输出也会被拒绝，不会静默回退到末行。
 
-尚待 Manager 提供 scheduler / MemoryContext / UI 增量后，复核 row index、actual k、
-query_selected/chunk_completed 时刻、legacy F0、reset/takeover 清 pending、UI 字段透传
-和异常收尾。当前 metadata 透传未调用新 client API，因此尚未创建本 task 的 openpi
-worktree；增量若实际依赖 `openpi_client.memory_config`，将按要求单独创建
-`openpi@58d6f2155acc3af03017677bb3f536101e6699f4` worktree 后审查。
+独立 CPU 验证（`CUDA_VISIBLE_DEVICES=''`）：
+
+```text
+.venv/bin/python -m pytest -q tests/scheduler/test_openpi_simulation.py \
+  -k 'legacy_full_f0 or legacy_full_last_executed or legacy_full_selector_rejects'
+7 passed, 7 deselected
+```
+
+该集合覆盖 rows 1/20/30/50、K30 的 `last_executed`/row30 等价、terminal 的 actual-k/trace，以及越界 selector 拒绝。
+
+## F0 阻塞：terminal trace 与实际调用不一致
+
+`OpenPiSimulationScheduler.build_policy_obs()` 已把 terminal 写入 `_episode_terminal`，而 `build_act_request()` 会据此返回 `None`。但共享 `SchedulerBase.run_iteration()` 的顺序仍是：`get_obs` → `build_policy_obs` → **policy `infer`** → `build_act_request`。所以 terminal observation 的 trace 虽写 `next_query: false`，实际仍有一次无用推理。
+
+独立最小复现使用 terminal RMBench-shaped observation、真实 scheduler hook 和计数 policy client：`run_iteration()` 返回 `"skip"`，`infer_calls=1`，robot 端只收到 `get_obs`、未收到 execute。该结果确认风险在实际循环，不是只存在于手工 hook 调用。
+
+作者已被 Manager 要求给出 simulation-only 小提交。收到后需复核以下条件：
+
+- terminal trace 保留真实 `actual_k` 且 `next_query: false`；
+- terminal observation 的 policy `infer` 调用数为 0；
+- 没有 execute / action 入队；
+- 非 terminal F0 K30 路径和 shared base/live 循环未被改动；
+- 上述 7 个 selector 测试及新增实际循环 infer-count 回归测试通过。
+
+通过后，F0 runtime 才可交给 eval 任务按 rows 1/20/30/50 各自 2 rollout smoke、再各自 100 rollout 的既定流程执行，并保留完整 recorder 检查。
+
+## 尚未纳入本阶段结论
+
+- Memory v1 多字段、serial、partial completion、reset/takeover 和 UI 全范围审查仍在继续。
+- x1/x1pro 三项 live controller P1（排程时间冒充实际处理、takeover 后旧 proposal 作为锚点、跨 `get_obs` 时间基提前推进 progress）由作者另行修复；它们是 live runtime 的阻塞，不作为 F0 simulation 小修复的等待条件。
+- `fd38513` 全量改动为 13 files、`+2252/-69`；其中 simulation scheduler 和其测试的增量规模分别为 `+342/-29`、`+131/-0`。关于其余实现必要性、重复逻辑、打包运行依赖及完整 schema/live 结论将在后续 report 更新中给出。
