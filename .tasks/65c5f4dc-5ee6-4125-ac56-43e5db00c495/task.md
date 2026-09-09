@@ -19,3 +19,5 @@
 6. 不占GPU、不大规模扫描数据/模型、不过度反复验证。已定位旧监控由manager处理。对删除有疑点的独有成果先报出，不自行销毁。
 
 交付：发布 report.md（task_revision、workspace/commit、三组绝对路径、15 run结果、文件完整性验证、删除项、遗留项）。清理自用临时文件，保留代码worktree等manager归档。业务主目录 robot-bridge 有用户未跟踪设计文档，勿触碰。
+
+Manager 文档验收反馈（2026-09-09）：文件迁移已独立复核全部2209文件含71视频零hash差异，15run各100唯一ID，无需重复验证。README压缩后仍须保留关键比较与实验身份：统一runtime结果表增加历史baseline及百分点差（93/36/15/11/100/6/84/8/80对应现有9行），说明Pi serial的36%为同配置历史，主表30.5%属于[15,50]另一variant；DM05实际跨库目录写 ../opendm/user_checkpoints/...（不是不存在的OpenDM/）。自训README保留实际8×48/global384、base Qwen初始化及resume:null。官方README保留HF发布模型revision、发布卡五项参考值与来源链接、checkpoint及norm hash、observe使用3dbd7ae其余4827f83的commit区分；这些可用一张小表/几行表达，旧时序进度和待办可以删。完成后提交并重新发布report。
