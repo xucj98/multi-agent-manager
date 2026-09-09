@@ -5,7 +5,7 @@ task_revision: d606b3740789a1ed496f84d9bd2f462797d1078f
 审查候选与工作区：
 
 - F0 候选：`bc842036e3735390f35fe1138aa7b19f5ae2f95b`（`fix: skip terminal simulation inference in base`）。
-- F0 审阅基线：`b247332`，是将该 terminal patch 合入 `fd38513` 的等价 cherry-pick；二者稳定 patch-id 同为 `d09ba4ad09d83d1181b47ec6109bb006f24ceb45`。当前审阅树 HEAD 为其后仅含 live controller 增量的 `281e0a7`；该后继不纳入本 F0 判断。
+- F0 审阅基线：`b247332`，是将该 terminal patch 合入 `fd38513` 的等价 cherry-pick；二者稳定 patch-id 同为 `d09ba4ad09d83d1181b47ec6109bb006f24ceb45`。作出本 F0 判断时后继仅为 live controller 增量 `281e0a7`；当前审阅树 HEAD `967ba14` 还后接新 schema runtime 增量 `f84edbd` 的等价 cherry-pick（patch-id `d3b9dbe1bebf60c7d06b20a0eb74f7bfc534b514`）。两项后继均不纳入 `bc842036` 的 F0 判断。
 - 按任务要求只读核对的 OpenPI worktree：`/mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/openpi`，`58d6f2155acc3af03017677bb3f536101e6699f4`。
 
 本报告只放行旧 full checkpoint 的 F0 simulation CPU gate。未修改作者实现，未启动 GPU、真机或 rollout；GPU smoke/100 rollout 仍由独立 eval 任务执行。
@@ -67,7 +67,9 @@ task_revision: d606b3740789a1ed496f84d9bd2f462797d1078f
 
 ## 后续独立范围（不影响上述 bc842036 F0 结论）
 
-- **新 Memory v1 wire 契约尚未验收。** 当前实现的 `MemoryContext.add_inputs()` 将 dense 编码写入 padded `state`，真实训练 input transform 却读取 `memory_input_ids`；真实 output transform 又会把 `actions` 裁为 14 维机器人动作，而 runtime 曾从该尾部解码 memory。这两处断链须按已发布契约修为 scheduler 传 `(F,)` 的语义 `memory_input_ids`、policy transform 负责编码、输出以 `memory_prediction_ids`（full `(H,F)`、serial `(1,F)`）交给 `MemoryContext`。收到作者小增量后将跨真实 input/output transforms 与真实 context 做 CPU 联通复核，覆盖单/多字段、no-memory、K30 row30 和 serial 的实际 selected 条件；不会用两端 mock 字典代替。旧 F0 checkpoint 无 `memory_config`，因此不受此项阻塞。
+- **新 Memory v1 wire：runtime 半边 `f84edbd` 已复核，跨库闭环仍未验收。** 审阅树中的 `967ba14` 是 `f84edbd6eea81104a00fd85409046eaaa8712e9b` 的等价 cherry-pick。它使三类 scheduler 只发送原始 robot state/images/prompt 加有序 `(F,)` 的 `memory_input_ids`，不再由 runtime 写 padded dense tail；它只接受 declared `robot_dim` 的 robot-only `actions`，从严格 shape/range 校验的 `memory_prediction_ids` 读取 full `(H,F)` / serial `(1,F)` 语义输出；no-memory 不索取该字段，serial 不再重新 argmax。以 `CUDA_VISIBLE_DEVICES=''` 执行 `tests/scheduler/test_memory_context.py tests/scheduler/test_memory_v1_schedulers.py tests/scheduler/test_openpi_simulation.py tests/scheduler/test_openpi_takeover.py tests/robot/controllers/test_execution_progress.py` 得到 **65 passed in 16.82s**。
+
+  但发布的 OpenPI 审阅基线 `58d6f2155acc3af03017677bb3f536101e6699f4` 还不实现这条 wire，不能以这些 runtime mock 代替跨边界验收。对真实 `ArxSm2smInputs` / `ArxSm2smOutputs` 的 CPU 调用，scheduler-shaped serial input `{memory_input_ids: [2]}` 立即因缺旧 `key_state_input_ids` 抛 `KeyError`；full 的原始 14 维 state 因仍要求 dense 17 维而抛 `ValueError`，即使提供 17 维 state 也会丢弃 `memory_input_ids`；full output 为 `(50,17)` dense actions、serial output 为 `(50,14)` actions，二者均没有 `memory_prediction_ids`。训练侧任务 `ad6bb77e-3892-4730-ae1a-7d9cd99a5728` 仍为 working，尚未发布正式 transform / `Policy.infer` 提交。因此新 schema 不能放行；收到该提交后必须用真实 policy input/output transform 链与真实 `MemoryContext` 复核非初始 cache 改变 tokenized prompt、robot-only action 裁切后 ID 字段仍存、full K30 row30、serial 实际 selected ID、单/多字段和 no-memory。旧 F0 checkpoint 无 `memory_config`，不受此项阻塞。
 
 - **新增 live P1：`281e0a7` 在 synchronous row 边界漏掉 chunk 末行。** 该增量正确把已完成进度从“时间戳已过”改为实际 transport handoff，但 X1 loop 和 X1Pro worker 都只在有下一个 `after` endpoint 时把 `before` 命令标为 processed。对 3 行实际 `execute` chunk，独立无硬件复现得到：X1 已 `queue_idle: true` 时 `completed_rows: 2`、`queued_rows: 1`（只发布 2 次，最后值约 2.994）；X1Pro 也只有两个不同 command timestamp 的 handoff event（末次发布约 2.50）。`MemoryContext.apply_wait_condition()` 对 `synchronous_rows` 只写 `action_queue_remaining: 0`，因此下一次 `get_obs` 可以在最后 policy row 未完成时返回；`observe()` 只得到 K−1 行，`last_executed`/`chunk_completed` 的第 K 行反馈会滞后一 query 或在 terminal/takeover 时丢失。这直接违反 “synchronous rows” 与实际执行行的契约，阻塞 live runtime 验收。修复必须让该模式在下一 infer 前拥有 K 行真实 handoff evidence（或显式继续等待），不能把已排期 timestamp 当作完成；回归须覆盖真实 X1 loop、X1Pro worker、插值 factor>1、最后 chunk/terminal 和 takeover/reset。
 
