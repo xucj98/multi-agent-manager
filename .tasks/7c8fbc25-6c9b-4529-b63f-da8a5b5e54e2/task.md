@@ -1,75 +1,51 @@
-## metadata文件的收敛约定
-
-command.txt本身包含实际命令、cwd和git commit（可用注释头），不另新增git_commit.txt或runtime信息副本。数据生成只保留本次实际使用的data/binding配置及上游metadata；不要把目录里所有候选训练memory YAML都复制进转换metadata。目标时序/decoder等完整memory配置由训练最终TrainConfig.memory_config权威保存，不让数据准备阶段看似选择了多种训练协议。69ca148中的configs/*.yaml批量拷贝应删除；未被正式训练使用的预备metadata可清理后真实重生成，保留准确新命令。
-
-## 留痕补齐（现有验收要求）
-
-Manager已查新sim sidecar目录只有episode_memory/binding_manifest，未保留command.txt及上游metadata。请在生成产物旁的metadata保存实际生成命令及本次git commit、使用的binding/config、沿既有数据链继承转换/source metadata；只复制metadata/config，不复制代码或dataset/videos/标签矩阵。代码和正式生成命令先固定，重新生成这份小sidecar以留下真实记录（不能事后编造不存在的原始command）。新的wash正确转换同样遵守。使用项目现有布局和简单复制，不新增provenance体系/重复runtime。checkpoint owner已被安排在保存时继承这份metadata；它沿sidecar_path父目录的metadata发现即可，保持训练与RMBench不耦合。
-
-## Sim binding接口收敛（4815273后的Manager裁定）
-
-4815273正确恢复了额外raw最后帧，但新增的manifest.tail_append协议当前训练adapter不支持。不要再实现一套tail_append扩展/解释器。采用既有sidecar绑定：sidecar直接保存等长M+1的series（phase/属性及robot_action_target），机器人前M行逐值拷贝converted action[:14]，第M行重复末动作；availability也M+1。图像/robot state及query仍来自原LeRobot的M行，query范围不变；初末行逐值测试不能省。这里只有低维数组复制，图像和原数据不复制，不会新采样不存在的query。MemoryBindings用source=sidecar指向robot_action_target，semantics=action_at_row、offset0；训练层移除仅允许robot source=column的无必要限制，保留不能绑定observation state与禁止二次移位检查。这样不修改已验收core API，也不新增tail_append schema/第二种补尾配置。
-
-适配器里的账号绝对DEFAULT_LEROBOT_ROOT/RMBENCH_DATA_ROOT/ARTIFACT_ROOT删除；源路径由明确参数传入，输出默认路径若需要则从本openpi项目根构造。相对参数按项目根解析。完整实验命令可写本集群绝对路径。路径检查不依赖作者workspace，shared产物写入原openpi的data软链目标。请data owner以独立增量commit更新，training owner沿既有sidecar reader直接使用。
-
-## 2026-09-10 独立review后的优先级与阻塞修复
-
-先交付examples/rmbench的sim bindings及正式YAML独立commit，让训练与review继续；wash修复可随后推进。James已确认wash master v2的视频与pose/action source索引漂移：ep0 face q23为46对43，q765为1515对1527，q1205为2387对2407，最大20 raw frame。其报告见任务3e78bfec-0cb7-41f4-ab7c-e002adf50c88/report.md。v2不能用于训练。视频、状态、next master action及标注必须共用真实可审计的时间/source mapping；不能仅改offset，亦不能继续复用不同时间轴的视频。保留原始时间与选择依据，先小样本独立核验后完成正确的新输出。提交前在raw/converted逐帧比对两集、多相机、开头/中段/尾部，除了shape还要验证视觉帧与pose/action索引相同。不要为省重编码成本牺牲时间对齐。请报告sim独立commit和wash修复预计耗时。
-
 # Memory v1：数据适配与wash-cup转换
 
-首批八卡所需sim配置除已有四份P2 full外，还包含rearrange serial fixed lag30/current query target和rearrange no-memory。请沿同一sim sidecar/bindings给两份英文可运行YAML；serial时序规则与本任务wash serial一致，但字段使用rearrange三字段，no-memory用memory=[]及空updates。只增加对应配置，模型实现仍归训练owner。不会要求扩其它三个任务后才能先启动这六项。
+## 范围与当前状态
 
+复用本任务openpi worktree及独立环境，阅读openpi AGENTS。负责examples/rmbench的数据适配、YAML、中文操作说明及定向测试，和examples/x2robot的wash转换/标注/配置/测试。不改src/openpi、packages/openpi-client、robot-bridge或主checkout，不自行派agent。新图像/低维产物归主openpi的gitignored data共享路径，不能依赖临时workspace。
 
-## 阶段事实后的Manager裁定
+sim两任务数据/配置已由James独立review通过（100ep、4500 P2 sample、1250 serial/no-memory query）。当前sim最终commit63319ac984492cd8bfd8a71158200220a6e14e38，其metadata收敛增量由review补核。wash修复commit773d177b93b6a6d8569a6761ae74118bef5d4adc、配置a75d1737539d5497b2e8d3569756ef0dc67d5ed2已送James。现在优先提供修正后两集三相机的实际小样本及证据，独立验收后立即全172转换；sim不得等待wash。未获分配不使用GPU，不启动模型训练或真机。
 
-文件归属：新sim adapter、其tests和rearrange/put-back运行YAML放examples/rmbench/及其memory_configs/；wash保持examples/x2robot/。不要将RMBench适配代码塞在x2robot目录下。尚未提交的新文件直接移到正确目录并调整import即可，不增加公共框架，也不为搬路径重复转换数据。
+## 数据来源与sim约定
 
-首批可运行YAML的协议必须按实验计划核对：当前wash_cup_phase_serial_t_plus_1.yaml使用train/infer均initial、target t+1、空feedback，是另一种辅助任务，不能作首批serial基线。首批wash full：当前reference输入（首次/缺GT用unknown）、infer cache、phase target t+j+1、chunk_completed消费last_executed。首批wash serial：输入同一named previous lag30（train reference t-30，负索引/缺GT才initial）、infer cache；query phase target t（offset0/stride0），current_condition train reference/infer selected，query_selected反馈预测phase供下一query。两者H50/K30、同domain与S2M动作目标，不夹带ordered decoder。serial不套P2未来两个时刻的公共validity；其query当前GT可用就监督，不因t+30缺标注静默屏蔽。P2公共mask只用于计划中rearrange/put-back的两组full受控比较；wash full第一批不需要重复endpoint配置。所有实际基线YAML必须有闭环反馈，initial-input/空feedback只属于明确命名的aux对照。提交前逐项与/root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md核对，报告不能仅以YAML可parse为通过。
+所有新仿真转换/训练使用demo_clean_state，不能fallback demo_clean；沿metadata确认来源和详细标注，不能仅看目录名。评测场景配置不由此自动改变。
 
-S2M输出存在阻塞疑点，优先核对/修复：你当前wash_cup_memory_adapter.py注释宣称Drawer S2M只用follower，load_s2m_trajectory却state/action都返回同一follower数组。用户确认的是从臂当前state→主臂action；旧drawer policy metadata也明确slave_state_dim14/master_action_dim14，独立openpi标准converter v5含follow与master两套键。请立即对照旧drawer准确converter commit及X2RobotInputs(mode=s2m)定位实际action切片，不能用名称S2M或shape14代替语义。除非可靠原始接口证据证明另有含义，wash应state取follow_*14维，action取master_*14维并按正确下一对齐帧取值；两者不能共用robot_observation_state序列来构造action。提供同一raw帧对应两套不同数值的逐值对照，修复共享转换metadata/配置，不改raw源。当前all_172_15hz仅是待验收转换产物，不能当训练可用资产；修复时独立新输出目录、保留最小错误说明后清理未使用的错误产物，视频可安全复用而不重复解码。若你认为旧drawer本身确实follow→follow，明确报告与用户S2M要求的冲突供Manager裁定，不自动沿用。训练owner已通知等待修复。
+恢复的LeRobot数据在/mnt/public/xcj/cache/huggingface/lerobot/<task>_demo_clean_state_shared_memory；rearrange50ep/20103rows、put-back50ep/17588rows。raw scene/language/seed/metadata在主RMBench/data/<task>/demo_clean_state。旧converted action[:14]已为raw q(t+1)，绑定offset0，不能再移位或改用observation state构造动作。原始首尾100ep对照已通过，无需重新转换图像。
 
-已读172合格/72剔除、13,404行缺phase GT和sim action预移位报告。wash保留全部合格episode的机器人数据；不因full需要未来50行标注而整sample删除，否则造成未声明的采样选择。API owner会增加EpisodeMemoryData可选availability（series key→bool数组，缺省全true）；显式缺GT输入用schema initial，目标逐字段mask/weight=0且dense全0，不能把unknown当已知phase监督。转换保留原始availability，不自行在适配器实现第二套mask/loss算法。
+sidecar放主openpi/data/memory_v1/rmbench/<repo_id>/，直接保存每集等长M+1 series与availability：机器人前M行逐值等于converted action[:14]，第M行重复末action；memory最后行来自核实的raw末观察标签。原LeRobot图像/state/query仍是M行，不采样不存在的query。绑定用sidecar robot_action_target、semantics=action_at_row、offset0；不增加tail_append配置或解释框架。
 
-sim直接绑定已转换action的机器人14维、offset=0，以精确复现原有q→q+1标签；P2两臂共用这些目标，不为尾部重新从observation.state生成另一套动作。继续全量内部行级核对，缺raw尾部只列具体缺口，不重复转换已有视频。原始scene_info/language_annotation及每集末尾动作数值的补核将交资产任务恢复；尽量远端只读提取需要的末帧数值/形状/来源，不需先传所有含图像HDF5才推进训练。若现有converted已给全部当前target和input获取边界，则注明哪些原始事件是新schema实际必需，哪些只为额外审计，避免把不用的原始文件作为开跑硬阻塞。
-# 目标
+current memory truth来自已转换current target/原始事件，不能用旧lag20 input列冒充。字段参考series/constants/events和availability只保存真实标签，目标时序由同一core sample helper生成，不为不同实验重复转换数据。
 
-# 样本时序验收补充
+## 首批英文配置
 
-必须核对已转换LeRobot的action列是否已经表示下一帧关节目标a_t=q(t+1)。若已经移位，不能直接把action列绑定为raw robot_joints并再用offset=1，造成二次移位。应按实际列语义选择key/action时间offset（例如已对齐action用offset0），并用同一个episode/query与旧可靠loader/原始timestamp逐行比较机器人目标；比较P2两臂时这些机器人目标完全一致。memory的current truth也不能从lagged input推断。给绑定列、索引定义和小样本证据，而不是仅凭shape通过。此项是已有数据语义核对，不新增算法。
+同一轻量openpi_client.memory_config解析器（主库58d6f21）：load_memory_config、compile_model_spec、make_training_sample(EpisodeMemoryData)、to_dict；具体沿实际API，不复制parser/mask/decoder。缺GT availability按series key逐项提供，缺省全true；缺GT input用initial，目标mask/weight/dense为0，机器人样本保留。
 
-# API已提交，可开始接入
+- rearrange/put-back两种full：H50/K30；current reference训练、cache推理；phase目标t+j+1与重复t+30。两臂公共phase mask=(t+j+1<=L)&(t+30<=L)，L为sidecar最终索引；phase固定H归约，机器人及其他字段/norm相同。chunk_completed/last_executed均读row30。重复监督不保证H行预测相等。
+- rearrange serial：previous named lag30训练reference、推理cache；target当前query t；train reference/infer selected动作条件；query_selected/query反馈。不使用P2未来mask。默认独立argmax，不继承旧phase/button规则。
+- rearrange no-memory：memory=[]与空updates；使用时bindings只保留robot target、availability={}。
+- wash full：current reference/推理cache、t+j+1、chunk_completed/last_executed；首批不需repeated endpoint。
+- wash serial：previous lag30/current t target/selected query反馈，与sim serial同机制。full/serial共用单phase语义、S2M目标。initial-input无反馈仅属于明确aux配置，不能当闭环基线。
 
-轻量契约commit：openpi de79cce20e54c612634fdc2598b91cc0ab5034ec（API owner正在精简内部/修复，后续补commit，当前可供开发）。ResolvedMemoryConfig.compile_model_spec(model_config=None)返回MemoryModelSpec；属性为representation、field_names、field_values、initial_ids、encoding、dense_offsets、robot_dim、padded_dim、action_horizon、execution_rows、target_layout、loss_kind/loss_weight、current_condition、decoder_rules、feedback。共享方法encode_dense_ids(ids)、decode_ids(ids)、decode_dense_actions(actions, previous_ids)、decode_token_logits(logits, previous_ids)。训练sample额外给dense_actions/action_loss_mask/action_loss_weights。具体以该commit代码/owner report为准，不做两份切片/解码器。后续由ad6bb77e-3892-4730-ae1a-7d9cd99a5728负责src训练接入，f252只维护轻量package。
+## wash-cup筛选与时间对齐
 
+原始数据/mnt/public/datasets/x1pro/wash-cup只读，annotation_layers.json定位子任务标注。label6、没有子任务标注、不是1..5恰好各一次的episode整集排除；顺序允许变化。已核实244集→172合格/72剔除，原因可重叠：16缺标注、28label6、56非各一次。合格120集1→2→3→4→5，52集2→1→3→4→5。全部172用于训练，不划holdout；固定5个训练episode给offline并保存ID。
 
-# 用户最新数据约束
+phase表示当前子任务。未知时使用显式unknown，不读取episode首GT初始化部署，也不假定先抓杯。domain ID与原始label ID明确区分。15Hz有效query共142609，13404行缺phase GT，mask该字段而不删机器人行。
 
-用户明确指定RMBench训练/转换只用demo_clean_state；demo_clean没有metadata及详细子任务划分，不允许用作fallback。wash-cup原始数据不受此命名约束。已转换仿真数据须沿metadata确认来自demo_clean_state，并核实所需真值/事件完整；来源不明先不训练，不从评测rollout重建标注。
+S2M沿已核实drawer协议：当前follow_* EE pose+gripper14维输入→下一对齐帧master_*14维action。两套数值不能混用；不从follow observation q+1代替master action。数据/标注/视频共用唯一实际source-frame映射，保留JSON timestamps及selected source index。
 
-资产owner已定位旧converted源：/mnt/public3/xcj/cache/huggingface/lerobot/{rearrange_blocks,put_back_block}_demo_clean_state_shared_memory，分别50ep/20103frames、50ep/17588frames，正恢复到本集群/mnt/public/xcj/cache/huggingface/lerobot/同名目录。包含action、observation.state、key_state_input/target/mask、index/timestamp；rearrange还有key_state_guard_offset，meta/rmbench保留转换与source/key-state metadata。尚需你检查是否足够绑定series/constants/events和P2当前真值（不能将lagged input误作当前truth），若原始详细边界缺失则精确列出所需raw文件让Manager安排恢复。不要依靠目录名自行宣布来源已核验，也不要为了框架接口重转全部图像。此事与wash-cup转换可并行。
+旧all_172_15hz错误follow→follow；master_v2虽修动作，视频仍按MP4 PTS重采样而pose按JSON索引，抽样漂移20 raw frame约0.67秒，均不得训练或复用其视频。新v3由JSON选帧映射驱动每个相机decoded frame选择。验证raw decoded n确实对应JSON帧，逐帧比对两集三相机开头/中段/尾部及原漂移点；不能只校验总帧数。记录current follow、next master、标注和视频选择的共同映射，raw尾与query数关系清楚。
 
-# 已确定共享接口（API owner的先行契约）
+小样本及固定代码先独立验收，通过后正式全量转换；预计超过1小时用mam job add登记真实host/PID。正式结果替代后清理错误/临时产物，仅保留本MAM简短错误说明；不删除raw或未验收的唯一证据。
 
-openpi-client模块为 openpi_client.memory_config，load_memory_config(path_or_mapping) -> ResolvedMemoryConfig；to_dict()为metadata.memory_config。训练入口 make_training_sample(EpisodeMemoryData(series, constants, events, tail=None), query_index, rng) 返回input_ids/target_ids/逐行target_mask、robot目标索引/有效位和lag_draws；字段顺序为memory列表。model_spec()提供representation、词表/initial IDs、dense offsets或token sizes、loss和显式decoder/反馈。validate_model_dimensions(robot_dim, padded_dim)检查已有模型维度。具体可调用属性以owner首个commit为准，先通过该helper复用契约，不复制parser。
+## 留痕与路径
 
-input train/infer显式source=initial可作为辅助监督无递推对照；memory=[]为标准无记忆。正常新schema默认独立argmax，历史规则仅显式配置生效。首批H50/K30；P2两full配置仅phase目标时刻不同，共享mask和固定H分母。跨agent的工作树代码需通过明确commit集成，不能把对方临时workspace长期加入PYTHONPATH。需要伴随openpi代码时在自己MAM任务下增加openpi worktree并接owner提交，或用自身venv安装该commit构建的轻量包，勿改共享环境。
+每个转换/sidecar在metadata保存command.txt（实际命令、cwd、commit注释头）、实际binding/config、上游meta/metadata及scene/language/seed。只复制metadata/config，不复制代码、图像、标签矩阵进metadata。meta/metadata目录完整继承；不要新增runtime/provenance系统、独立git_commit.txt，或将所有候选训练YAML复制进去。最终训练选定memory_config由TrainConfig唯一保存。原69生成metadata收敛后用633真实重生成，不事后伪造命令。
 
+脚本无账号绝对DEFAULT源路径；必要source-root/dataset-root参数明确传入，相对路径从openpi项目根解析，输出通过data共享软链保留。中文README具体命令可写本集群完整绝对路径，不用export root设置段。
 
-在独立openpi中准备统一schema的数据适配与首批wash-cup转换，支持同一memory字段定义供full/serial训练使用。后续RMBench新训练复用现有真实标注，不新增另一套任务语义。可实施转换，暂不启动正式模型训练。
+## 验收与交付
 
-# 工作区与分工
+测试筛选、合法逆序、缺GT/边界、S2M真实值与时间索引、视频帧映射、M+1尾行及P2公共mask。已独立通过部分只复核增量，不重复无关全数据测试。代码与正式生成命令先commit，再运行；报告完整git SHA由git读取。
 
-用mam workspace add --repo openpi --base 71c80db723a242c61cfe429dd6794e9ece3cbcf1创建环境/worktree；读openpi AGENTS.md。写入范围openpi/examples的数据转换器、新数据适配模块/配置和对应定向测试。不要改src/openpi或packages/openpi-client（任务 f252006a-8676-4d10-b6a1-1a791d91c6a6 owner负责）。若需RMBench薄转换入口，用其worktree e31d14fe0818235d471b371924ea30c273e75c7a且先报Manager；不改legacy policy/pi05的算法/转换实现。不要写robot-bridge。
-
-# 数据与语义
-
-1. 原始wash-cup /mnt/public/datasets/x1pro/wash-cup，annotation_layers.json给子任务标注位置。扫描并给确定筛选清单：任何label6、缺标注文件、labels1..5不是各恰好一次都剔除；次序允许变化。其余全部训练，不划分holdout；固定5个合格训练episode做offline并记录IDs。phase是当前子任务，不是已完成到哪步。沿用drawer S2M输入/动作定义、真实时间戳/频率与相机映射，不猜SM2SM。
-2. 首轮只一个phase，full与serial使用同一有序domain/标注；顺序可变，不能默认按1到5推进。初始值如何在未知顺序下合法：若第一label并不恒为1，报告事实并设置显式unknown或由可观测的初始化定义，不能在推理偷用训练episode首标签。不要把domain ID和原始label ID混用。
-3. 抽取现有drawer/rearrange多字段转换中可复用的sample/time绑定，明确normalized series/constants/events映射。原始数据转换只保存真实标签和可用性，不把每次实验的phase目标策略写死进数据导致重复转换。P2在训练sample阶段从同份标签生成目标/mask，保留t+1 vs t+30和采样边界。
-4. 配置唯一解析器由f252任务提供，checkpoint metadata键memory_config；先整理标注适配/读写入口，接口到达再接，不抄第二套schema。无需扫描所有历史实验或另造统一data framework。新数据结果放共享主openpi的gitignored data目录，按明确dataset/run命名，不指向你临时workspace。
-5. raw数据只读。转换数据保存命令+commit+resolved配置+源标注路径及筛选统计/IDs等既有metadata链。先小规模转换验证schema/标签/视频同步，再提交代码再正式全量转换；预计超过1小时进程登记mam job。清理成功正式转换替代的临时smoke，不让结果根混乱。
-
-# 验收与交付
-
-报告有效/过滤数和原因、phase次序统计、数据/5ep输出位置、必要空间估算。测试label6/缺标注/重复/缺类/任意顺序、标签边界、S2M shape/时间对齐；读回生成数据验证。代码量先预估，复用优先；新文件名/接口尽早发Manager。未获分配不占GPU，CPU解码可用；不运行模型训练或真机。最终report含task_revision/workspace/commit与验证，发布等待归档，不自行派agent。
+及时发布阶段report：task_revision、workspace/commit、完成/未完成、实际数据/5ep/sample位置、验证、真实转换命令及所需耗时/空间。数据GO与模型GO分开；不要用配置可parse宣称训练已联通。全量转换完成读回核对并清理被替代smoke/错误数据，archive job后保留workspace待Manager验收归档。
