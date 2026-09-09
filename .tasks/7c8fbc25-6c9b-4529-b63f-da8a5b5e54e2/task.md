@@ -2,6 +2,8 @@
 
 ## 阶段事实后的Manager裁定
 
+首批可运行YAML的协议必须按实验计划核对：当前wash_cup_phase_serial_t_plus_1.yaml使用train/infer均initial、target t+1、空feedback，是另一种辅助任务，不能作首批serial基线。首批wash full：当前reference输入（首次/缺GT用unknown）、infer cache、phase target t+j+1、chunk_completed消费last_executed。首批wash serial：输入同一named previous lag30（train reference t-30，负索引/缺GT才initial）、infer cache；query phase target t（offset0/stride0），current_condition train reference/infer selected，query_selected反馈预测phase供下一query。两者H50/K30、同domain与S2M动作目标，不夹带ordered decoder。serial不套P2未来两个时刻的公共validity；其query当前GT可用就监督，不因t+30缺标注静默屏蔽。P2公共mask只用于计划中rearrange/put-back的两组full受控比较；wash full第一批不需要重复endpoint配置。所有实际基线YAML必须有闭环反馈，initial-input/空feedback只属于明确命名的aux对照。提交前逐项与/root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md核对，报告不能仅以YAML可parse为通过。
+
 S2M输出存在阻塞疑点，优先核对/修复：你当前wash_cup_memory_adapter.py注释宣称Drawer S2M只用follower，load_s2m_trajectory却state/action都返回同一follower数组。用户确认的是从臂当前state→主臂action；旧drawer policy metadata也明确slave_state_dim14/master_action_dim14，独立openpi标准converter v5含follow与master两套键。请立即对照旧drawer准确converter commit及X2RobotInputs(mode=s2m)定位实际action切片，不能用名称S2M或shape14代替语义。除非可靠原始接口证据证明另有含义，wash应state取follow_*14维，action取master_*14维并按正确下一对齐帧取值；两者不能共用robot_observation_state序列来构造action。提供同一raw帧对应两套不同数值的逐值对照，修复共享转换metadata/配置，不改raw源。当前all_172_15hz仅是待验收转换产物，不能当训练可用资产；修复时独立新输出目录、保留最小错误说明后清理未使用的错误产物，视频可安全复用而不重复解码。若你认为旧drawer本身确实follow→follow，明确报告与用户S2M要求的冲突供Manager裁定，不自动沿用。训练owner已通知等待修复。
 
 已读172合格/72剔除、13,404行缺phase GT和sim action预移位报告。wash保留全部合格episode的机器人数据；不因full需要未来50行标注而整sample删除，否则造成未声明的采样选择。API owner会增加EpisodeMemoryData可选availability（series key→bool数组，缺省全true）；显式缺GT输入用schema initial，目标逐字段mask/weight=0且dense全0，不能把unknown当已知phase监督。转换保留原始availability，不自行在适配器实现第二套mask/loss算法。
