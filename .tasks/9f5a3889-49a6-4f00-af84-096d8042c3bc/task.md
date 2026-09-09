@@ -59,3 +59,12 @@ CPU测试覆盖以上进度/并发/中断/wire/旧路径/UI；按库规范全tes
 ## CPU训练交付与跨库验收版本
 
 openpi训练commit ffa308d5485a2c8222d3e7735b08723c6e93a237已固定，包含所需checkpoint字段、MemoryDataAdapter/transforms及Policy.infer wire；其父链有等价core、sim YAML、checkpoint最终增量。请合入本任务openpi独立树（等价patch按实际文件处理），完成前述真实transforms→MemoryContext联通。你负责此双库测试，Pascal独立复核；Bernoulli继续norm/GPU1保存恢复，Banach审OpenPI模型/训练/加载，不重复创建bridge环境。不要等待GPU50step才检查CPU wire。
+
+## 78e1b4a复核裁定：轨迹进度与同步观察需一致
+
+Pascal实际复核已关闭drain后的latency偏移，真实ffa308d transforms→Context的7项CPU联通也通过。剩余两个live问题由Manager接受，优先小修：
+
+1. 真实get_obs的wait仍只按timestamp队列决定返回；将发送函数用event延迟时，单行已到期、传感器时间已推进，但尚未成功handoff就返回queued=1/completed=0，context又清await并允许下次infer。同步schema应在同一次wait-condition get_obs中等待与返回观察时间相符的handoff进度。保留原异步路径，不新增get_progress RPC或多轮轮询。
+2. 实时tick可以跨过中间端点。3个目标1/2/3、间隔20ms，90ms后才启动实际loop/worker，只成功发送3，tracker报completed1/queued2，Context误反馈model row0=1且旧pending永久残留。不要补发过期动作；将进度定义为一次成功handoff确认执行器推进到的轨迹位置/已消费前缀，与policy row映射一致。仅墙钟推进或单纯累加SDK发送次数都不正确。被取消的旧epoch/proposal不贡献新进度；较旧图像snapshot不能被后来的无图请求提前推进。
+
+可沿现有轻量tracker调整成功handoff的前缀语义和wait条件，不需要新状态框架；generic执行能力/等待条件仍归controller，memory语义归scheduler。测试覆盖上述两项真实loop/worker复现、同期正常/跳tick、partial、terminal、takeover/reset。每条命令“被执行器消费”不等于机器人物理到位，在文档/trace命名中准确说明。先交独立commit供Pascal增量复核；不重跑已通过的跨wire或旧F0。
