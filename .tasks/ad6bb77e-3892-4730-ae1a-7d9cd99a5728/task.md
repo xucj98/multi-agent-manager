@@ -9,6 +9,8 @@
 
 # 工作区与边界
 
+环境恢复裁定：de79新增PyYAML但缺lock更新，独立修复commit为0dc120c（uv.lock两行）。已有登记worktree不反复调用workspace add；在自己树cherry-pick修复后，沿受版本管理scripts/worktree_env/create_worktree_env.sh第268行以后的lock检查、独立uv venv、sync frozen/hardlink、import验证恢复，不复用他人环境。通过后报告证据，Manager修复本task的MAM failed状态记录；不扩展MAM实现。
+
 用mam workspace add --repo openpi --base de79cce20e54c612634fdc2598b91cc0ab5034ec，读取AGENTS.md。只修改src/openpi、scripts训练/norm/checkpoint相关入口及其tests/训练文档；packages/openpi-client由f252006a-8676-4d10-b6a1-1a791d91c6a6负责，examples/converter由7c8fbc25-6c9b-4529-b63f-da8a5b5e54e2负责，不能重复修改。不要动legacy RMBench/policy/pi05或robot-bridge。后续API修订按明确commit cherrypick到自己的worktree，不能PYTHONPATH挂他人临时树。
 
 # 契约与必须达到的行为
