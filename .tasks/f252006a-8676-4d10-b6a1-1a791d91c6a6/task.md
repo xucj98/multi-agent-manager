@@ -33,6 +33,8 @@
 
 # 验证与交付
 
+环境阻塞修复优先：de79cce新增openpi-client PyYAML依赖却未同步uv.lock，已导致training/runtime两份新worktree的uv lock --check失败。你负责同步最小lock变更（本次允许修改根uv.lock）；不换源、不升级无关包，先提交独立修复commit给依赖方恢复环境，再继续API精简。验证uv lock --check通过，报告锁文件实际差异。
+
 Manager对de79cce的修订要求：模块1480行、合计1838行明显高于450+250预估，先做实质精简再交付，不以减少换行冒充简化。保留已公布runtime/sample接口，减少重复的to_dict/parse对象映射与未使用包装，不要为新API加backward-friendly别名，去掉validate_first_batch_protocol这种通用库硬编码H50/K30的入口。可以复用项目已有结构校验机制，保留必要语义与范围检查；目标轻量模块约800-1000行以内，若合理实现仍超出给逐项原因，不删关键校验凑行数。修复两个具体问题：YAML重复key必须拒绝；invalid memory目标在dense编码中必须是真正全零向量，不是one_hot(ID0)，并同时保持逐坐标loss为0。B/T公共mask对应的时刻、固定H分母和lambda只应用一次须在helper文档/API说明清楚。维度来自现有model/data配置，不能强制重复填写；若load阶段尚未绑定维度，compile/sample时显式绑定而非假定所有机器人14维。首个de79cce供依赖方开发，尚未最终验收。此次只收敛契约/测试，不做src训练接入或GPU smoke。
 
 设计文件同步交付：在你workspace提供一个针对论文 docs/memory_config/memory.schema.yaml 的最小patch（不直接改共享论文库），包含一期实际新增的initial输入、empty memory、target.validity all_in_bounds及loss_reduction等字段，使P2/无memory/aux配置可按类型校验。另给1份P2两臂英文YAML最小差异示例供Manager整合；数据实际绑定由data/train owner承担。只为实际实现同步已有规格，不再发明一个平行schema或第二套执行规则。
