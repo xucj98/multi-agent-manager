@@ -32,4 +32,6 @@ input train/infer显式source=initial可作为辅助监督无递推对照；memo
 
 P2补充：full的“重复终点”是H行监督label相同，实际预测H行仍可能不同；两臂统一读取第30行。只有模型实际输出完全相同的值时两种取行才等价，不能把重复训练目标当作首行/末行/均值随便替换的依据。query-level单输出是另一个结构，不在P2中混用。
 
+旧full时序锚点已实测：任务a15fdd25的83cbec9入口通过2rollout smoke，旧scheduler是get_obs取得logical_step advance后反馈末已执行行，K30完整执行取row30。当前缺独立row20 selector与逐query trace，所以P1 K30/row20尚不可运行。请在新schema反馈配置路径支持row index及trace（本任务原要求），并说明如何为该旧full checkpoint显式提供等价schema来做这项诊断；只用其真实字段/归一化信息，不发明全历史兼容转换器。基线row30必须先核对同输入输出/反馈一致，再开始row20。旧checkpoint无schema路径继续保留。
+
 定向mock/offline CPU tests覆盖单字段、多字段、completion vs accept、partial/takeover/rejection/reset、首行与末执行行、同值的chunk目标两种row等价、无schema既有路径未变；按库规范跑全tests。不触碰真机、不跑GPU；GPU smoke待Manager分配。先报告代码量预估与接口需澄清处，之后提交commit，report记task_revision、workspace、commit、测试/未完成，发布。任务完清理自己的短smoke与临时文件，等待归档；不自行派agent。
