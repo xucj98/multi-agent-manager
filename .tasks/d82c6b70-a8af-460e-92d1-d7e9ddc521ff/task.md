@@ -4,6 +4,8 @@
 
 本轮固定review commit：openpi f6327197459bf830c6b5d0b9ba5d643bc5e0cbd3，已包含PyYAML的uv.lock修复0dc120c。源要求revision为18a99cbea563d961481f6f75fb0c03feef0b4e86；源报告可读MAM .tasks/f252006a-8676-4d10-b6a1-1a791d91c6a6/report.md当前阶段交付。后续论文patch不改本轮代码。实现实际961行，作者11 tests passed。
 
+最新追加增量0f37cfc1ae42e4703b741f0f05fd1e3c58c87e89（29行core变化+32行tests），请在自己的树cherry-pick并以此为最终review对象，不重新创建环境。对应源要求现在为0982373b3e9384be7c5d314287d76cf55fc3a1ae，新增EpisodeMemoryData availability以处理wash真实缺GT：按reference series key→等长bool数组，缺省全true；显式false的输入用initial、该字段目标mask/weight=0/dense全0，机器人监督保留。请检查缺key依然报错、缺GT与有效unknown类别区别、action_rows和query都生效、mask/权重未丢。首批P2两sim标签完整，all_in_bounds只代表索引有效，不代表两个时刻都有标注；这一范围说明保留，不能扩写成任意可用性表达式引擎。
+
 独立review轻量openpi-client memory_config模块。以源任务f252006a-8676-4d10-b6a1-1a791d91c6a6的已发布要求和Manager指定的最终commit为验收依据；不要只复述作者测试。Manager随后在本task固定commit，再启动你。读取MAM README及openpi AGENTS，用mam workspace add创建自己的openpi环境。只读review，可在自己workspace写最小验证脚本；不修改交付代码，不占GPU，不派生agent。
 
 ## 核查重点
@@ -17,3 +19,9 @@
 ## 交付
 
 report写清task_revision、自己workspace及review commit、独立执行的检查、按严重性列发现（路径/行号、具体输入、实际与预期、为何影响首批），无问题也明确。区分阻塞首批的问题与后续扩展，不把目前缺少scalar/parallel等一期外能力当回归。无需全面论文review或重跑旧实验。完成清理自己的临时样本/脚本；保留worktree待Manager归档。
+
+## 增量核查：availability
+
+作者在原 review commit 之后新增 `0f37cfc1ae42e4703b741f0f05fd1e3c58c87e89`（`feat: mask unavailable memory labels`）。保留已完成的 `f632719` 审查，额外核查该小 diff；不必重复全面 review。目标版本是 `f632719..0f37cfc`，可在自己的 worktree 用 `git diff`/`git show` 检查，若需要运行测试再切换到该 commit。
+
+`EpisodeMemoryData` 末尾新增可选 `availability: Mapping[str, Sequence[bool]] = {}`，仅允许 memory 的 `reference.kind: series` 键且数组与 episode 等长。缺省保持原行为；series key 缺失仍应报错。availability=false 时，训练输入必须使用该字段 initial，目标 ID/mask/逐坐标 loss/dense 编码为零；不得读取或监督占位 `unknown`。验证另一个 memory 字段、机器人目标和机器人权重仍保留，并确认 availability 是对目标时刻的独立 annotation 条件，不把 `all_in_bounds` 误解为跨候选时刻的 availability 交集。报告中单列该增量的检查和发现。
