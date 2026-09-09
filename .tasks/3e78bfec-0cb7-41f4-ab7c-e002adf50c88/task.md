@@ -1,3 +1,5 @@
+当前sim数据增量：openpi `38bf82c1753e6e911e6215a6762cccc2a7bb15bd`，前置 `481527346573b73958dcd81591fc8473e20feaff`。该增量实现下文已确定的M+1 sidecar与路径修正，请以实际提交继续集成/审查。
+
 ## 恢复sim增量审查
 
 已交sim commit481527346573b73958dcd81591fc8473e20feaff，请在已有本task openpi树合入，继续review四个full YAML/原始当前truth与P2 mask。其tail_append接口和账号绝对路径是Manager已发现并正在修的问题，不重复提出新框架。作者将很快补增量：sidecar直接保存等长M+1的robot_action_target、memory series和availability，前M机器人行逐值等于converted action[:14]、末行repeat；query仍原LeRobot M行。训练采用现有sidecar绑定、action_at_row/offset0，core API不变。核验raw最终观察确实给第M行memory监督，没有增加不存在的query或二次动作移位；P2 query M-30应有前30个phase有效位置。
