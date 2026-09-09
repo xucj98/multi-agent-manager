@@ -1,3 +1,5 @@
+当前sim数据增量：openpi `38bf82c1753e6e911e6215a6762cccc2a7bb15bd`，前置 `481527346573b73958dcd81591fc8473e20feaff`。该增量实现下文已确定的M+1 sidecar与路径修正，请以实际提交继续集成/审查。
+
 ## Sim binding接口收敛（4815273后的Manager裁定）
 
 4815273正确恢复了额外raw最后帧，但新增的manifest.tail_append协议当前训练adapter不支持。不要再实现一套tail_append扩展/解释器。采用既有sidecar绑定：sidecar直接保存等长M+1的series（phase/属性及robot_action_target），机器人前M行逐值拷贝converted action[:14]，第M行重复末动作；availability也M+1。图像/robot state及query仍来自原LeRobot的M行，query范围不变；初末行逐值测试不能省。这里只有低维数组复制，图像和原数据不复制，不会新采样不存在的query。MemoryBindings用source=sidecar指向robot_action_target，semantics=action_at_row、offset0；训练层移除仅允许robot source=column的无必要限制，保留不能绑定observation state与禁止二次移位检查。这样不修改已验收core API，也不新增tail_append schema/第二种补尾配置。
