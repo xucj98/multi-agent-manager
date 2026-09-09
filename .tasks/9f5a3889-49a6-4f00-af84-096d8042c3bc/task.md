@@ -30,4 +30,6 @@ input train/infer显式source=initial可作为辅助监督无递推对照；memo
 
 # 验收与交付
 
+P2补充：full的“重复终点”是H行监督label相同，实际预测H行仍可能不同；两臂统一读取第30行。只有模型实际输出完全相同的值时两种取行才等价，不能把重复训练目标当作首行/末行/均值随便替换的依据。query-level单输出是另一个结构，不在P2中混用。
+
 定向mock/offline CPU tests覆盖单字段、多字段、completion vs accept、partial/takeover/rejection/reset、首行与末执行行、同值的chunk目标两种row等价、无schema既有路径未变；按库规范跑全tests。不触碰真机、不跑GPU；GPU smoke待Manager分配。先报告代码量预估与接口需澄清处，之后提交commit，report记task_revision、workspace、commit、测试/未完成，发布。任务完清理自己的短smoke与临时文件，等待归档；不自行派agent。
