@@ -1,3 +1,7 @@
+## 留痕补齐（现有验收要求）
+
+Manager已查新sim sidecar目录只有episode_memory/binding_manifest，未保留command.txt及上游metadata。请在生成产物旁的metadata保存实际生成命令及本次git commit、使用的binding/config、沿既有数据链继承转换/source metadata；只复制metadata/config，不复制代码或dataset/videos/标签矩阵。代码和正式生成命令先固定，重新生成这份小sidecar以留下真实记录（不能事后编造不存在的原始command）。新的wash正确转换同样遵守。使用项目现有布局和简单复制，不新增provenance体系/重复runtime。checkpoint owner已被安排在保存时继承这份metadata；它沿sidecar_path父目录的metadata发现即可，保持训练与RMBench不耦合。
+
 ## Sim binding接口收敛（4815273后的Manager裁定）
 
 4815273正确恢复了额外raw最后帧，但新增的manifest.tail_append协议当前训练adapter不支持。不要再实现一套tail_append扩展/解释器。采用既有sidecar绑定：sidecar直接保存等长M+1的series（phase/属性及robot_action_target），机器人前M行逐值拷贝converted action[:14]，第M行重复末动作；availability也M+1。图像/robot state及query仍来自原LeRobot的M行，query范围不变；初末行逐值测试不能省。这里只有低维数组复制，图像和原数据不复制，不会新采样不存在的query。MemoryBindings用source=sidecar指向robot_action_target，semantics=action_at_row、offset0；训练层移除仅允许robot source=column的无必要限制，保留不能绑定observation state与禁止二次移位检查。这样不修改已验收core API，也不新增tail_append schema/第二种补尾配置。
