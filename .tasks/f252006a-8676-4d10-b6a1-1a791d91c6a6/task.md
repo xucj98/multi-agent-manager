@@ -35,4 +35,6 @@
 
 Manager对de79cce的修订要求：模块1480行、合计1838行明显高于450+250预估，先做实质精简再交付，不以减少换行冒充简化。保留已公布runtime/sample接口，减少重复的to_dict/parse对象映射与未使用包装，不要为新API加backward-friendly别名，去掉validate_first_batch_protocol这种通用库硬编码H50/K30的入口。可以复用项目已有结构校验机制，保留必要语义与范围检查；目标轻量模块约800-1000行以内，若合理实现仍超出给逐项原因，不删关键校验凑行数。修复两个具体问题：YAML重复key必须拒绝；invalid memory目标在dense编码中必须是真正全零向量，不是one_hot(ID0)，并同时保持逐坐标loss为0。B/T公共mask对应的时刻、固定H分母和lambda只应用一次须在helper文档/API说明清楚。维度来自现有model/data配置，不能强制重复填写；若load阶段尚未绑定维度，compile/sample时显式绑定而非假定所有机器人14维。首个de79cce供依赖方开发，尚未最终验收。此次只收敛契约/测试，不做src训练接入或GPU smoke。
 
+设计文件同步交付：在你workspace提供一个针对论文 docs/memory_config/memory.schema.yaml 的最小patch（不直接改共享论文库），包含一期实际新增的initial输入、empty memory、target.validity all_in_bounds及loss_reduction等字段，使P2/无memory/aux配置可按类型校验。另给1份P2两臂英文YAML最小差异示例供Manager整合；数据实际绑定由data/train owner承担。只为实际实现同步已有规格，不再发明一个平行schema或第二套执行规则。
+
 先CPU测试：字段顺序/重复和无memory、单字段wash及多字段drawer/rearrange、可变顺序phase不被限制、公共mask/固定分母、metadata roundtrip。代码量先给预估，再报告新增/删除行；避免大兼容脚手架。GPU短smoke待Manager分配，当前不占GPU。先交可供依赖方使用的契约commit，再完成训练实现commit；全量验证适用部分后report记录commit/测试/不足并发布。不得修改共享checkout或他人环境。过程中需求有歧义及时给Manager具体选项，不阻塞可独立实现部分。长程序若后续获分配超过1小时，用mam job登记。任务完清理自己的smoke/临时文件，不删除正式资产；不自行派agent。
