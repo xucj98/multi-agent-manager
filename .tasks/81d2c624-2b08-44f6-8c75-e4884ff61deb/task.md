@@ -15,3 +15,7 @@
 # 交付
 
 只读/资产恢复无需建代码worktree；临时transfer文件置本workspace，正式数据放共享主目录。预计超过1小时传输用mam job登记host/PID及用途，并在完成/失败后记录收尾再archive job。给实际数据量、episode/frames、base来源、真实路径、完整性验证、尚未验证项。没有修改代码就记无commit。task_revision和report按MAM发布，清理自有临时文件后等Manager归档。不要自行派agent。
+
+# 用户补充的传输拓扑（优先采用）
+
+可以ssh wuwen-nx-aic，再从zx-data执行rsync拉取。wuwen-nx-aic与本机/wuwen-1共享同一个/mnt/public；zx-data与wuwen-11共享旧集群文件系统。该路径每条约10MB/s，最多两条并发，第二条必须至少在第一条启动60秒后再启动；同时启动会限为合计10MB/s。先核查已由你启动/运行的传输及目标，避免对同一文件并行写或重复复制。正式写入直接落共享目标，避免再经过本机中转。大传输登记真实执行host=wuwen-nx-aic及PID，可按base与数据拆两条并确保一分钟间隔。记录开始时间/实际吞吐，不调整他人的链路或进程。若已启动较慢的自有传输，先说明并安全停止自己那条再断点续传，不破坏已有目标。新发现有用路径尽早通知Manager。
