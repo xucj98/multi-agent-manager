@@ -49,3 +49,11 @@ S2M沿已核实drawer协议：当前follow_* EE pose+gripper14维输入→下一
 测试筛选、合法逆序、缺GT/边界、S2M真实值与时间索引、视频帧映射、M+1尾行及P2公共mask。已独立通过部分只复核增量，不重复无关全数据测试。代码与正式生成命令先commit，再运行；报告完整git SHA由git读取。
 
 及时发布阶段report：task_revision、workspace/commit、完成/未完成、实际数据/5ep/sample位置、验证、真实转换命令及所需耗时/空间。数据GO与模型GO分开；不要用配置可parse宣称训练已联通。全量转换完成读回核对并清理被替代smoke/错误数据，archive job后保留workspace待Manager验收归档。
+
+## wash v3视频验收通过，补齐真实末帧标签
+
+James报告7f4d74e已独立核对两集三相机60个位置、2725行pose/action、原漂移点及采集转换契约，Manager接受773d177的视频修复与a75d173的闭环配置。sim633 metadata增量也接受。
+
+剩余wash小修：EpisodeMemoryAnnotation目前仅对indices[:-1]生成phase/availability，丢掉真实M+1末帧。ep0 M1216的raw2408仍在label5区间[1710,2409)，末query首目标应有效；ep1末raw2989超出label5[1440,2970)，应unknown/false。请用完整selected mapping生成低维memory series与availability，robot_action_target前M行保持converted actions，末行重复；query/state/动作M行不变，offset0。复用现有sidecar形式，不改core/不增加tail_append。定向回归这两个相反边界，然后给James增量commit和更新后的低维sample；已验收视频不需要因低维修复重编码。
+
+代码固定及低维增量review通过后直接启动全部172转换、记录metadata/job；这属于原授权，不必再次请求许可。视频/pose时间轴已经通过的范围不再重复整轮检查，最终正式产物仍需读回数量/格式/metadata和首尾低维检查。
