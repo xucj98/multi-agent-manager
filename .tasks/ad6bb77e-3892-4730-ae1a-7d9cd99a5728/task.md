@@ -21,6 +21,8 @@
 
 # 验证/资源/交付
 
+Manager已经把P2确切标量loss公式固定到 /root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md 第6节：L_dense=sum(w*逐坐标FM误差平方)/(B*H*D)，D为相同padded维度；phase权重公共mask×lambda一次、padding0、机器人clamp保持1。其他字段若valid_mean用mask×H/max(valid_count,1)。helper产生的action_loss_weights必须在坐标归约前数值乘法应用。旧MEMORY_CONFIG统一valid-mean表述已由Manager修正；以新实验公式/配置为准。不能为了复用旧分支在masked phase时将整行robot loss清零。
+
 先给代码量预估；优先复用既有transform/model/metadata。CPU针对无memory、单字段wash、多字段drawer/rearrange、动态phase顺序、mask/loss、metadata roundtrip；适用旧tests通过。你可独占本机GPU1进行短训练/保存加载smoke（先核对该卡实际空闲，只设置CUDA_VISIBLE_DEVICES=1且不占他卡）。base由资产任务恢复到/mnt/public/cache/openpi/openpi-assets/checkpoints/pi05_base，data路径由Manager同步，不用随机参数smoke冒充base加载通过。完整50步train smoke+最终BF16保存/只checkpoint恢复测试有资产后开展，缺资产时CPU工作继续。只有短smoke授权，20k另行派发。
 
 保存需要的检查结果和大小/张量dtype/模型输出对齐证据；代码固定commit后给Manager准备独立review。报告task_revision/workspace/commit、测试、未完成与可复跑命令，发布；自己清理smoke/临时文件，不动正式资产或共享环境。预计>1小时程序登记mam job；不自行派agent。
