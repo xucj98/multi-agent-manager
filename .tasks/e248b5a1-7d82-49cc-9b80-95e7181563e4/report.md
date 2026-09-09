@@ -1,4 +1,12 @@
-task_revision: 022632919797b7bf045cd60fbc728df87e5d3adc
+task_revision: bca77f60f3100e453aec62f63cc95a396bdae596
+
+最高优先级补核已完成（2026-09-10 04:20前）：
+
+- `/mnt/public/xcj/Projects/RMBench/data/rearrange_blocks/demo_clean_state/` 已恢复50集 scene_info.json、language_annotation.json、seed.txt、metadata/，来源 `zx-data:/mnt/public3/xcj/rmbench/data/rearrange_blocks/demo_clean_state/`；原样metadata 157,107 bytes，checksum dry-run零差异。empty_mat_side、block1_place、press_return、language segment_4 均可读。
+- `/mnt/public/xcj/Projects/RMBench/data/put_back_block/demo_clean_state/` 同样恢复50集小标注，源为上述raw根的put_back_block目录；332,576 bytes，checksum dry-run零差异。origin_mat_name、center_pick、center_place、button_return 均可读。
+- 两目录各有 `metadata/robot_edge_samples.json`：使用wuwen-11已有h5py 3.12.1，仅只读100个HDF5的 joint_action/{vector,left_arm,left_gripper,right_arm,right_gripper} 首末两行；保留shape/dtype/源路径/文件字节与mtime，未读取或复制图像数组。样本输出分别266,064 / 266,136 bytes，源输出与目标SHA256一致：rearrange `f8a08cf2ebbd9ee68f57d476da3f0c17d55cefb04ee7954f2c125d65a75bf494`；put-back `df0941a6377fe9a139a9a7b375ed6cf514c033e42b0a479b0536f1a013d46464`。
+- 与data已发布报告f48bf331逐项对照，100/100集均验证 raw_N=converted_N+1；state[:2,:14]=raw[:2]、action[0,:14]=raw[1]、action[-2:,:14]=raw[-2:]（raw转float32）最大误差全部0。详细逐集结果在各自 `metadata/robot_edge_comparison.json`。raw总帧20,153 / 17,638，converted仍是原20,103 / 17,588，未重复复制或重转converted。
+- 优先补核期间暂停了自有battery进程组13148及第一链控制进程13126，保证不启动cover/swap；既有drawer传输可收尾。补核完成后恢复原job。
 
 完成与未完成：四份所需 converted 均已在 zx-data 定位，本地标准 cache 无对应资产，正在经 nx 两条顺序链恢复。未改代码或使用 GPU；尚未完成传输的目录不可用于训练。
 
