@@ -1,3 +1,9 @@
+## GPU安排：GPU1训练smoke结束后允许第二个F0并行
+
+当前仍只允许启动GPU0；GPU1由训练owner占用50step smoke，Manager确认其释放后才可用于另一完整100ep run。为之后无需改已冻结代码，请在首次smoke前给现有F0入口加--gpu（default0，可选0/1），传给已有runner同一sim/policy GPU参数；为两卡选择不冲突的robot/policy端口和分别的Warp cache目录。不要硬绑定GPU0、也不拆分一个100ep。每个正式run用其实际GPU/端口/配置对应的2rollout smoke通过原完整检查。
+
+这是恢复原本两张本机卡承担eval的安排，避免训练smoke结束后GPU1闲置18小时。只需少量参数与端口/cache派生修改，不新增队列系统或修改runtime；README注明GPU1当前未获放行。完整入口准备后立即报告，F0 runtime独立review不会因这些实验启动参数改动重做。
+
 ## 恢复F0：固定候选bc84203，完整入口先准备
 
 请恢复原workspace，把bridge固定到bc842036e3735390f35fe1138aa7b19f5ae2f95b（fd38513→92b365c→bc84203；删除临时client代理，以build_policy_obs=None跳过终止infer），OpenPI仍58d6f2155acc3af03017677bb3f536101e6699f4。只拿这条F0候选，不合后续live进度或新memory wire改动。Pascal正在做该几行增量复核；收到Manager无阻塞确认后可smoke。
