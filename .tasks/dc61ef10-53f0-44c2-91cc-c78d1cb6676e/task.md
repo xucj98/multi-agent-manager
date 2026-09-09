@@ -1,3 +1,7 @@
+## metadata文件的收敛约定
+
+command.txt本身包含实际命令、cwd和git commit（可用注释头），不另新增git_commit.txt或runtime信息副本。数据生成只保留本次实际使用的data/binding配置及上游metadata；不要把目录里所有候选训练memory YAML都复制进转换metadata。目标时序/decoder等完整memory配置由训练最终TrainConfig.memory_config权威保存，不让数据准备阶段看似选择了多种训练协议。69ca148中的configs/*.yaml批量拷贝应删除；未被正式训练使用的预备metadata可清理后真实重生成，保留准确新命令。
+
 ## 恢复：补齐已要求的逐步metadata继承
 
 Manager核对当前独立openpi：checkpoint_metadata.save仅保存train_config.yaml/datasets.json，scripts/train.py无command.txt/上游metadata复制；新sim sidecar也只有episode_memory/binding_manifest。用户明确要求convert→train→eval每步保留之前的metadata/config和含commit的command.txt。只保存训练配置不能满足此要求。
