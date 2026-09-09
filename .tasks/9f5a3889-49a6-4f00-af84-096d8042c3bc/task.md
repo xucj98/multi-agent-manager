@@ -1,85 +1,57 @@
-## 新memory跨库wire契约：必须联通真实train/infer transforms与scheduler
+# Memory v1：真机、仿真与offline统一反馈
 
-Manager发现当前两个实现不匹配：runtime MemoryContext.add_inputs把full编码写入padded state；训练AttachMemoryAfterNormalize只读取memory_input_ids，缺失会回initial。输出MemoryOutputs已把actions裁为robot_dim并给memory_prediction_ids，runtime却仍从actions尾部decode。仅各自CPU mock通过不能批准新模型闭环。
+## 范围、责任和工作区
 
-新memory_config路径统一为：
-- policy输入使用机器人原有state/images/prompt，加memory_input_ids，shape(F,)；full和serial都由policy输入transform负责具体编码。scheduler只送当前语义ID，停止自己写dense state offsets。旧无memory_config路径/F0保持原语义。
-- policy输出actions始终为机器人动作；另给memory_prediction_ids，full为(H,F)，serial为(1,F)，已按保存schema的decoder用本query输入memory作previous解码。full继续复用MemoryOutputs现有实现；serial复用实际动作条件化用的key_state_prediction结果，不能在scheduler重新argmax生成另一个当前条件。允许训练owner在src/openpi/policies/policy.py现有diagnostics输出位置为新memory_config加此统一字段；旧diagnostics可保持兼容。schema仍只有TrainConfig.memory_config一份。
-- MemoryContext从统一memory_prediction_ids读取并检查layout/shape/类别范围，然后按既有反馈时刻/row选择维护cache；不再次从已经裁掉memory的机器人actions解码，也不重编码policy输入state。policy无跨query缓存，previous来自请求的memory_input_ids；scheduler拥有反馈时序及context。不新增session/plugin/RPC或第二种wire配置。
-- no-memory字段F=0可用空预测维度或在空field情况下不索取该字段；旧checkpoint不强制需要新字段。
+复用本任务登记的robot-bridge及openpi worktree与独立环境。修改robot-bridge runtime、相关测试和功能文档；openpi只合固定交付依赖，不改训练实现。阅读robot-bridge AGENTS及docs/design/conventions.md。Manager负责跨库接口与验收裁定，训练owner为ad6bb77e，reviewer为0bc5129d。不改主checkout、不使用他人临时PYTHONPATH、不自行派agent。
 
-训练owner负责输入/输出transform与Policy.infer，runtime owner负责MemoryContext及三个scheduler/UI；backend保持现有字典透传。先固定F0 terminal最小commit，再进行此新schema接口增量，避免旧权重评测被后者阻塞。
+目标是同一个checkpoint中的memory_config驱动live/offline/simulation的多字段context与UI，同时保留既有真机控制和takeover。旧F0评测独立在已冻结代码上运行；不因后续live修改要求其重跑。
 
-验收必须跨边界：用真实policy input/output transforms和真实MemoryContext，非initial cache经scheduler传入后确实改变pi05 tokenized_prompt；模型原始dense输出经过真实输出transform裁为14维robot actions后，memory_prediction_ids仍到达context并按K30选row30反馈。serial预测ID与实际动作条件selected相同；测试单/多字段和no-memory。可以用小模型/构造原始输出做CPU联通，不能用两个各自mock字典替代这条测试。GPU50step保存加载后再复验实际返回的keys/shape。Reviewer均按此明确契约复核。
+## 已交付与当前优先级
 
-## terminal修复的结构裁定（替代“不改Base任何代码”的过严限制）
+- F0已验收：fd38513→92b365c→bc842036e3735390f35fe1138aa7b19f5ae2f95b。最后版本以build_policy_obs返回None跳过terminal infer/execute，不保留临时client代理。Base不识别仿真字段，正常dict仍按原序执行；terminal前已有reset保持。row30的2rollout GPU smoke已通过，正式100由独立eval owner执行。
+- live handoff修复9d2784d143bcc4c4fdd59bc558f0e0a9303d42a5仍有下述两处独立review阻塞。
+- 新wire f84edbd6eea81104a00fd85409046eaaa8712e9b已通过runtime半边审查，跨真实OpenPI transform仍待训练commit。
+- 优先修两个live问题为独立commit；轻量依赖安装同时补齐；随后用正式训练commit做跨库联通。CPU验证，不触碰真机或启动GPU。
 
-92b365c通过每轮替换_policy_client为代理来跳过terminal infer，功能方向正确，但新增临时client身份/包装器没有必要。Manager此前要求“不改Base”过严；应保留已有执行顺序与通信机制，不必禁止最小退出契约。
+## 当前必须修复的live边界
 
-请删除_TerminalInferenceSkippingClient和sim的run_iteration包装，采用已有build_policy_obs hook返回None表示这轮不调用policy；Base在该hook后作None检查并返回skip，文档/类型同步。simulation仍先处理terminal observation的真实执行进度/trace，之后返回None；其_loop_step会按_episode_terminal结束。Base不读取仿真字段、不加新RPC、session或调度循环；live/offline正常dict返回行为不变。保留并复核actual run_iteration的infer_count=0、execute=0、terminal actual_k/next_query，以及非terminal/reset/takeover原路径。此小修单独commit，以其作为F0正式候选。
+Pascal报告6eb517df97db65b600dead62e7ba2da6ae762727已由Manager核对：
 
-## F0额外小修：terminal不再调用policy
+1. synchronous_rows等待queue剩余0，但X1/X1Pro仅在有after端点时发送before，末行缺handoff evidence，3行只completed2。最小修正末行消费及完成等待；不能把timestamp过期算成完成。验证真实loop/worker（fake SDK）、单行/末行、插值factor>1、terminal/takeover/reset。
+2. synchronous drain后live/offline仍按非0 latency跳过新chunk前几行。该iteration的动作起点、future window和反馈映射必须与实际wait语义一致：同步从row0开始，原流水线wait_condition路径保留非0 latency及重叠推理机制。覆盖继承的takeover，不能全局废弃异步行为。
 
-Eval owner在RMBench commit9e8fccbd2fa004f18a3cbcc301e7387b02edaccf报告：terminal观测的trace写next_query=false，但基类循环仍实际infer后才跳过action。请在OpenPISimulationScheduler现有边界最小修正terminal时跳过真正policy调用，保留SchedulerBase/真机循环；定向测试同时计policy.infer调用数和trace。请作为独立小commit先交F0review，不必等live三个P1一起交付。
+还要保持先前修复：没有成功transport handoff不增加completed；clear_actions清掉所有未处理proposal且不作下一插值anchor；progress由该次返回观察的时间基得到，不能被UI/无图get_obs提前消费。完成计数仅证明发送交接，不证明物理到位，硬件边界在报告中明确。
 
-## 独立review裁定：真机完成进度必须修正
+## 共享schema与wire
 
-Pascal起始审查在0bc5129d-623c-4c3d-8bce-b8c172ccca56/report.md给出三个P1复现，Manager确认其是新memory反馈的真实阻塞，不能用445 tests通过覆盖掉：
-1. tracker按入队timestamp越过观察时间计completed，但x1/x1pro执行线程未实际发送也会completed=1（合法单行chunk可发送0次）。完成证据需对应实际执行线程处理及本chunk/行映射，不能以时间到期冒充执行。
-2. clear_actions的cut只按timestamp筛除，滞后worker可能保留未执行旧proposal作为下一插值anchor。保留已验证控制循环与通信方式，最小修正清除语义，不能接管后继续执行尚未处理的旧proposal；不要大改控制频率/插值算法。
-3. tracker.observe是全局累进值，无图get_obs可先推进计数，较旧图像对齐get_obs随后也返回已推进进度。反馈证据必须绑定本次返回观察的时间基，不能被UI或其他请求提前消费。
+依赖轻量openpi-client的memory_config，正式core在58d6f2155acc3af03017677bb3f536101e6699f4（本任务等价7061c94可用）。load_memory_config→ResolvedMemoryConfig→compile_model_spec；to_dict为唯一保存mapping。不复制parser/decoder，不引入训练框架依赖。
 
-请复现并给最小修复commit及实际线程/队列测试。若涉及真实硬件行为仍不能证明，用精确未验证边界报告，不宣称硬件通过。mock/sim的同步take_action计数可以独立验收，故本修复不要阻塞已提交F0仿真路径的独立review/smoke。完整scheduler commit fd38513已交Pascal继续审；新修复请单独commit便于追踪。完成或部分进度直接写report并发布。
+新checkpoint有memory_config时：
+- 输入为原robot state/images/prompt，加有序memory_input_ids，shape(F,)。scheduler只发语义IDs，具体full/serial编码归policy transforms。
+- 输出actions只有robot_dim；memory_prediction_ids为full(H,F)、serial(1,F)。full由policy共享decoder生成；serial必须是实际动作条件化选中的ID，不重新argmax logits。
+- context验证layout/shape/range后按schema事件和row维护cache，不从裁掉memory的actions尾部decode。previous由当前request IDs提供，policy不维护显式任务cache。
+- F=0不要求预测字段或允许空field维度；旧无memory_config checkpoint保持已验证路径。
 
-# Memory v1：真机仿真offline统一反馈
+scheduler单个robot/policy、维护context；backend透传并提供reset，DM05/Mem-0原内部缓存保留。没有session/get_progress RPC/插件总线。UI从schema有序fields/domain显示和编辑，不硬编码phase、属性数或wash/drawer名字；键盘/UI走同一操作入口。
 
-## 环境恢复裁定
+## 调度与反馈语义
 
-de79新增PyYAML但缺lock更新，独立修复commit为0dc120c（uv.lock两行）。已有登记openpi worktree不反复调用workspace add；在自己树cherry-pick修复后，沿受版本管理scripts/worktree_env/create_worktree_env.sh第268行以后的lock检查、独立uv venv、sync frozen/hardlink、import验证恢复，不复用他人环境。通过后报告证据，Manager修复本task的MAM failed状态记录；不扩展MAM实现。
-# 目标
+保留WS action chunk、UDP遥操作、execute后wait-condition get_obs，Base只接受既有hook最小None退出。chunk accepted与实际完成区分；pending预测要等相应事件才能更新。支持query_selected/chunk_accepted/chunk_completed及声明row first/index/last_executed/query，按core支持范围校验。没有所需进度的controller启动时报错，不猜已完成K。
 
-# API已提交，可开始接入
+取行基于真实model row与实际执行k，不把render/integration substep当policy row。partial、reject、跨chunk、episode终止、takeover/reset及异常不回灌旧pending。每query记录输入/目标参考时刻、计划K、actual k、选行、字段before/after、是否下一query消费，沿既有diagnostics。
 
-轻量契约commit：openpi de79cce20e54c612634fdc2598b91cc0ab5034ec（API owner正在精简内部/修复，后续补commit，当前可供开发）。ResolvedMemoryConfig.compile_model_spec(model_config=None)返回MemoryModelSpec；属性为representation、field_names、field_values、initial_ids、encoding、dense_offsets、robot_dim、padded_dim、action_horizon、execution_rows、target_layout、loss_kind/loss_weight、current_condition、decoder_rules、feedback。共享方法encode_dense_ids(ids)、decode_ids(ids)、decode_dense_actions(actions, previous_ids)、decode_token_logits(logits, previous_ids)。训练sample额外给dense_actions/action_loss_mask/action_loss_weights。具体以该commit代码/owner report为准，不做两份切片/解码器。后续由ad6bb77e-3892-4730-ae1a-7d9cd99a5728负责src训练接入，f252只维护轻量package。
+首批full：current reference训练、cache推理、目标t+j+1；P2另一臂仅phase目标重复t+30；两者K30完成后均读row30。重复监督不保证实际H行预测相同，不能随意换首行/平均。serial：previous lag30输入、current query目标、train reference/infer selected动作条件、query_selected反馈。默认独立argmax，顺序可变的wash不加入ordered规则。
 
+旧F0固定H50/K30，legacy_full_feedback_selector支持index0/19/29/49和last_executed；保持原字段、归一化和解码，全部字段同选行。row50是未来模型预测，不是真值。F0只用于无新schema旧full模型；终止仍写actual k与next_query=false，不再infer。
 
-# 已确定共享接口（API owner的先行契约）
+## 轻量包安装与部署
 
-openpi-client模块为 openpi_client.memory_config，load_memory_config(path_or_mapping) -> ResolvedMemoryConfig；to_dict()为metadata.memory_config。训练入口 make_training_sample(EpisodeMemoryData(series, constants, events, tail=None), query_index, rng) 返回input_ids/target_ids/逐行target_mask、robot目标索引/有效位和lag_draws；字段顺序为memory列表。model_spec()提供representation、词表/initial IDs、dense offsets或token sizes、loss和显式decoder/反馈。validate_model_dimensions(robot_dim, padded_dim)检查已有模型维度。具体可调用属性以owner首个commit为准，先通过该helper复用契约，不复制parser。
+新schema需要openpi_client.memory_config，生产部署必须有明确安装路径。接受由独立openpi固定commit构建openpi-client wheel、在新隔离环境安装并实际创建MemoryContext的最小方案。不要假定公开同名旧包已有新模块。中文文档给可复制命令/安装来源，复用现有部署入口；不复制全训练环境，不为了依赖检查重做SDK系统，不连接/改变真机或原环境。先简述选择依据再实现；这一验收不阻塞sim训练。
 
-input train/infer显式source=initial可作为辅助监督无递推对照；memory=[]为标准无记忆。正常新schema默认独立argmax，历史规则仅显式配置生效。首批H50/K30；P2两full配置仅phase目标时刻不同，共享mask和固定H分母。跨agent的工作树代码需通过明确commit集成，不能把对方临时workspace长期加入PYTHONPATH。需要伴随openpi代码时在自己MAM任务下增加openpi worktree并接owner提交，或用自身venv安装该commit构建的轻量包，勿改共享环境。
+## 验收与交付
 
+使用实际policy input/output transforms→实际MemoryContext联通：非initial cache改变pi05实际tokenized_prompt；full raw dense输出裁为14维后predicted IDs保留并在K30消费row30；serial反馈ID等于实际动作条件ID；单字段、多字段、no-memory。可以构造原始model输出，不用两份mock字典代替真实transform链。训练正式commit到后在本任务openpi合入，使用自身环境。
 
-接入统一memory_config，使robot-bridge的真机、offline、仿真scheduler按同一份checkpoint配置维护多字段记忆，保持经过验证的通信、takeover和reset。实现与定向CPU验证，不启动正式GPU实验。
+CPU测试覆盖以上进度/并发/中断/wire/旧路径/UI；按库规范全tests。GPU与真实硬件验收分开记录，不能将CPU通过写成硬件通过。RMBench recorder负责仿真产物格式，结果归RMBench/eval_result/<exp-group>/<run>，bridge不新建正式结果根。每步继承metadata/config，不复制代码。
 
-# 工作区与写入范围
-
-从robot-bridge b17f6c53ffbc1030972a9820cf592f28b937d501 用mam workspace add创建独立环境/worktree，读AGENTS.md及docs/design/conventions.md。只修改robot-bridge和其相关tests/功能文档。openpi契约owner任务 f252006a-8676-4d10-b6a1-1a791d91c6a6，接口会由Manager发布；不要复制实现第二套parser、不自行修改openpi/RMBench。只读现有规格 /root/Documents/task-state-vla-paper/docs/MEMORY_CONFIG.zh-CN.md，接口调查 .tasks/8584105e-adae-4a96-83f2-af47cece6bf8/report.md。
-
-# 实施约束
-
-1. checkpoint metadata的memory_config（schema_version、memory有序字段、protocol）为事实源。openpi-client将提供轻量validator/字段工具；scheduler不导入训练框架。旧模型仍走现有已验证路径，新schema路径显式运行；不再扩展旧格式兼容。
-2. scheduler持有语义memory/context，一个scheduler同时一个robot/policy；backend转发模型结果并提供reset，保留DM05/Mem-0已有内部算法缓存行为。无session、无通用插件总线、无get_progress新RPC。不要重构SchedulerBase的调度循环。
-3. 保持execute之后带wait_condition的get_obs；不能把chunk accepted冒充已执行完成。多字段通用处理，field数不是模型/任务专用分支。默认独立argmax，wash-cup顺序可变不施加固定顺序；full和serial共享同一个字段schema。UI从domain显示字段和值，不手写wash/drawer字段。
-4. 反馈按声明时刻与选行：query-level serial不依赖动作行；full row选first/index/last_executed，必须使用实际执行进度；前者合法与否取决于目标时间定义，不统一强改成首行。保留pending chunk预测到现有get_obs确认/同步执行返回后再提交需要完成事件的反馈。能力无法提供k时应在启动阶段报明确不支持，不能猜K已全部执行。跨chunk、episode终止、execute失败、takeover中断、reset不回灌错误pending。
-5. 解码在动作反归一化后，缓存语义类别然后再次编码；不能把model padding或者动作原始连续尾部当语义ID。输入/feedback/reset的实现由三类scheduler共用，避免每个scheduler一份逻辑。字段/协议由metadata透传，runtime要检查它能支持所声明event/row。
-6. 记录每query的目标参考时刻、计划K、实际k、选行/最终反馈、下一次消费，依托现有diagnostics/context；保留episode成功率全部分母。数据引用/Oracle不能进入普通推理。RMBench负责结果格式与目录，统一仍由其recorder写RMBench/eval_result/<exp-group>/<run>，不在robot-bridge产生正式eval_result目录。
-
-# 验收与交付
-
-P2补充：full的“重复终点”是H行监督label相同，实际预测H行仍可能不同；两臂统一读取第30行。只有模型实际输出完全相同的值时两种取行才等价，不能把重复训练目标当作首行/末行/均值随便替换的依据。query-level单输出是另一个结构，不在P2中混用。
-
-旧full时序锚点已实测：任务a15fdd25的83cbec9入口通过2rollout smoke，旧scheduler是get_obs取得logical_step advance后反馈末已执行行，K30完整执行取row30。当前缺独立row20 selector与逐query trace，所以P1 K30/row20尚不可运行。请在新schema反馈配置路径支持row index及trace（本任务原要求），并说明如何为该旧full checkpoint显式提供等价schema来做这项诊断；只用其真实字段/归一化信息，不发明全历史兼容转换器。基线row30必须先核对同输入输出/反馈一致，再开始row20。旧checkpoint无schema路径继续保留。
-
-定向mock/offline CPU tests覆盖单字段、多字段、completion vs accept、partial/takeover/rejection/reset、首行与末执行行、同值的chunk目标两种row等价、无schema既有路径未变；按库规范跑全tests。不触碰真机、不跑GPU；GPU smoke待Manager分配。先报告代码量预估与接口需澄清处，之后提交commit，report记task_revision、workspace、commit、测试/未完成，发布。任务完清理自己的短smoke与临时文件，等待归档；不自行派agent。
-
-## 2026-09-10 06:57：live独立复核追加与验收边界
-
-Pascal最新已发布report 6eb517df97db65b600dead62e7ba2da6ae762727提出两处live/offline实质问题。Manager核对现有控制循环与latency路径后裁定需要修正；不阻塞冻结bc842036的F0正式评测，也不阻塞训练。
-
-1. synchronous_rows等待queue剩余0，但实际X1/X1Pro仅在有after端点时发送before；最后一行缺handoff evidence，3行只completed2。保持现有插值/WS/UDP机制，最小修正末行消费/完成等待的语义。不能仅把timestamp过期当作完成。回归真实执行loop/worker（fake SDK可）、单行/末行、factor>1、terminal/takeover/reset；明确这是handoff而非物理到位证明。
-2. synchronous drain后live/offline仍按配置latency跳过新chunk前几行。当前iteration的action起点、future window和反馈映射应与实际wait语义一致；同步时执行row0起，流水线wait_condition路径维持原有非0 latency行为。不能全局废掉既有真机异步机制。两类scheduler/继承takeover均验证。
-
-另新memory依赖openpi_client.memory_config，但生产部署尚无安装路径。交付最小明确的轻量包构建/安装入口和中文说明，在全新隔离环境验证无训练框架仍能import并创建MemoryContext。可安装独立openpi该版本构建的openpi-client wheel，不假定公开PyPI同名旧包具备新模块，不要求复制全训练环境；不要实际连接/改变真机。是否修改现有部署脚本按其实际职责处理，先给简短选择理由，避免为本地验证重做整个SDK部署系统。该项属于部署验收，不阻塞sim训练。
-
-优先交两处live修复的独立commit供Pascal复核；真实openpi transforms跨库检查待训练commit到达再做。报告准确剩余项，不用旧mock测试数代替新边界验收。
+报告task_revision、工作区/完整commit、变更规模、实际验证及剩余项；阶段交付及时publish report供review。清理自己的smoke/cache临时文件，保留workspace待Manager归档。
