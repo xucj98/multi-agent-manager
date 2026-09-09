@@ -11,7 +11,7 @@
 
 # 工作区与写入范围
 
-从 openpi 71c80db723a242c61cfe429dd6794e9ece3cbcf1 用 mam workspace add 创建独立worktree/环境，先读该库AGENTS.md。独占 packages/openpi-client（共享轻量契约）、src/openpi（训练/模型/metadata）、相关定向tests；不改examples数据转换器和robot-bridge。论文规格只读：/root/Documents/task-state-vla-paper/docs/MEMORY_CONFIG.zh-CN.md 与 memory_config/*.yaml。你上个只读报告为 .tasks/8584105e-adae-4a96-83f2-af47cece6bf8/report.md。
+复用已登记的openpi worktree。现在独占packages/openpi-client及其定向tests；src/openpi和scripts训练/模型/metadata改由任务ad6bb77e-3892-4730-ae1a-7d9cd99a5728并行负责，不再修改这些路径。以上训练需求继续作为接口要求，你交付契约/sample/权重后即可完成该任务。不改examples和robot-bridge。论文规格只读。各库AGENTS.md和之前报告仍适用。
 
 # Manager裁定与第一版范围
 
@@ -32,5 +32,7 @@
 留痕精简：resolved memory_config只需在checkpoint已有train_config/metadata链中有一个权威可读取位置，不再并行保存一份重复model_spec/字段切片配置。model_spec在加载时推导；backend的metadata透传同一个配置对象。raw YAML路径不是自包含，恢复不得依赖已经清理的worktree。P2的公共phase loss mask必须作用到逐坐标损失上，不是只把target置零；phase有效行比例做数据诊断，不能降低机器人loss权重。
 
 # 验证与交付
+
+Manager对de79cce的修订要求：模块1480行、合计1838行明显高于450+250预估，先做实质精简再交付，不以减少换行冒充简化。保留已公布runtime/sample接口，减少重复的to_dict/parse对象映射与未使用包装，不要为新API加backward-friendly别名，去掉validate_first_batch_protocol这种通用库硬编码H50/K30的入口。可以复用项目已有结构校验机制，保留必要语义与范围检查；目标轻量模块约800-1000行以内，若合理实现仍超出给逐项原因，不删关键校验凑行数。修复两个具体问题：YAML重复key必须拒绝；invalid memory目标在dense编码中必须是真正全零向量，不是one_hot(ID0)，并同时保持逐坐标loss为0。B/T公共mask对应的时刻、固定H分母和lambda只应用一次须在helper文档/API说明清楚。维度来自现有model/data配置，不能强制重复填写；若load阶段尚未绑定维度，compile/sample时显式绑定而非假定所有机器人14维。首个de79cce供依赖方开发，尚未最终验收。此次只收敛契约/测试，不做src训练接入或GPU smoke。
 
 先CPU测试：字段顺序/重复和无memory、单字段wash及多字段drawer/rearrange、可变顺序phase不被限制、公共mask/固定分母、metadata roundtrip。代码量先给预估，再报告新增/删除行；避免大兼容脚手架。GPU短smoke待Manager分配，当前不占GPU。先交可供依赖方使用的契约commit，再完成训练实现commit；全量验证适用部分后report记录commit/测试/不足并发布。不得修改共享checkout或他人环境。过程中需求有歧义及时给Manager具体选项，不阻塞可独立实现部分。长程序若后续获分配超过1小时，用mam job登记。任务完清理自己的smoke/临时文件，不删除正式资产；不自行派agent。
