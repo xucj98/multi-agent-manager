@@ -1,20 +1,29 @@
-task_revision: 52e2454ea202c84a9d51b2fad301b99171e80639
+task_revision: 1ebde35fd5511b2c330ffa70de43993121b1a85d
 
 完成与未完成：
 
 已在任务登记的三个 worktree 中完成旧 shared-full checkpoint 的实际加载、2 accepted-rollout smoke、时序调查和正式入口准备。未启动任何 100-rollout 正式评测；正式运行仍等待 Manager 集成 review 与明确开跑通知。
 
+本轮已落实 Manager 文档反馈：README 改为中文直接命令，脚本默认定位同一 workspace 的三库，无需先 export 根目录变量；第 50 条后的偏差检查明确由实验负责人执行；产物按共享主 RMBench 的真实保存路径报告。沿用 Manager 已验收的加载、视频和退出证据，本轮未重跑 GPU smoke，未启动 100，等待新 runtime 集成。
+
 workspace、各库交付 commit：
 
-- RMBench：`/mnt/public/xcj/Projects/workspace/a15fdd25-5e7d-4eb4-8059-a5bd4d35a691/RMBench`，commit `83cbec9a2477858b727148016c3b4125f32296fa`（`experiments: add memory chunk P1 smoke entry`）。新增 `experiments/memory_chunk_20260910/{README.md,config.yaml,commands/run_pi05_rearrange_full_smoke.sh}`。
+- RMBench：`/mnt/public/xcj/Projects/workspace/a15fdd25-5e7d-4eb4-8059-a5bd4d35a691/RMBench`，交付 commit `d1a64cb2468d409411bbcfd3f23ae59d2ec8db6e`（`实验：中文说明评测流程并自动定位任务工作区`）。它在原入口 commit `83cbec9a2477858b727148016c3b4125f32296fa` 上仅修订 README 和脚本根目录默认值/启动 cwd；`config.yaml` 和三库模型、scheduler 核心未修改。
 - robot-bridge：登记 worktree、无代码修改，base `b17f6c53ffbc1030972a9820cf592f28b937d501`。
 - openpi：登记 worktree、无代码修改，base `71c80db723a242c61cfe429dd6794e9ece3cbcf1`。
 
+直接命令（供后续获准复跑时使用，本轮未执行）：
+
+```bash
+cd /mnt/public/xcj/Projects/workspace/a15fdd25-5e7d-4eb4-8059-a5bd4d35a691/RMBench
+bash experiments/memory_chunk_20260910/commands/run_pi05_rearrange_full_smoke.sh
+```
+
 Smoke 结果与成果位置：
 
-- 运行目录：`/mnt/public/xcj/Projects/workspace/a15fdd25-5e7d-4eb4-8059-a5bd4d35a691/RMBench/eval_result/memory_chunk_20260910/pi05_rearrange_full_k30_oldfull_smoke_20260910/`。
+- 真实保存目录：`/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/pi05_rearrange_full_k30_oldfull_smoke_20260910/`。本轮用 `readlink -f` 确认 worktree 中的 `eval_result` 别名解析到该共享目录，产物不依赖临时 workspace 留存。
 - 启动于 `2026-09-10T03:35:11+08:00`，结束于 `2026-09-10T03:41:57+08:00`，launcher exit code 为 0；两条 accepted rollout 的 seed 为 `100000`、`100001`。结果为 Fail（`button_press_insufficient`）和 Success，汇总为 1/2。该结果仅用于 smoke，不纳入正式成功率结论。
-- episode 0 的 `episode0.mp4` 为 700 帧、521128 bytes，`video_checks.jsonl` 验证可读；episode 1 的视频明确关闭、无 `episode1.mp4`，视频关闭检查通过。两个 scheduler child 都以 return code 0 正常退出；robot/policy 均由 runner shutdown 收尾。
+- 视频：`/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/pi05_rearrange_full_k30_oldfull_smoke_20260910/episode0.mp4`，700 帧、521128 bytes，既有 `video_checks.jsonl` 验证可读；episode 1 的视频明确关闭、无 `episode1.mp4`，视频关闭检查通过。两个 scheduler child 都以 return code 0 正常退出；robot/policy 均由 runner shutdown 收尾。
 - 结果目录保留 `config.yaml`、`command.txt`、`checkpoint_metadata/`、两个 episode context、诊断、视频检查与 `processes.jsonl`。`validate_smoke_run` 已通过，config SHA-256 为 `2dbaa989b3703e3aeb0fd342528ddfa6e5b519e48783d8ce180296b734814a89`，bridge commit 为 `b17f6c53ffbc1030972a9820cf592f28b937d501`。
 - 全程限定 GPU 0：`CUDA_VISIBLE_DEVICES=0`、`SAPIEN_RENDER_DEVICE=cuda:0`、policy `XLA_PYTHON_CLIENT_MEM_FRACTION=0.40`。结束后 GPU 0 为 1 MiB/0%，19300 与 19302 均未监听。
 
@@ -28,9 +37,10 @@ Smoke 结果与成果位置：
 
 验证与吞吐：
 
+- 本轮仅做 `bash -n`、`git diff --check`、默认路径和共享产物路径检查。清空 `RMBENCH_ROOT/BRIDGE_ROOT/OPENPI_ROOT/RMBENCH_INPUT_ROOT` 后，从 `/tmp` 对实际脚本执行到首个 `mkdir` 前拦截退出；三库默认路径、各自 Python 和 RMBench 启动 cwd 均正确，未创建缓存、未启动 runner 或 GPU 进程。
 - 入口通过 `bash -n`、实际 checkpoint restore、完整 smoke 与官方 `validate_smoke_run`。既有 bridge benchmark tests 为 32 passed，RMBench eval diagnostics tests 为 3 passed。
 - checkpoint 参数恢复日志为 7.95 s。整个冷启动 smoke 为 406 s，即约 17.7 accepted episodes/hour 的粗略端到端值；两条的 episode 长度分别为 700 与 406 logical steps，且包含首次 XLA 编译，不能直接作为正式 100ep 的吞吐承诺。历史审计的 55.1 ep/hour 仍只是历史锚点。
 
 正式运行状态：
 
-入口已提交且 worktree 干净，smoke 已通过、结果留存。正式单 GPU 串行 100 rollout（K30/row30 或任何后续已实现的独立比较）保持 blocked，直到 Manager 完成集成 review 并明确通知开跑。短 smoke 未登记 MAM job；无运行中的任务 job。
+补充 commit 已提交且 worktree 干净，旧 smoke 已由 Manager 验收、共享结果留存。等待 runtime owner 的 selector/trace 集成及 Manager review、明确通知后才能启动正式单 GPU 串行 100 rollout。第 50 条后的检查由实验负责人执行：相对固定基线偏差超过 10 个百分点时调查协议/基础设施，并在该 run 目录与任务报告记录结论；不宣称 runner 已自动实现该人工检查，保留不利 episode。短 smoke 未登记 MAM job；本轮无新运行进程或 job。
