@@ -1,6 +1,10 @@
 # Memory实验：评测入口、旧full时序锚点与开跑准备
 # 目标
 
+# 用户最新数据约束
+
+用户明确新仿真训练数据来自demo_clean_state，demo_clean缺metadata/详细子任务标注。后续新checkpoint来源检查遵循此要求。此要求针对训练/转换数据，并不要求擅自改变旧checkpoint评测的场景task_config；P1仍固定已核实的旧评测协议。
+
 准备统一memory首批实验的RMBench评测入口，先用可用的旧shared full checkpoint验证加载、完成进度与反馈时序。GPU实验owner，为后续新20k训练的100ep评测做好入口和留痕。不要重跑全部历史实验。代码/配置成果交Manager审查后正式跑。
 
 # 工作区/代码边界
