@@ -23,7 +23,7 @@
 | 6 | pi05_rmbench_rearrange_blocks_full_t_plus_1 | 1 |
 | 7 | pi05_rmbench_rearrange_blocks_full_t_plus_30 | 1 |
 
-GPU6/7使用研究计划已经批准的wash等待替补：Q2的配对seed1，属于原72次预算，不增加无目的实验。wash v3正在转换，其训练注册配置另行完成；下一批空闲卡优先wash。可先准备这八项，不把未验收wash放进当前八项。
+GPU6/7使用研究计划已经批准的wash等待替补：Q2的配对seed1，属于原72次预算，不增加实验数。wash v3数据已通过最终独立review a2ee264，其训练注册配置和模型验收仍由实施owner完成；下一批空闲卡优先wash。当前继续准备既定八项。
 
 不同config/seed每次使用独立、带明确实验组和seed的exp_name，已有输出拒绝混写；失败重试新目录。使用现有scripts/train.py，不开发通用队列/launcher系统。必要的实际启动命令和分配表写本task report即可，由MAM发布；长进程用可靠detach启动，不依赖短tool session存活。
 
