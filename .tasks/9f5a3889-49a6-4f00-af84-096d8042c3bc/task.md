@@ -55,3 +55,7 @@ scheduler单个robot/policy、维护context；backend透传并提供reset，DM05
 CPU测试覆盖以上进度/并发/中断/wire/旧路径/UI；按库规范全tests。GPU与真实硬件验收分开记录，不能将CPU通过写成硬件通过。RMBench recorder负责仿真产物格式，结果归RMBench/eval_result/<exp-group>/<run>，bridge不新建正式结果根。每步继承metadata/config，不复制代码。
 
 报告task_revision、工作区/完整commit、变更规模、实际验证及剩余项；阶段交付及时publish report供review。清理自己的smoke/cache临时文件，保留workspace待Manager归档。
+
+## CPU训练交付与跨库验收版本
+
+openpi训练commit ffa308d5485a2c8222d3e7735b08723c6e93a237已固定，包含所需checkpoint字段、MemoryDataAdapter/transforms及Policy.infer wire；其父链有等价core、sim YAML、checkpoint最终增量。请合入本任务openpi独立树（等价patch按实际文件处理），完成前述真实transforms→MemoryContext联通。你负责此双库测试，Pascal独立复核；Bernoulli继续norm/GPU1保存恢复，Banach审OpenPI模型/训练/加载，不重复创建bridge环境。不要等待GPU50step才检查CPU wire。
