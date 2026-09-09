@@ -72,3 +72,14 @@ P2补充：full的“重复终点”是H行监督label相同，实际预测H行�
 旧full时序锚点已实测：任务a15fdd25的83cbec9入口通过2rollout smoke，旧scheduler是get_obs取得logical_step advance后反馈末已执行行，K30完整执行取row30。当前缺独立row20 selector与逐query trace，所以P1 K30/row20尚不可运行。请在新schema反馈配置路径支持row index及trace（本任务原要求），并说明如何为该旧full checkpoint显式提供等价schema来做这项诊断；只用其真实字段/归一化信息，不发明全历史兼容转换器。基线row30必须先核对同输入输出/反馈一致，再开始row20。旧checkpoint无schema路径继续保留。
 
 定向mock/offline CPU tests覆盖单字段、多字段、completion vs accept、partial/takeover/rejection/reset、首行与末执行行、同值的chunk目标两种row等价、无schema既有路径未变；按库规范跑全tests。不触碰真机、不跑GPU；GPU smoke待Manager分配。先报告代码量预估与接口需澄清处，之后提交commit，report记task_revision、workspace、commit、测试/未完成，发布。任务完清理自己的短smoke与临时文件，等待归档；不自行派agent。
+
+## 2026-09-10 06:57：live独立复核追加与验收边界
+
+Pascal最新已发布report 6eb517df97db65b600dead62e7ba2da6ae762727提出两处live/offline实质问题。Manager核对现有控制循环与latency路径后裁定需要修正；不阻塞冻结bc842036的F0正式评测，也不阻塞训练。
+
+1. synchronous_rows等待queue剩余0，但实际X1/X1Pro仅在有after端点时发送before；最后一行缺handoff evidence，3行只completed2。保持现有插值/WS/UDP机制，最小修正末行消费/完成等待的语义。不能仅把timestamp过期当作完成。回归真实执行loop/worker（fake SDK可）、单行/末行、factor>1、terminal/takeover/reset；明确这是handoff而非物理到位证明。
+2. synchronous drain后live/offline仍按配置latency跳过新chunk前几行。当前iteration的action起点、future window和反馈映射应与实际wait语义一致；同步时执行row0起，流水线wait_condition路径维持原有非0 latency行为。不能全局废掉既有真机异步机制。两类scheduler/继承takeover均验证。
+
+另新memory依赖openpi_client.memory_config，但生产部署尚无安装路径。交付最小明确的轻量包构建/安装入口和中文说明，在全新隔离环境验证无训练框架仍能import并创建MemoryContext。可安装独立openpi该版本构建的openpi-client wheel，不假定公开PyPI同名旧包具备新模块，不要求复制全训练环境；不要实际连接/改变真机。是否修改现有部署脚本按其实际职责处理，先给简短选择理由，避免为本地验证重做整个SDK部署系统。该项属于部署验收，不阻塞sim训练。
+
+优先交两处live修复的独立commit供Pascal复核；真实openpi transforms跨库检查待训练commit到达再做。报告准确剩余项，不用旧mock测试数代替新边界验收。
