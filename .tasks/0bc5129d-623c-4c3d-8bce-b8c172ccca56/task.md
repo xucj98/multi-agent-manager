@@ -1,3 +1,7 @@
+## Eval入口补充
+
+Eval准备commit RMBench9e8fccbd2fa004f18a3cbcc301e7387b02edaccf发现terminal trace next_query=false仍额外policy infer。Manager已要求作者在simulation scheduler局部跳过terminal infer并单独提交，保留base/live循环；请复核此增量与F0实际调用/trace一致。另正式recorder原完整配置smoke检查保留，四种row各自先2rollout smoke，不写新的白名单兼容机制。
+
 ## 已提交的完整runtime增量
 
 作者已交付robot-bridge fd38513adb5ba171327358f70f55f88059de49d2（含22a5c6c/bb908c6前置），请在本任务独立分支合入并完成上述全范围review；openpi helper使用主库58d6f2155acc3af03017677bb3f536101e6699f4的等价API。作者报告445 passed/1skipped不是独立验收结论。F0是旧full固定权重评测的直接阻塞：先给selector/legacy/progress部分是否阻塞的明确结论，剩余新schema路径继续检查。报告实现与测试的代码规模，以及必要性/重复逻辑方面的实质问题，不为凑行数删必要验证。
