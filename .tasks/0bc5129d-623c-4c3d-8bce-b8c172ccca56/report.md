@@ -73,7 +73,9 @@ task_revision: d606b3740789a1ed496f84d9bd2f462797d1078f
 
   `281e0a7` 的现有定向回归仍通过：`tests/robot/controllers/test_execution_progress.py` 为 `9 passed`，`tests/scheduler/test_memory_v1_schedulers.py tests/scheduler/test_openpi_takeover.py` 为 `28 passed`；它们没有覆盖 queue drain 后末行 completion。
 
-- **其余 live / takeover 项仍待完成复核。** 该增量旨在修复先前的三项 P1：timestamp 过期即冒充实际执行、takeover 后旧 proposal 作为插值锚点、另一 `get_obs` 时间基提前推进 progress。另有 `synchronous_rows + latency_step>0` 在 queue drain 后仍保留 latency、令 H20/K15/latency2 从模型 rows 2..16 而不是 row 0 反馈的问题。这些与新末行 P1 都不随本 F0 terminal 修复自动关闭，均只阻塞完整 live runtime 结论，不阻塞旧 RMBench F0 smoke。
+- **live/offline P1：synchronous drain 后仍错误跳过 latency rows。** `MemoryContext.apply_wait_condition()` 在有 pending synchronous chunk 时将 get-obs 条件覆盖为 `action_queue_remaining: 0`，说明本轮 infer 不会与旧 chunk 并行；但 `OpenPiScheduler` 保留 `_iter_latency=2`，`OpenPiOfflineScheduler` 保留 `_latency_step=2`，两者的 `build_act_request()` 仍取 rows 2..16。用真实两类 scheduler 的初始化、request、`MemoryContext` 和 action 构造执行 H20/K15/latency2，得到二者同样的 `wait_condition: {action_queue_remaining: 0}`、`first_executed_model_row: 2`、`last_executed_model_row: 16`，而正确首行应为 0。该错误会把 feedback/实际 chunk 映射前移两行，影响 live、offline 和继承该路径的 takeover；需要把当前 iteration 的 action-row 起点与实际 wait 语义绑定，并覆盖 drain 与非-drain 两种分支。
+
+- **其余 live / takeover 项仍待完成复核。** `281e0a7` 旨在修复先前的三项 P1：timestamp 过期即冒充实际执行、takeover 后旧 proposal 作为插值锚点、另一 `get_obs` 时间基提前推进 progress。上述两项新/存量 P1 都不随本 F0 terminal 修复自动关闭，均只阻塞完整 live runtime 结论，不阻塞旧 RMBench F0 smoke。
 
 - **部署 P1：新 checkpoint 的轻量配置包没有可复现安装路径。** `MemoryContext.from_checkpoint_metadata()` 在检测到 `memory_config` 后必然导入 `openpi_client.memory_config`，但 robot-bridge 的 `pyproject.toml` / `uv.lock` 没有 `openpi-client`，`scripts/deployment/x1pro_master.sh` 只 clone `robot-bridge` 和 `sdk_robot` 并在 sdk_robot venv 中 `pip install -e .`，远端 scheduler 脚本也默认该 venv。因而干净部署对任一新 memory checkpoint 会立即抛出“openpi-client is unavailable”；本审阅 venv 中的 editable 安装只用于 CPU review，不能作为生产依赖。需要提交明确的包版本/安装来源和部署入口，并在干净 sdk_robot 环境实际创建 `MemoryContext` 验证。旧 F0 checkpoint 没有 `memory_config`，不受此项影响。
 
