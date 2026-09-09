@@ -47,3 +47,5 @@ Manager发现当前两个实现不匹配：runtime MemoryContext.add_inputs把fu
 该固定commit及已含的最终checkpoint链进入组合验收；作者报告56649e2。请在现有独立openpi worktree合入其所需core/sim配置与训练文件，记录真实review HEAD，处理等价cherry-pick不重复实现。作者CPU30passed另train_test1passed，仅是输入证据。你重点复核真实条件/loss/样本与配置自包含、20k更新计数/BF16保存，norm资产正在生成，GPU1实际50step由作者进行。
 
 跨真实MemoryContext的集成测试由已有双库workspace的runtime owner负责、Pascal独立复核；你负责真实policy transform/实际selected与wire边界，结合他们的集成证据，不为同一检查创建第三套bridge环境。注意作者测试使用的筛选表达式可能排除部分test名称，确认关键项目实际运行，不照抄总数判通过。原先6B字样已经更正为3.35B，以真实参数树验证。
+
+GPU证据将由owner在GPU1顺序提供full及serial各50step（新head/条件路径各实际验证）；no-memory不重复50step。按各实际路径给分阶段结论，full通过可先放行相应full实验，不必等wash或live。正式长训练代码树保持冻结；尚待实施的wash注册配置与运行树分开处理。
