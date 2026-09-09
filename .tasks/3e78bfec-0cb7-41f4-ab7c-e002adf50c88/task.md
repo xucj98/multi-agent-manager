@@ -44,3 +44,9 @@ full输入current reference/推理cache、t+j+1预测、chunk_completed/last_exe
 在已审a75基础上，作者94d9927使wash source path显式，46e619e补terminal memory row。复用原worktree，增量审这两个commit并核对已更新低维sample，按你7f4d74e报告中ep0末raw2408 label5/true及ep1末raw2989 unknown/false两边界验证，机器人/query保持M、无动作二次移位；只复核此次低维变更与路径参数，已通过的视频不重新解码。取得完整SHA由git读取。
 
 通过后及时发布数据层GO，使全172转换启动，不等待训练GPU/live。正式转换产物完成后再做数量/metadata及必要低维读回。本次不重建环境、不占GPU。
+
+## 最终172转换已完成，收尾验收
+
+作者已发布最终报告78bf2d4f16c97fa8835ca34b909c78fbcc7c0d78。正式数据在主openpi/data/lerobot/wash_cup_x1pro_s2m_memory_v1/all_172_15hz_s2m_master_v3_source_frame_aligned，冻结转换commit46e619e；172集、143698 query、13944缺GT、516视频。转换job已归档，旧错误输出/技术smoke已清理，原始数据未动。
+
+请仅复核正式产物数量/实际文件对应、完整metadata与真实command/source版本、必要低维值/M+1、固定5ep仍属训练集；无需重编码/重解码已通过source mapping的视频，也不要求重跑已有所有tests。正文新增中文README commit377ddff2279180092ae72f42945af4f758ac20e5（examples/rmbench/README.md与examples/x2robot/README.md），在本任务树合入并检查命令/路径及数据边界说明与实际一致。此为最终数据/文档验收；训练/模型新字段由对应review负责，不以其是否完成阻塞数据任务归档。完成后发布最终report并清理你自己的临时文件，Manager将集成README并归档作者/reviewer工作区。
