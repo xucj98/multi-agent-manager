@@ -30,7 +30,7 @@ current memory truth来自已转换current target/原始事件，不能用旧lag
 
 原始数据/mnt/public/datasets/x1pro/wash-cup只读，annotation_layers.json定位子任务标注。label6、没有子任务标注、不是1..5恰好各一次的episode整集排除；顺序允许变化。已核实244集→172合格/72剔除，原因可重叠：16缺标注、28label6、56非各一次。合格120集1→2→3→4→5，52集2→1→3→4→5。全部172用于训练，不划holdout；固定5个训练episode给offline并保存ID。
 
-phase表示当前子任务。未知时使用显式unknown，不读取episode首GT初始化部署，也不假定先抓杯。domain ID与原始label ID明确区分。15Hz有效query共142609，13404行缺phase GT，mask该字段而不删机器人行。
+phase表示当前子任务。未知时使用显式unknown，不读取episode首GT初始化部署，也不假定先抓杯。domain ID与原始label ID明确区分。旧v2有142609 query、13404行缺phase GT；修正JSON source mapping后数量允许变化，以真实新转换结果核验和记录，不能为了匹配旧数删行。缺GT只mask该字段，不删机器人行。
 
 S2M沿已核实drawer协议：当前follow_* EE pose+gripper14维输入→下一对齐帧master_*14维action。两套数值不能混用；不从follow observation q+1代替master action。数据/标注/视频共用唯一实际source-frame映射，保留JSON timestamps及selected source index。
 
