@@ -86,3 +86,9 @@ Banach已在等价ffa308d的63be08c发布具体复现（本MAM 9b73b590/report.m
 3. R3只阻塞aux：合法train source=initial没有mask键，adapter不能无条件索引mask；infer source=initial也要遵守配置而不消费传入非initial cache。full/serial正常闭环不因aux未验收停工。
 
 先R1/R2固定小commit送复核，R3可独立增量。已通过真实tokenizer条件、P2数值loss/梯度与metadata继承不重跑无关检查。GPU50step若已运行且修复仅涉及加载factory/YAML时机，不需要再训练同一50步；用明确修复commit重做checkpoint恢复并记录保存/加载各自版本即可。不要把新增读取阻塞误报成模型训练数值问题。
+
+## CPU review其余范围完成
+
+Banach报告fb9c495确认真实data窗口、serial实际选中条件/wire和50/20k更新计数通过。R4仅显式conditional decoder：Pi0逐case覆盖取last-match，而公共schema为first-match；应做小修使消费者遵守同一已保存规则，补一个重叠case对照。此项与aux R3不阻塞当前默认argmax首批，优先完成R1/R2和实际GPU。
+
+put-back独立adapter窗口已通过，但其专用robot-only norm尚未生成/实测，请在首批put-back正式开跑前生成并验证真实归一化loader，不能借用rearrange stats。无需再跑第三个50step模型smoke。
