@@ -23,6 +23,8 @@
 
 必要对照补充：为区分辅助监督与递推输入，支持字段输入显式使用initial（train/infer均可），部署保持initial而不消费预测；状态目标/loss与同形状full保留。优先通过input source=initial和已有反馈禁用的清晰表示实现，不再加独立aux模型类。memory=[]是标准无记忆baseline，辅助对照仍保留memory字段/目标；两者不能混称。P3任意constant label覆盖不属于第一批阻塞项，可后补。
 
+留痕精简：resolved memory_config只需在checkpoint已有train_config/metadata链中有一个权威可读取位置，不再并行保存一份重复model_spec/字段切片配置。model_spec在加载时推导；backend的metadata透传同一个配置对象。raw YAML路径不是自包含，恢复不得依赖已经清理的worktree。P2的公共phase loss mask必须作用到逐坐标损失上，不是只把target置零；phase有效行比例做数据诊断，不能降低机器人loss权重。
+
 # 验证与交付
 
 先CPU测试：字段顺序/重复和无memory、单字段wash及多字段drawer/rearrange、可变顺序phase不被限制、公共mask/固定分母、metadata roundtrip。代码量先给预估，再报告新增/删除行；避免大兼容脚手架。GPU短smoke待Manager分配，当前不占GPU。先交可供依赖方使用的契约commit，再完成训练实现commit；全量验证适用部分后report记录commit/测试/不足并发布。不得修改共享checkout或他人环境。过程中需求有歧义及时给Manager具体选项，不阻塞可独立实现部分。长程序若后续获分配超过1小时，用mam job登记。任务完清理自己的smoke/临时文件，不删除正式资产；不自行派agent。
