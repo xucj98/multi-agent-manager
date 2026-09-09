@@ -71,3 +71,9 @@ checkpoint_metadata.save保留实际command/cwd/git commit、train config和上�
 ## CPU交付后的分工
 
 ffa308d5485a2c8222d3e7735b08723c6e93a237已送Banach独立review。真实transforms→MemoryContext联通由已有双库workspace的Einstein负责、Pascal复核；你继续共享norm、实际loader与GPU1的真实base50step保存恢复，检查policy wire keys/shape，不为这项测试再创建bridge环境或等待live小修。完整schema规范不变；任何发现及时固定小commit给review。
+
+## GPU验收覆盖两条实际模型路径
+
+新joint-dense与serial-token改变了不同模型路径（后者有新head/动作条件选择），单个full smoke不能证明serial实际base加载/JIT/保存/恢复可运行。请在同一GPU1顺序完成full和serial各50 optimizer updates，均验证最终BF16 model-only/仅checkpoint恢复及各自wire；no-memory沿已通过loader与共享模型路径，不要求额外50step。复用同一robot norm统计，两个smoke独立输出；不同时占额外GPU。full完成即可报告，serial可与CPU独立review并行。GPU1全部结束释放时通知Manager。
+
+正式20k启动后运行worktree需要固定，不应继续改该树的模型/loader/config。先准备所有将运行的配置；若wash还需实施，告诉Manager剩余配置写集，Manager会安排与正式训练冻结树分开处理，不让长训练读取途中变动的源码。
