@@ -1,6 +1,10 @@
 # Memory v1：openpi训练模型与checkpoint集成
 # 目标
 
+# 样本时序验收补充
+
+必须核对已转换LeRobot的action列是否已经表示下一帧关节目标a_t=q(t+1)。若已经移位，不能直接把action列绑定为raw robot_joints并再用offset=1，造成二次移位。应按实际列语义选择key/action时间offset（例如已对齐action用offset0），并用同一个episode/query与旧可靠loader/原始timestamp逐行比较机器人目标；比较P2两臂时这些机器人目标完全一致。memory的current truth也不能从lagged input推断。给绑定列、索引定义和小样本证据，而不是仅凭shape通过。此项是已有数据语义核对，不新增算法。
+
 把已经提交的memory_config轻量契约实际接入独立openpi的训练数据/模型/metadata，让同一schema可以训练full、serial、no-memory和辅助监督无递推对照。用户已授权实施及实验，Manager负责审阅合入/正式任务排程。你负责训练代码和短smoke，暂不启动20k正式run。
 
 # 工作区与边界
