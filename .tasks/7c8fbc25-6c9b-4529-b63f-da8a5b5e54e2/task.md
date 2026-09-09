@@ -1,6 +1,11 @@
 # Memory v1：数据适配与wash-cup转换
 # 目标
 
+# API已提交，可开始接入
+
+轻量契约commit：openpi de79cce20e54c612634fdc2598b91cc0ab5034ec（API owner正在精简内部/修复，后续补commit，当前可供开发）。ResolvedMemoryConfig.compile_model_spec(model_config=None)返回MemoryModelSpec；属性为representation、field_names、field_values、initial_ids、encoding、dense_offsets、robot_dim、padded_dim、action_horizon、execution_rows、target_layout、loss_kind/loss_weight、current_condition、decoder_rules、feedback。共享方法encode_dense_ids(ids)、decode_ids(ids)、decode_dense_actions(actions, previous_ids)、decode_token_logits(logits, previous_ids)。训练sample额外给dense_actions/action_loss_mask/action_loss_weights。具体以该commit代码/owner report为准，不做两份切片/解码器。后续由ad6bb77e-3892-4730-ae1a-7d9cd99a5728负责src训练接入，f252只维护轻量package。
+
+
 # 用户最新数据约束
 
 用户明确指定RMBench训练/转换只用demo_clean_state；demo_clean没有metadata及详细子任务划分，不允许用作fallback。wash-cup原始数据不受此命名约束。已转换仿真数据须沿metadata确认来自demo_clean_state，并核实所需真值/事件完整；来源不明先不训练，不从评测rollout重建标注。
