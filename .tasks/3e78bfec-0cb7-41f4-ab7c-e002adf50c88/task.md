@@ -1,3 +1,11 @@
+## 恢复sim增量审查
+
+已交sim commit481527346573b73958dcd81591fc8473e20feaff，请在已有本task openpi树合入，继续review四个full YAML/原始当前truth与P2 mask。其tail_append接口和账号绝对路径是Manager已发现并正在修的问题，不重复提出新框架。作者将很快补增量：sidecar直接保存等长M+1的robot_action_target、memory series和availability，前M机器人行逐值等于converted action[:14]、末行repeat；query仍原LeRobot M行。训练采用现有sidecar绑定、action_at_row/offset0，core API不变。核验raw最终观察确实给第M行memory监督，没有增加不存在的query或二次动作移位；P2 query M-30应有前30个phase有效位置。
+
+另将新增rearrange serial lag30（query当前target/独立argmax/current_condition train reference/infer selected/query_selected feedback）及no-memory配置。收齐增量后给两任务能否进入sim训练的独立结论，先不等wash重转；四P2 YAML除phase time外的所有主动训练变量相同，mask共用。wash仍因视频/pose映射错误禁止训练，收到正确小样本后再复核，不重复全量数据转码。
+
+继续使用已有workspace/环境，CPU审查。最新作者requirements在7c8fbc25-6c9b-4529-b63f-da8a5b5e54e2/task.md；依发布内容，不采纳旧report中已废弃的tail_append方案。
+
 # Memory数据独立review：S2M动作源、标注有效性与sim样本绑定
 
 ## 目标与工作区
