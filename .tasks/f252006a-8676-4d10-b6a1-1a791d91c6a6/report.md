@@ -1,11 +1,11 @@
-task_revision: 18a99cbea563d961481f6f75fb0c03feef0b4e86
+task_revision: 329b650d618949779b0f5dfcb6b1fa07dc944d33
 
-阶段交付（可独立 review）：openpi `f6327197459bf830c6b5d0b9ba5d643bc5e0cbd3`（`refactor: slim memory config API`），前置环境解阻 commit 为 `0dc120cf850e13a8fab71974f4f7e29778c13406`（`fix: lock openpi-client PyYAML dependency`）。
+完成：openpi worktree `/mnt/public/xcj/Projects/workspace/f252006a-8676-4d10-b6a1-1a791d91c6a6/openpi` 的交付链为 `0dc120cf850e13a8fab71974f4f7e29778c13406`（最小 PyYAML lock 修复）、`f6327197459bf830c6b5d0b9ba5d643bc5e0cbd3`（精简 memory config API）和 `0f37cfc1ae42e4703b741f0f05fd1e3c58c87e89`（availability）。最后一个 commit 是独立 review 的最终代码对象；review task `d82c6b70-a8af-460e-92d1-d7e9ddc521ff` 已包含其增量核查要求。
 
-`f632719` 仅改 `packages/openpi-client` 的 memory 配置 helper 与定向测试：实现从 de79 的 1,480 行收敛到 961 行，移除重复解析/序列化包装和未使用兼容入口，同时保留 runtime/data 所需的 `load_memory_config`、`ResolvedMemoryConfig.to_dict/make_training_sample/compile_model_spec/validate_model_dimensions`、`EpisodeMemoryData`、`MemoryTrainingSample`、`MemoryModelSpec` 及 model spec 的 encode/decode helpers。新测试直接断言 dense 与 serial 的字段名、类别词表、initial IDs 共享同一 YAML 顺序。
+client 仅修改 `packages/openpi-client`。实现从 de79 的 1,480 行收敛到 986 行，定向测试从 357 行到 334 行；当前总计 1,320 行。保留 `load_memory_config`、resolved metadata、sample/model-spec helper 和同一 field vocabulary/offset source，删除重复映射和不再需要的兼容入口。没有改 `src/openpi`、scripts、examples 或 robot-bridge。
 
-给并行依赖方的签名提醒：`compile_model_spec(model_config=None)` 保留，新增可选关键字 `robot_dim`、`padded_dim`；`make_training_sample` 现在只接收 `EpisodeMemoryData`，不再接受裸 mapping。已删除 `ResolvedMemoryConfig.model_spec`、`validate_first_batch_protocol` 和 `MemoryModelSpec.to_dict/pi0_kwargs`；runtime 应在加载时调用 `compile_model_spec(...)`，checkpoint 只保存 `resolved.to_dict()`。
+最终数据接口为 `EpisodeMemoryData(series, constants={}, events={}, tail=None, availability={})`（实际为 default factory）。availability 仅接受 memory `reference.kind: series` 的 key 到 episode 等长 bool 数组；省略表示完整标注，缺 series key 仍报错。false 时训练输入用 field initial，目标 ID/mask/逐坐标权重/dense 编码全零；其他 memory 字段与 robot target/weight 保留。它与 `target.validity` 独立，未将 all_in_bounds 声称为多候选时刻的 annotation-availability 交集。
 
-验证：`python -m pytest -q packages/openpi-client/src/openpi_client/memory_config_test.py` 为 11 passed；Ruff check、Ruff format check、`git diff --check` 均通过。此前 lock commit 只在根 `uv.lock` 的 openpi-client stanza 增加既有 `pyyaml>=6.0` 声明，`uv lock --check --offline` 通过。
+论文交付物位于 workspace 根目录 `paper-artifacts/`，未进入 openpi：`memory.schema.patch`、`p2_phase_per_frame.example.yaml`、`p2_phase_repeated_endpoint.example.yaml`、`README.md`。两个单 phase P2 比较组均为可单独 load 的英文 YAML，采用 current-reference input、H50/K30、shared public mask、fixed_horizon、同一 `robot_action` target 和 `chunk_completed/last_executed`；仅 phase target `offset/stride` 为 1/1 或 30/0。共享论文 schema 已由并行方更新为与 patch target 相同内容；reverse apply check 通过，执行者未修改共享论文 checkout。Manager 可据此保留或清理 artifacts。
 
-仍在进行：论文 schema 最小 patch 与英文 P2 双臂 YAML 示例将作为独立后续 commit；未启动 GPU smoke 或正式训练。
+验证：`python -m pytest -q packages/openpi-client/src/openpi_client/memory_config_test.py` 为 12 passed；Ruff check、Ruff format check、`git diff --check` 和 `uv lock --check --offline` 通过。两份 artifact YAML 用 Draft 7 校验通过，并由 client loader/sample helper 验证 H50/K30、公共边界 mask 与 target-only diff。未启动 GPU smoke 或正式训练。
