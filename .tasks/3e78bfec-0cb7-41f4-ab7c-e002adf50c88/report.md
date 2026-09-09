@@ -1,4 +1,100 @@
-task_revision: 5dcc6240831df11028fb4be6bd4de7a1f8a86e60
+task_revision: b46616e1efd03c474dde2570695e499fab0c0df4
+
+**恢复后的 wash 阶段结论**
+
+新 v3 两集的实际视频/pose/action 共同 source mapping 通过；773d177 的视频漂移修复可以接受。a75d173 的 full current / serial lag30 闭环 YAML 语义也通过。但完整 wash 数据侧 GO 暂不能签：raw memory sidecar 仍只有 M 行 phase/availability，丢掉一个真实存在的 M+1 末帧标签。此项为新发现的 P2，见下面精确复现；不涉及重编码已通过的视频。可继续基于已验证 source mapping 的视频/机器人转换准备，训练使用前须补全低维 sidecar 并复核。
+
+sim 既有数值/P2/serial 结论保持，未重跑100集检查。63319ac 的 metadata 小增量及两份实际共享产物已通过；数据 command 文件含 commit/cwd/命令，候选训练 YAML 和独立 git_commit.txt 已移除，sidecar 数值 SHA-256 与上一阶段相同。
+
+工作区继续使用 /mnt/public/xcj/Projects/workspace/3e78bfec-0cb7-41f4-ab7c-e002adf50c88/openpi，在原69ca148上依次 fast-forward：
+- 63319ac984492cd8bfd8a71158200220a6e14e38
+- 773d177b93b6a6d8569a6761ae74118bef5d4adc
+- a75d1737539d5497b2e8d3569756ef0dc67d5ed2（本轮审查HEAD）
+
+未修改交付代码，未使用GPU，未重转任何数据，未派agent。仅CPU解码既有raw/v3视频及读取两集数值。临时review_wash.py与相关cache已清理，worktree保留。
+
+**P2：wash phase/availability 尾行丢失，需在训练前补齐**
+
+代码位置：examples/x2robot/wash_cup_memory_adapter.py:685 先将完整 source_frame_indices 截为 row_indices=indices[:-1]，:689 只为 row_indices 生成标签，:692-697 序列化 M 行 phase/availability 且 tail=None。conversion 的 video_source_frame_indices 虽为 M+1，但不是可直接绑定的 M+1 memory series。
+
+明确输入：新样本 episode0，M=1216，video/source mapping=1217；最后query1215的state raw2406，action raw2408，保留的第1216个video frame也为raw2408。raw subtasks.json 的label5范围为[1710,2409)，故raw2408的phase必须是label_5、availability=true。
+
+实测：sidecar memory.series.phase 和 availability.phase 都长1216。以这些落盘字段和Parquet actions构造现有EpisodeMemoryData，full(q=1215) 的首个t+1 phase target mask=false、14:20六维weight全0；full(q=1186=M-30)仅29个phase有效。期望分别为1个和30个。仅在内存中补真实label_5/true并重复末action形成M+1后，实测分别恢复为1/30，机器人50行target与原样本完全一致。
+
+episode1提供相反边界：M=1509、末selected raw2989超出label5范围[1440,2970)，这一额外memory行应保留unknown/availability=false，不能无条件补true。phase/availability目前同样只有M行。
+
+修复要求沿已确定契约：低维memory series/availability完整M+1，robot_action_target前M行保持已对齐actions、最后重复末action；query/state仍为M行，不能二次动作移位。末帧标签和availability应从既有raw ranges及完整selected mapping推导。当前视频及source index provenance已包含所需末帧，不应因此再转视频。此处不要求新增tail_append或改core。
+
+**已通过的两集实际产物检查**
+
+样本路径：/mnt/public/xcj/Projects/openpi/data/lerobot/wash_cup_x1pro_s2m_memory_v1/all_2_15hz_s2m_master_v3_source_frame_aligned_smoke
+
+metadata/command实际位于meta/memory/command.txt，记录commit773d177、作者cwd和当时运行命令；当时用旧full_t_plus_1 YAML只校验转换契约，样本不作为正式训练配置交付。此次真实数值调用使用审查HEAD的新full_current_feedback和serial_lag30 YAML。
+
+| 项目 | ep0 | ep1 |
+| --- | ---: | ---: |
+| raw JSON与每路raw视频帧数 | 2410 | 2991 |
+| v3每路视频/完整source mapping行数 | 1217 | 1510 |
+| Parquet query行数 | 1216 | 1509 |
+| 无phase GT的query行 | 30 | 69 |
+| 独立配置边界query数 | 30 | 37 |
+
+1. 不调用作者选帧helper，以每个目标时刻 timestamp[0]+k/15 对全部raw timestamp求绝对距离argmin，复算完整selected mapping，逐项等于sidecar。索引严格递增；Parquet observation/action source indices分别等于mapping[:-1]/mapping[1:]；各source timestamp逐值相等，query frame_index保持0..M-1。
+2. 直接从raw JSON按左position/rotation/gripper、右position/rotation/gripper拼14维，2,725行state逐值等于当前selected follow、action逐值等于下一selected master，最大float32误差0。同raw帧follow/master最大差ep0为4.49447、ep1为1.96506，验证没有把follow误作action。current raw phase/availability依subtasks半开区间独立展开，Parquet和sidecar前M行全部一致。
+3. 实际CPU ffmpeg解码两集三相机，各10位置，共60位置：q=0/1/23/100/floor(M/2)/765/1205/M-2/M-1/M。raw候选在声明映射n附近±25帧，raw/converted分别scale=320:240,format=gray后计算像素MAE；未依靠帧数作为唯一证明。声明映射的MAE全在1.0317–2.2024。运动/原漂移位置均与预期raw index精确匹配；少数静止首尾帧邻近帧有小于0.06的MAE差异，属于重复/近似图像与有损编码下无法仅按argmin区分的情况，不将这些位置声称为唯一像素匹配。
+
+ep0 face 原问题点的本轮证据（新v3图像对候选raw帧的MAE，与旧报告缩放方式不同，不跨报告直接比较MAE数值）：
+
+| query | 正确source | 正确MAE | 原v2实际source | 对原错误source的MAE |
+| --- | ---: | ---: | ---: | ---: |
+| 23 | 46 | 1.9888 | 43 | 6.2712 |
+| 765 | 1515 | 1.8763 | 1527 | 12.1389 |
+| 1205 | 2387 | 1.5923 | 2407 | 5.0308 |
+
+同三位置left/right wrist也均选择正确46/1515/2387。q765 right wrist对正确source MAE=2.2024，对旧1527为38.3557，具有明显区分力。ep0额外保留的视频末帧也实际匹配raw2408。
+
+4. decoded n 与 JSON row 的依据另有源端契约：raw header为robot-bridge-v260630，.done记载同版multipart和总帧数；只读核对robot-bridge主库的docs/reference/data-collection-format.md和scripts/mcap_to_training.py，source转换在同一head-camera frame_ts循环追加JSON并为每个camera写一帧，腕相机按同一时刻取nearest。raw三路均完整解码且帧数与JSON逐集相等，结合上述具体像素匹配支持n=row索引假设。此项没有重新打开MCAP，未声称测量传感器物理同步误差。
+5. 转换metadata保留172 accepted/72 rejected，非互斥原因label6=28、非1..5恰一次=56、缺标注=16；次序120正常/52交换1与2。固定offline5恰为accepted前5，且都属于训练合格集，没有holdout。复制的annotation_layers与两集subtasks文件逐字节等于raw。沿用已验收全量筛选结论，不重扫/转换所有视频。
+
+**配置与缺GT边界**
+
+a75d173 full为当前reference输入、首次/缺GT用initial unknown、infer cache，目标q+j+1，chunk_completed/last_executed反馈，phase只按其自身目标越界/availability mask、固定H分母，不套sim的q+30公共约束。serial为同一named previous lag30、负索引或缺GT用initial、目标当前q、train current_condition reference/infer selected、query_selected/query反馈，不按未来q+30屏蔽。两者同domain、独立argmax、H50/K30、robot offset0/stride1。
+
+用两集真实缺GT前缀/阶段间隙、q0/29/30/31及语义边界前后、最后query共67个query验证输入/目标/mask；无GT只屏蔽phase，所有robot target/weight保留，robot尾部按末动作clamp。上述P2尾行缺口是数据序列长度问题，不是新YAML错误。
+
+定向测试（审查树执行）：
+```bash
+PYTHONDONTWRITEBYTECODE=1 CUDA_VISIBLE_DEVICES='' JAX_PLATFORMS=cpu .venv/bin/python -m pytest -q -p no:cacheprovider examples/x2robot/test_wash_cup_memory_adapter.py examples/x2robot/test_wash_cup_memory_config.py examples/rmbench/test_rmbench_memory_adapter.py::test_sidecar_metadata_records_command_context_and_only_actual_binding
+# 12 passed in 11.24s
+git diff --check 69ca148..HEAD
+```
+
+尾行问题最小复现（不改共享产物）：
+```bash
+PYTHONDONTWRITEBYTECODE=1 CUDA_VISIBLE_DEVICES='' JAX_PLATFORMS=cpu .venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+import pyarrow.parquet as pq
+from openpi_client.memory_config import EpisodeMemoryData, load_memory_config
+root = Path('data/lerobot/wash_cup_x1pro_s2m_memory_v1/all_2_15hz_s2m_master_v3_source_frame_aligned_smoke')
+e = json.loads((root/'meta/memory/raw_episode_memory.json').read_text())['episodes'][0]
+a = pq.read_table(root/'data/chunk-000/episode_000000.parquet', columns=['actions'])['actions'].to_pylist()
+mem = e['memory']
+episode = EpisodeMemoryData(series={'phase': mem['series']['phase'], 'robot_action_target': a}, availability=mem['availability'])
+c = load_memory_config('examples/x2robot/memory_configs/wash_cup_phase_full_current_feedback.yaml')
+print(len(a), len(e['video_source_frame_indices']), len(mem['series']['phase']))
+print(e['video_source_frame_indices'][-1], mem['source_phase_ranges'][-1])
+for q in (len(a)-30, len(a)-1):
+    print(q, int(c.make_training_sample(episode, q).target_mask.sum()))
+# 当前：1216 1217 1216；最后raw2408位于label5 [1710,2409)
+# q1186得到29（应30）；q1215得到0（应1）
+PY
+```
+
+本轮发布的是阶段审查，未验收正式172集新输出或训练模型wire；未把整个数据任务标记完成。上一阶段sim详细证据保留如下，其wash状态由本轮更新覆盖。
+
+---
+**上一阶段历史记录（publication 2e8437d975d3278791846c233dd829d6acf0fc1e，task revision 5dcc6240831df11028fb4be6bd4de7a1f8a86e60）**
 
 完成与结论：两项 sim 真实低维数据、M+1 sidecar、四份 P2 full 配置通过独立 CPU 审查，数据层 GO，可供 training owner 接入开跑，不等待 wash。rearrange serial lag30 配置与真实样本也通过。no-memory YAML 通过，但需要只含 robot_action_target、availability={} 的 binding，不能直接套完整三字段 manifest。training owner 的模型/loader 尚无发布交付，本报告不代表 train/offline 闭环通过。wash v2 仍因视频/pose 时间轴漂移 NO-GO。
 
