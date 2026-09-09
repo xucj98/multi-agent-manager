@@ -1,6 +1,10 @@
 # Memory v1：数据适配与wash-cup转换
 # 目标
 
+# 样本时序验收补充
+
+必须核对已转换LeRobot的action列是否已经表示下一帧关节目标a_t=q(t+1)。若已经移位，不能直接把action列绑定为raw robot_joints并再用offset=1，造成二次移位。应按实际列语义选择key/action时间offset（例如已对齐action用offset0），并用同一个episode/query与旧可靠loader/原始timestamp逐行比较机器人目标；比较P2两臂时这些机器人目标完全一致。memory的current truth也不能从lagged input推断。给绑定列、索引定义和小样本证据，而不是仅凭shape通过。此项是已有数据语义核对，不新增算法。
+
 # API已提交，可开始接入
 
 轻量契约commit：openpi de79cce20e54c612634fdc2598b91cc0ab5034ec（API owner正在精简内部/修复，后续补commit，当前可供开发）。ResolvedMemoryConfig.compile_model_spec(model_config=None)返回MemoryModelSpec；属性为representation、field_names、field_values、initial_ids、encoding、dense_offsets、robot_dim、padded_dim、action_horizon、execution_rows、target_layout、loss_kind/loss_weight、current_condition、decoder_rules、feedback。共享方法encode_dense_ids(ids)、decode_ids(ids)、decode_dense_actions(actions, previous_ids)、decode_token_logits(logits, previous_ids)。训练sample额外给dense_actions/action_loss_mask/action_loss_weights。具体以该commit代码/owner report为准，不做两份切片/解码器。后续由ad6bb77e-3892-4730-ae1a-7d9cd99a5728负责src训练接入，f252只维护轻量package。
