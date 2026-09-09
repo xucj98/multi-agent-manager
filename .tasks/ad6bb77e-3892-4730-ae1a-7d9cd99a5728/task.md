@@ -15,6 +15,8 @@
 
 # 契约与必须达到的行为
 
+wash实际合格172ep，15Hz有13,404行无phase GT。保留机器人样本，不能用unknown/initial做缺标注的phase target监督，不能因H50任一行缺GT就整sample删除。API owner被要求增加EpisodeMemoryData可选availability（series key→bool数组，缺省全true），缺GT输入回退initial、目标逐字段loss0且dense全0；你复用helper权重，不另写一套缺GT采样规则。sim action已确认预移位q→q+1，首批绑定其14维offset0，别再从obs q+1重建末尾动作。数据owner将提供精确episode binding。
+
 读f252任务已发布task/report及实际openpi_client.memory_config代码。load_memory_config -> ResolvedMemoryConfig，make_training_sample(EpisodeMemoryData, query_index, rng) -> ordered input/target IDs、dense_actions、逐坐标action_loss_mask/action_loss_weights；compile_model_spec(model_config)给编码/decoder/Pi0 kwargs。API owner正在精简内部及修复重复YAML key/invalid dense零向量；公开接口大体保持，准确以修订commit为准。你不重写parser/one-hot切片。
 
 1. TrainConfig可配置YAML/path，运行时解析一次；数据adapter绑定series/constants/events，不从目录名推断任务或phase语义。RMBench这批使用demo_clean_state源、明确metadata，不把这项实验来源限制硬编码到通用train/model。wash-cup真机同入口。全部相对路径按openpi项目根解析。
