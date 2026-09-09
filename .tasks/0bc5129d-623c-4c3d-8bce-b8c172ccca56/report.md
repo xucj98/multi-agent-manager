@@ -1,63 +1,74 @@
-task_revision: c84dfba0fe3b7b935ae6645526a7ba95a13773fa
+task_revision: d606b3740789a1ed496f84d9bd2f462797d1078f
 
-# fd38513：F0 / legacy RMBench simulation 阶段审结（非最终 runtime 验收）
+# F0 / legacy RMBench simulation：CPU 阶段审结，可开始 GPU smoke
 
-审查 HEAD / 工作区：
+审查候选与工作区：
 
-- `robot-bridge`：`fd38513adb5ba171327358f70f55f88059de49d2`
-- `/mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/robot-bridge`
-- 另按任务要求创建并只读核对 `openpi` worktree：
-  `/mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/openpi`
-  at `58d6f2155acc3af03017677bb3f536101e6699f4`。
+- F0 候选：`bc842036e3735390f35fe1138aa7b19f5ae2f95b`（`fix: skip terminal simulation inference in base`）。
+- 独立审阅树：`/mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/robot-bridge`，HEAD `b247332`，是将该 terminal patch 合入 `fd38513` 审阅基线的等价 cherry-pick；二者稳定 patch-id 同为 `d09ba4ad09d83d1181b47ec6109bb006f24ceb45`。
+- 按任务要求只读核对的 OpenPI worktree：`/mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/openpi`，`58d6f2155acc3af03017677bb3f536101e6699f4`。
 
-本阶段只审旧 full checkpoint 的 F0 legacy simulation 路径、selector、progress/trace 和 terminal 边界。未修改作者实现、未启动 GPU、真机或 rollout；四行 smoke 和正式 100 rollout 仍归独立 eval 任务。
+本报告只放行旧 full checkpoint 的 F0 simulation CPU gate。未修改作者实现，未启动 GPU、真机或 rollout；GPU smoke/100 rollout 仍由独立 eval 任务执行。
 
-## 结论
+## F0 结论
 
-**legacy H50/K30 selector / progress 没有阻塞；当前 F0 不可放行的唯一 simulation 阻塞是 terminal observation 仍额外调用一次 policy `infer`。**
+**F0 可进入 GPU smoke。** legacy H50/K30 selector、实际执行进度/trace，以及 terminal observation 的真实调用路径均无剩余 F0 runtime blocker。
 
-因此，在作者交付并通过 terminal 局部修复前，不启动 rows 1/20/30/50 的各 2 rollout smoke，也不进入每行 100 rollout。修复只需局限于 simulation scheduler 的 terminal 分支；不应等待三项 live controller P1 一并解决。正式 recorder 的原完整配置检查保持，不加入新的白名单或兼容豁免。
+Eval 可按既定入口执行 rows **1 / 20 / 30 / 50**：每行先各 2 rollout smoke，再各 100 rollout。保留原完整 recorder 检查；不增加白名单、兼容绕过或放宽 recorder 检查。本 CPU 结论不替代 GPU rollout、视频产物或真实 recorder 验收。
 
-## 已检查、可接受的 F0 行为
+## 已检查的行为
 
-1. **旧 checkpoint 保持 legacy 路径。** 无 `memory_config` 的 `full_state` 不进入 `MemoryContext` / 新 schema 解码；其状态输入、密集输出切片和原有 one-hot 归一化仍由 `OpenPiSimulationScheduler` 的 legacy 路径处理。新 selector 只允许 legacy full-state；含 `memory_config` 的 checkpoint 会拒绝这个诊断参数，避免改变新 schema 的 metadata 事实源。
+1. **旧 checkpoint 保持旧路径。** 不含 `memory_config` 的 `full_state` 不进入 `MemoryContext` / 新 schema 输入输出处理；原有 state、dense memory tail、one-hot 投影和动作切片保持 F0 可比性。legacy selector 只用于该旧 full-state 路径，新 schema checkpoint 不会借此伪造旧 metadata 语义。
 
-2. **H50/K30 基线正确。** 默认或显式 `{kind: last_executed}` 在实际完整执行 K=30 时选择 model index 29（人类 row 30）。选择从实际 `logical_step` 前进的 executed prefix 导出，未把 render/substep 当作 policy row。
+2. **H50/K30 selector/progress 正确。** `last_executed` 在完整 K30 时选 model index 29（人类 row 30）；显式 index `0/19/29/49` 分别对应 rows `1/20/30/50`。每次先选择同一条 raw output row，再用于全部 legacy dense memory fields。row 50 保持模型预测，trace 标记 `was_executed: false`，不读取或伪造未来 GT。
 
-3. **四种 row 诊断使用一条统一规则。** `{kind: index, value: 0|19|29|49}` 分别对应 rows 1/20/30/50；同一 raw output row 先被选出，再被用于所有 legacy dense memory fields 的既有投影。row 50 仍是模型预测而非 GT，trace 明确标记 `was_executed: false`，不会伪装为已执行行。
+3. **实际终止时刻正确记录。** 一个 F0 K30 chunk 在 terminal observation 前只实际推进 10 行时，trace 为 `actual_k: 10`、`next_query: false`；不会生成 execute request，也不会把仿真积分/render substep 计为 policy row。
 
-4. **trace 的实际执行和 terminal 表达正确。** 接受 chunk 后，以 `logical_step - source_step` 计算 `actual_k`；terminal 前仅执行 10 行的例子记录 `actual_k: 10`，且 `next_query: false`。在直接调用 scheduler hook 的路径，terminal `build_act_request()` 返回 `None`，不会生成 execute request。
+4. **terminal infer blocker 已消除。** 候选删除每轮 policy-client 代理和 simulation 的 `run_iteration` 包装。`OpenPiSimulationScheduler.build_policy_obs()` 先处理 terminal feedback/trace，再返回 `None`；共享 `SchedulerBase.run_iteration()` 在 hook 后立即返回 `"skip"`，所以不调用 infer 或 execute。Base 只接受已有 hook 的最小 `dict | None` 契约，未读取仿真字段、未新增 RPC/session，live/offline 对正常 dict 的顺序不变。
 
-5. **边界校验明确。** selector 越出 H50 会在初始化时报错；不足以容纳 selector 的模型输出也会被拒绝，不会静默回退到末行。
+5. **reset 兼容。** Base 原有 reset 位于 hook 之前；terminal 场景中若 `_policy_reset_pending=True`，仍先向 backend 发送一次 `reset` 并清除 pending，随后因 `None` 跳过 infer/execute。这保持既有 reset 生命周期而不把 terminal 变成一轮模型调用。
 
-独立 CPU 验证（`CUDA_VISIBLE_DEVICES=''`）：
+6. **边界校验明确。** selector 超出 H50，以及输出不足以容纳选择行，均显式报错，不会静默退回最后一行。
+
+## 独立 CPU 验证
+
+在审阅 worktree 以 `CUDA_VISIBLE_DEVICES=''` 执行：
 
 ```text
+.venv/bin/python -m pytest -q \
+  tests/scheduler/test_openpi_simulation.py \
+  tests/scheduler/test_openpi_takeover.py
+40 passed in 14.95s
+
 .venv/bin/python -m pytest -q tests/scheduler/test_openpi_simulation.py \
   -k 'legacy_full_f0 or legacy_full_last_executed or legacy_full_selector_rejects'
-7 passed, 7 deselected
+7 passed, 8 deselected in 0.69s
+
+.venv/bin/python -m pytest -q tests/scheduler/test_openpi_simulation.py \
+  -k terminal_observation_skips_policy_infer_and_records_f0_trace -vv
+1 passed, 14 deselected in 0.14s
 ```
 
-该集合覆盖 rows 1/20/30/50、K30 的 `last_executed`/row30 等价、terminal 的 actual-k/trace，以及越界 selector 拒绝。
+另外以 terminal RMBench-shaped observation、真实 `SchedulerBase.run_iteration()`、计数 policy/robot client 独立复现，输出为：
 
-## F0 阻塞：terminal trace 与实际调用不一致
+```json
+{
+  "result": "skip",
+  "policy_cmds": ["reset"],
+  "infer_count": 0,
+  "robot_cmds": ["get_obs"],
+  "execute_count": 0,
+  "actual_k": 10,
+  "next_query": false
+}
+```
 
-`OpenPiSimulationScheduler.build_policy_obs()` 已把 terminal 写入 `_episode_terminal`，而 `build_act_request()` 会据此返回 `None`。但共享 `SchedulerBase.run_iteration()` 的顺序仍是：`get_obs` → `build_policy_obs` → **policy `infer`** → `build_act_request`。所以 terminal observation 的 trace 虽写 `next_query: false`，实际仍有一次无用推理。
+这验证的是实际共享循环，不只是直接调用 `build_act_request()` 的局部 hook。它不证明真机 transport 已通过，真机验证仍属于 live 复核范围。
 
-独立最小复现使用 terminal RMBench-shaped observation、真实 scheduler hook 和计数 policy client：`run_iteration()` 返回 `"skip"`，`infer_calls=1`，robot 端只收到 `get_obs`、未收到 execute。该结果确认风险在实际循环，不是只存在于手工 hook 调用。
+## 仍在进行、但不阻塞 F0 的完整 runtime 审查
 
-作者已被 Manager 要求给出 simulation-only 小提交。收到后需复核以下条件：
+- **新 Memory v1 wire 契约尚未验收。** 当前实现的 `MemoryContext.add_inputs()` 将 dense 编码写入 padded `state`，真实训练 input transform 却读取 `memory_input_ids`；真实 output transform 又会把 `actions` 裁为 14 维机器人动作，而 runtime 曾从该尾部解码 memory。这两处断链须按已发布契约修为 scheduler 传 `(F,)` 的语义 `memory_input_ids`、policy transform 负责编码、输出以 `memory_prediction_ids`（full `(H,F)`、serial `(1,F)`）交给 `MemoryContext`。收到作者小增量后将跨真实 input/output transforms 与真实 context 做 CPU 联通复核，覆盖单/多字段、no-memory、K30 row30 和 serial 的实际 selected 条件；不会用两端 mock 字典代替。旧 F0 checkpoint 无 `memory_config`，因此不受此项阻塞。
 
-- terminal trace 保留真实 `actual_k` 且 `next_query: false`；
-- terminal observation 的 policy `infer` 调用数为 0；
-- 没有 execute / action 入队；
-- 非 terminal F0 K30 路径和 shared base/live 循环未被改动；
-- 上述 7 个 selector 测试及新增实际循环 infer-count 回归测试通过。
+- **live controller / takeover 仍待 9d2784d 增量复核。** 先前发现的 timestamp 过期即冒充实际执行、takeover 后旧 proposal 作为插值锚点、另一 `get_obs` 时间基提前推进 progress 三项 P1，及 `synchronous_rows + latency_step>0` 在队列 drain 后仍保留 latency、导致 H20/K15/latency2 从模型 rows 2..16 而不是 row 0 反馈的问题，均不随本 F0 terminal 修复自动关闭。它们阻塞完整 live runtime 结论，不阻塞旧 RMBench F0 smoke。
 
-通过后，F0 runtime 才可交给 eval 任务按 rows 1/20/30/50 各自 2 rollout smoke、再各自 100 rollout 的既定流程执行，并保留完整 recorder 检查。
-
-## 尚未纳入本阶段结论
-
-- Memory v1 多字段、serial、partial completion、reset/takeover 和 UI 全范围审查仍在继续。
-- x1/x1pro 三项 live controller P1（排程时间冒充实际处理、takeover 后旧 proposal 作为锚点、跨 `get_obs` 时间基提前推进 progress）由作者另行修复；它们是 live runtime 的阻塞，不作为 F0 simulation 小修复的等待条件。
-- `fd38513` 全量改动为 13 files、`+2252/-69`；其中 simulation scheduler 和其测试的增量规模分别为 `+342/-29`、`+131/-0`。关于其余实现必要性、重复逻辑、打包运行依赖及完整 schema/live 结论将在后续 report 更新中给出。
+- 打包/部署依赖和真实硬件通信没有在本阶段宣称通过；后续 report 将随新 wire 与 live 增量复核更新。
