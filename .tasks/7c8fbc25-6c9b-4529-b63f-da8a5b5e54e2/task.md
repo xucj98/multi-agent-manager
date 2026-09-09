@@ -57,3 +57,5 @@ James报告7f4d74e已独立核对两集三相机60个位置、2725行pose/action
 剩余wash小修：EpisodeMemoryAnnotation目前仅对indices[:-1]生成phase/availability，丢掉真实M+1末帧。ep0 M1216的raw2408仍在label5区间[1710,2409)，末query首目标应有效；ep1末raw2989超出label5[1440,2970)，应unknown/false。请用完整selected mapping生成低维memory series与availability，robot_action_target前M行保持converted actions，末行重复；query/state/动作M行不变，offset0。复用现有sidecar形式，不改core/不增加tail_append。定向回归这两个相反边界，然后给James增量commit和更新后的低维sample；已验收视频不需要因低维修复重编码。
 
 代码固定及低维增量review通过后直接启动全部172转换、记录metadata/job；这属于原授权，不必再次请求许可。视频/pose时间轴已经通过的范围不再重复整轮检查，最终正式产物仍需读回数量/格式/metadata和首尾低维检查。
+
+sim阶段已集成到独立openpi开发分支codex/unified-sim-real-runtime，主库HEAD216cf2e（481→38→2c→69→633等价cherry-pick）。examples/rmbench与已审633逐文件零差异。主checkout没有可用.venv，Manager未改共享环境；采用独立review通过及集成文件同一性验收，不宣称主库pytest已运行。后续任务继续原独立环境，不需要重建。wash与中文操作文档仍待最终交付，整个task未归档。
