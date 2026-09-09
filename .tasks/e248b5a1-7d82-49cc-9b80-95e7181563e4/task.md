@@ -16,6 +16,8 @@
 
 ## 交付与收尾
 
+原始小metadata的本集群统一目标为/mnt/public/xcj/Projects/RMBench/data/<task>/demo_clean_state，与已完成rearrange/put-back一致。源端/mnt/public3/xcj/rmbench路径保留在provenance即可，后续swap/cover/battery不要在本地另造/mnt/public/xcj/rmbench数据树。若已开始复制到该旧镜像父路径，待该项传输完成校验后再将仅本task新建的小标注目录移到主RMBench data，核对无现有冲突并清理空目录；不重传、不影响正在运行的rsync。
+
 每项先报确切来源、预计字节量及metadata是否充分；必要资产可直接传输，不需再问Manager。每项完成checksum dry-run与episode/frame计数后及时报ready，不等全部。报告实际路径、来源、数量、可读metadata及缺口，不声称训练语义/模型加载已通过。引用首任务经验即可，不复制旧日志。
 
 report按当前task_revision发布；清理本task临时partial/transfer脚本/日志（关键校验结果已摘要进report），归档jobs，workspace应可直接由mam task archive清除，避免上次asset-recovery未登记目录阻塞归档。共享正式资产保留。不自行派agent。
