@@ -1,3 +1,13 @@
+## 恢复：补齐已要求的逐步metadata继承
+
+Manager核对当前独立openpi：checkpoint_metadata.save仅保存train_config.yaml/datasets.json，scripts/train.py无command.txt/上游metadata复制；新sim sidecar也只有episode_memory/binding_manifest。用户明确要求convert→train→eval每步保留之前的metadata/config和含commit的command.txt。只保存训练配置不能满足此要求。
+
+你继续本task原workspace，在489359f之后独立小commit补checkpoint保存阶段的留痕。写范围仍为checkpoint_metadata.py/checkpoints.py及对应tests；如必须触及train.py先联系Manager，不与训练owner重叠。复用现有run/config/dataset/sidecar路径与标准库复制；可只读参考RMBench/policy/pi05旧做法，但不要依赖RMBench、复制代码快照、添加runtime大字典或新provenance框架。保存真实训练命令和git commit，继承本训练使用数据的metadata/config以及必要的memory binding生成metadata，字段定义仍只在TrainConfig.memory_config保存一次。只复制metadata/config，不把整dataset、图像、label数组或模型代码放进ckpt。inference仍只用checkpoint，不读源data。相对来源按openpi根。
+
+先给最小接口方案和预估（期望几十行实现），然后实施；不要求用户另行批准。新sim sidecar metadata由data owner同时补，不需要互相等待才推进。checkpoint metadata可读取TrainConfig已有memory_bindings.sidecar_path的父metadata；准确字段名同训练owner当前实现协调，不为每个sim任务单独分支。训练规范首次run command必须是本次实际配置/路径和commit，不复制上一试跑命令冒充本次。
+
+Banach对489359f的B1/B2是已知未合入TrainConfig接口的依赖，不归你重复添加config字段或改其factory。它们等训练增量合入整体复核。继续只用CPU，不运行GPU训练；新增有意义的临时上游metadata复制/不读训练源恢复验证，报告新增实际代码量和小commit，由同一combined reviewer继续验收。
+
 # Memory v1：BF16仅模型保存与checkpoint路径自包含加载
 
 ## 目标和边界
