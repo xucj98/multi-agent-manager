@@ -28,3 +28,13 @@
 ## 交付
 
 先把有把握的阻塞发现及时报告Manager，然后report写task_revision、审查commit/工作区、复现命令与结果、按严重性列具体路径/输入/预期与实测；区分作者已知正在修的问题和新发现。独立验证结果不冒充完整train/offline闭环通过。等待后续小增量时可阶段报告，最终清理临时脚本/cache，worktree留待Manager归档。
+
+## 2026-09-10：恢复review，修正wash视频映射及配置
+
+作者新增固定commit：773d177b93b6a6d8569a6761ae74118bef5d4adc（JSON唯一source-frame映射驱动视频select），a75d1737539d5497b2e8d3569756ef0dc67d5ed2（closed-loop full current与serial lag30 YAML）；sim最后小增量63319ac984492cd8bfd8a71158200220a6e14e38（metadata收敛，删除无关候选YAML和独立commit文件）。在本任务现有openpi worktree合入633→773→a75，独立CPU审查，不重建环境。
+
+请先复核新增代码/配置，再结合作者新sample验证实际视频，不复用已判错v2视频。以JSON选帧索引为共同依据核对current follow14、next master14、标注和每个相机实际解码帧；开头/中段/末段及原漂移样本都要覆盖。核实假设raw视频decoded n与JSON源帧序号对应，不把只检查输出总帧数当时间对齐证明。首尾clamp、M+1原始sidecar与M训练query保持真实关系。小样本路径作者即将发布；在此之前可完成固定commit review，不空等或重跑已通过100ep sim样本。
+
+full输入current reference/推理cache、t+j+1预测、chunk_completed/last_executed；serial previous lag30/当前t目标/selected query反馈。数据筛选label6、缺标注、不是1..5各一次整集排除，合法次序可变；全部172训练、固定5ep offline；无标注行只mask memory，不丢机器人训练行。确认各配置的初始化/缺GT/mask与core一致。metadata633只复核变更范围及实际sidecar更新即可。
+
+将数据可用与训练模型可用分开：你给数据/配置GO，不宣称尚未实现的训练wire全通过。小样本通过就及时发布stage报告，让全172正式转换与其他训练准备并行。
