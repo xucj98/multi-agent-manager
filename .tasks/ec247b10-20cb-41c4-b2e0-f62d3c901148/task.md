@@ -18,3 +18,7 @@
 # 边界与交付
 
 只读调查与方案评议，不创建代码环境/worktree，不修改论文原文件、不使用GPU。报告力求150行以内、有数据/来源的结论优先，不写冗长预防性清单。读MAM发布任务，最终report包含task_revision、完成/未知、workspace与无代码commit、结果与来源，发布report，清理临时文件等待归档。你不能继续派subagent。
+
+# Manager初版计划已到达
+
+请一并审阅 /root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md，这是Manager负责的方向与矩阵草案（第一批8训练，基础72训练/108核心评测，150评测预留）。尤其裁决：前三个研究问题是否有可重复/有价值结论；辅助监督对照是否恰当；B中full如何统一P2的公共mask以真的复用；矩阵是否有重复计数/不合理提前扩展；18h估算如何限制预算。给修改意见而非再写一份并行计划，不改原文件。以本次最新发布task revision交付。
