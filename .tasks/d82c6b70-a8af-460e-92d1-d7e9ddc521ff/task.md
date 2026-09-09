@@ -18,4 +18,6 @@
 
 ## 交付
 
+最终复核增量：58d6f2155acc3af03017677bb3f536101e6699f4修复你报告的两项，作者18 tests passed，公开API不变。在现有review树cherry-pick此增量后，独立复现全true availability与省略在clamp下等价、末帧GT false仍被mask、invalidity公共mask不被破坏、H50/index49合法而index50拒绝。检查实际diff未引入新的问题；无需重复无关测试/创建新环境。更新report为本最新task要求及最终HEAD，给明确可合入或剩余问题结论。源报告已发布c09e7ab8；论文artifact已由Manager应用清理。
+
 report写清task_revision、自己workspace及review commit、独立执行的检查、按严重性列发现（路径/行号、具体输入、实际与预期、为何影响首批），无问题也明确。区分阻塞首批的问题与后续扩展，不把目前缺少scalar/parallel等一期外能力当回归。无需全面论文review或重跑旧实验。完成清理自己的临时样本/脚本；保留worktree待Manager归档。
