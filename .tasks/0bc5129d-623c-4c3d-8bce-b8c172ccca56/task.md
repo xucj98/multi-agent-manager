@@ -1,3 +1,9 @@
+## terminal修复的结构裁定（替代“不改Base任何代码”的过严限制）
+
+92b365c通过每轮替换_policy_client为代理来跳过terminal infer，功能方向正确，但新增临时client身份/包装器没有必要。Manager此前要求“不改Base”过严；应保留已有执行顺序与通信机制，不必禁止最小退出契约。
+
+请删除_TerminalInferenceSkippingClient和sim的run_iteration包装，采用已有build_policy_obs hook返回None表示这轮不调用policy；Base在该hook后作None检查并返回skip，文档/类型同步。simulation仍先处理terminal observation的真实执行进度/trace，之后返回None；其_loop_step会按_episode_terminal结束。Base不读取仿真字段、不加新RPC、session或调度循环；live/offline正常dict返回行为不变。保留并复核actual run_iteration的infer_count=0、execute=0、terminal actual_k/next_query，以及非terminal/reset/takeover原路径。此小修单独commit，以其作为F0正式候选。
+
 ## Eval入口补充
 
 Eval准备commit RMBench9e8fccbd2fa004f18a3cbcc301e7387b02edaccf发现terminal trace next_query=false仍额外policy infer。Manager已要求作者在simulation scheduler局部跳过terminal infer并单独提交，保留base/live循环；请复核此增量与F0实际调用/trace一致。另正式recorder原完整配置smoke检查保留，四种row各自先2rollout smoke，不写新的白名单兼容机制。
