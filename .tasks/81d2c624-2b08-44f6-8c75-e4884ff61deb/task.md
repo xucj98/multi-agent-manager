@@ -1,6 +1,10 @@
 # 首批训练资产：恢复pi05 base与仿真数据
 # 目标
 
+# 用户最新数据约束
+
+用户明确指定仿真训练源只能用demo_clean_state；demo_clean缺metadata/详细子任务标注，不作为fallback。恢复数据必须含demo_clean_state的metadata和详细子任务划分。若恢复已转换LeRobot数据，必须可沿metadata确认来源为demo_clean_state且所需标签/事件保存完整；来源不明先不用于训练。请核对当前找到/正在传输的两任务数据，缺状态版就继续从zx-data/wuwen-11定位真实目录，不用clean版凑齐。
+
 恢复首批pi05训练所需base初始化和rearrange/put_back数据，尽快解除开跑阻塞。用户已经授权schema施工和正式实验，可按需利用原wuwen-11资产；你负责定位/复制已有数据和权重，不写算法，不训练、不占GPU。
 
 # 范围与步骤
