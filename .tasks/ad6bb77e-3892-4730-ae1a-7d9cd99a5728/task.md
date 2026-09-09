@@ -1,3 +1,5 @@
+参数大小验收更正：Manager只读base params/_METADATA得到3,353,433,872个参数元素，全BF16原始字节约6.71GB（3.35B模型）。先前“6B/约12GB”只是错误的规模估算；不要通过固定文件大小判定保存完整，也不增加任何复制来凑12GB。请核对完整树/shape/dtype与实际恢复，新head的少量参数据实记录。
+
 保存与metadata继承最终增量为openpi `cc706e37fb5c2190281789affce0095569a781af`（接在3d4fe31之后）；meta/metadata目录完整继承、源根只挑小配置文件，并记录实际数据定位env。此为该保存子任务当前验收HEAD，后续与训练真实接口一起审。
 
 ## checkpoint-only验收必须覆盖全新进程导入
