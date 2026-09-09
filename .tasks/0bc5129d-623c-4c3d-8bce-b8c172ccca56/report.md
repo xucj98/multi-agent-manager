@@ -1,20 +1,20 @@
 task_revision: d606b3740789a1ed496f84d9bd2f462797d1078f
 
-# F0 / legacy RMBench simulation：CPU 阶段审结，可开始 GPU smoke
+# bc842036：F0 / legacy RMBench simulation 独立 CPU 验收通过，可开始 GPU smoke
 
 审查候选与工作区：
 
 - F0 候选：`bc842036e3735390f35fe1138aa7b19f5ae2f95b`（`fix: skip terminal simulation inference in base`）。
-- 独立审阅树：`/mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/robot-bridge`，HEAD `b247332`，是将该 terminal patch 合入 `fd38513` 审阅基线的等价 cherry-pick；二者稳定 patch-id 同为 `d09ba4ad09d83d1181b47ec6109bb006f24ceb45`。
+- F0 审阅基线：`b247332`，是将该 terminal patch 合入 `fd38513` 的等价 cherry-pick；二者稳定 patch-id 同为 `d09ba4ad09d83d1181b47ec6109bb006f24ceb45`。当前审阅树 HEAD 为其后仅含 live controller 增量的 `281e0a7`；该后继不纳入本 F0 判断。
 - 按任务要求只读核对的 OpenPI worktree：`/mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/openpi`，`58d6f2155acc3af03017677bb3f536101e6699f4`。
 
 本报告只放行旧 full checkpoint 的 F0 simulation CPU gate。未修改作者实现，未启动 GPU、真机或 rollout；GPU smoke/100 rollout 仍由独立 eval 任务执行。
 
 ## F0 结论
 
-**F0 可进入 GPU smoke。** legacy H50/K30 selector、实际执行进度/trace，以及 terminal observation 的真实调用路径均无剩余 F0 runtime blocker。
+**`bc842036e3735390f35fe1138aa7b19f5ae2f95b` 通过 F0 runtime CPU 验收，F0 可进入 GPU smoke。** legacy H50/K30 selector、实际执行进度/trace，以及 terminal observation 的真实调用路径均无剩余 F0 runtime blocker。
 
-Eval 可按既定入口执行 rows **1 / 20 / 30 / 50**：每行先各 2 rollout smoke，再各 100 rollout。保留原完整 recorder 检查；不增加白名单、兼容绕过或放宽 recorder 检查。本 CPU 结论不替代 GPU rollout、视频产物或真实 recorder 验收。
+固定的完整 eval 入口 `425afaf` 可按既定流程执行 rows **1 / 20 / 30 / 50**：每行先各 2 rollout smoke，再各 100 rollout。保留原完整 recorder 检查；不增加白名单、兼容绕过或放宽 recorder 检查。本 CPU 结论不替代 GPU rollout、视频产物或真实 recorder 验收。
 
 ## 已检查的行为
 
@@ -65,7 +65,7 @@ Eval 可按既定入口执行 rows **1 / 20 / 30 / 50**：每行先各 2 rollout
 
 这验证的是实际共享循环，不只是直接调用 `build_act_request()` 的局部 hook。它不证明真机 transport 已通过，真机验证仍属于 live 复核范围。
 
-## 仍在进行、但不阻塞 F0 的完整 runtime 审查
+## 后续独立范围（不影响上述 bc842036 F0 结论）
 
 - **新 Memory v1 wire 契约尚未验收。** 当前实现的 `MemoryContext.add_inputs()` 将 dense 编码写入 padded `state`，真实训练 input transform 却读取 `memory_input_ids`；真实 output transform 又会把 `actions` 裁为 14 维机器人动作，而 runtime 曾从该尾部解码 memory。这两处断链须按已发布契约修为 scheduler 传 `(F,)` 的语义 `memory_input_ids`、policy transform 负责编码、输出以 `memory_prediction_ids`（full `(H,F)`、serial `(1,F)`）交给 `MemoryContext`。收到作者小增量后将跨真实 input/output transforms 与真实 context 做 CPU 联通复核，覆盖单/多字段、no-memory、K30 row30 和 serial 的实际 selected 条件；不会用两端 mock 字典代替。旧 F0 checkpoint 无 `memory_config`，因此不受此项阻塞。
 
