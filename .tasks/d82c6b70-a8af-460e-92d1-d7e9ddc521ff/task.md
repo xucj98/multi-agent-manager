@@ -2,6 +2,8 @@
 
 ## 目标与范围
 
+本轮固定review commit：openpi f6327197459bf830c6b5d0b9ba5d643bc5e0cbd3，已包含PyYAML的uv.lock修复0dc120c。源要求revision为18a99cbea563d961481f6f75fb0c03feef0b4e86；源报告可读MAM .tasks/f252006a-8676-4d10-b6a1-1a791d91c6a6/report.md当前阶段交付。后续论文patch不改本轮代码。实现实际961行，作者11 tests passed。
+
 独立review轻量openpi-client memory_config模块。以源任务f252006a-8676-4d10-b6a1-1a791d91c6a6的已发布要求和Manager指定的最终commit为验收依据；不要只复述作者测试。Manager随后在本task固定commit，再启动你。读取MAM README及openpi AGENTS，用mam workspace add创建自己的openpi环境。只读review，可在自己workspace写最小验证脚本；不修改交付代码，不占GPU，不派生agent。
 
 ## 核查重点
