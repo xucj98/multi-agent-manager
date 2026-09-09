@@ -25,6 +25,8 @@
 
 # 跨agent契约
 
+新增数据事实与最小契约补充：wash-cup 172合格ep中每集都有内部/尾部未标注区间，15Hz共13,404行无phase GT；unknown是占位不是已知类别事实，不能监督为initial。请给EpisodeMemoryData增加可选availability（按reference的series key映射等长bool数组；缺省代表全部有GT），而非新增schema表达式语言/任务专用分支。现有key不存在仍报错；显式availability=false时输入使用字段initial，target对应位置mask/weight为0、dense编码全0。机器人监督保留，不能为了full H50把整sample或整episode扔掉；reference-mask与availability两者区分。向训练/数据owner明确最终签名，增加有实际数据依据的缺GT测试。若你判断此接口无法在不引入歧义的条件下接入，先给一个明确替代方案供Manager裁定，勿将unknown当GT继续。P2首批sim全标签适用原公共mask；不声称all_in_bounds已表达跨两个候选时间的annotation-availability交集。论文patch同步规范化数据接口的availability及输入fallback/目标loss规则即可。
+
 你是配置/API owner。尽早（先于大实现）报告你准备暴露的轻量helper函数、resolved memory_config结构与数据入口，控制在一屏；Manager会把确定接口发布到其他任务。沿用已给YAML名称，必要精简给理由，不自行大改设计空间。数据agent只改examples/适配器，runtimeagent只改robot-bridge。不要让它们猜接口。
 
 必要对照补充：为区分辅助监督与递推输入，支持字段输入显式使用initial（train/infer均可），部署保持initial而不消费预测；状态目标/loss与同形状full保留。优先通过input source=initial和已有反馈禁用的清晰表示实现，不再加独立aux模型类。memory=[]是标准无记忆baseline，辅助对照仍保留memory字段/目标；两者不能混称。P3任意constant label覆盖不属于第一批阻塞项，可后补。
