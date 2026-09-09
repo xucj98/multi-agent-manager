@@ -49,3 +49,7 @@ Manager发现当前两个实现不匹配：runtime MemoryContext.add_inputs把fu
 跨真实MemoryContext的集成测试由已有双库workspace的runtime owner负责、Pascal独立复核；你负责真实policy transform/实际selected与wire边界，结合他们的集成证据，不为同一检查创建第三套bridge环境。注意作者测试使用的筛选表达式可能排除部分test名称，确认关键项目实际运行，不照抄总数判通过。原先6B字样已经更正为3.35B，以真实参数树验证。
 
 GPU证据将由owner在GPU1顺序提供full及serial各50step（新head/条件路径各实际验证）；no-memory不重复50step。按各实际路径给分阶段结论，full通过可先放行相应full实验，不必等wash或live。正式长训练代码树保持冻结；尚待实施的wash注册配置与运行树分开处理。
+
+## 自包含修复已固定：d10cc01d44c10e5ed0cd8c228d9409dd6cabac50
+
+作者训练树在ffa308d后还有5e3bfd6d46f13643c53271c1e3e1bc116dd4ff06（CLI暴露新模板），当前d10修factory/YAML自包含。请复用原worktree合这两个增量，优先只复验R1/R2及新CLI入口/全新进程仅checkpoint加载；给是否关闭这两阻塞的明确结论。已有数值loss/token/窗口/计数不重测，aux R3/conditional R4单独列未完成，不捆绑firstfull。训练owner接着GPU1 full/serial50step；put-back norm另需实际loader证据。
