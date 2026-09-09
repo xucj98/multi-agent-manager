@@ -15,3 +15,5 @@
 实施：使用git worktree remove删除已审计且无依赖旧树并清理对应临时分支（仅明确这些tree创建的分支；保持xcj-dev/main及正在使用分支）。detach唯一commit若实验metadata引用且无持久引用，留最小git tag保全并记录，勿堆积worktree。避免follow symlink删除共享目标。仅移除具体已审计路径，勿扫除未知目录。不要扩大到/tmp或全系统垃圾清理。
 
 交付：发布report.md，含task_revision、workspace、删除清单/空间（区分逻辑与物理/hardlink共享）、保留成果路径、未处理项及原因、最终worktree列表、链接/环境最小只读核验。自用临时文件清理。及时向manager报告阻碍，不长时间自行扩展调查。
+
+Manager 现场裁决（2026-09-09）：bridge-runtime-integration-20260908/openpi 的7个modified及3个untracked源码/测试逐文件与主openpi一致；RMBench-mem0的4个modified源码与主RMBench一致；两个untracked bridge_worker.py/test_bridge_worker.py已经集成于主RMBench commit 7af489d，主版本仅增加gitlink provenance处理及对应测试。上述工作树改动已被主库成果覆盖，可随旧树删除，无需重新提交或复制源码。logs链接目标须按结果依赖检查。保持主库用户未提交文件不动。
