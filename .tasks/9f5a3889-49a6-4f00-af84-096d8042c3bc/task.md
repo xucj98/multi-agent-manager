@@ -1,4 +1,8 @@
 # Memory v1：真机仿真offline统一反馈
+
+## 环境恢复裁定
+
+de79新增PyYAML但缺lock更新，独立修复commit为0dc120c（uv.lock两行）。已有登记openpi worktree不反复调用workspace add；在自己树cherry-pick修复后，沿受版本管理scripts/worktree_env/create_worktree_env.sh第268行以后的lock检查、独立uv venv、sync frozen/hardlink、import验证恢复，不复用他人环境。通过后报告证据，Manager修复本task的MAM failed状态记录；不扩展MAM实现。
 # 目标
 
 # API已提交，可开始接入
