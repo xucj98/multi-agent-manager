@@ -9,6 +9,8 @@
 
 # 工作区与边界
 
+保存/恢复写集已拆出：dc61ef10-53f0-44c2-91cc-c78d1cb6676e负责training/checkpoints.py、checkpoint_metadata.py、policies/policy_config.py及对应tests。你不再改这三文件；继续独占config.py、scripts/train.py、data_loader、memory_data、models/transforms及训练tests。请在TrainConfig增加save_dtype: Literal['bfloat16','float32']|None（默认None，首批配置bfloat16），供checkpoint owner使用。最终20k唯一保存由你配置。当前norm裁定：机器人使用同一shared stats，one-hot memory在Normalize后identity追加，不进入stats。给Manager/保存owner明确resolved memory_config唯一保存位置及加载时所用transforms接口，避免彼此猜schema新入口。普通checkpoint推理不能依赖训练dataset存在，此边界由保存owner保障、你提供不读数据的transform工厂。无需等待保存owner才能先完成实际数据/模型loss CPU检查；最终GPU smoke合入其commit后一次完成。
+
 环境恢复裁定：de79新增PyYAML但缺lock更新，独立修复commit为0dc120c（uv.lock两行）。已有登记worktree不反复调用workspace add；在自己树cherry-pick修复后，沿受版本管理scripts/worktree_env/create_worktree_env.sh第268行以后的lock检查、独立uv venv、sync frozen/hardlink、import验证恢复，不复用他人环境。通过后报告证据，Manager修复本task的MAM failed状态记录；不扩展MAM实现。
 
 用mam workspace add --repo openpi --base de79cce20e54c612634fdc2598b91cc0ab5034ec，读取AGENTS.md。只修改src/openpi、scripts训练/norm/checkpoint相关入口及其tests/训练文档；packages/openpi-client由f252006a-8676-4d10-b6a1-1a791d91c6a6负责，examples/converter由7c8fbc25-6c9b-4529-b63f-da8a5b5e54e2负责，不能重复修改。不要动legacy RMBench/policy/pi05或robot-bridge。后续API修订按明确commit cherrypick到自己的worktree，不能PYTHONPATH挂他人临时树。
