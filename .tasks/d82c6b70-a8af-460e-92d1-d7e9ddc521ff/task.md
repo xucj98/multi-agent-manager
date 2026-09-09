@@ -19,9 +19,3 @@
 ## 交付
 
 report写清task_revision、自己workspace及review commit、独立执行的检查、按严重性列发现（路径/行号、具体输入、实际与预期、为何影响首批），无问题也明确。区分阻塞首批的问题与后续扩展，不把目前缺少scalar/parallel等一期外能力当回归。无需全面论文review或重跑旧实验。完成清理自己的临时样本/脚本；保留worktree待Manager归档。
-
-## 增量核查：availability
-
-作者在原 review commit 之后新增 `0f37cfc1ae42e4703b741f0f05fd1e3c58c87e89`（`feat: mask unavailable memory labels`）。保留已完成的 `f632719` 审查，额外核查该小 diff；不必重复全面 review。目标版本是 `f632719..0f37cfc`，可在自己的 worktree 用 `git diff`/`git show` 检查，若需要运行测试再切换到该 commit。
-
-`EpisodeMemoryData` 末尾新增可选 `availability: Mapping[str, Sequence[bool]] = {}`，仅允许 memory 的 `reference.kind: series` 键且数组与 episode 等长。缺省保持原行为；series key 缺失仍应报错。availability=false 时，训练输入必须使用该字段 initial，目标 ID/mask/逐坐标 loss/dense 编码为零；不得读取或监督占位 `unknown`。验证另一个 memory 字段、机器人目标和机器人权重仍保留，并确认 availability 是对目标时刻的独立 annotation 条件，不把 `all_in_bounds` 误解为跨候选时刻的 availability 交集。报告中单列该增量的检查和发现。
