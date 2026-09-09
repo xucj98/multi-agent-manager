@@ -1,6 +1,6 @@
 task_revision: 18a99cbea563d961481f6f75fb0c03feef0b4e86
 
-进行中。紧急环境解阻的独立 openpi commit：`0dc120c69f4b5cce7c0d6a10bd0e92412870fc0e`（`fix: lock openpi-client PyYAML dependency`）。
+进行中。紧急环境解阻的独立 openpi commit：`0dc120cf850e13a8fab71974f4f7e29778c13406`（`fix: lock openpi-client PyYAML dependency`）。
 
 该 commit 只改根 `uv.lock` 两行：在 workspace package `openpi-client` 的 dependencies 与 requires-dist 中声明既有锁定的 `pyyaml>=6.0`；未变更来源、版本、解析结果或其他包。验证：`uv lock --check --offline` 通过（仅现有 deprecated dev-dependencies warning）。
 
