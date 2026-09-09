@@ -77,3 +77,12 @@ ffa308d5485a2c8222d3e7735b08723c6e93a237已送Banach独立review。真实transfo
 新joint-dense与serial-token改变了不同模型路径（后者有新head/动作条件选择），单个full smoke不能证明serial实际base加载/JIT/保存/恢复可运行。请在同一GPU1顺序完成full和serial各50 optimizer updates，均验证最终BF16 model-only/仅checkpoint恢复及各自wire；no-memory沿已通过loader与共享模型路径，不要求额外50step。复用同一robot norm统计，两个smoke独立输出；不同时占额外GPU。full完成即可报告，serial可与CPU独立review并行。GPU1全部结束释放时通知Manager。
 
 正式20k启动后运行worktree需要固定，不应继续改该树的模型/loader/config。先准备所有将运行的配置；若wash还需实施，告诉Manager剩余配置写集，Manager会安排与正式训练冻结树分开处理，不让长训练读取途中变动的源码。
+
+## CPU独立review当前发现与优先级
+
+Banach已在等价ffa308d的63be08c发布具体复现（本MAM 9b73b590/report.md与combined_review_test.py），Manager裁定以下需要最小修正：
+1. R1：training=False factory仍先读原训练norm，再由policy加载checkpoint assets；仅checkpoint路径恢复必须完全不读取原norm/dataset/sidecar/YAML。原norm缺失/损坏/不可读也不应影响有效checkpoint。保留现有factory和checkpoint资产机制，不新增第二配置框架。
+2. R2：serial真实TrainConfig YAML roundtrip时Pi0Config.__post_init__过早校验尚未填充完成的nested decoder mapping，导致load失败。把必要校验放在完整构造后且使用前，保持唯一resolved schema与默认独立argmax，不为每种历史格式另加兼容层。
+3. R3只阻塞aux：合法train source=initial没有mask键，adapter不能无条件索引mask；infer source=initial也要遵守配置而不消费传入非initial cache。full/serial正常闭环不因aux未验收停工。
+
+先R1/R2固定小commit送复核，R3可独立增量。已通过真实tokenizer条件、P2数值loss/梯度与metadata继承不重跑无关检查。GPU50step若已运行且修复仅涉及加载factory/YAML时机，不需要再训练同一50步；用明确修复commit重做checkpoint恢复并记录保存/加载各自版本即可。不要把新增读取阻塞误报成模型训练数值问题。
