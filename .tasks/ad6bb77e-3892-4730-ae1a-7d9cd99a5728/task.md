@@ -92,3 +92,9 @@ Banach已在等价ffa308d的63be08c发布具体复现（本MAM 9b73b590/report.m
 Banach报告fb9c495确认真实data窗口、serial实际选中条件/wire和50/20k更新计数通过。R4仅显式conditional decoder：Pi0逐case覆盖取last-match，而公共schema为first-match；应做小修使消费者遵守同一已保存规则，补一个重叠case对照。此项与aux R3不阻塞当前默认argmax首批，优先完成R1/R2和实际GPU。
 
 put-back独立adapter窗口已通过，但其专用robot-only norm尚未生成/实测，请在首批put-back正式开跑前生成并验证真实归一化loader，不能借用rearrange stats。无需再跑第三个50step模型smoke。
+
+## 正式运行与继续实施分离
+
+新task e7e5ac54-2f5c-4f46-9210-6c2a51f7f4fe（Locke）从d10建立独立冻结运行树，专门执行/监控远端首批8个20k；收到你full/serial50step及CPU GO后由Manager放行该owner启动。你保持实现/smoke职责，不自行启动20k，后续可继续R3/R4和wash训练注册配置而不影响其源码。
+
+wash v3正式172转换已完成：data/lerobot/wash_cup_x1pro_s2m_memory_v1/all_172_15hz_s2m_master_v3_source_frame_aligned，143698 query、13944缺GT、M+1低维sidecar，最终数据/文档复核中。首批八卡暂按既定sim六项+Q2 seed1两项准备。先完成GPU gate和put-back norm，再接wash full/serial训练注册与真实loader/self-contained config roundtrip；仅配置/显式bindings差异，复用同一通用训练机制，不引入第二套代码。需要的转换代码已在主库2e92fbc合入（相同46e619e树）。
