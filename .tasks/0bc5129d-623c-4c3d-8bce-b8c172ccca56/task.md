@@ -46,3 +46,9 @@ Eval准备commit RMBench9e8fccbd2fa004f18a3cbcc301e7387b02edaccf发现terminal t
 ## 验证与交付
 
 CPU测试适用于controller进度、并发/中断、MemoryContext时序、legacy分支和UI字段传递。GPU的2rollout video/no-video及正式100由独立eval任务执行，你不启动。起始阶段只报告已审查commit的范围；新scheduler增量到后再给完整结论。报告须有task_revision、审查HEAD/工作区、独立验证及发现的具体输入/路径/后果，区分阻塞首批与扩展事项；记录未能验证的真机硬件部分，不能用mock成功冒称真机通过。发布report后清理自己的临时脚本/cache，保留工作树待Manager归档。
+
+## 2026-09-10 06:57：追加发现的裁定
+
+Manager已读6eb517d报告，认定synchronous末行K-1与drain后仍跳latency是需要修复的live/offline问题，并交原作者处理。新wire runtime半边已通过但跨真实OpenPI transforms仍待CPU训练commit，届时再联合复核。F0 row30 smoke已通过并放行正式100，不因此重开F0 gate。
+
+生产轻量包依赖需要可复制安装路径；接受独立openpi该版本构建的openpi-client wheel及全新隔离环境中import/创建MemoryContext验证，不必安装整套训练框架或改动真机/原sdk_robot环境。SDK硬件可运行性不是纯schema依赖验收的前置条件，真实设备验收另列。收到作者最小方案后据真实安装链路评判。保留每项精确范围，避免将尚未交付的训练增量重复计为实现缺陷。
