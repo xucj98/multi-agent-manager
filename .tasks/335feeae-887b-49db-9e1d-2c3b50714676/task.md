@@ -11,7 +11,7 @@ mam workspace add 335feeae-887b-49db-9e1d-2c3b50714676 --repo RMBench --base 9fa
 
 ## 已冻结输入
 - Token专题：MAM task 9265c564-bbd5-4076-be45-163cf6fa6bc9；requirements 8da86ef2b2675840491c98fd5e7ae6a847237347；report 0f8bc1ad871e5777982f28058335e2dc365ee2e6；RMBench commit 9faa19d4fa03d66619cc09ce70b2803c35b499e1。
-- 总账：task a7e2c48b-6bcd-43d0-ad60-1e923e578947，待manager追加交付版本。
+- 总账：task a7e2c48b-6bcd-43d0-ad60-1e923e578947；requirements 58dc9d6edb06af2b8641175200d3a6aba940741e；report 81d65f9d4b2580589bed48d9244ac8ea0807037f；RMBench commit 38499ed5ecec1d2f5a2522d968db8d23f7b7074a（23组184叶、73格主表映射）。请在自己的worktree合入该commit并纳入独立核验。
 - Shared时序：task 0a70d0ce-181c-47dc-96b0-f3b1c8d04c10，待追加。
 - 早期设计：task c1bc0678-1326-40fb-94db-8cad5278feab，待追加。
 
