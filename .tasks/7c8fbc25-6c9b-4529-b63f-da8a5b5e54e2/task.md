@@ -1,4 +1,10 @@
 # Memory v1：数据适配与wash-cup转换
+
+## 阶段事实后的Manager裁定
+
+已读172合格/72剔除、13,404行缺phase GT和sim action预移位报告。wash保留全部合格episode的机器人数据；不因full需要未来50行标注而整sample删除，否则造成未声明的采样选择。API owner会增加EpisodeMemoryData可选availability（series key→bool数组，缺省全true）；显式缺GT输入用schema initial，目标逐字段mask/weight=0且dense全0，不能把unknown当已知phase监督。转换保留原始availability，不自行在适配器实现第二套mask/loss算法。
+
+sim直接绑定已转换action的机器人14维、offset=0，以精确复现原有q→q+1标签；P2两臂共用这些目标，不为尾部重新从observation.state生成另一套动作。继续全量内部行级核对，缺raw尾部只列具体缺口，不重复转换已有视频。原始scene_info/language_annotation及每集末尾动作数值的补核将交资产任务恢复；尽量远端只读提取需要的末帧数值/形状/来源，不需先传所有含图像HDF5才推进训练。若现有converted已给全部当前target和input获取边界，则注明哪些原始事件是新schema实际必需，哪些只为额外审计，避免把不用的原始文件作为开跑硬阻塞。
 # 目标
 
 # 样本时序验收补充
