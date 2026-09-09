@@ -10,11 +10,16 @@ task_revision: eab68403016a134e3e99f012e3155d795663b814
 
 新增可定位问题：
 
+4. **R4 / P2 / 仅显式conditional decoder：Pi0与公共schema的case优先级相反。** models/pi0.py:297-310逐case用jnp.where覆盖allowed，所以最后一个匹配分支获胜；公共memory_config.py:866-870命中首个立即返回。实际serial配置加入合法重叠case（previous.phase=unknown允许left；后续selected.phase=unknown允许right）后，相同logits/previous在公共spec得[0,1,0]，Pi0得[0,2,0]。会让serial动作条件与保存schema定义不同；当前默认argmax的full/serial均不走此分支，不阻塞firstfull。remaining_review_test.py::test_explicit_conditional_decoder_agrees_with_public_spec可独立复现；仅复核consumer一致性，未重审parser。
+
 1. **R1 / P1 / full、serial、no-memory共用：推理factory仍打开训练norm。** training/config.py:1004-1015 的 training=False 分支仍调用 data.create → create_base_config:208 → _load_norm_stats:230，读取原 data.assets.assets_dir 下的 norm_stats.json。policy_config.py:59 在加载 checkpoint assets:65 之前执行该factory。独立测试使用实际full配置、有效checkpoint/assets，并在全新进程禁止训练norm/data/sidecar/YAML访问，得到 TRAINING_SOURCE_READ（源 norm_stats.json）。原norm目录不可读、格式变化或维度变化仍可使有完整checkpoint assets的加载失败；URI资产还会触发不必要下载。需让普通推理构造transforms时不读取训练norm，使用checkpoint携带的统计。
 2. **R2 / P1 / serial：真实TrainConfig不能从保存的YAML恢复。** models/pi0_config.py:92-98 在 __post_init__ 校验 tuple[Mapping] decoder_rules，而tyro/PyYAML此刻还只构造出 ({}, {}, {})；load_train_config直接抛 ValueError: each key_state_decoder_rules entry must be a mapping with a string kind。用真实 pi05_rmbench_rearrange_blocks_serial_lag30 和真实 checkpoint_metadata.save/load 即可复现，无stub、无GPU。full/no-memory相同roundtrip通过。需在嵌套mapping完成构造后验证，且保持唯一resolved schema。
 3. **R3 / P1 / aux：合法source: initial无法构造adapter。** training/memory_data.py:195-198 为所有 train input 无条件索引 input_spec["mask"]；core对source: initial的合法resolved项只有source。将实际full配置各字段train/infer改initial、feedback updates清空，TrainConfig成功但create_data_config报KeyError: mask。须先按source区分；修复后还要验证policy遵守infer initial而不消费传入的非initial cache（当前AttachMemory只使用IDs/model_spec，尚未证明该协议约束）。
 
 已通过的独立证据：
+
+- 本轮新增实际serial sampler检查通过：使用真实Pi0.embed_prefix、value/query embeddings、logit head、selector、sample_actions_with_key_state和JAX while_loop，仅用可观测小trunk替换Gemma/SigLIP。相同输入previous=[3,1,0]选[0,2,2]；选中IDs及显式override=[1,1,1]分别进入segment1 current tokens并改变动作。实际Policy.infer经真实输入/输出transforms返回robot actions(50,14)、memory_prediction_ids(1,3)，与真正动作条件一致。真实compute_loss训练分支追加reference ID的同一embedding，query head不能看teacher target、action suffix可看全部current tokens。此为CPU算法/接口检查，不替代实际base GPU JIT。
+- 本轮新增实际scripts/train.py::main计数检查：分别执行50和20000次受控update，只有最终一次save_state调用，其state.step和目录step严格为50/20000，save_full_state=False，最后wait_until_finished。使用真实main、受控CPU update/save替身，不创建Orbax checkpoint；真实train_step静态核对每次optax.update后step+1，原作者实际train_test的2/4保存证据沿用。正式配置num_train_steps=save_interval=20000、batch32、BF16/model-only。
 
 - checkpoint metadata 3d4fe31→cc706e37：新增3测试通过；未重复tiny cast。独立metadata_review_probe.py使用真实rearrange/put-back目录：dataset meta各8文件（304571 / 277972字节），sidecar metadata各17文件（741466 / 890008字节），SHA256逐文件完全一致；root episode_memory/视频/Parquet/源码未复制。真实command argv/env/cwd可还原。全新进程禁止训练来源后metadata加载通过（不等同于policy全链路通过）。
 - 实际full transforms使用真实SentencePiece/PaligemmaTokenizer、同robot/images/prompt、memory [0,0,0]与[2,1,2]：token条件不同；memory one-hot维持identity、机器人部分相同，真实data_loader.transform_dataset与推理token一致。原始50x32输出解码后actions为50x14，memory_prediction_ids为50x3且保留第30行。
