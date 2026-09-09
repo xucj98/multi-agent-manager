@@ -1,25 +1,38 @@
-task_revision: 6c68fa0375b0a0abc8ff830b4fa86cfc09ac7693
+task_revision: 4b18f95b18037ea45c01b6ec2597bd6bb6832660
 
-阶段交付（sim binding 已独立提交，wash 后续修复）
+阶段交付（RMBench sim 六项已准备；wash 正确重转换仍待继续）
 
 workspace：`/mnt/public/xcj/Projects/workspace/7c8fbc25-6c9b-4529-b63f-da8a5b5e54e2/openpi`
 
-openpi sim 交付 commit：`4815273f3c15529401316138e9bc14a3bd36372f feat: add RMBench memory bindings`
+openpi 交付 commit：`69ca14825574981989340f8645ab3713208699fb` `feat: preserve RMBench sidecar metadata`
 
-- 新文件均在 `examples/rmbench/` 与 `examples/rmbench/memory_configs/`；没有改 `src/openpi` 或 `packages/openpi-client`，也没有重转图像/视频。
-- 新增四份可运行 P2 YAML：rearrange/put-back 各 `full_t_plus_1`、`full_t_plus_30`。H50/K30，train 读 current reference、infer 读 cache、feedback 为 selected/last_executed/chunk_completed；两组只改变 phase target 时刻并共用 P2 `t+j+1` + `t+30` validity。robot target 为 converted `action[:14]`、`action_at_row`、`offset=0`。
-- 全量只读审计通过：rearrange 50 ep/20,103 query rows，put-back 50 ep/17,588 query rows；每一行 active `observation.key_state_target_ids` 都与恢复的 `demo_clean_state` `scene_info.json`/`language_annotation.json` 重建的 current truth 一致。`observation.key_state_input_ids` 是 legacy t-20，未绑定。sidecar 保留 raw events 作为审计资料。
-- `metadata/robot_edge_comparison.json` 的既有核验规则为 `converted_N=raw_N-1`，`state[:2]=raw[:2]`，`action[0]=raw[1]`，`action[-2:]=raw[-2:]`；两任务所有 50 集三个 max error 都是 0。因此 action 的 q(t+1) 绑定与 offset 0 已有源端数值证据。
-- 已写共享 gitignored 训练资产（只含 JSON labels/availability/events/tail）：
-  - `/mnt/public/xcj/Projects/openpi/data/memory_v1/rmbench/rearrange_blocks_demo_clean_state_shared_memory/{episode_memory,binding_manifest}.json`
-  - `/mnt/public/xcj/Projects/openpi/data/memory_v1/rmbench/put_back_block_demo_clean_state_shared_memory/{episode_memory,binding_manifest}.json`
-  每集均保留 M 个 converted query rows，外加 raw M 的 current-truth tail 和重复的 converted 最后 action；manifest 的 `sidecar_path` 是 training worktree 可解析的 `data/memory_v1/...` 相对路径。
-- 训练 owner 可由 manifest 直接构造的 binding 为：state=`column(observation.state, observation_at_row, start=0, stop=14)`；三相机为 `observation.images.cam_high/cam_left_wrist/cam_right_wrist`；robot=`column(action, action_at_row, start=0, stop=14)`；memory fields=`sidecar(series.<field>, current_truth, labels)`；availability=`sidecar(availability.<field>, availability_at_row)`。
+commit 链均由 `git rev-parse` 取得完整 SHA：
 
-训练 prototype 的唯一剩余通用接口阻塞已用真实 episode smoke 复现：它目前将 column action 和 sidecar series 都构造成 M 行，因而 query `M-30` 的 P2 phase mask 前 30 行为 0；追加 sidecar `tail.series`/`tail.availability` 并重复 action tail 后应为 30。不能用 converted M-1 clamp 替代 raw M。请 training owner 在通用 binding 层将每集 tail append 为 M+1 logical `EpisodeMemoryData`（loader 仍只采样 M 个 converted query rows）；本 commit 的 manifest 已精确给出字段、source 和 path。
+- `481527346573b73958dcd81591fc8473e20feaff` `feat: add RMBench memory bindings`
+- `38bf82c1753e6e911e6215a6762cccc2a7bb15bd` `fix: store RMBench tails directly in sidecars`
+- `2c91f9aff8275b42285c93da094302800ec65f4e` `feat: add rearrange serial and no-memory configs`
+- `69ca14825574981989340f8645ab3713208699fb` `feat: preserve RMBench sidecar metadata`
 
-验证：`ruff format --check examples/rmbench`、`ruff check examples/rmbench`、`pytest -q examples/rmbench/test_rmbench_memory_adapter.py`（9 passed）；真实全量 100 ep audit；training owner worktree 对两份 manifest 的只读 build smoke 均复现上述 pre-tail mask 问题，确认 binding 字段本身可解析。
+上一份 report 误写的首个 SHA 已纠正为 `481527346573b73958dcd81591fc8473e20feaff`，不再使用手工补全值。
 
-代码量：新增 1,179 行（adapter 688、tests 225、YAML 266），没有新增公共 framework。
+RMBench sidecar 已按当前实现重新生成到：
 
-wash 进度与后续：244 集中合格 172、剔除 72；无 phase GT 的 `availability=false` 共 13,404 行，必须逐字段 mask，不能当 initial/unknown 类监督。已确认 S2M 正确为 follow state -> next master action；当前 `all_172_15hz` 及 master v2 均不能作为训练资产。最新 review 发现 v2 video 与 pose/action source index 最大漂移 20 raw frame（例如 ep0 face q23 46 vs 43、q765 1515 vs 1527、q1205 2387 vs 2407），因此下一步是统一 video/state/action/annotation 的真实 source mapping 并先做两集多相机开头/中段/尾部逐帧验收。预计 30--45 分钟完成 mapping 审计与小修；若正确资产必须重输出，会单独报告时长和空间，不复用不同时间轴的视频。
+- `/mnt/public/xcj/Projects/openpi/data/memory_v1/rmbench/rearrange_blocks_demo_clean_state_shared_memory/`
+- `/mnt/public/xcj/Projects/openpi/data/memory_v1/rmbench/put_back_block_demo_clean_state_shared_memory/`
+
+两目录各有 `metadata/`：`command.txt` 是本次实际生成命令，`git_commit.txt` 为 `69ca14825574981989340f8645ab3713208699fb`，并复制实际 `binding_manifest.json`、同任务 YAML、converted `meta/`、以及 `demo_clean_state` 的 scene/language/seed/既有 metadata。它们只含 metadata/config；未复制代码、Parquet、视频或标签矩阵。checkpoint owner 可由 `sidecar_path` 的父目录读取该 metadata。
+
+sidecar 没有 `tail_append`。每集 `series` 和 memory availability 均为 `M+1`；前 `M` 个 `robot_action_target` 逐值等于 converted `action[:, :14]`，第 `M` 行重复最后 converted action；图像、state 和 query 仍为 `M`。manifest 的 robot binding 是 `sidecar(series.robot_action_target, action_at_row, offset=0)`，不含切片，避免二次移位。
+
+全量只读审计通过：rearrange 50 ep、20,103 query rows、20,153 sidecar rows；put-back 50 ep、17,588 query rows、17,638 sidecar rows。所有 100 集的 action 前/末行、每个 availability 的 `M+1` 长度和 converted mask 加 raw 末行均精确相等；复制到 `metadata/` 的全部 converted/source metadata 文件与上游逐字节相等。
+
+新增两份英文 runnable YAML，复用 rearrange sidecar：
+
+- `examples/rmbench/memory_configs/rearrange_blocks_serial_lag30.yaml`：三个字段 training input 为同一 named `previous=30` 的 `t-30`，负索引/缺 GT 自动 initial；infer cache；query target 为 current `t`；`current_condition` 为 reference/selected；三个字段在 `query_selected` 反馈 selected 值；H50/K30，无 P2 future validity。
+- `examples/rmbench/memory_configs/rearrange_blocks_no_memory.yaml`：`memory: []`、空 input/target/updates，保留同一 `robot_action_target` 和 H50/K30。
+
+API 语义 smoke：serial 的 query 30 读取 row 0、监督 row 30、action 从 row 30 offset 0；query 0 输入 initial。no-memory 返回空 memory input/target，并保持同一 robot targets。训练 owner 当前 reader 的 full binding 对 serial 正常构造通过。对 no-memory，若直接复用 full binding 会精确报错 `availability may only bind memory series: ['button_press_status', 'empty_mat_side', 'phase']`；同一 sidecar 改用只保留 `robot_action_target`、无 categorical availability 的 binding 则正常构造通过。训练配置需选择该 robot-only binding 或等价现有无记忆数据路径；本任务未改其 `src`。
+
+验证：`ruff format --check examples/rmbench`、`ruff check examples/rmbench`、`pytest -q examples/rmbench/test_rmbench_memory_adapter.py`（9 passed）；CLI `--help`；两条实际生成命令；metadata byte audit；100 集 M+1 action/availability audit；训练 reader smoke。未使用 GPU、未启动训练。
+
+未完成：wash-cup master v2 的视频与 pose/action source index 最大漂移 20 raw frame，仍禁止训练。后续需按 JSON timestamps 统一 state、next master action、annotation 和三相机视频的 source mapping，并在两集开头/中段/尾部逐帧验收后输出独立正确资产及同样的 metadata 链。
