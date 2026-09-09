@@ -1,68 +1,38 @@
-## F0 runtime已验收，放行GPU0 row30 smoke
+# Memory实验：F0反馈行评测与新checkpoint评测准备
 
-独立review报告dc14d105b1928c280270e0ec304d2b1d74bc9d7a明确放行bc842036；Manager也比对review基线b247332与bc842036的base/simulation及对应tests，零差异。请完成刚追加的--gpu与端口/cache小调整并固定完整入口commit，随后可立即检查GPU0并运行row30的一次2rollout smoke（一video一no-video）。这就是smoke开跑通知，无需再等待用户或Manager确认。GPU1尚未放行。
+## 当前授权与验收
 
-smoke完成用现有check-smoke/recorder验证结果格式、两个accepted episodes、视频一有一无可读、command/config/前序metadata、实际K/选行/terminal infer计数/进程收尾。报告实际source commits、结果路径、成功数和检查结果，等待Manager验收后发正式100通知。四row正式预算仍有效，不再改运行代码或扩新功能。
+Manager已于2026-09-10 06:52验收row30/GPU0的2rollout smoke。依据已发布报告598cd4538b2b9ad293f4274bd01eb862029be53b及smoke_verification.json/video_metadata_verification.json：2个accepted episode，1success/1button_press_insufficient，视频700帧可读/另一集无视频，38个query反馈链、metadata/source匹配、terminal路径和进程收尾通过。RPC抓包不完整仅作辅助；不以smoke成功率推断正式结果。
 
-## GPU安排：GPU1训练smoke结束后允许第二个F0并行
+现在直接启动row30/GPU0正式100，无需等待再次许可。使用本任务RMBench worktree运行：
 
-当前仍只允许启动GPU0；GPU1由训练owner占用50step smoke，Manager确认其释放后才可用于另一完整100ep run。为之后无需改已冻结代码，请在首次smoke前给现有F0入口加--gpu（default0，可选0/1），传给已有runner同一sim/policy GPU参数；为两卡选择不冲突的robot/policy端口和分别的Warp cache目录。不要硬绑定GPU0、也不拆分一个100ep。每个正式run用其实际GPU/端口/配置对应的2rollout smoke通过原完整检查。
+```bash
+../robot-bridge/.venv/bin/python experiments/memory_chunk_20260910/commands/run_f0.py --row 30 --gpu 0 --mode formal --detach
+```
 
-这是恢复原本两张本机卡承担eval的安排，避免训练smoke结束后GPU1闲置18小时。只需少量参数与端口/cache派生修改，不新增队列系统或修改runtime；README注明GPU1当前未获放行。完整入口准备后立即报告，F0 runtime独立review不会因这些实验启动参数改动重做。
+启动后立即登记真实host/PID的mam job，检查服务和第一条episode，报告实际run路径和预计50条检查时机。GPU1仍留训练50step smoke，Manager确认释放后才能用于第二个F0。远端八卡留新训练，不使用。F0四个run的预算均已授权；后续同一卡上row20/1/50各自先通过匹配的2rollout smoke，确认产物后可依次正式100，不需再次等待许可。GPU1释放前按GPU0串行安排。每个run完整100条在同一GPU串行，sim/policy共用该GPU，不拆分。
 
-## 恢复F0：固定候选bc84203，完整入口先准备
+## 固定代码与实验协议
 
-请恢复原workspace，把bridge固定到bc842036e3735390f35fe1138aa7b19f5ae2f95b（fd38513→92b365c→bc84203；删除临时client代理，以build_policy_obs=None跳过终止infer），OpenPI仍58d6f2155acc3af03017677bb3f536101e6699f4。只拿这条F0候选，不合后续live进度或新memory wire改动。Pascal正在做该几行增量复核；收到Manager无阻塞确认后可smoke。
+复用本任务已登记三库worktree/独立环境，先读各库AGENTS与相关规范。固定：
+- RMBench f022badd11228e5763a301339a5d1fe5574962b4。
+- robot-bridge bc842036e3735390f35fe1138aa7b19f5ae2f95b。
+- openpi 58d6f2155acc3af03017677bb3f536101e6699f4。
 
-先补齐完整smoke/正式100入口、四份配置、README与候选固定版本检查，然后才跑smoke；不能smoke后才新增正式入口，导致source_content_hash改变而失配。保持完整recorder配置/source检查。每个row2rollout（一video一no-video）smoke→确认产物→commit→该row100，依row30/20/1/50，GPU0单卡串行；其它CPU准备可以同步。报告实际可复制命令与source身份检查，不通过放宽门禁解决。
+运行期间不修改这三处源码/实验文档，避免source hash漂移；中间结果写ignored run目录或本MAM report。不合入后续live或新memory wire改动。旧F0已独立review通过；不因新训练接口尚未完成而停住F0。
 
-当前允许准备完整入口，GPU smoke等待本候选review结论；正式100需smoke通过后Manager发通知。未来同一scope只需一次阶段正式放行，不另向用户请求。超过1小时正式进程必须nohup/可靠脱离短工具会话并mam job登记host/PID；50个时自己记录检查，阶段结束说明下次监控时机。整个F0完成前不改运行代码；结果与MAM报告可正常写。
+同一checkpoint：/mnt/public/xcj/Projects/RMBench/policy/pi05/checkpoints/pi05_full_key_state/shared_memory_full_key_state_seed0/30000。保留原词表、norm、模型、H50、K30；不注入新memory_config。params.legacy_full_feedback_selector按index.value=0/19/29/49选择row1/20/30/50；所有字段统一选该行。保持demo_clean_eval、起始候选seed100000及已固定成对seed协议。这里是旧评测场景配置，新仿真训练/转换数据必须来自demo_clean_state，不能fallback demo_clean。
 
-## F0 smoke匹配与终止query裁定
+每个row对应自己实际GPU/端口/配置的一个2rollout smoke（一video一no-video），通过完整recorder/config/source检查再正式100；不放宽检查、不建白名单。记录真实执行K、所选行、各字段before/after、partial与terminal；终止后无下一query，不伪造执行或GT。row50是模型预测，标明未执行关系。
 
-保留recorder当前完整配置匹配检查。四个row配置分别在自己的100ep之前运行一个2rollout smoke（一video一no-video），然后固定该配置提交开跑；不新增selector白名单，不放宽门禁代码。只允许GPU0，按row30/20/1/50依次执行。先前“只做row30即可覆盖其余三行”的预期不作为当前验收。
+## 监控与解释
 
-你发现terminal trace next_query=false但公共循环仍额外infer的问题已交runtime owner做小修，且交reviewer复核。目标是在OpenPISimulationScheduler现有路径中对terminal跳过真实policy infer，不改SchedulerBase通用循环/真机循环。拿明确修复commit后更新入口固定版本；先继续交准备阶段report，不擅自按fd38513跑正式。
+每run到50条检查结果，相对历史93/100偏差超过10个百分点时调查协议/基础设施，并记录失败原因；同seed前50可作辅助。反馈行本身是主动实验变量，差异可以是真实结果，不能为了接近93而改协议或删除不利episode。区分实验效应和运行错误。正式100完成记录结果、失败分布、时序诊断、可复制命令、完整commit及证据路径；处理任务临时产物后archive job。
 
-## 恢复执行：F0明确接口与资源裁定
+## 产物、范围与交付
 
-runtime commit已到：robot-bridge fd38513adb5ba171327358f70f55f88059de49d2。使用你本task bridge独立分支合入此commit；openpi可合主库58d6f2155acc3af03017677bb3f536101e6699f4并使用自己的editable环境。接口为OpenPISimulationScheduler.params.legacy_full_feedback_selector，支持{kind: index, value: 0|19|29|49}和{kind: last_executed}。F0保留旧checkpoint原字段/归一化/模型，不强行将其转为新memory_config；该显式selector仅控制旧full反馈行。准备四个固定K30/H50配置和诊断，先row30。独立runtime reviewer正在复核，收到Manager确认F0无阻塞后才运行新入口的一个2rollout smoke，检查一次video/一次no-video和metadata；通过后提交完整正式配置再启动100仍等Manager通知。
+写范围为RMBench experiments/memory_chunk_20260910的配置/命令/中文README；模型/runtime由其他owner负责。需要新增核心诊断先报告Manager，不修改主checkout。新checkpoint评测准备只在其代码/数据验收后推进。
 
-资源以本条为准：当前仅分配本机GPU0，GPU1留训练50step smoke，远端训练预留。四个F0可在GPU0依次执行，不因等待第二卡停工。开跑前检查GPU0显存。原文同时GPU0/1安排失效。回复准备就绪commit、smoke实际命令、报告需要的runtime阻塞；不重建已有worktree，不新建任务。
+结果统一/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/<run>，说明归RMBench/experiments/memory_chunk_20260910；不在bridge保存，不增加日志根。每步完整继承metadata/config/command+commit，不复制代码。README直接命令，不使用root export设置段。正式实验替代的smoke在无需再使用门禁引用后清理，不删除唯一证据或活跃run依赖。
 
-# Memory实验：评测入口、旧full时序锚点与开跑准备
-
-## 下一阶段清单（等待Manager恢复agent并发开跑通知）
-
-论文计划F0已明确：同一个旧rearrange full 30k，H50、K30，所有memory字段统一分别读取row1/20/30/50，共四个100ep run，成对初始seed一致。文中row为1-based，因此schema index.value分别0/19/29/49；last_executed在实际k=30时对应row30。先排row30/20，本机GPU0/1各一个串行100ep，完成后row1/50；正式启动前Manager会重新确认资源。使用同一runtime commit与明确的旧full等价schema/config，不能某一臂悄悄走不同解码/归一化。row50是模型对未来时刻的预测，不读取未来GT。记录实际执行k、所选行和各字段before/after语义；中途终止不伪造下一query。
-
-目前已完成旧入口smoke，仅作加载/产物锚点；新selector/trace代码集成后按同一路径完成必要2rollout（一次video一次no-video）smoke与独立review，固定commit后才能正式跑。这个清单是已授权实验的安排，不是要求当前闭合agent自行开始。RMBench保存两个层级目录及逐步metadata要求不变，50条人工检查偏差>10个百分点并记录，不按成绩丢弃不利run。
-# 目标
-
-# 用户最新数据约束
-
-用户明确新仿真训练数据来自demo_clean_state，demo_clean缺metadata/详细子任务标注。后续新checkpoint来源检查遵循此要求。此要求针对训练/转换数据，并不要求擅自改变旧checkpoint评测的场景task_config；P1仍固定已核实的旧评测协议。
-
-准备统一memory首批实验的RMBench评测入口，先用可用的旧shared full checkpoint验证加载、完成进度与反馈时序。GPU实验owner，为后续新20k训练的100ep评测做好入口和留痕。不要重跑全部历史实验。代码/配置成果交Manager审查后正式跑。
-
-# 工作区/代码边界
-
-用MAM创建RMBench worktree base e31d14fe0818235d471b371924ea30c273e75c7a，按需添加robot-bridge b17f6c53ffbc1030972a9820cf592f28b937d501和openpi 71c80db723a242c61cfe429dd6794e9ece3cbcf1；全部在同任务workspace，用独立环境。先读各库AGENTS.md，特别RMBench代码/实验/rmbench guidelines，robot-bridge conventions。写范围RMBench experiments/memory_chunk_20260910/ 的简洁配置/命令/README，必要诊断修改先报Manager；不改三库模型/scheduler核心（其它agent在做）。不修改主checkout。
-
-# 现有checkpoint与关键问题
-
-full：/mnt/public/xcj/Projects/RMBench/policy/pi05/checkpoints/pi05_full_key_state/shared_memory_full_key_state_seed0/30000，历史93/100。metadata和params已查可读但未实际load。现有重构900实验/manifest可作运行入口来源；实验索引在RMBench/experiments/history_audit_20260909，计划在 /root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md。
-
-先查最少入口，使用已固定代码和旧checkpoint的原协议做1个smoke包含2个rollout（第1有video，第2无video），验证policy加载、RMBench结果格式、视频可读、config/command+commit+上游metadata。确认执行K30时旧full实际消费哪行，是否现有配置可选择第20/第30行，以及日志是否有实际k。不能只看成功率就声称时间对齐。若缺参数/trace，列出具体缺口交runtime owner 9f5a3889-49a6-4f00-af84-096d8042c3bc，不要临时篡改模型输出来冒充配置实验。
-
-# GPU与正式运行
-
-你独占本机GPU0用于此任务，启动前只检查该卡仍可用；本机GPU1留另一集成任务，GPU2..7已有他人工作，wuwen-1八卡留新训练，不使用。JAX明确限制可见GPU及合理显存分配，仿真+policy共用GPU0，不额外占卡。训练不在本任务范围。
-
-正式eval每run100rollouts单GPU串行，禁止拆分。预备比较为K30 row30 vsrow20，基于同checkpoint/初始条件/固定H50和解码；新入口无阻塞review、2rollout smoke产物确认、代码commit干净后由Manager发正式运行通知（不先行擅自跑100）。到50rollout检查偏差>10个百分点是否协议/基础设施问题，不删除不利episode。预计>1小时的进程用mam job add登记本机真实PID/用途，结束记录结果和清理再archive job。
-
-# 产物与交付
-
-Manager验收反馈：83cbec9的README需按用户长期约定改为中文，具体操作直接写命令，不再要求先export RMBENCH_ROOT/BRIDGE_ROOT/OPENPI_ROOT。可以从明确cwd运行并由脚本默认定位同一workspace下的三库，或提供简洁CLI参数；脚本内部变量不受此限制。README不要说“runner会自动记录>10pp gate”，除非已核实实际代码实现；当前人工50rollout检查要写清由实验负责人执行。路径对外报告用共享主RMBench/eval_result的真实保存位置，worktree别名可以附带，但不能误让用户以为成果留在临时workspace。这次只修正文档/必要入口默认值，不重跑相同GPU smoke，不开100；追加commit和report后等新runtime集成。
-
-eval_result统一RMBench/eval_result/memory_chunk_20260910/<run>；smoke也在本实验组但明确smoke名，不进入主表；正式实验接替后清理。不能在robot-bridge/eval_result产物，不造第三个日志根。继承metadata+config，不复制代码。交付可复跑命令/配置、smoke结果和视频路径、是否可运行P1/剩余缺口、环境实测吞吐粗估，写report与commit发布。保持可继续接评测工作；不自行派agent。
+本任务report记录task_revision、workspace、实际三库commit、完成/剩余、job/PID、成果路径、下一检查时机。运行期间可发布report而不结束责任；无需频繁检查训练，用预定评测中点检查即可。不要自行派agent，不创建游离workspace。
