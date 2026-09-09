@@ -75,4 +75,6 @@ task_revision: d606b3740789a1ed496f84d9bd2f462797d1078f
 
 - **其余 live / takeover 项仍待完成复核。** 该增量旨在修复先前的三项 P1：timestamp 过期即冒充实际执行、takeover 后旧 proposal 作为插值锚点、另一 `get_obs` 时间基提前推进 progress。另有 `synchronous_rows + latency_step>0` 在 queue drain 后仍保留 latency、令 H20/K15/latency2 从模型 rows 2..16 而不是 row 0 反馈的问题。这些与新末行 P1 都不随本 F0 terminal 修复自动关闭，均只阻塞完整 live runtime 结论，不阻塞旧 RMBench F0 smoke。
 
-- 打包/部署依赖和真实硬件通信没有在本阶段宣称通过；后续 report 将随新 wire 与 live 增量复核更新。
+- **部署 P1：新 checkpoint 的轻量配置包没有可复现安装路径。** `MemoryContext.from_checkpoint_metadata()` 在检测到 `memory_config` 后必然导入 `openpi_client.memory_config`，但 robot-bridge 的 `pyproject.toml` / `uv.lock` 没有 `openpi-client`，`scripts/deployment/x1pro_master.sh` 只 clone `robot-bridge` 和 `sdk_robot` 并在 sdk_robot venv 中 `pip install -e .`，远端 scheduler 脚本也默认该 venv。因而干净部署对任一新 memory checkpoint 会立即抛出“openpi-client is unavailable”；本审阅 venv 中的 editable 安装只用于 CPU review，不能作为生产依赖。需要提交明确的包版本/安装来源和部署入口，并在干净 sdk_robot 环境实际创建 `MemoryContext` 验证。旧 F0 checkpoint 没有 `memory_config`，不受此项影响。
+
+- 真实硬件通信没有在本阶段宣称通过；后续 report 将随新 wire 与 live 增量复核更新。
