@@ -1,76 +1,65 @@
-参数大小验收更正：Manager只读base params/_METADATA得到3,353,433,872个参数元素，全BF16原始字节约6.71GB（3.35B模型）。先前“6B/约12GB”只是错误的规模估算；不要通过固定文件大小判定保存完整，也不增加任何复制来凑12GB。请核对完整树/shape/dtype与实际恢复，新head的少量参数据实记录。
+# Memory v1：openpi训练、模型与checkpoint集成
 
-保存与metadata继承最终增量为openpi `cc706e37fb5c2190281789affce0095569a781af`（接在3d4fe31之后）；meta/metadata目录完整继承、源根只挑小配置文件，并记录实际数据定位env。此为该保存子任务当前验收HEAD，后续与训练真实接口一起审。
+## 目标与当前范围
 
-## checkpoint-only验收必须覆盖全新进程导入
+在独立openpi以同一memory_config支持full、serial、no-memory、无递推辅助监督；将真实样本、模型条件/loss、BF16保存和仅checkpoint恢复联通。先交可独立review的CPU实现commit，再做本机GPU1的50step实际base训练/保存/恢复smoke。20k正式训练已获用户授权，但本实现任务待Manager验收并发开跑通知；现在不自行开20k。
 
-Manager看到训练草稿在模块级_CONFIGS中调用_pi05_rmbench_memory_config，而TrainConfig.__post_init__会立即读取memory_config_path。因此即使保存的某个checkpoint已内嵌schema，单纯import training.config也可能读取examples里的原YAML。验收不能只在进程内先import再移走源文件：应在不提供训练dataset/sidecar/原YAML的全新进程通过checkpoint恢复。请把仅用于启动新训练的模板读取延后到选择/构造该训练配置时，普通checkpoint加载不应因无关RMBench模板YAML缺失而失败；不要为此增加第二份schema或通用配置框架。已有保存字段约定不变。
+## 工作区、文件归属与依赖
 
-保存/继承metadata最新交付：在489359f之后接入3d4fe31d0efef5e3dd8cdb30a3dc9d9050ecf2c5。此增量仅改checkpoint_metadata及tests，实现command内commit/cwd和上游data/binding metadata继承。
+复用本MAM task现有openpi worktree及独立.venv，读取openpi AGENTS。你负责models、training/config.py/data_loader.py/memory_data.py、transforms、scripts/train.py/compute_norm_stats.py及相应tests。新wire统一字段允许修改policies/policy.py。checkpoint_metadata.py/checkpoints.py/policies/policy_config.py由dc61ef10任务交付，合入其commit，不重复越写集。examples/converter/config YAML归7c8fbc25任务；client core归已验收f252任务，勿再扩公共schema。禁止把他人临时worktree加入PYTHONPATH；跨库测试使用本task登记的明确代码版本和自己的环境。
 
-## 新memory跨库wire契约：必须联通真实train/infer transforms与scheduler
+当前交付版本（相同patch的本地cherry-pick可继续使用，记录实际HEAD）：
+- client core：主库58d6f2155acc3af03017677bb3f536101e6699f4，已独立验收；包含精简API、缺GT availability、clamp边界与row.index范围修复。
+- sim data：481527346573b73958dcd81591fc8473e20feaff→38bf82c1753e6e911e6215a6762cccc2a7bb15bd；serial/no-memory YAML为2c91f9aff8275b42285c93da094302800ec65f4e。metadata生成69ca148后有63319ac收敛修正。数据独立review任务3e78bfec已确认两任务100ep、4500 P2 sample、serial/no-memory真实query的数据层通过。
+- 保存/恢复：489359f8655c0a0af35447caa71f4db702fefabe→3d4fe31d0efef5e3dd8cdb30a3dc9d9050ecf2c5→cc706e37fb5c2190281789affce0095569a781af。最后一项完整继承meta/metadata，修复按名称漏文件问题。
+- 完整独立review owner为9b73b590-f7bf-4f46-b2e4-4fa5882d9db3；runtime owner为9f5a3889-49a6-4f00-af84-096d8042c3bc。两侧wire契约见下文。
 
-Manager发现当前两个实现不匹配：runtime MemoryContext.add_inputs把full编码写入padded state；训练AttachMemoryAfterNormalize只读取memory_input_ids，缺失会回initial。输出MemoryOutputs已把actions裁为robot_dim并给memory_prediction_ids，runtime却仍从actions尾部decode。仅各自CPU mock通过不能批准新模型闭环。
+## 数据与第一批协议
 
-新memory_config路径统一为：
-- policy输入使用机器人原有state/images/prompt，加memory_input_ids，shape(F,)；full和serial都由policy输入transform负责具体编码。scheduler只送当前语义ID，停止自己写dense state offsets。旧无memory_config路径/F0保持原语义。
-- policy输出actions始终为机器人动作；另给memory_prediction_ids，full为(H,F)，serial为(1,F)，已按保存schema的decoder用本query输入memory作previous解码。full继续复用MemoryOutputs现有实现；serial复用实际动作条件化用的key_state_prediction结果，不能在scheduler重新argmax生成另一个当前条件。允许训练owner在src/openpi/policies/policy.py现有diagnostics输出位置为新memory_config加此统一字段；旧diagnostics可保持兼容。schema仍只有TrainConfig.memory_config一份。
-- MemoryContext从统一memory_prediction_ids读取并检查layout/shape/类别范围，然后按既有反馈时刻/row选择维护cache；不再次从已经裁掉memory的机器人actions解码，也不重编码policy输入state。policy无跨query缓存，previous来自请求的memory_input_ids；scheduler拥有反馈时序及context。不新增session/plugin/RPC或第二种wire配置。
-- no-memory字段F=0可用空预测维度或在空field情况下不索取该字段；旧checkpoint不强制需要新字段。
+仿真使用demo_clean_state来源，不能fallback demo_clean。该限制属于实验数据配置，不能硬编码进通用model。首批sim有rearrange的full per-frame/full repeated-endpoint/serial/no-memory，以及put-back两种full；wash两项待正确数据验收，不能阻塞sim。
 
-训练owner负责输入/输出transform与Policy.infer，runtime owner负责MemoryContext及三个scheduler/UI；backend保持现有字典透传。先固定F0 terminal最小commit，再进行此新schema接口增量，避免旧权重评测被后者阻塞。
+恢复数据在/mnt/public/xcj/cache/huggingface/lerobot/<task>_demo_clean_state_shared_memory；sidecar在主openpi/data/memory_v1/rmbench/<repo_id>/。原LeRobot每集M个实际观察query，sidecar是等长M+1的机器人target、memory series和availability；最后一行是已核对的raw最终观察memory，机器人重复converted末动作。query仍只采样0..M-1。无需tail_append框架。
 
-验收必须跨边界：用真实policy input/output transforms和真实MemoryContext，非initial cache经scheduler传入后确实改变pi05 tokenized_prompt；模型原始dense输出经过真实输出transform裁为14维robot actions后，memory_prediction_ids仍到达context并按K30选row30反馈。serial预测ID与实际动作条件selected相同；测试单/多字段和no-memory。可以用小模型/构造原始输出做CPU联通，不能用两个各自mock字典替代这条测试。GPU50step保存加载后再复验实际返回的keys/shape。Reviewer均按此明确契约复核。
+robot_action_target前M行逐值等于converted action[:14]，已经是raw q(t+1)，source=sidecar/action_at_row/offset0，不能再移位。current truth来自target标签/原始事件，不用旧lag20 input列。no-memory绑定只保留robot_action_target，availability={}，不能把完整三字段manifest原样传给空memory。
 
-当前sim数据增量：openpi `38bf82c1753e6e911e6215a6762cccc2a7bb15bd`，前置 `481527346573b73958dcd81591fc8473e20feaff`。该增量实现下文已确定的M+1 sidecar与路径修正，请以实际提交继续集成/审查。
+- H50、K30。full输入训练current reference（首次/缺GT用initial），推理cache；phase per-frame目标t+j+1。full反馈chunk_completed/last_executed。
+- P2两任务另一个full将phase改为全H行重复t+30；其余主动变量完全相同，共用phase mask=(t+j+1<=L)&(t+30<=L)，L为最终有效源索引（上述sidecar中L=M）。例如query M-30的前30个phase目标有效，后20无效；query M-29的phase全部无效但机器人继续监督。机器人和其他字段目标/norm不因本臂改变。
+- serial输入named previous lag30的真实t-30，负索引/缺GT用initial；推理cache；target是当前query t，current_condition为train reference/infer selected，query_selected/query反馈。默认每字段独立argmax，不继承旧phase递增/button特例，不套P2未来mask。
+- 空memory是无记忆基线；aux保留相同字段/head/监督，但train/infer输入initial、无反馈。
+- wash为S2M：当前follow14→下一对齐master14，EE pose+gripper；phase当前子任务且顺序可变。172合格episode全部训练，5个训练episode offline，缺GT字段逐项mask、不丢整个机器人sample。旧all_172_15hz及master_v2有已知S2M/视频pose映射问题，未验收不可训练。
 
-## Sim binding接口收敛（4815273后的Manager裁定）
+## 模型、样本与损失
 
-4815273正确恢复了额外raw最后帧，但新增的manifest.tail_append协议当前训练adapter不支持。不要再实现一套tail_append扩展/解释器。采用既有sidecar绑定：sidecar直接保存等长M+1的series（phase/属性及robot_action_target），机器人前M行逐值拷贝converted action[:14]，第M行重复末动作；availability也M+1。图像/robot state及query仍来自原LeRobot的M行，query范围不变；初末行逐值测试不能省。这里只有低维数组复制，图像和原数据不复制，不会新采样不存在的query。MemoryBindings用source=sidecar指向robot_action_target，semantics=action_at_row、offset0；训练层移除仅允许robot source=column的无必要限制，保留不能绑定observation state与禁止二次移位检查。这样不修改已验收core API，也不新增tail_append schema/第二种补尾配置。
+只复用已支持的categorical/full one-hot/serial token；unsupported类型明确报错，不造新模型族。load_memory_config→ResolvedMemoryConfig，compile_model_spec(model_config或robot_dim/padded_dim)，make_training_sample(EpisodeMemoryData, query_index, rng)。helper给input/target IDs、robot/dense targets、数值mask/reduction weights；具体以已验收API为准，不复制parser/decoder。
 
-适配器里的账号绝对DEFAULT_LEROBOT_ROOT/RMBENCH_DATA_ROOT/ARTIFACT_ROOT删除；源路径由明确参数传入，输出默认路径若需要则从本openpi项目根构造。相对参数按项目根解析。完整实验命令可写本集群绝对路径。路径检查不依赖作者workspace，shared产物写入原openpi的data软链目标。请data owner以独立增量commit更新，training owner沿既有sidecar reader直接使用。
+机器人state/action用同一robot-only norm。one-hot memory使用identity，必须在robot Normalize之后、TokenizePrompt之前追加；不能只在Pad之前加，因为pi05的discrete_state_input=True已经在tokenize时消费state。用真实transform链证明同robot/images/prompt而不同memory会改变tokenized_prompt。训练和推理顺序一致。
 
-# Memory v1：openpi训练模型与checkpoint集成
-# 目标
+实际flow-matching loss为sum(w*e²)/(B*H*D)，D是相同padded action维度。helper权重含mask/reduction但不含memory lambda；仅memory坐标乘一次spec.loss_weight，机器人保持1，padding为0。phase fixed_horizon用公共mask×lambda；其他valid_mean字段为mask×H/max(valid_count,1)×lambda，零有效项0。必须先对逐坐标误差乘数值权重，不能先平均坐标再用phase mask清整行动作。actions与weights成对pad。
 
-# 样本时序验收补充
+缺GT input用initial；target的ID/mask/dense/weight按helper处理，无效dense全0，机器人仍监督。保留输入mask、目标mask和公共validity的区别。真实compute_loss测试覆盖非1 lambda（如0.25）、非单位valid_mean、全invalid、padding和P2两臂相同有效位置；不能只检查helper输出形状。
 
-必须核对已转换LeRobot的action列是否已经表示下一帧关节目标a_t=q(t+1)。若已经移位，不能直接把action列绑定为raw robot_joints并再用offset=1，造成二次移位。应按实际列语义选择key/action时间offset（例如已对齐action用offset0），并用同一个episode/query与旧可靠loader/原始timestamp逐行比较机器人目标；比较P2两臂时这些机器人目标完全一致。memory的current truth也不能从lagged input推断。给绑定列、索引定义和小样本证据，而不是仅凭shape通过。此项是已有数据语义核对，不新增算法。
+## 新memory的训练/部署wire契约
 
-把已经提交的memory_config轻量契约实际接入独立openpi的训练数据/模型/metadata，让同一schema可以训练full、serial、no-memory和辅助监督无递推对照。用户已授权实施及实验，Manager负责审阅合入/正式任务排程。你负责训练代码和短smoke，暂不启动20k正式run。
+新policy输入为原机器人state/images/prompt加memory_input_ids，shape(F,)；scheduler只发语义IDs，full/serial具体编码由policy transform完成。旧checkpoint无memory_config保持既有路径。
 
-# 工作区与边界
+输出actions只含robot动作；另给memory_prediction_ids：full (H,F)，serial (1,F)。full复用MemoryOutputs的schema decoder；serial复用实际动作条件化所用key_state_prediction，不由scheduler再argmax另选一份。previous由本query输入IDs给出，policy不维护跨query任务cache；scheduler按schema事件/row维护context。旧diagnostics可保留兼容。F=0可不要求预测字段或使用空字段维度。
 
-保存/恢复写集已拆出：dc61ef10-53f0-44c2-91cc-c78d1cb6676e负责training/checkpoints.py、checkpoint_metadata.py、policies/policy_config.py及对应tests。你不再改这三文件；继续独占config.py、scripts/train.py、data_loader、memory_data、models/transforms及训练tests。请在TrainConfig增加save_dtype: Literal['bfloat16','float32']|None（默认None，首批配置bfloat16），供checkpoint owner使用。最终20k唯一保存由你配置。当前norm裁定：机器人使用同一shared stats，one-hot memory在Normalize后identity追加，不进入stats。给Manager/保存owner明确resolved memory_config唯一保存位置及加载时所用transforms接口，避免彼此猜schema新入口。普通checkpoint推理不能依赖训练dataset存在，此边界由保存owner保障、你提供不读数据的transform工厂。无需等待保存owner才能先完成实际数据/模型loss CPU检查；最终GPU smoke合入其commit后一次完成。
+MemoryContext只检查预测layout/shape/类别范围并反馈，不从裁掉memory的actions尾部解码，不在state里预写one-hot。输出先decode/剥离identity memory再robot-only Unnormalize。通过实际input/output transforms→真实MemoryContext验证非initial缓存确实进tokenizer，raw dense输出被裁为14维后预测IDs仍按K30消费row30；serial用的条件ID与反馈候选一致。不要用两份各自mock字典冒充联通。
 
-环境恢复裁定：de79新增PyYAML但缺lock更新，独立修复commit为0dc120c（uv.lock两行）。已有登记worktree不反复调用workspace add；在自己树cherry-pick修复后，沿受版本管理scripts/worktree_env/create_worktree_env.sh第268行以后的lock检查、独立uv venv、sync frozen/hardlink、import验证恢复，不复用他人环境。通过后报告证据，Manager修复本task的MAM failed状态记录；不扩展MAM实现。
+## checkpoint、自包含与留痕
 
-用mam workspace add --repo openpi --base de79cce20e54c612634fdc2598b91cc0ab5034ec，读取AGENTS.md。只修改src/openpi、scripts训练/norm/checkpoint相关入口及其tests/训练文档；packages/openpi-client由f252006a-8676-4d10-b6a1-1a791d91c6a6负责，examples/converter由7c8fbc25-6c9b-4529-b63f-da8a5b5e54e2负责，不能重复修改。不要动legacy RMBench/policy/pi05或robot-bridge。后续API修订按明确commit cherrypick到自己的worktree，不能PYTHONPATH挂他人临时树。
+唯一权威字段是TrainConfig.memory_config的resolved mapping；memory_config_path仅新训练入口使用，解析后清空，不再保存model_spec或第二份schema。TrainConfig.create_data_config(*, training:bool)仅构造transforms：普通推理不读训练rows、labels、sidecar或原YAML，norm从checkpoint assets恢复。
 
-# 契约与必须达到的行为
+特别检查模块级_CONFIGS不因初始化无关训练模板而读取原memory YAML。训练模板读取应在选中/构造新训练时发生；checkpoint-only需在全新进程且原YAML/dataset/sidecar不可用的情况下恢复，不能只先import再rename。
 
-Manager发现当前原型的阻塞问题，需优先修复：memory_data._insert_before_padding把AttachMemory放到PadStatesAndActions前，但原ModelTransformFactory的TokenizePrompt在Pad之前。pi05默认discrete_state_input=True会在TokenizePrompt时消费state，因此当前append位置已经太晚，full memory实际不进入状态token，可能把full悄悄变成aux。AttachMemory应位于robot Normalize之后、TokenizePrompt之前；FinalizeMemoryLossWeights仍在pad之后。不要仅测试state数组变长，应在实际data_config transform链上用同一机器人state/图像/prompt、不同memory值验证tokenized_prompt/模型实际消费的状态条件确实不同，且train/infer一致（不需要大模型GPU才能做这项）。保留原有其他transform顺序，不粗暴重排整条链。
+新训练默认配置为单GPU、batch32、20,000次optimizer update；只保留最终模型BF16权重、assets与metadata。save_dtype支持bfloat16/float32/None（默认None，新实验显式bf16），内部FP32参数不改变，save_full_state=False。新run拒绝混写已有目录，不用model-only结果假装可恢复optimizer训练状态。检查scripts/train.py现有循环用零基step保存：新最终目录应反映完成的20,000次更新（50step smoke同理），不要把19999目录误记成训练计数20k或用20,001次更新凑名。
 
-wash转换待修复：Manager发现当前adapter的state/action都取follow_*，与已确认S2M slave状态→master动作不一致，data owner正核对准确旧drawer实现并修复。现有all_172_15hz不可作为已验收训练资产；wash应绑定独立robot_action序列及正确offset，不能以robot_observation_state下一帧代替master action。sim已确认的action14维offset0路径可以先集成/smoke，勿等待wash修复停工。
+base参数形状统计为3,353,433,872个元素，全BF16裸权重约6.71GB。此前6B/12GB估算已更正；按完整参数树/shape/dtype/恢复验收，不以固定文件大小验收。新head据实增加。
 
-wash实际合格172ep，15Hz有13,404行无phase GT。保留机器人样本，不能用unknown/initial做缺标注的phase target监督，不能因H50任一行缺GT就整sample删除。API owner被要求增加EpisodeMemoryData可选availability（series key→bool数组，缺省全true），缺GT输入回退initial、目标逐字段loss0且dense全0；你复用helper权重，不另写一套缺GT采样规则。sim action已确认预移位q→q+1，首批绑定其14维offset0，别再从obs q+1重建末尾动作。数据owner将提供精确episode binding。
+checkpoint_metadata.save保留实际command/cwd/git commit、train config和上游data/sidecar metadata/config；不复制代码、图像或label矩阵。meta/metadata目录完整继承，不按少量文件名丢掉stats/tasks/provenance等。相对路径从项目根；已使用的数据定位env也写在command中，不建重复runtime/provenance系统。
 
-读f252任务已发布task/report及实际openpi_client.memory_config代码。load_memory_config -> ResolvedMemoryConfig，make_training_sample(EpisodeMemoryData, query_index, rng) -> ordered input/target IDs、dense_actions、逐坐标action_loss_mask/action_loss_weights；compile_model_spec(model_config)给编码/decoder/Pi0 kwargs。API owner正在精简内部及修复重复YAML key/invalid dense零向量；公开接口大体保持，准确以修订commit为准。你不重写parser/one-hot切片。
+## 验收、资源与交付
 
-1. TrainConfig可配置YAML/path，运行时解析一次；数据adapter绑定series/constants/events，不从目录名推断任务或phase语义。RMBench这批使用demo_clean_state源、明确metadata，不把这项实验来源限制硬编码到通用train/model。wash-cup真机同入口。全部相对路径按openpi项目根解析。
-2. token新schema默认每字段独立argmax。必须避开现有_select_key_state默认第0字段递增/3字段button特例，新config仅按显式decoder_rules选类；历史checkpoint没memory_config保留既有行为。full/serial词表顺序一致。序列化head schema、条件路径和推理入口必须一致，不能训练了新头但保存后loader走另一模板。
-3. P2两臂full H50/K30：phase(t+j+1) vs重复phase(t+30)，公共逐坐标mask由两时刻均有效决定；phase固定H分母，不按valid-count重新归约。robot目标/其余字段不受phase mask影响。masked目标数值全0仍需要loss mask，不能只改target。逐坐标weight应在flow-matching误差按维度归约前应用一次，不能bool化抹去H/valid_count权重。loss中的模型padding、坐标平均和memory lambda写清并固定，不重复乘lambda。用真实compute_loss的测试验证invalid phase梯度/机器人权重、全invalid末尾、两臂同有效位置。
-4. no memory=空字段；辅助监督控制仍有字段/head/loss，但train/infer输入均initial、无递推消费。复用现有模型类，不增加aux专用架构。新schema表示仅categorical joint_dense one_hot/serial token，未实现类型显式拒绝。
-5. 规范化使用现有pipeline/norm stats，memory编码和反归一化的先后与部署一致。新memory是否参与norm必须明确，不能把机器人14维norm广播到memory。首批两臂机器人norm/fields完全相同。转换数据不需因目标时刻不同重转视频；从当前真实标签生成目标/lag，勿将旧lagged输入当当前truth。
-6. checkpoint已有train_config/metadata中嵌入resolved memory_config一次，不另保存重复model_spec。checkpoint仅给路径应能恢复模型、memory fields/协议、norm；不能依赖临时worktree或原YAML路径仍存在，不要求推理加载训练labels/data。
-7. 新训练单卡batch32、20k，只保留最终20k模型BF16权重约12GB与必要metadata，不保存优化器/ema/多步checkpoint。核对JAX/Orbax实际保存/恢复，只在缺少现有参数时增加一个保存dtype选项；BF16计算不等于参数已BF16。不能用full-state训练状态包冒充model-only。正式run唯一目录，已存在拒绝混写或明确resume，但不为历史错误写兼容。
+先CPU阶段固定commit送review，可与后续GPU smoke并行。适用旧tests及上述真实条件/loss/自包含联通检查通过后，在本机GPU1跑实际base的50step训练、保存、仅checkpoint恢复，并核对返回wire keys/shapes。base在/mnt/public/cache/openpi/openpi-assets/checkpoints/pi05_base。先检查GPU1实际显存；只占GPU1，本机GPU0跑F0，远端八卡留正式单卡训练。未核验路径不要填卡凑数。
 
-# 验证/资源/交付
-
-独立core review已确认两个consumer契约：当前helper的action_loss_weights含validity/reduction，但不含memory lambda；MemoryModelSpec.loss_weight单独给出，所以训练consumer应只在memory坐标乘一次lambda，机器人保持1。不要既helper后乘一次又Pi0 loss再乘一次。未提供padded维度时sample可返回未补齐的实际宽度，模型spec另有padded_dim；接入模型前actions和数值weights须成对补齐，padding weights=0。真实compute_loss测试必须覆盖非1的lambda（如0.25）、非单位valid_mean权重以及padding/全invalid样本，别用默认1掩盖缺乘/重复乘问题。core自身的全true availability+clamp和row.index越界两个问题正在小修，P2全标签公共mask结果已通过独立CPU样本检查。
-
-Manager已经把P2确切标量loss公式固定到 /root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md 第6节：L_dense=sum(w*逐坐标FM误差平方)/(B*H*D)，D为相同padded维度；phase权重公共mask×lambda一次、padding0、机器人clamp保持1。其他字段若valid_mean用mask×H/max(valid_count,1)。helper产生的action_loss_weights必须在坐标归约前数值乘法应用。旧MEMORY_CONFIG统一valid-mean表述已由Manager修正；以新实验公式/配置为准。不能为了复用旧分支在masked phase时将整行robot loss清零。
-
-先给代码量预估；优先复用既有transform/model/metadata。CPU针对无memory、单字段wash、多字段drawer/rearrange、动态phase顺序、mask/loss、metadata roundtrip；适用旧tests通过。你可独占本机GPU1进行短训练/保存加载smoke（先核对该卡实际空闲，只设置CUDA_VISIBLE_DEVICES=1且不占他卡）。base由资产任务恢复到/mnt/public/cache/openpi/openpi-assets/checkpoints/pi05_base，data路径由Manager同步，不用随机参数smoke冒充base加载通过。完整50步train smoke+最终BF16保存/只checkpoint恢复测试有资产后开展，缺资产时CPU工作继续。只有短smoke授权，20k另行派发。
-
-保存需要的检查结果和大小/张量dtype/模型输出对齐证据；代码固定commit后给Manager准备独立review。报告task_revision/workspace/commit、测试、未完成与可复跑命令，发布；自己清理smoke/临时文件，不动正式资产或共享环境。预计>1小时程序登记mam job；不自行派agent。
+报告当前commit、task_revision、workspace、CPU/GPU实际命令/结果/产物及剩余项/耗时预估。先发布CPU交付，不必等整个GPU链路才送review。GPU1释放时通知Manager以便F0并行。自己清理被正式实验替代的smoke和临时文件；长于1小时的进程登记MAM job。不自行派agent。
