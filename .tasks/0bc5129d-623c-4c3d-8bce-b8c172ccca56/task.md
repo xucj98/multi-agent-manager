@@ -1,3 +1,7 @@
+## 已提交的完整runtime增量
+
+作者已交付robot-bridge fd38513adb5ba171327358f70f55f88059de49d2（含22a5c6c/bb908c6前置），请在本任务独立分支合入并完成上述全范围review；openpi helper使用主库58d6f2155acc3af03017677bb3f536101e6699f4的等价API。作者报告445 passed/1skipped不是独立验收结论。F0是旧full固定权重评测的直接阻塞：先给selector/legacy/progress部分是否阻塞的明确结论，剩余新schema路径继续检查。报告实现与测试的代码规模，以及必要性/重复逻辑方面的实质问题，不为凑行数删必要验证。
+
 # Memory runtime独立review：执行进度、反馈时刻与takeover
 
 ## 范围与工作区
