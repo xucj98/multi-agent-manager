@@ -1,11 +1,33 @@
-task_revision: 4a77a277172b37fdc983e69fda61760e25f1942e
+task_revision: 8fe3dd5e1f2848b5339ae1d75346fe139b3e61e2
 # 只读实验设计与文献评议
 
-完成与未完成：完成了方案、历史证据边界和原始文献核查；未写代码、未建环境、未运行训练/评测/GPU，也没有访问 `wuwen-11`。建议先以 P1 的时序审计和 P2 的两臂对照收敛，再决定是否确认 P3。
+完成与未完成：完成了方案、历史证据边界、原始文献核查及 Manager 初版计划的只读审阅；未写代码、未建环境、未运行训练/评测/GPU，也没有访问 `wuwen-11`。建议先以 P1 的时序审计和 P2 的两臂对照收敛，再决定是否确认 P3。
 
 workspace、各库交付 commit：登记 workspace 为 `/mnt/public/xcj/Projects/workspace/ec247b10-20cb-41c4-b2e0-f62d3c901148`；本任务没有业务库、worktree 或代码 commit。唯一交付为本报告。
 
-验证结果与成果位置：已只读核对论文的 `ROADMAP.zh-CN.md`、`docs/MEMORY_DESIGN_FRAMEWORK.zh-CN.md`、`docs/MEMORY_CONFIG.zh-CN.md`，以及 `/mnt/public/xcj/Projects/RMBench/experiments/history_audit_20260909/` 的索引、token 和 shared-timing 审计；报告路径为本文件。外部来源见“文献核查”。
+验证结果与成果位置：已只读核对论文的 `ROADMAP.zh-CN.md`、`docs/MEMORY_DESIGN_FRAMEWORK.zh-CN.md`、`docs/MEMORY_CONFIG.zh-CN.md`、`docs/EXPERIMENT_PLAN_20260910.zh-CN.md`，以及 `/mnt/public/xcj/Projects/RMBench/experiments/history_audit_20260909/` 的索引、token 和 shared-timing 审计；报告路径为本文件。外部来源见“文献核查”。
+
+## 对 Manager 初版计划的具体修改建议（2026-09-10）
+
+审阅对象为 [实验计划](</root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md:1>)；以下建议用于直接修订该文件，不另起平行计划。
+
+短评：矩阵可执行，且 B/T/F 的复用计数没有训练重复；开跑前必须把 P2 的 B 基线和逐坐标 mask 固定下来。72 训练应作为带闸门的总上限，D150 只能按实测 eval 吞吐释放。这里的补审优先于本报告中较早的独立排期建议，旧内容保留为审阅来由。
+
+1. **给 Q1–Q3 排序并收紧可写结论。** [§1](</root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md:13>) 应明确 Q2 是主问题，Q1 是部署规则诊断，Q3 是条件性内容×K 筛查。Q1 固定 K 时改行会同时改 h 与 d，只能得到“选行规则的整体效应”，不能写成 state-age 的独立因果；它也不能扩写为“为什么 action chunk 有效”。Q2 仅在 rearrange 和 put-back 的三 train seeds 都有同向、可解释的结果时升级为跨任务规律。Q3 的 c0 对照改变标签熵、监督难度和 action condition，只能称有意义字段学习设计的交互，不能称纯内容或纯 memory-off 效应。
+
+2. **把 P2 的复用基线冻结为显式配置。** [§4 的两个 full per-frame 槽位](</root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md:48>) 和 [§5 的 B/T](</root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md:67>) 应命名为 `full-per-frame-p2mask`（仅 rearrange、put-back），并写明它是新的受控基线，不能与历史 full 当严格复现混称。该 checkpoint 可以复用给 F；但 swap/cover/battery 不必被迫改成这个 P2 专用 phase mask。
+
+3. **将 P2 mask 写成可验收的损失定义。** [§6 T](</root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md:86>) 增加 `phase_valid[t,j]=1[t+j+1≤L]·1[t+30≤L]`，其中 L 是转换后该 episode 最后一个可引用的 phase 时刻。两臂都对 phase 的全部坐标乘这个 mask，按 `Σ_j phase_valid·loss_j / H` 归约；零 target 本身绝不能代替 loss mask。保存每样本有效行数 m/H、phase 标签/边界计数和 mask 版本到 metadata，并以单元测试核对两臂相同 t 的 mask 完全一致。
+
+4. **保留固定 H 分母，但准确说明它控制了什么。** 这个公共 mask 加固定 H 分母确实防止尾部时两臂拥有不同的有效位置数或 phase-loss 尺度；它不消除重复终点造成的标签重复、类别频率、边界权重和梯度差异。这些是 T 的有意处理效应，结果只能归因给“目标构造”，不能提前归因给预测难度或某一梯度机制。机器人 tail、其他字段 target/loss、normalization、样本起点和 action condition 必须逐项保持不变；特别检查 full action path 没有从改写后的 phase target 隐式取得 teacher-forcing 条件。
+
+5. **修改 U 的命名和结论。** [§1/§6 U](</root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md:17>) 的 initial-input 方案是合理的“辅助状态监督、无动态记忆输入”对照：它与 no-memory 可检验 state head/loss 的额外价值。它同时改变 I 的训练分布，不能单独识别 cache U 的反馈效应；将标题从“递推与辅助监督”改为这个更窄的含义。若论文需要“feedback 本身有效”的主张，应从 B 的空余扩展名额中保留一个明确的 cache 干预，而不是把 U 的差值过度解释。
+
+6. **把 72 训练改为上限式分层，而非无条件基础承诺。** [B 的 45 项](</root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md:67>) 先只完成 rearrange/put-back 的 18 项；加 T6、U6、C3、R12 后是 45 项的可裁决主链。swap/cover/battery 的 B27 项应在 Q1/Q2 信号通过后入队，或其中 6 项改作 P2 命中后的“仅第30行状态 loss、总权重相同”定位对照（2 任务×3 seed）。这样仍保留 72 的硬上限，却不会在主问题尚未成立时扩展成跨任务排序。
+
+7. **拆开评测计数并给 D 加容量闸门。** [§5 的标题和合计](</root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md:61>) 应写为：96 个核心仿真 100ep run（B45+T6+U6+C9+F30）＋12 个 5ep offline 回放；D 另为最多 150 个可选仿真/诊断 job。F 的 30 和 C 的 9 都是正确的复用计数，但应在表下注明，避免被误读成漏算。两张 eval 卡两周仅有 672 GPUh：按计划的 2–4 GPUh/run，246 个仿真 run 要 492–984 GPUh，后者超过 eval lane。首个有效 100ep run 测得耗时后，令 D 的可排数为剩余 eval-GPUh/实测均值；否则须明确释放 wuwen-1 的空闲训练卡给 eval，不能把 D150 当承诺。
+
+8. **在首批的说明里标出证据状态。** [首批八项](</root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md:42>) 只包含 P2 的两个任务 seed0 筛查，并未测试 c0 或 U，也还没有三 seed 复现；应写成“接口验证＋筛查”，不写成已足以裁决三个问题。首批 full per-frame 同时必须使用上面的 P2 mask，避免稍后为 T 重训所谓可复用基线。
 
 ## 结论与证据边界
 
