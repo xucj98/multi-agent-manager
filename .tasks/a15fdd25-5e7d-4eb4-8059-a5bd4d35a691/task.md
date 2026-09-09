@@ -1,3 +1,9 @@
+## 恢复执行：F0明确接口与资源裁定
+
+runtime commit已到：robot-bridge fd38513adb5ba171327358f70f55f88059de49d2。使用你本task bridge独立分支合入此commit；openpi可合主库58d6f2155acc3af03017677bb3f536101e6699f4并使用自己的editable环境。接口为OpenPISimulationScheduler.params.legacy_full_feedback_selector，支持{kind: index, value: 0|19|29|49}和{kind: last_executed}。F0保留旧checkpoint原字段/归一化/模型，不强行将其转为新memory_config；该显式selector仅控制旧full反馈行。准备四个固定K30/H50配置和诊断，先row30。独立runtime reviewer正在复核，收到Manager确认F0无阻塞后才运行新入口的一个2rollout smoke，检查一次video/一次no-video和metadata；通过后提交完整正式配置再启动100仍等Manager通知。
+
+资源以本条为准：当前仅分配本机GPU0，GPU1留训练50step smoke，远端训练预留。四个F0可在GPU0依次执行，不因等待第二卡停工。开跑前检查GPU0显存。原文同时GPU0/1安排失效。回复准备就绪commit、smoke实际命令、报告需要的runtime阻塞；不重建已有worktree，不新建任务。
+
 # Memory实验：评测入口、旧full时序锚点与开跑准备
 
 ## 下一阶段清单（等待Manager恢复agent并发开跑通知）
