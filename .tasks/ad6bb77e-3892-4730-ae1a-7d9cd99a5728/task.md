@@ -33,6 +33,8 @@ wash实际合格172ep，15Hz有13,404行无phase GT。保留机器人样本，�
 
 # 验证/资源/交付
 
+独立core review已确认两个consumer契约：当前helper的action_loss_weights含validity/reduction，但不含memory lambda；MemoryModelSpec.loss_weight单独给出，所以训练consumer应只在memory坐标乘一次lambda，机器人保持1。不要既helper后乘一次又Pi0 loss再乘一次。未提供padded维度时sample可返回未补齐的实际宽度，模型spec另有padded_dim；接入模型前actions和数值weights须成对补齐，padding weights=0。真实compute_loss测试必须覆盖非1的lambda（如0.25）、非单位valid_mean权重以及padding/全invalid样本，别用默认1掩盖缺乘/重复乘问题。core自身的全true availability+clamp和row.index越界两个问题正在小修，P2全标签公共mask结果已通过独立CPU样本检查。
+
 Manager已经把P2确切标量loss公式固定到 /root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN_20260910.zh-CN.md 第6节：L_dense=sum(w*逐坐标FM误差平方)/(B*H*D)，D为相同padded维度；phase权重公共mask×lambda一次、padding0、机器人clamp保持1。其他字段若valid_mean用mask×H/max(valid_count,1)。helper产生的action_loss_weights必须在坐标归约前数值乘法应用。旧MEMORY_CONFIG统一valid-mean表述已由Manager修正；以新实验公式/配置为准。不能为了复用旧分支在masked phase时将整行robot loss清零。
 
 先给代码量预估；优先复用既有transform/model/metadata。CPU针对无memory、单字段wash、多字段drawer/rearrange、动态phase顺序、mask/loss、metadata roundtrip；适用旧tests通过。你可独占本机GPU1进行短训练/保存加载smoke（先核对该卡实际空闲，只设置CUDA_VISIBLE_DEVICES=1且不占他卡）。base由资产任务恢复到/mnt/public/cache/openpi/openpi-assets/checkpoints/pi05_base，data路径由Manager同步，不用随机参数smoke冒充base加载通过。完整50步train smoke+最终BF16保存/只checkpoint恢复测试有资产后开展，缺资产时CPU工作继续。只有短smoke授权，20k另行派发。
