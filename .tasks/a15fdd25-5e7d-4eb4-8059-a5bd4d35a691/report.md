@@ -4,7 +4,7 @@ task_revision: 03e23da22e39a090cb44d1f5956492560d6231a6
 
 Manager已验收row30/GPU0 smoke，并一并授权F0四个run预算及同GPU后续各row的“匹配smoke→正式100”。已立即按冻结入口启动row30/GPU0正式100，登记真实host/PID的MAM job；真实服务metadata握手、原完整smoke兼容门禁与首条episode检查均完成。正式进程继续运行，尚未达到50条或100条，不归档活跃job。
 
-截至2026-09-10 06:59:21 +08:00，已完成1/100、成功0/1。首条是任务失败button_press_insufficient，没有运行错误，未更换协议、seed或删除episode。GPU1尚未获准、未使用；后续同GPU各row匹配smoke验收后可直接正式100，无需再次等待用户许可。
+本轮恢复检查时间为2026-09-10 07:29:09 +08:00：已完成19/100，第20条（episode_id=19）正在运行，19个已完成scheduler均returncode0。不到50条，本轮只检查完成计数、耗时和进程，不汇总成功率或重新检查成绩。runner/robot/policy正常存活，进程未干预，源码/文档未修改。GPU1尚未获准、未使用；后续同GPU各row匹配smoke验收后可直接正式100，无需再次等待用户许可。
 
 冻结workspace与实际代码：
 
@@ -41,7 +41,7 @@ mam job add a15fdd25-5e7d-4eb4-8059-a5bd4d35a691 --note 'F0 row30 H50 K30 正式
 
 正式run：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_100ep_seed0/
 
-首条检查记录：上述目录progress_check_0001.json。config.yaml、command.txt、checkpoint_metadata/、processes.jsonl、episode_diagnostics.jsonl、video_checks.jsonl和各进程日志均已产生。eval_result是共享主RMBench真实位置，不依赖临时worktree保存。
+本轮进度/吞吐记录：上述目录progress_check_20260910_072909.json。首条检查记录progress_check_0001.json继续保留。config.yaml、command.txt、checkpoint_metadata/、processes.jsonl、episode_diagnostics.jsonl、video_checks.jsonl和各进程日志均已产生。eval_result是共享主RMBench真实位置，不依赖临时worktree保存。
 
 门禁引用的已验收smoke：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_smoke_20260910/。该smoke为1/2、video700帧/另一条无video，38个query检查通过；不以smoke成功率推断正式结果。唯一证据及活跃正式run的smoke依赖仍保留。
 
@@ -67,7 +67,9 @@ mam job add a15fdd25-5e7d-4eb4-8059-a5bd4d35a691 --note 'F0 row30 H50 K30 正式
 
 中点预计时机与后续责任：
 
-下一次进度检查计划为2026-09-10 07:30 +08:00，按正式已完成条数与最近耗时重新估算。第50条暂估08:00—08:30 +08:00。此范围是初步估计：首条含启动与video约5分钟；前5条录video；既有smoke的no-video episode连同reset约85秒。不能将首条冷启动耗时直接外推100条，也不能承诺上述时间即完成中点。
+07:30检查点已在07:29完成。本轮取最近10个无视频episode（episode_id 9—18）的完成时间间隔，包含reset/preflight与实际执行：85/95/84/84/86/82/82/84/86/80秒，平均84.8秒、中位84秒，约42.45条/小时。最近完成时间07:28:18；按剩余31条外推，第50条中心估计08:12:06，更新检查窗口为08:10—08:20 +08:00。
+
+下一次进度检查计划为2026-09-10 08:00 +08:00，先按实际计数修正中点时间，到50条再进行结果/偏差检查。该预测用最近稳定周期替代首条冷启动外推，仍受episode长度和reset耗时变化影响，不是完成时刻承诺。GPU0本次快照为37222 MiB/2%，三个服务进程存活，episode19已于07:29:04进入scheduler loop；没有停止、重启或修改运行。三库HEAD仍为上述冻结版本且均干净。本轮未检查训练进度或GPU1。
 
 达到50条时由实验负责人对历史93/100主基线检查绝对偏差是否超过10个百分点，同seed前50只作辅助；调查协议/基础设施和失败原因，区分反馈行实验效应与运行错误，不为接近93而改配置或丢弃不利episode。人工检查结论写run目录和本report。
 
