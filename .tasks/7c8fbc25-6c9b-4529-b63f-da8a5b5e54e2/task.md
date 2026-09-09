@@ -5,6 +5,8 @@
 
 用户明确指定RMBench训练/转换只用demo_clean_state；demo_clean没有metadata及详细子任务划分，不允许用作fallback。wash-cup原始数据不受此命名约束。已转换仿真数据须沿metadata确认来自demo_clean_state，并核实所需真值/事件完整；来源不明先不训练，不从评测rollout重建标注。
 
+资产owner已定位旧converted源：/mnt/public3/xcj/cache/huggingface/lerobot/{rearrange_blocks,put_back_block}_demo_clean_state_shared_memory，分别50ep/20103frames、50ep/17588frames，正恢复到本集群/mnt/public/xcj/cache/huggingface/lerobot/同名目录。包含action、observation.state、key_state_input/target/mask、index/timestamp；rearrange还有key_state_guard_offset，meta/rmbench保留转换与source/key-state metadata。尚需你检查是否足够绑定series/constants/events和P2当前真值（不能将lagged input误作当前truth），若原始详细边界缺失则精确列出所需raw文件让Manager安排恢复。不要依靠目录名自行宣布来源已核验，也不要为了框架接口重转全部图像。此事与wash-cup转换可并行。
+
 # 已确定共享接口（API owner的先行契约）
 
 openpi-client模块为 openpi_client.memory_config，load_memory_config(path_or_mapping) -> ResolvedMemoryConfig；to_dict()为metadata.memory_config。训练入口 make_training_sample(EpisodeMemoryData(series, constants, events, tail=None), query_index, rng) 返回input_ids/target_ids/逐行target_mask、robot目标索引/有效位和lag_draws；字段顺序为memory列表。model_spec()提供representation、词表/initial IDs、dense offsets或token sizes、loss和显式decoder/反馈。validate_model_dimensions(robot_dim, padded_dim)检查已有模型维度。具体可调用属性以owner首个commit为准，先通过该helper复用契约，不复制parser。
