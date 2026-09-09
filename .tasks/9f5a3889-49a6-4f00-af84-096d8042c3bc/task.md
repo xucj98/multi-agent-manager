@@ -1,3 +1,12 @@
+## 独立review裁定：真机完成进度必须修正
+
+Pascal起始审查在0bc5129d-623c-4c3d-8bce-b8c172ccca56/report.md给出三个P1复现，Manager确认其是新memory反馈的真实阻塞，不能用445 tests通过覆盖掉：
+1. tracker按入队timestamp越过观察时间计completed，但x1/x1pro执行线程未实际发送也会completed=1（合法单行chunk可发送0次）。完成证据需对应实际执行线程处理及本chunk/行映射，不能以时间到期冒充执行。
+2. clear_actions的cut只按timestamp筛除，滞后worker可能保留未执行旧proposal作为下一插值anchor。保留已验证控制循环与通信方式，最小修正清除语义，不能接管后继续执行尚未处理的旧proposal；不要大改控制频率/插值算法。
+3. tracker.observe是全局累进值，无图get_obs可先推进计数，较旧图像对齐get_obs随后也返回已推进进度。反馈证据必须绑定本次返回观察的时间基，不能被UI或其他请求提前消费。
+
+请复现并给最小修复commit及实际线程/队列测试。若涉及真实硬件行为仍不能证明，用精确未验证边界报告，不宣称硬件通过。mock/sim的同步take_action计数可以独立验收，故本修复不要阻塞已提交F0仿真路径的独立review/smoke。完整scheduler commit fd38513已交Pascal继续审；新修复请单独commit便于追踪。完成或部分进度直接写report并发布。
+
 # Memory v1：真机仿真offline统一反馈
 
 ## 环境恢复裁定
