@@ -1,3 +1,7 @@
+## metadata文件的收敛约定
+
+command.txt本身包含实际命令、cwd和git commit（可用注释头），不另新增git_commit.txt或runtime信息副本。数据生成只保留本次实际使用的data/binding配置及上游metadata；不要把目录里所有候选训练memory YAML都复制进转换metadata。目标时序/decoder等完整memory配置由训练最终TrainConfig.memory_config权威保存，不让数据准备阶段看似选择了多种训练协议。69ca148中的configs/*.yaml批量拷贝应删除；未被正式训练使用的预备metadata可清理后真实重生成，保留准确新命令。
+
 ## 留痕补齐（现有验收要求）
 
 Manager已查新sim sidecar目录只有episode_memory/binding_manifest，未保留command.txt及上游metadata。请在生成产物旁的metadata保存实际生成命令及本次git commit、使用的binding/config、沿既有数据链继承转换/source metadata；只复制metadata/config，不复制代码或dataset/videos/标签矩阵。代码和正式生成命令先固定，重新生成这份小sidecar以留下真实记录（不能事后编造不存在的原始command）。新的wash正确转换同样遵守。使用项目现有布局和简单复制，不新增provenance体系/重复runtime。checkpoint owner已被安排在保存时继承这份metadata；它沿sidecar_path父目录的metadata发现即可，保持训练与RMBench不耦合。
