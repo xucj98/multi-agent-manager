@@ -1,3 +1,9 @@
+## 3d4fe31后的必要修正：完整复制metadata目录
+
+当前_copy_metadata对meta/metadata内部仍按文件名白名单过滤，实际会遗漏stats.json、tasks.jsonl、episodes_stats.jsonl、provenance.json、scene_info.json、robot_edge_comparison.json等。这违背用户每步保留前序metadata的要求。请按目录边界复制：明确meta/metadata目录内部的metadata/config全部保留（目录布局保留）；源根目录仅挑command/config/binding等小文件，不能把root的episode_memory.json、Parquet、视频或源码拷入。不要靠列出越来越多metadata文件名解决；已有数据meta目录内的合法JSON/JSONL不应被按名称丢弃。保留不复制代码/媒体/逐行训练data的要求，用真实目录职责区分。
+
+新增CPU验收以未知名称的meta JSON/JSONL（例如trace_manifest之外的provenance、stats、tasks、scene_info）确认逐字保留，并继续确认root labels/video/code不进checkpoint；这应是简短删减/收敛，不新增框架。command还需保留实际使用的非秘密数据定位环境开关（若进程设有HF_LEROBOT_HOME/HF_HOME/OPENPI_DATA_HOME），否则命令可能在不同cache读到不同dataset；只记录这些已知影响运行的配置，不dump环境。小增量提交后立即报告，原B1/B2仍由训练owner解决。
+
 ## metadata文件的收敛约定
 
 command.txt本身包含实际命令、cwd和git commit（可用注释头），不另新增git_commit.txt或runtime信息副本。数据生成只保留本次实际使用的data/binding配置及上游metadata；不要把目录里所有候选训练memory YAML都复制进转换metadata。目标时序/decoder等完整memory配置由训练最终TrainConfig.memory_config权威保存，不让数据准备阶段看似选择了多种训练协议。69ca148中的configs/*.yaml批量拷贝应删除；未被正式训练使用的预备metadata可清理后真实重生成，保留准确新命令。
