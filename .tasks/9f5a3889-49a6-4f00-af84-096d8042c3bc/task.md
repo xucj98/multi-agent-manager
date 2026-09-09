@@ -1,3 +1,7 @@
+## F0额外小修：terminal不再调用policy
+
+Eval owner在RMBench commit9e8fccbd2fa004f18a3cbcc301e7387b02edaccf报告：terminal观测的trace写next_query=false，但基类循环仍实际infer后才跳过action。请在OpenPISimulationScheduler现有边界最小修正terminal时跳过真正policy调用，保留SchedulerBase/真机循环；定向测试同时计policy.infer调用数和trace。请作为独立小commit先交F0review，不必等live三个P1一起交付。
+
 ## 独立review裁定：真机完成进度必须修正
 
 Pascal起始审查在0bc5129d-623c-4c3d-8bce-b8c172ccca56/report.md给出三个P1复现，Manager确认其是新memory反馈的真实阻塞，不能用445 tests通过覆盖掉：
