@@ -1,0 +1,26 @@
+# Memory v1：openpi训练模型与checkpoint集成
+# 目标
+
+把已经提交的memory_config轻量契约实际接入独立openpi的训练数据/模型/metadata，让同一schema可以训练full、serial、no-memory和辅助监督无递推对照。用户已授权实施及实验，Manager负责审阅合入/正式任务排程。你负责训练代码和短smoke，暂不启动20k正式run。
+
+# 工作区与边界
+
+用mam workspace add --repo openpi --base de79cce20e54c612634fdc2598b91cc0ab5034ec，读取AGENTS.md。只修改src/openpi、scripts训练/norm/checkpoint相关入口及其tests/训练文档；packages/openpi-client由f252006a-8676-4d10-b6a1-1a791d91c6a6负责，examples/converter由7c8fbc25-6c9b-4529-b63f-da8a5b5e54e2负责，不能重复修改。不要动legacy RMBench/policy/pi05或robot-bridge。后续API修订按明确commit cherrypick到自己的worktree，不能PYTHONPATH挂他人临时树。
+
+# 契约与必须达到的行为
+
+读f252任务已发布task/report及实际openpi_client.memory_config代码。load_memory_config -> ResolvedMemoryConfig，make_training_sample(EpisodeMemoryData, query_index, rng) -> ordered input/target IDs、dense_actions、逐坐标action_loss_mask/action_loss_weights；compile_model_spec(model_config)给编码/decoder/Pi0 kwargs。API owner正在精简内部及修复重复YAML key/invalid dense零向量；公开接口大体保持，准确以修订commit为准。你不重写parser/one-hot切片。
+
+1. TrainConfig可配置YAML/path，运行时解析一次；数据adapter绑定series/constants/events，不从目录名推断任务或phase语义。RMBench这批使用demo_clean_state源、明确metadata，不把这项实验来源限制硬编码到通用train/model。wash-cup真机同入口。全部相对路径按openpi项目根解析。
+2. token新schema默认每字段独立argmax。必须避开现有_select_key_state默认第0字段递增/3字段button特例，新config仅按显式decoder_rules选类；历史checkpoint没memory_config保留既有行为。full/serial词表顺序一致。序列化head schema、条件路径和推理入口必须一致，不能训练了新头但保存后loader走另一模板。
+3. P2两臂full H50/K30：phase(t+j+1) vs重复phase(t+30)，公共逐坐标mask由两时刻均有效决定；phase固定H分母，不按valid-count重新归约。robot目标/其余字段不受phase mask影响。masked目标数值全0仍需要loss mask，不能只改target。逐坐标weight应在flow-matching误差按维度归约前应用一次，不能bool化抹去H/valid_count权重。loss中的模型padding、坐标平均和memory lambda写清并固定，不重复乘lambda。用真实compute_loss的测试验证invalid phase梯度/机器人权重、全invalid末尾、两臂同有效位置。
+4. no memory=空字段；辅助监督控制仍有字段/head/loss，但train/infer输入均initial、无递推消费。复用现有模型类，不增加aux专用架构。新schema表示仅categorical joint_dense one_hot/serial token，未实现类型显式拒绝。
+5. 规范化使用现有pipeline/norm stats，memory编码和反归一化的先后与部署一致。新memory是否参与norm必须明确，不能把机器人14维norm广播到memory。首批两臂机器人norm/fields完全相同。转换数据不需因目标时刻不同重转视频；从当前真实标签生成目标/lag，勿将旧lagged输入当当前truth。
+6. checkpoint已有train_config/metadata中嵌入resolved memory_config一次，不另保存重复model_spec。checkpoint仅给路径应能恢复模型、memory fields/协议、norm；不能依赖临时worktree或原YAML路径仍存在，不要求推理加载训练labels/data。
+7. 新训练单卡batch32、20k，只保留最终20k模型BF16权重约12GB与必要metadata，不保存优化器/ema/多步checkpoint。核对JAX/Orbax实际保存/恢复，只在缺少现有参数时增加一个保存dtype选项；BF16计算不等于参数已BF16。不能用full-state训练状态包冒充model-only。正式run唯一目录，已存在拒绝混写或明确resume，但不为历史错误写兼容。
+
+# 验证/资源/交付
+
+先给代码量预估；优先复用既有transform/model/metadata。CPU针对无memory、单字段wash、多字段drawer/rearrange、动态phase顺序、mask/loss、metadata roundtrip；适用旧tests通过。你可独占本机GPU1进行短训练/保存加载smoke（先核对该卡实际空闲，只设置CUDA_VISIBLE_DEVICES=1且不占他卡）。base由资产任务恢复到/mnt/public/cache/openpi/openpi-assets/checkpoints/pi05_base，data路径由Manager同步，不用随机参数smoke冒充base加载通过。完整50步train smoke+最终BF16保存/只checkpoint恢复测试有资产后开展，缺资产时CPU工作继续。只有短smoke授权，20k另行派发。
+
+保存需要的检查结果和大小/张量dtype/模型输出对齐证据；代码固定commit后给Manager准备独立review。报告task_revision/workspace/commit、测试、未完成与可复跑命令，发布；自己清理smoke/临时文件，不动正式资产或共享环境。预计>1小时程序登记mam job；不自行派agent。
