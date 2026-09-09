@@ -25,4 +25,6 @@ full：/mnt/public/xcj/Projects/RMBench/policy/pi05/checkpoints/pi05_full_key_st
 
 # 产物与交付
 
+Manager验收反馈：83cbec9的README需按用户长期约定改为中文，具体操作直接写命令，不再要求先export RMBENCH_ROOT/BRIDGE_ROOT/OPENPI_ROOT。可以从明确cwd运行并由脚本默认定位同一workspace下的三库，或提供简洁CLI参数；脚本内部变量不受此限制。README不要说“runner会自动记录>10pp gate”，除非已核实实际代码实现；当前人工50rollout检查要写清由实验负责人执行。路径对外报告用共享主RMBench/eval_result的真实保存位置，worktree别名可以附带，但不能误让用户以为成果留在临时workspace。这次只修正文档/必要入口默认值，不重跑相同GPU smoke，不开100；追加commit和report后等新runtime集成。
+
 eval_result统一RMBench/eval_result/memory_chunk_20260910/<run>；smoke也在本实验组但明确smoke名，不进入主表；正式实验接替后清理。不能在robot-bridge/eval_result产物，不造第三个日志根。继承metadata+config，不复制代码。交付可复跑命令/配置、smoke结果和视频路径、是否可运行P1/剩余缺口、环境实测吞吐粗估，写report与commit发布。保持可继续接评测工作；不自行派agent。
