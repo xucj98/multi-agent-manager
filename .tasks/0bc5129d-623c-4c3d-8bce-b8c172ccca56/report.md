@@ -69,6 +69,10 @@ task_revision: d606b3740789a1ed496f84d9bd2f462797d1078f
 
 - **新 Memory v1 wire 契约尚未验收。** 当前实现的 `MemoryContext.add_inputs()` 将 dense 编码写入 padded `state`，真实训练 input transform 却读取 `memory_input_ids`；真实 output transform 又会把 `actions` 裁为 14 维机器人动作，而 runtime 曾从该尾部解码 memory。这两处断链须按已发布契约修为 scheduler 传 `(F,)` 的语义 `memory_input_ids`、policy transform 负责编码、输出以 `memory_prediction_ids`（full `(H,F)`、serial `(1,F)`）交给 `MemoryContext`。收到作者小增量后将跨真实 input/output transforms 与真实 context 做 CPU 联通复核，覆盖单/多字段、no-memory、K30 row30 和 serial 的实际 selected 条件；不会用两端 mock 字典代替。旧 F0 checkpoint 无 `memory_config`，因此不受此项阻塞。
 
-- **live controller / takeover 仍待 9d2784d 增量复核。** 先前发现的 timestamp 过期即冒充实际执行、takeover 后旧 proposal 作为插值锚点、另一 `get_obs` 时间基提前推进 progress 三项 P1，及 `synchronous_rows + latency_step>0` 在队列 drain 后仍保留 latency、导致 H20/K15/latency2 从模型 rows 2..16 而不是 row 0 反馈的问题，均不随本 F0 terminal 修复自动关闭。它们阻塞完整 live runtime 结论，不阻塞旧 RMBench F0 smoke。
+- **新增 live P1：`281e0a7` 在 synchronous row 边界漏掉 chunk 末行。** 该增量正确把已完成进度从“时间戳已过”改为实际 transport handoff，但 X1 loop 和 X1Pro worker 都只在有下一个 `after` endpoint 时把 `before` 命令标为 processed。对 3 行实际 `execute` chunk，独立无硬件复现得到：X1 已 `queue_idle: true` 时 `completed_rows: 2`、`queued_rows: 1`（只发布 2 次，最后值约 2.994）；X1Pro 也只有两个不同 command timestamp 的 handoff event（末次发布约 2.50）。`MemoryContext.apply_wait_condition()` 对 `synchronous_rows` 只写 `action_queue_remaining: 0`，因此下一次 `get_obs` 可以在最后 policy row 未完成时返回；`observe()` 只得到 K−1 行，`last_executed`/`chunk_completed` 的第 K 行反馈会滞后一 query 或在 terminal/takeover 时丢失。这直接违反 “synchronous rows” 与实际执行行的契约，阻塞 live runtime 验收。修复必须让该模式在下一 infer 前拥有 K 行真实 handoff evidence（或显式继续等待），不能把已排期 timestamp 当作完成；回归须覆盖真实 X1 loop、X1Pro worker、插值 factor>1、最后 chunk/terminal 和 takeover/reset。
+
+  `281e0a7` 的现有定向回归仍通过：`tests/robot/controllers/test_execution_progress.py` 为 `9 passed`，`tests/scheduler/test_memory_v1_schedulers.py tests/scheduler/test_openpi_takeover.py` 为 `28 passed`；它们没有覆盖 queue drain 后末行 completion。
+
+- **其余 live / takeover 项仍待完成复核。** 该增量旨在修复先前的三项 P1：timestamp 过期即冒充实际执行、takeover 后旧 proposal 作为插值锚点、另一 `get_obs` 时间基提前推进 progress。另有 `synchronous_rows + latency_step>0` 在 queue drain 后仍保留 latency、令 H20/K15/latency2 从模型 rows 2..16 而不是 row 0 反馈的问题。这些与新末行 P1 都不随本 F0 terminal 修复自动关闭，均只阻塞完整 live runtime 结论，不阻塞旧 RMBench F0 smoke。
 
 - 打包/部署依赖和真实硬件通信没有在本阶段宣称通过；后续 report 将随新 wire 与 live 增量复核更新。
