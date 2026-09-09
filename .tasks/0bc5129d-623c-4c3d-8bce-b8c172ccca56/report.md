@@ -1,4 +1,4 @@
-task_revision: d606b3740789a1ed496f84d9bd2f462797d1078f
+task_revision: 8a554f2c2383cc4ace5ef5c6915df2ba06577ef1
 
 # bc842036：F0 / legacy RMBench simulation 独立 CPU 验收通过，可开始 GPU smoke
 
@@ -65,20 +65,15 @@ task_revision: d606b3740789a1ed496f84d9bd2f462797d1078f
 
 这验证的是实际共享循环，不只是直接调用 `build_act_request()` 的局部 hook。它不证明真机 transport 已通过，真机验证仍属于 live 复核范围。
 
-## 后续独立范围（不影响上述 bc842036 F0 结论）
+## 当前增量复核（78e1b4a / ffa308d；不重开 F0）
 
-- **新 Memory v1 wire：runtime 半边 `f84edbd` 已复核，跨库闭环仍未验收。** 审阅树中的 `967ba14` 是 `f84edbd6eea81104a00fd85409046eaaa8712e9b` 的等价 cherry-pick。它使三类 scheduler 只发送原始 robot state/images/prompt 加有序 `(F,)` 的 `memory_input_ids`，不再由 runtime 写 padded dense tail；它只接受 declared `robot_dim` 的 robot-only `actions`，从严格 shape/range 校验的 `memory_prediction_ids` 读取 full `(H,F)` / serial `(1,F)` 语义输出；no-memory 不索取该字段，serial 不再重新 argmax。以 `CUDA_VISIBLE_DEVICES=''` 执行 `tests/scheduler/test_memory_context.py tests/scheduler/test_memory_v1_schedulers.py tests/scheduler/test_openpi_simulation.py tests/scheduler/test_openpi_takeover.py tests/robot/controllers/test_execution_progress.py` 得到 **65 passed in 16.82s**；随后全量 `tests/scheduler` 为 **88 passed in 25.73s**。
+bridge 审阅 HEAD `87fbc9c` 是 `78e1b4a49677d7aef50b0915076a465a4523ba5b` 的等价 cherry-pick；OpenPI 已在原独立树合入 `ffa308d5485a2c8222d3e7735b08723c6e93a237`，合并后的文件树与该提交完全一致。以下覆盖只涉及 runtime 和 inference wire，训练/loss/checkpoint 由 Banach 专审。Manager 已确认 F0 row30 smoke 通过并启动正式100；先前 bc842036 放行保持有效。
 
-  但发布的 OpenPI 审阅基线 `58d6f2155acc3af03017677bb3f536101e6699f4` 还不实现这条 wire，不能以这些 runtime mock 代替跨边界验收。对真实 `ArxSm2smInputs` / `ArxSm2smOutputs` 的 CPU 调用，scheduler-shaped serial input `{memory_input_ids: [2]}` 立即因缺旧 `key_state_input_ids` 抛 `KeyError`；full 的原始 14 维 state 因仍要求 dense 17 维而抛 `ValueError`，即使提供 17 维 state 也会丢弃 `memory_input_ids`；full output 为 `(50,17)` dense actions、serial output 为 `(50,14)` actions，二者均没有 `memory_prediction_ids`。训练侧任务 `ad6bb77e-3892-4730-ae1a-7d9cd99a5728` 仍为 working，尚未发布正式 transform / `Policy.infer` 提交。因此新 schema 不能放行；收到该提交后必须用真实 policy input/output transform 链与真实 `MemoryContext` 复核非初始 cache 改变 tokenized prompt、robot-only action 裁切后 ID 字段仍存、full K30 row30、serial 实际 selected ID、单/多字段和 no-memory。旧 F0 checkpoint 无 `memory_config`，不受此项阻塞。
+- **drain 后跳 latency 的 P1 已关闭。** 两类 scheduler 在 build_obs_request 记录本轮是否同步 drain，并把 action 起点及 future 查询按有效 latency=0 处理；非 drain 仍保持 latency_step。独立运行 `CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/robot/controllers/test_execution_progress.py tests/scheduler/test_memory_v1_schedulers.py tests/scheduler/test_openpi_takeover.py` 为 **48 passed in 15.01s**，含同步/异步 action slice、末行发送及原 takeover 回归。
 
-- **新增 live P1：`281e0a7` 在 synchronous row 边界漏掉 chunk 末行。** 该增量正确把已完成进度从“时间戳已过”改为实际 transport handoff，但 X1 loop 和 X1Pro worker 都只在有下一个 `after` endpoint 时把 `before` 命令标为 processed。对 3 行实际 `execute` chunk，独立无硬件复现得到：X1 已 `queue_idle: true` 时 `completed_rows: 2`、`queued_rows: 1`（只发布 2 次，最后值约 2.994）；X1Pro 也只有两个不同 command timestamp 的 handoff event（末次发布约 2.50）。`MemoryContext.apply_wait_condition()` 对 `synchronous_rows` 只写 `action_queue_remaining: 0`，因此下一次 `get_obs` 可以在最后 policy row 未完成时返回；`observe()` 只得到 K−1 行，`last_executed`/`chunk_completed` 的第 K 行反馈会滞后一 query 或在 terminal/takeover 时丢失。这直接违反 “synchronous rows” 与实际执行行的契约，阻塞 live runtime 验收。修复必须让该模式在下一 infer 前拥有 K 行真实 handoff evidence（或显式继续等待），不能把已排期 timestamp 当作完成；回归须覆盖真实 X1 loop、X1Pro worker、插值 factor>1、最后 chunk/terminal 和 takeover/reset。
+- **末行 handoff 的 P1 部分修复，仍阻塞 live synchronous 验收。** 78e1b4a 增加 accepted endpoint 的最后一次真实发送，正常运行最终计数可达 K；但两个 controller 的 `_wait` 仍只检查 `action_queue.count_after(observation_base)`，没有等待该观察时间基上的 handoff 完成。独立 CPU 复现使用真实 `execute`、X1 `_exec_loop` / X1Pro `exec_worker_main` 和真实 `get_obs`，只把设备发送函数用 event 暂缓返回：一个合法单行 chunk 的终点已到期，传感器 buffer 时间戳已推进；发送尚未完成时 `get_obs(wait_condition={action_queue_remaining:0})` 已返回。X1 返回用时0.05ms、X1Pro 0.04ms，二者均为 `scheduled_remaining=0`，但 `execution_progress={completed:0,queued:1}`。释放 event 后线程正常退出，未使用硬件。`MemoryContext.observe()` 又无条件清 `_await_observation`，scheduler 随后仍可生成下一次 infer 输入，故“最终会发送末行”不等于“同步 query 前已获得 K 行证据”。修复需把同步 query 放行与本次观察对应的实际 handoff 绑定，并保留原异步语义。该复现不以排期时间冒充执行，也不要求硬件 ACK。
 
-  `281e0a7` 的现有定向回归仍通过：`tests/robot/controllers/test_execution_progress.py` 为 `9 passed`，`tests/scheduler/test_memory_v1_schedulers.py tests/scheduler/test_openpi_takeover.py` 为 `28 passed`；它们没有覆盖 queue drain 后末行 completion。
+- **新 wire 实际跨库 CPU 联通正在复核。** 已使用正式 ffa308d，后续证据覆盖真实 tokenizer / policy input-output transforms / MemoryContext。旧58d6的缺接口是已替代的历史基线，不重复测试，也不计作新训练增量的实现缺陷。
 
-- **live/offline P1：synchronous drain 后仍错误跳过 latency rows。** `MemoryContext.apply_wait_condition()` 在有 pending synchronous chunk 时将 get-obs 条件覆盖为 `action_queue_remaining: 0`，说明本轮 infer 不会与旧 chunk 并行；但 `OpenPiScheduler` 保留 `_iter_latency=2`，`OpenPiOfflineScheduler` 保留 `_latency_step=2`，两者的 `build_act_request()` 仍取 rows 2..16。用真实两类 scheduler 的初始化、request、`MemoryContext` 和 action 构造执行 H20/K15/latency2，得到二者同样的 `wait_condition: {action_queue_remaining: 0}`、`first_executed_model_row: 2`、`last_executed_model_row: 16`，而正确首行应为 0。该错误会把 feedback/实际 chunk 映射前移两行，影响 live、offline 和继承该路径的 takeover；需要把当前 iteration 的 action-row 起点与实际 wait 语义绑定，并覆盖 drain 与非-drain 两种分支。
+- **轻量安装方案待作者交付。** 按最新裁定，以固定 OpenPI 版本 wheel + 全新隔离环境 import/创建 MemoryContext 为验收范围。无需先安装整套训练框架或 SDK，也不改动真机和现有 sdk_robot 环境；设备可运行性另列。
 
-- **其余 live / takeover 项仍待完成复核。** `281e0a7` 旨在修复先前的三项 P1：timestamp 过期即冒充实际执行、takeover 后旧 proposal 作为插值锚点、另一 `get_obs` 时间基提前推进 progress。上述两项新/存量 P1 都不随本 F0 terminal 修复自动关闭，均只阻塞完整 live runtime 结论，不阻塞旧 RMBench F0 smoke。
-
-- **部署 P1：新 checkpoint 的轻量配置包没有可复现安装路径。** `MemoryContext.from_checkpoint_metadata()` 在检测到 `memory_config` 后必然导入 `openpi_client.memory_config`，但 robot-bridge 的 `pyproject.toml` / `uv.lock` 没有 `openpi-client`，`scripts/deployment/x1pro_master.sh` 只 clone `robot-bridge` 和 `sdk_robot` 并在 sdk_robot venv 中 `pip install -e .`，远端 scheduler 脚本也默认该 venv。因而干净部署对任一新 memory checkpoint 会立即抛出“openpi-client is unavailable”；本审阅 venv 中的 editable 安装只用于 CPU review，不能作为生产依赖。需要提交明确的包版本/安装来源和部署入口，并在干净 sdk_robot 环境实际创建 `MemoryContext` 验证。旧 F0 checkpoint 没有 `memory_config`，不受此项影响。
-
-- 真实硬件通信没有在本阶段宣称通过；后续 report 将随新 wire 与 live 增量复核更新。
