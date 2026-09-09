@@ -1,4 +1,4 @@
-task_revision: be14f517c506b6e8281f4733275abb2e77d7fdd3
+task_revision: 8a6aef30ec5df04f01e7781dd9ca110eb6decb15
 
 # bc842036：F0 / legacy RMBench simulation 独立 CPU 验收通过，可开始 GPU smoke
 
@@ -77,7 +77,7 @@ bridge 审阅 HEAD `87fbc9c` 是 `78e1b4a49677d7aef50b0915076a465a4523ba5b` 的�
 
 - **新 wire 的实际跨库 CPU 联通通过本轮定向验收。** 正式 ffa308d 与当前 runtime 已通过下列7个独立用例；不是对两个 mock 字典分别测试。旧58d6的缺接口已被正式增量替代，不再列作缺陷。这不关闭前述 live 进度/等待 P1。
 
-- **轻量安装方案待作者交付。** 按最新裁定，以固定 OpenPI 版本 wheel + 全新隔离环境 import/创建 MemoryContext 为验收范围。无需先安装整套训练框架或 SDK，也不改动真机和现有 sdk_robot 环境；设备可运行性另列。
+- **轻量安装方案已通过 c94f508 增量验收，详见末节。** 固定 OpenPI 版本 wheel 在全新隔离环境中 import/创建 MemoryContext 已实际通过；无需安装整套训练框架或 SDK。真机和现有 sdk_robot 环境未改动，设备可运行性另列。
 
 ## 真实 inference wire 的独立 CPU 证据
 
@@ -125,4 +125,39 @@ CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q 
 
 实质结构缺陷是 controller 的 completed 表示实际发送次数，而 Context 将其解释为连续轨迹前缀，以及 `_wait` 另用排期队列决定完成；上述两个 live P1 是这两套进度语义不一致的实际后果。现有末行测试只验证最终 handoff；补上该测试仍未覆盖“同步观察是否提前返回”和“tick跳端点如何映射”两个边界。应保留既有必要测试，并使修复覆盖这两条真实 loop/worker 路径，不能靠删测试或补发过期动作化解。
 
-本轮没有修改作者实现。独立临时 harness 按任务要求清理，原两库工作树及已发布证据保留；没有启动GPU、硬件、rollout或需登记的长进程。后续仅复核新交付的 live 修复、最小 wheel 安装路径和实际权重接口证据；F0与已通过的CPU wire不因这些待办重开。
+本轮没有修改作者实现。独立临时 harness 按任务要求清理，原两库工作树及已发布证据保留；没有启动GPU、硬件、rollout或需登记的长进程。后续仅复核新交付的 live 修复和实际权重接口证据；最小 wheel 安装已由下节关闭，F0与已通过的CPU wire不因待办重开。
+
+## c94f508 部署增量：最小 wheel 安装验收 GO
+
+候选 `c94f508907da6c9a6a786246a3f5968df28af46f` 已合入原 bridge 审阅树，当前 HEAD 为 `b15d209de965b8979b5280d323639f92513f62dc`。该增量仅4个文件、253新增行：安装脚本109行、独立安装测试93行、说明文档51行；没有修改已审 runtime/wire 实现。OpenPI 保持 `f3f645938170cc6f84082d3b07bdc9820cb223c1`，其 client package tree 与正式 `ffa308d5485a2c8222d3e7735b08723c6e93a237` 均为 `243a6c6fd7fe840aea9a922f7309026d8aba9bb8`，该包目录无未提交文件。
+
+**结论：c94f508 的本地 wheel 构建、安装和纯 schema 依赖路径可复现，通过本项验收，无剩余部署依赖 blocker。** 不扩大为完整 scheduler 依赖、机器人 SDK、硬件或实际 transport 验收；两个已裁定 live P1 仍等待作者修复，已通过7项 wire和latency未重跑。
+
+独立执行交付脚本，工作目录刻意置于 `/tmp`，同时清除 PYTHONPATH/PYTHONHOME、禁用 user site，避免工作树 editable 或当前目录掩盖 wheel 导入。使用命令：
+
+```bash
+env -u PYTHONPATH -u PYTHONHOME \
+  PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 CUDA_VISIBLE_DEVICES='' JAX_PLATFORMS=cpu \
+  bash /mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/robot-bridge/scripts/tests/local/test_openpi_client_wheel.sh \
+  --openpi-root /mnt/public/xcj/Projects/workspace/0bc5129d-623c-4c3d-8bce-b8c172ccca56/openpi \
+  --openpi-commit ffa308d5485a2c8222d3e7735b08723c6e93a237
+```
+
+实际执行结果（exit 0）：
+
+```text
+Successfully built robot_bridge-0.1.0-py3-none-any.whl
+Successfully built openpi_client-0.1.0-py3-none-any.whl
+Successfully installed PyYAML-6.0.3 numpy-1.26.4
+Successfully installed robot-bridge-0.1.0
+Successfully installed openpi-client-0.1.0
+openpi-client scheduler smoke passed: /tmp/openpi-client-wheel.e9lx8k/venv/lib/python3.11/site-packages/openpi_client/__init__.py
+clean wheel environment passed (MemoryContext module=robot_bridge/scheduler/memory_context)
+openpi-client wheel installation test passed (OpenPI source tree 243a6c6fd7fe840aea9a922f7309026d8aba9bb8)
+```
+
+验证使用 Python 3.11.14 新建隔离 venv；两个业务包均安装本地 wheel，`--no-deps` 未触发索引按包名解析 openpi-client。该 venv 仅额外安装 NumPy/PyYAML，实际导入 `openpi_client.memory_config`，通过 `MemoryContext.from_checkpoint_metadata` 创建 H1、14维机器人/16维 padded、单字段配置，并由 `add_inputs` 得到 `[0]`。`importlib.util.find_spec` 确认没有 `openpi`、`jax`、`torch`；没有初始化任何 controller、发出 RPC 或连接 SDK。
+
+静态核对：安装入口要求显式 `RB_PY`、可执行解释器及本地 `.whl`，复用既有 scheduler 的解释器变量；原 `x1pro.sh` 和 `run_scheduler.sh` 未改变。独立测试在构建前检查固定 commit 的 client tree 及目录清洁性，文档给出构建后的 SHA256 记录步骤；产物来源由固定源码/审计交付保证，安装入口本身不宣称对任意传入 wheel 自动完成来源认证。仅需 `memory_config` 的范围内跳过 client 其它可选使用路径的依赖符合本 task 裁定，不声称新环境能够使用 client 的全部接口。
+
+两个新增 shell 脚本 `bash -n` 及增量 `git diff --check` 通过。脚本 EXIT trap 已删除 `/tmp/openpi-client-wheel.e9lx8k`（独立检查不存在），两库审阅树干净，原 SDK/训练环境没有安装变更。未新增或保留临时脚本、wheel、venv；保留双库 worktree 待新 live commit 增量复核。
