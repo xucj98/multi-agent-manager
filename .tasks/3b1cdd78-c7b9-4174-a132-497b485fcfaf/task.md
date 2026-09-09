@@ -17,3 +17,5 @@
 交付：发布report.md，含task_revision、workspace、删除清单/空间（区分逻辑与物理/hardlink共享）、保留成果路径、未处理项及原因、最终worktree列表、链接/环境最小只读核验。自用临时文件清理。及时向manager报告阻碍，不长时间自行扩展调查。
 
 Manager 现场裁决（2026-09-09）：bridge-runtime-integration-20260908/openpi 的7个modified及3个untracked源码/测试逐文件与主openpi一致；RMBench-mem0的4个modified源码与主RMBench一致；两个untracked bridge_worker.py/test_bridge_worker.py已经集成于主RMBench commit 7af489d，主版本仅增加gitlink provenance处理及对应测试。上述工作树改动已被主库成果覆盖，可随旧树删除，无需重新提交或复制源码。logs链接目标须按结果依赖检查。保持主库用户未提交文件不动。
+
+Manager 对交接审计目录裁决：其中 dirty-worktree-patch-archives 的小型历史源码补丁、未跟踪源码副本及解释其base commit/archive ref的现有索引，压缩保留到 MAM gitignored 的 .local/archives/<本任务UUID>/legacy-source-patches.tar.gz；验证可读并保留hash、来源映射在report。其余过时清理日志/清单不继续保留。原 workspace-handoff-audit-20260908-0845 可删除，无需为了这几MB逐一做跨库历史源码考古，也不需把这些补丁重新合并进业务库。
