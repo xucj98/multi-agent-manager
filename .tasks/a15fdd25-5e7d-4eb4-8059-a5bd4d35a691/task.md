@@ -1,3 +1,9 @@
+## F0 runtime已验收，放行GPU0 row30 smoke
+
+独立review报告dc14d105b1928c280270e0ec304d2b1d74bc9d7a明确放行bc842036；Manager也比对review基线b247332与bc842036的base/simulation及对应tests，零差异。请完成刚追加的--gpu与端口/cache小调整并固定完整入口commit，随后可立即检查GPU0并运行row30的一次2rollout smoke（一video一no-video）。这就是smoke开跑通知，无需再等待用户或Manager确认。GPU1尚未放行。
+
+smoke完成用现有check-smoke/recorder验证结果格式、两个accepted episodes、视频一有一无可读、command/config/前序metadata、实际K/选行/terminal infer计数/进程收尾。报告实际source commits、结果路径、成功数和检查结果，等待Manager验收后发正式100通知。四row正式预算仍有效，不再改运行代码或扩新功能。
+
 ## GPU安排：GPU1训练smoke结束后允许第二个F0并行
 
 当前仍只允许启动GPU0；GPU1由训练owner占用50step smoke，Manager确认其释放后才可用于另一完整100ep run。为之后无需改已冻结代码，请在首次smoke前给现有F0入口加--gpu（default0，可选0/1），传给已有runner同一sim/policy GPU参数；为两卡选择不冲突的robot/policy端口和分别的Warp cache目录。不要硬绑定GPU0、也不拆分一个100ep。每个正式run用其实际GPU/端口/配置对应的2rollout smoke通过原完整检查。
