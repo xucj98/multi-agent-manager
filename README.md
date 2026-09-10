@@ -14,6 +14,8 @@ Projects/workspace/TASK-ID/REPO/
 
 ## 任务管理
 
+管理仓库使用共享 checkout：Manager 在其中编辑 `task.md`，执行者在其中编辑自己的 `report.md`。`main` 上的提交内容是已发布版本，工作目录中的修改是草稿，使用 `mam task publish` 发布。途中追加要求时，先更新 `task.md` 并发布，再通知执行者读取新版本。
+
 Manager 创建任务、填写任务要求并发布，再绑定执行 agent：
 
 ```text
@@ -60,6 +62,8 @@ mam workspace add TASK-ID --repo REPO --base COMMIT
 mam task publish TASK-ID --file report
 ```
 
+交付后清理任务要求的临时文件，保留 worktree 供 Manager 验收、归档。
+
 ## 进程管理
 
 预计运行超过一小时的正式数据生成、训练或评估需要登记；短 smoke 不需要。登记、查询和收尾使用：
@@ -88,7 +92,7 @@ mam wait stop --agent AGENT-ID
 
 ## 工作区
 
-代码修改和独立 review 使用本任务的 worktree；讨论、只读调查和监控不需要创建 workspace。每个仓库分别执行一次 `mam workspace add TASK-ID --repo REPO --base COMMIT`，并按任务要求的 base commit 工作。
+代码修改和独立 review 使用本任务的 worktree；讨论、只读调查和监控无需创建 worktree 或代码环境，`mam task create` 仍会分配空 workspace。每个仓库分别执行一次 `mam workspace add TASK-ID --repo REPO --base COMMIT`，并按任务要求的 base commit 工作。
 
 ## 开发验证
 
