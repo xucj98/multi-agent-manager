@@ -36,4 +36,6 @@ GPU1交接证据为row50目录gpu1_handoff_verification.json；此前GPU0交接�
 
 清理完成：四个F0 smoke原始目录均已删除，保留正式metadata门禁结论、smoke_gate_summary.json及smoke_cleanup_receipt.json，不保留整包压缩档。全部F0结束后也清理了已无后续门禁用途的旧P1加载smoke，原结论/检查摘要和清理receipt保存在row30正式目录legacy_p1_smoke_summary.json、legacy_p1_smoke_cleanup_receipt.json；未重新评测。其他任务的BF16产物未触碰。
 
-后续：本任务已无评测或轮询工作；由Manager完成最终文档集成及workspace归档。新schema、BF16与GPU接手任务继续由各自owner负责。
+归档前补清理：Manager已验收文档并合入xcj-dev。按要求删除本任务worktree内34个缓存目录（RMBench 8、robot-bridge 17、openpi 9），包括__pycache__、.ruff_cache及.pytest_cache；未跟随共享软链，未触碰data/assets/eval_result/checkpoint或环境。三树git status --short --ignored逐项核对，仅剩.venv环境目录及共享软链，无其他临时垃圾或源码改动。未重跑测试/评测，未改实验文档。
+
+后续：本任务已无评测或轮询工作；workspace保留，由Manager归档。新schema、BF16与GPU接手任务继续由各自owner负责。
