@@ -20,3 +20,10 @@
 ## 文档与验收
 同步更新docs/task-management-design.zh-CN.md（用户明确指定）及README/CLI help的必要差异，中文简洁，列清接口行为；AGENTS仅必要入口改动，避免重复手册。
 临时root真实CLI验证：表头/单行/筛选/详情；真实短sleep注册job，wait因job停止返回；另进程stop唤醒且被监控sleep仍活着；两个agent等待互不干扰；重复等待、超时、空集、已有stopped、unknown与陈旧登记。不得用真实MAM根做可变测试，不占GPU。完整标准库单测和diff-check。清理临时root/进程/pycache；提交干净commit和report，包含task_revision、workspace/HEAD、变更文件、验证及明确剩余限制。代码规模保持克制，超过约300行新增生产代码前报告取舍，不以压缩代码凑行数。
+## 独立review后的修复裁定
+
+独立review报告8ecd5775172717b4c39b905f2bf2891a95e65c07（任务362daf44-9644-41b7-9ec9-8893bea1abb4）提出两个成立的问题，修复后复验：
+1. wait deadline应在每次target探测前检查，单次远端探测timeout不得超过剩余预算；多个remote下不能按每job固定0.5秒逐个超出总deadline。超时允许运行时小幅调度开销，不要求硬实时。
+2. job list --attention的needs_verification必须在表格明确标为待核实，包含job已经stopped但agentunknown的情况；不新增列、不把不确定记录展示为普通待处理stopped。
+
+保持其他接口与已验证并发取消/正常远端探测行为；增加对应有意义回归并同步文档措辞如必要。只在原worktree增量修复，不安装、不占GPU、不修改真实job。生产净增336行接受为本轮实现上限附近，不扩框架；优先小修。提交新commit、清理并更新report。源review真实wuwen-1短sleep的0.5秒探测12/12通过，最长0.314秒，不需要为假想网络问题重写异步框架。
