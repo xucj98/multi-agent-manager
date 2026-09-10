@@ -31,3 +31,7 @@ wash训练owner ad6bb77e-3892-4730-ae1a-7d9cd99a5728最新task/report：两20k c
 训练owner ad6bb77e已发布两20000的CPU完整参数、真实GPU checkpoint-only恢复及进程释放验收，GPU2/3于07:30各1MiB/0%。独立review65a3对fda269c1通过且Manager告知后，授权本任务使用本机GPU2串行执行full/serial两个模型固定5ep；GPU3暂不使用，不跨wuwen-1。启动前核对显存、独立端口，复用已有两库环境和入口，固定干净源码。
 统一正式输出目录RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_20k_offline5ep，launcher内模型子目录wash_full/wash_serial属于同一run的分项产物。先dry-run确认两个真实checkpoint可用。完整执行各5ep[0..4]，不用新smoke模型代替，检查真实action/memory GT/pred/mask、实际infer次数（预计187/模型）与执行行5525/模型、每集退出和资源释放。读取GT仅评分。若失败保留具体首因和已生成产物，不覆盖同目录掩盖失败；恢复方案先报告。
 记录实际命令、源码与解释器、checkpoint/转换/训练metadata完整继承。若预计超1小时按mam登记job；可以按合理估算短任务无需强行登记。完成发布简报提供两模型每集动作误差/phase指标（含有效样本数）及产物路径；offline不是闭环成功率。随后Manager安排结果文档整合与统一台账更新，不把本次接口通过称作scheduler原始架构重构已完成。
+
+## 07:45 今日优先真机验证；修复真实metadata接线
+用户决定今天不做架构重构，优先wash-cup真机实验，明天再讨论统一架构。接受首次失败原因定位，允许最小修复：新memory_config协议中execution.rows为有效K来源；不要机械把dataset query_stride与execution.rows混为概念，明确launcher校验的是实际运行K及模型输入数据频率/H。对于legacy沿原metadata query_stride规则，显式字段与schema定义同一运行量时拒绝冲突。使用首次真实served_metadata作为回归输入，确认该缺失字段情况被覆盖，不另增配置格式。只修改launcher及必要测试，不扩展scheduler重构。
+提交小修并发布report，Manager/独立真机路径验收任务定向复核后启动GPU2重试；新run名wash_memory_v1_20k_offline5ep_retry1，不覆盖失败目录。失败目录最终保留必要首因与命令到工作报告/正式留痕后清理无用临时产物，不能当作正式成功结果。今天的最终交付除每集指标，还需给真机人员明确模型/代码路径与已知限制，不声称未实际验证的真机效果。
