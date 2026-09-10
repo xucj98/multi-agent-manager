@@ -75,3 +75,7 @@ wuwen-1 的现有训练自然结束、完成 checkpoint 保存并释放资源后
 用户要求OpenPI模型统一位于checkpoints，不再使用user_checkpoints。Manager交47a91a44-4efa-48d7-b162-93d097763376迁移已完成精度验证的BF16副本到openpi/checkpoints/precision_validation/rearrange_full_key_state_30k_bf16/30000，保留权重和历史原始留痕。此前本任务“原位保留user_checkpoints”改为保留迁移后副本；你不要并发移动或重建旧路径，不改变正在训练的输出。后续简报引用新位置并注明迁移完成状态，以迁移owner报告为准。
 
 07:04用户再次明确：该BF16验证副本实验已完成，应直接清理，不迁入checkpoints。47a91a44负责清理，仅保留源FP32和正式实验/导出留痕。替代上一条迁移安排；不要重建副本，wash训练不变。
+
+## 07:39 训练交付收尾
+Manager接受两20k保存/CPU全参数/GPU恢复交付；后续正式offline由b86b3d02使用自己的环境执行，不再依赖本训练workspace。请把有价值的两份20k保存/恢复验收小型报告与实际训练日志留入各自稳定checkpoints/<config>/<run>/下（复用既有位置，保持历史command/metadata原文；不要迁移公共logs或影响其他训练）。报告给出稳定链接，避免唯一证据只在临时workspace。逐个确认后可清理本任务全部已完成技术50 checkpoint、smoke视频/日志、临时cache及辅助自测脚本；e690已有实际20k自身smoke通过，旧full/serial50不再是依赖。只清理本任务拥有的临时内容，不删源模型、正式20k或数据。BF16验证临时副本已由47a91a44清理，无需再操作。
+完成后发布最终训练简报并保留干净worktree供Manager归档，不新增训练、不占GPU。用户关于架构缺口正在讨论，不在本任务扩大实施。
