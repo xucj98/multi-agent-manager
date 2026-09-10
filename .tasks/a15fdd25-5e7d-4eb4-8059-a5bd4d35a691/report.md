@@ -1,19 +1,17 @@
 task_revision: 51b7f02d2330dbfd132eaca201c6959348ce43ba
 
-2026-09-10 10:42:45 +08:00 既定巡检：row20/GPU1为83/100，row1/GPU0为26/100，两路继续。未汇总row1成功率，未重算row20中点后的成绩。源码、配置和实验README保持冻结。
+2026-09-10 11:11 +08:00 完成事件：row20最终86/100已完整核验、清理smoke并归档job；GPU1接续row50匹配smoke已启动（runner2522901），通过后直接正式100。row1/GPU0继续，50条前不汇总成功率。三树源码、配置和实验README保持冻结。
 
 | run（均H50/K30） | GPU | 状态/结果 | 正式runner PID；MAM job |
 | --- | ---: | --- | --- |
 | row30 | 0 | 已完成92/100并验收，job已归档，smoke清理完成 | 1933083（已退出）；a19ad5c6-4449-41c3-a077-2d67e80c5286 |
-| row20 | 1 | 83/100；已接受中点44/50，原run继续；预计11:07完成100 | 2227400；d358726f-3671-42d9-b3ac-801f15ddcdb7 |
-| row1 | 0 | 26/100；首条检查已通过，尚未汇总成功率；预计11:25到50 | 2371167；2b4a98cd-a13e-4051-b466-dfc60c25bce4 |
-| row50 | 1 | 未启动；row20收尾后自身smoke2→完整检查→正式100，已有授权 | — |
+| row20 | 1 | 11:09:21完成86/100，比主历史低7pp；核验/清理完成，job已归档 | 2227400（已退出）；d358726f-3671-42d9-b3ac-801f15ddcdb7 |
+| row1 | 0 | 继续运行；最近10:42快照26/100，50条预计11:25，尚未汇总成功率 | 2371167；2b4a98cd-a13e-4051-b466-dfc60c25bce4 |
+| row50 | 1 | 11:10:32匹配smoke2已启动，GPU1；检查通过直接100 | smoke2522901（短smoke无需job） |
 
-共同host：is-dcfi2kjdq7g3k6aa-devmachine-0。row20 robot/policy/sim worker PID为2227483/2227484/2227611，row1为2371250/2371251/2371378；两runner均PPID=1、独立session。实际服务进程存活，19300/19302与19310/19312分别由对应robot/policy监听，CUDA和缓存按GPU0/1隔离。本任务继续只用0/1。
+共同host：is-dcfi2kjdq7g3k6aa-devmachine-0。row1正式runner2371167、robot/policy2371250/2371251仍运行；row20全部进程已退出。GPU1启动row50前为1MiB/0%、无计算进程，沿用19310/19312及gpu1缓存；GPU0继续row1。
 
-row20与row1已完成的83/26个scheduler全部退出0；均无runtime_error、候选拒绝或日志Traceback/ERROR/连接故障。快照时row20正在第84条query，row1处于两集间reset/preflight阶段。完整正式/smoke配置、recorder及metadata身份仍相同。GPU0/1显存与进程快照见JSON，未干预进程。
-
-最近10个完整无视频周期（含reset/preflight）：row20均值90.791秒、39.65条/小时，100条预计11:07:20，窗口11:00—11:15；row1均值107.997秒、33.33条/小时，50条预计11:25:18，窗口11:20—11:35。
+row20最终86/100，失败首因重复按压11、按压不足3；连续成对100seed、0候选拒绝/运行错误，1555query、前5视频、metadata/source和全部子进程退出核验通过。耗时9933.112秒，整体36.24条/小时，95个无视频周期平均92.971秒。详细证据见最终JSON。row1下一50条事件原估11:25，尚未新增成绩统计。
 
 冻结workspace：/mnt/public/xcj/Projects/workspace/a15fdd25-5e7d-4eb4-8059-a5bd4d35a691
 
@@ -28,11 +26,13 @@ row20与row1已完成的83/26个scheduler全部退出0；均无runtime_error、�
 | run真实目录 | 必要证据 |
 | --- | --- |
 | /mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_100ep_seed0/ | final_review_0100.json；smoke_gate_summary.json；smoke_cleanup_receipt.json |
-| /mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row20_100ep_seed0/ | progress_check_20260910_104245.json；midpoint_review_0050.json；protocol_review_0050.json |
+| /mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row20_100ep_seed0/ | final_review_0100.json；smoke_gate_summary.json；smoke_cleanup_receipt.json |
 | /mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row1_100ep_seed0/ | progress_check_20260910_104245.json；progress_check_0001.json；config.yaml中的smoke_verification引用 |
 
-启动与来源见各run的config.yaml、command.txt、checkpoint_metadata/、processes.jsonl；逐query和smoke细节引用现有JSON。此前阶段publication为05e2a95b621ca6f04ba002cb06bab549041b8394。主历史93/100仍为/mnt/public/xcj/Projects/RMBench/eval_result/pi05_rearrange_shared_memory_representation/full_key_state_seed0@ckpt30k_step30_100ep_seed0/；同seed前50仅辅助。
+启动与来源见各run的config.yaml、command.txt、checkpoint_metadata/、processes.jsonl；逐query和smoke细节引用现有JSON。此前巡检publication为210f7374dc3951cbafbe38a211ff0b3a5414f654。主历史93/100仍为/mnt/public/xcj/Projects/RMBench/eval_result/pi05_rearrange_shared_memory_representation/full_key_state_seed0@ckpt30k_step30_100ep_seed0/；同seed前50仅辅助。
 
-清理：row30原smoke目录及row30_smoke_evidence.tar.gz已删除，正式metadata门禁结论和原检查摘要保留。row1/row20活跃run引用的smoke继续保留；后续完成run按同一边界只留结论/摘要后清理，不整包归档。
+清理：row30原smoke目录及row30_smoke_evidence.tar.gz已删除，正式metadata门禁结论和原检查摘要保留。row20 smoke也已按同一边界清理（32文件、672205字节，未创建压缩包）。row1活跃引用和正在运行的row50 smoke保留。
 
-下一事件：约11:07处理row20完成100，核对结果/失败分布/时序/视频/退出，清理并archive job后在GPU1接row50匹配smoke2→正式100并登记job、检查首条；约11:25做row1固定前50条人工中点。若提前出现完成或异常则按事件处理；其余维持约小时巡检，不频繁查询。全部调用本树的正式进程结束后再更新实验README并交付commit。
+row50 smoke真实目录：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row50_smoke_20260910/；完整字段检查要求index49/row50，K<=30下was_executed=false，属于模型预测未执行行。
+
+下一事件：row50 smoke两条video/no-video完成后全量核查，再正式100登记job并检查首条；row1约11:25做固定前50条人工中点。其余维持约小时和50/100事件巡检。全部调用本树的正式进程结束后再更新实验README并交付commit。
