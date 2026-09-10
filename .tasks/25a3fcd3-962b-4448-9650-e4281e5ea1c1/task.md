@@ -8,3 +8,6 @@ MAM_ROOT隔离所有task/job/wait/锁/归档登记，PROJECT_ROOT/workspace管�
 
 ## 交付与验证
 修改代码、测试、设计文档和install文档相关内容；README/AGENTS由Manager修改，避免同时编辑。覆盖两独立项目隔离、子目录发现、最近优先、缺失/坏配置、路径别名、linked MAM根、非main发布且main不变、错误分支拒绝、已有记录/job不损坏；完整测试通过。用旧安装mam在共享根发布交付报告，Manager在验收后才迁移生产。不要更改现有生产分支、配置、运行中的训练和环境；不得自行安装合并。清理短测试产物，保留worktree。报告给出commit、修改文件、测试和Manager迁移注意事项。
+
+## Manager迁移决策补充
+用户已确认本轮由Manager在实现/review完成后重写main历史，仅从main全历史过滤.tasks；project/state-vla保留原始完整历史。MAM开发worktree从main取基线，代码交付回main；生产MAM checkout处于project/state-vla。不要让新代码要求发布分支必须名为main，也不要把项目记录合回main。你无需执行历史迁移；在报告中核对独立发布分支与开发main共存是否受现有workspace add/primary逻辑影响。README已由Manager提交bdccfd0，可只读核对。
