@@ -1,8 +1,8 @@
-task_revision: eebd4b82e23caebe3886e3749f879f0e83348845
+task_revision: 83019249727dd14789999c8e0cf3d8ec7a150b7f
 
 完成与剩余：
 
-最新阶段：row30/GPU0已于09:29:23.210完成92/100，相对历史93/100低1个百分点。100条/汇总/1479query/前5条视频/全部子进程退出核查通过；失败首因按压不足6、未按1、重复按1。09:31已归档job a19ad5c6-4449-41c3-a077-2d67e80c5286。该smoke全部33文件含视频/原始日志已压缩进正式run、逐文件SHA校验并清理原目录，未丢失唯一证据。
+最新阶段：row30/GPU0已于09:29:23.210完成92/100，相对历史93/100低1个百分点，Manager已接受最终核验。100条/汇总/1479query/前5条视频/全部子进程退出核查通过；失败首因按压不足6、未按1、重复按1。09:31已归档job a19ad5c6-4449-41c3-a077-2d67e80c5286。随后按新发布83019249清理边界，已删除row30_smoke_evidence.tar.gz；原smoke目录也已清理。正式metadata门禁结论和原检查摘要保留于smoke_gate_summary.json，smoke_cleanup_receipt.json已注明整包及原始视频/日志清理。后续完成run同样只保留结论/摘要，不整包归档；活跃run引用的smoke仍保留。
 
 随后已启动row1/GPU0匹配2rollout smoke，runner PID2354686，host is-dcfi2kjdq7g3k6aa-devmachine-0；短smoke无需长job。实际目录/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row1_smoke_20260910/。沿用冻结入口--row 1 --gpu 0 --mode smoke --detach，完成完整检查后直接正式100。row20/GPU1继续，未提前汇总其成功率。
 
@@ -38,11 +38,11 @@ Manager已接受row30/GPU0的45/50人工中点，并于08:15释放GPU1。row20/G
 - row30正式：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_100ep_seed0/
 - row20正式：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row20_100ep_seed0/
 - row20 smoke：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row20_smoke_20260910/
-- row30 smoke完整证据归档：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_100ep_seed0/row30_smoke_evidence.tar.gz（原smoke目录已清理）。
+- row30 smoke门禁与原检查摘要：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_100ep_seed0/smoke_gate_summary.json（原smoke目录、视频/日志整包均已清理）。
 
-所有产物均为共享主RMBench真实位置，worktree的eval_result软链接只提供访问入口。每run保留config.yaml、command.txt、checkpoint_metadata/、processes.jsonl、episode_diagnostics.jsonl、video_checks.jsonl及进程日志。row20仍依赖其smoke，继续保留；row30正式已通过核查并退出，其smoke证据已归档，不再保留被替代目录。
+所有产物均为共享主RMBench真实位置，worktree的eval_result软链接只提供访问入口。每个正式run保留config.yaml、command.txt、checkpoint_metadata/、processes.jsonl、episode_diagnostics.jsonl、video_checks.jsonl及进程日志。row20仍依赖其smoke，继续保留；row30正式已通过核查并退出，其smoke只保留门禁结论与检查摘要，不保留被替代原始目录/压缩包。
 
-row30最终证据为正式目录final_review_0100.json、smoke_cleanup_receipt.json、row30_smoke_evidence.tar.gz。归档共33文件、原878688字节、压缩568271字节，SHA256 baa53f9d769108013a7343ecab35417a4a8bcf5cc52ce21b6d61f5f9a2ea90dc。100条均accepted且seed100000—100099连续唯一，无候选拒绝/运行错误；100个scheduler退出0，robot/policy由runner_shutdown收尾。总耗时9439.21秒，整体38.14条/小时；95个无视频完整周期均值89.055秒、中位86.749秒。1479query中1380完整K30、99partial；所有字段与step/terminal检查通过，100条终止后next_query均false。前5条视频帧数700/406/406/405/405，逐帧读取与记录一致。源码hash与启动身份仍一致，GPU0收尾后12 MiB/0%。
+row30最终证据为正式目录final_review_0100.json、smoke_cleanup_receipt.json和smoke_gate_summary.json。清理receipt保留原文件hash清单和已删除压缩包身份，仅作清理历史；压缩包本体已按新发布要求删除。100条均accepted且seed100000—100099连续唯一，无候选拒绝/运行错误；100个scheduler退出0，robot/policy由runner_shutdown收尾。总耗时9439.21秒，整体38.14条/小时；95个无视频完整周期均值89.055秒、中位86.749秒。1479query中1380完整K30、99partial；所有字段与step/terminal检查通过，100条终止后next_query均false。前5条正式视频帧数700/406/406/405/405，逐帧读取与记录一致。源码hash与启动身份仍一致，GPU0收尾后12 MiB/0%。
 
 row20/GPU1 smoke检查：
 
