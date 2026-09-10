@@ -1,0 +1,12 @@
+# 新schema评测入口独立review
+
+候选RMBench 737890494d38486c6335feed6fe55f550b271234（含498cc4c与审计目录修复）；依赖openpi a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4、bridge 8ea6078543a875b5ae223df16891cdc1fe975c66。从MAM登记独立三库worktree/环境，读各库AGENTS、RMBench实验规范、bridge conventions。CPU-only，不改生产实现、不占GPU、不重复模型/loss/数据已通过检查。
+
+只审源任务e6908de7-4b02-465a-987b-a19eba7a315a的新增入口/配置/README。核对checkpoint metadata进入真实OpenPI runtime metadata与MemoryContext，full/serial/no-memory与put-back绑定正确；新训练来源强制demo_clean_state，评测场景demo_clean_eval；H50/K30、full row30和serial query反馈来自schema，不能注入legacy selector替代。
+
+沿既有BenchmarkRunner验证审计manifest/evidence生成、metadata继承、RMBench/eval_result/memory_chunk_20260910/<run>位置、单GPU串行100与对应video/no-video smoke门。technical-smoke仅50step两集，不能授权正式100；正常smoke/formal仅20000且匹配自身checkpoint。用已保留真实两份50step checkpoint做CPU metadata/dry-run和关键错误输入检查，不加载GPU模型、不跑仿真，不复制权重。临时manifest/evidence随既有run metadata保存，临时输入目录有清理路径，不能混充正式run。
+
+drawer只需现有drawer_offline.py直接命令，核实两旧模型实际step/metadata、5ep数据路径、S2M、多字段和结果位置，无新专用算法wrapper。报告必要缺口及影响，不为假设未来格式扩展兼容。
+
+完成后清理自有CPU临时产物与非共享源码cache；report写task_revision、实际三库SHA/workspace、独立命令和结论、CPU/GPU边界，交Manager裁定与归档。
+新增审计输入统一在review worktree的RMBench/.local/memory_schema_eval内，不改checkpoint任何文件，保持config_source继承到正式run。两份真实50step在/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/gpu_smoke_checkpoints，full/serial目录具体以source报告为准；该owner现在GPU2/3跑wash，原rearrange50只读可用，不触GPU进程/新wash产物。代码约256物理行的必要manifest/audit接线范围已被Manager接受，不单按行数要求重构公共runner。
