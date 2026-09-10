@@ -27,3 +27,15 @@
 - 不改变已发布实验优先级、模型/评测数量和训练作业。若发现一个致命实验解释缺口，用中文裁决说明指出；不扩大实验清单。
 
 期望25分钟内提交初稿。report列读取的主要文档和任何引用限制，不需要记录每条读命令。无代码commit，明确写“文本交付，未修改业务库”。Manager裁定后将请空白reviewer审阅文字。
+
+## Manager首轮裁定（11:46）
+
+保留当前篇幅和实验边界，做以下精简修正后重新发布report：
+- 时序总述不能说所有policy都输出H行memory；full为H行、serial为一个query状态，当前共同框架需允许二者。
+- j始终是0-based预测索引，r为1-based反馈行且r=j+1；不在段落间切换。删除“four time quantities”的错误计数，直接列变量。
+- repeated endpoint两组的H行是不同输出位置，不意味着统计独立，删掉“independently predicted rows”。
+- demo_clean_state只修饰仿真训练，wash为真机数据。report里的“真机闭环尚在进行”不准确：实际尚未安排设备执行，改为待执行。
+- 正文写成可使用的研究叙述，删去开头过密的“not a new…not a claim…”和要求读者如何写稿的措辞，限制与解释边界放在对应比较/末段。相关工作仍使用可核查的明确文献名并列原文链接。
+- Q3明确为差异之差；假设结论不预写。
+- 建议标题改为 Task Memory in Action-Chunked Policies: A Study of Supervision and Feedback。图表建议控制为一张问题/时序示意、一张主结果图、一张Q1/Q3诊断图、一个协议表；避免正文重复主结果表与主结果图。
+这些是文字准确性修订，不追加实验或查新任务。
