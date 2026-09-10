@@ -2,24 +2,24 @@
 
 ## 核心原则
 
-MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job`、`mam wait`。所有 agent 与管理命令在本机运行；GPU 作业可通过 SSH 在 `wuwen-1` 运行，两端共享 `/mnt/public`。安装与更新见[安装说明](docs/install.md)。
+MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job`、`mam wait`。本集群的信息查看[本地说明](.local/README.md)，所有 `mam` 命令以及 agent 均在本机运行。安装与更新见[安装说明](docs/install.md)。
 
 使用细节可用 `mam --help` 查询，语法中的大写词需要替换为实际值，方括号表示可选参数。
 
 MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 由 codex 生成，标识执行 agent。
 
-在对应项目目录内运行 `mam`。下文 `MAM_ROOT` 表示 MAM 根目录，`PROJECT_ROOT` 表示项目根目录。
+MAM 使用共享根目录 `MAM_ROOT`：Manager 编辑其中的 `task.md`，执行者编辑自己的 `report.md`。任务和报告通过 `mam task publish` 发布，并使用 `mam task show` 查看，未发布的修改是草稿。
 
-MAM 使用共享根目录：Manager 编辑其中的 `task.md`，执行者编辑自己的 `report.md`。任务和报告通过 `mam task publish` 发布，未发布的修改是草稿。修改 MAM 工具时，从 `main` 创建 worktree，验收后将代码合并回 `main`。
-
-MAM 的任务 TASK-ID 和执行者 AGENT-ID 一一绑定。每个执行者有自己独立的 workspace `PROJECT_ROOT/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。
+MAM 的任务 TASK-ID 和执行者 AGENT-ID 一一绑定。每个执行者有自己独立的 workspace `PROJECT_ROOT/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。`mam` 需在 `PROJECT_ROOT` 或其各级子目录中使用。
 
 ```text
-MAM_ROOT/                   # MAM 工作目录
-  .tasks/TASK-ID/task.md      # Manager 编辑任务要求
-  .tasks/TASK-ID/report.md    # 执行者编辑结果简报
-PROJECT_ROOT/workspace/TASK-ID/   # 执行者的独立工作空间
-  REPO/                       # 按需创建的 worktree，分支为 task/TASK-ID
+PROJECT_ROOT/
+  MAM_ROOT/                   # MAM 根目录
+    .tasks/TASK-ID/task.md    # Manager 编辑任务要求
+    .tasks/TASK-ID/report.md  # 执行者编辑结果简报
+  REPO/                       # 一个项目下可以有多个 git 仓库
+  workspace/TASK-ID/          # 执行者的独立工作空间
+    REPO/                     # 按需创建的 worktree，分支为 task/TASK-ID
 ```
 
 ## 任务管理
@@ -64,7 +64,7 @@ mam task show TASK-ID
 mam workspace add TASK-ID --repo REPO --base COMMIT
 ```
 
-完成后，在 `MAM-ROOT` 的 `.tasks/TASK-ID/report.md` 写结果简报，记录完成项、workspace 与交付 commit、验证结果和成果位置。然后发布简报：
+完成后，在 `MAM_ROOT` 的 `.tasks/TASK-ID/report.md` 写结果简报，记录完成项、workspace 与交付 commit、验证结果和成果位置。然后发布简报：
 
 ```text
 mam task publish TASK-ID --file report
@@ -99,6 +99,8 @@ mam wait stop --agent AGENT-ID
 `mam wait stop` 只停止对应 agent 的等待，不会停止或归档 job。
 
 ## 开发验证
+
+修改 MAM 工具时，从 `main` 创建 worktree，验收后将代码合并回 `main`。
 
 修改 MAM 实现时，在自己的 worktree 运行：
 
