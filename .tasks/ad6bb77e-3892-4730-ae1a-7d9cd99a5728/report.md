@@ -1,4 +1,19 @@
-task_revision: 10b138a76b1bbf3a0a6401bdcee27a8ff7b34e82
+task_revision: 14974320cbd3669d043d71ceeca8db383fd2facf
+
+正式BF16评测副本已交付（按12:35追加要求保留，不能清理）：
+
+- 可用路径：/mnt/public/xcj/Projects/openpi/user_checkpoints/precision_validation/rearrange_full_key_state_30k_bf16/30000
+- 原模型：/mnt/public/xcj/Projects/RMBench/policy/pi05/checkpoints/pi05_full_key_state/shared_memory_full_key_state_seed0/30000。这是F0同一旧full30k模型的dtype导出副本，没有重新训练。CPU-only执行，沿本任务独立.venv与冻结056bcc887637cc6eda565a8ad7d45c88021d4bcd代码；原checkpoint只读，wash正常训练未变，本轮没有重复小时巡检或占用GPU。
+- 原文件metadata为51个FP32叶子；调用当前restore_params保留FP32、_cast_floating_params('bfloat16')、实际Orbax PyTreeSave导出。固定目录创建前确认不存在，未覆盖已有内容；最终仅params/assets/metadata。
+- 对此实际持久副本重新执行两条恢复路径全量比较：原FP32文件→restore BF16，与导出BF16文件→restore BF16；全部51叶子/3353433872元素键、shape、dtype均一致，逐值不一致0、uint16位模式不一致0，全部有限。不是仅复用上一轮临时导出的结果。
+- BF16参数逻辑大小6706867744字节；params文件实际合计5257190352字节（Orbax存储大小，不等同未压缩参数大小）；当前整个副本文件合计5257233544字节。
+- 原assets和全部metadata完整复制并逐文件SHA256核对，共7个原文件一致。原metadata/command.txt、train_config.yaml仍描述原30k训练，没有改写为新训练。
+- 本次可复现实际CPU导出命令/完整Python代码、导出commit/cwd/时间、原checkpoint位置和dtype说明：/mnt/public/xcj/Projects/openpi/user_checkpoints/precision_validation/rearrange_full_key_state_30k_bf16/30000/metadata/export_command.txt。
+- 全部逐叶数值/shape/dtype/位模式比较与继承文件hash证据：/mnt/public/xcj/Projects/openpi/user_checkpoints/precision_validation/rearrange_full_key_state_30k_bf16/30000/metadata/export_validation.json。执行日志：/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/cpu_norm_logs/f0_bf16_export_20260910.log。
+- 此固定副本作为正式100-rollout评测输入保留，交Manager/另一agent执行；本owner未运行或宣称动作/rollout结果。参数一致性只说明当前BF16恢复路径对该checkpoint没有额外权重变化，不等价于FP32推理、也不能恢复FP32训练精度。
+- 没有留下临时辅助脚本（本次直接以python -u -B -c执行，完整命令留在上述metadata）；上一轮临时副本及辅助脚本已清理。本正式副本、原d10两份50和wash产物均继续保留。
+
+以下为上一轮CPU参数验证及既有训练巡检状态，保留原训练job/PID/产物定位；下一小时巡检仍为13:02 CST。
 
 CPU追加验证：FP32保存与BF16导出在当前BF16恢复入口下的参数一致性（非新一轮巡检）。
 
