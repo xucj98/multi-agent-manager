@@ -1,6 +1,15 @@
-task_revision: 03e23da22e39a090cb44d1f5956492560d6231a6
+task_revision: eebd4b82e23caebe3886e3749f879f0e83348845
 
 完成与剩余：
+
+最新资源授权：Manager已于08:15释放GPU1并接受row30的45/50中点。已于08:17使用原冻结入口启动row20/GPU1的2rollout smoke，runner PID2214784，host is-dcfi2kjdq7g3k6aa-devmachine-0；sim/policy PID2214865/2214866，端口19310/19312，缓存gpu1/{robot,policy}。GPU1启动前1 MiB/0%、无计算进程，两个端口均空闲。08:20已完成真实checkpoint/norm加载并进入首条video rollout，确认K30/index19及三个字段共同row20反馈。短smoke不登记长job；全部产物检查通过后直接正式100并登记，无需再次许可。row30/GPU0原进程继续，09:10巡检计划不变。
+
+row20 smoke实际目录：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row20_smoke_20260910/。启动命令：
+
+```bash
+cd /mnt/public/xcj/Projects/workspace/a15fdd25-5e7d-4eb4-8059-a5bd4d35a691/RMBench
+../robot-bridge/.venv/bin/python experiments/memory_chunk_20260910/commands/run_f0.py --row 20 --gpu 1 --mode smoke --detach
+```
 
 Manager已验收row30/GPU0 smoke，并一并授权F0四个run预算及同GPU后续各row的“匹配smoke→正式100”。已按冻结入口启动row30/GPU0正式100，登记真实host/PID的MAM job；真实服务metadata握手、原完整smoke兼容门禁、首条检查、08:00巡检和50条人工中点比较均完成。第50条于2026-09-10 08:12:39.242 +08:00终止，固定前50条为45/50（90%），相对历史93/100低3个百分点，未触发超过10个百分点的阈值。正式进程继续运行，未完成100条，不归档活跃job。
 
@@ -83,4 +92,4 @@ mam job add a15fdd25-5e7d-4eb4-8059-a5bd4d35a691 --note 'F0 row30 H50 K30 正式
 
 结论：保持原运行继续row30正式100；中点不触发阈值调查或干预。人工检查证据均已写主RMBench真实run路径和本report。
 
-row30完成100后记录结果、失败分布、时序和完整source/命令，确认进程收尾再archive本job。GPU1释放前按GPU0依次处理row20/1/50，各自匹配两条smoke确认后直接正式100，不再次请求已授权scope的许可。源码与实验文档保持冻结，workspace不删除。
+row30和row20各自完成100后记录结果、失败分布、时序和完整source/命令，确认各进程收尾再archive相应job。剩余row1/50按两卡空闲顺序调度，各row先执行其实际GPU的匹配两条smoke，全部检查通过后直接正式100，不再次请求已授权scope的许可。只使用本机GPU0/1，每run完整100始终同卡串行；源码与实验文档保持冻结，workspace不删除。
