@@ -72,3 +72,6 @@ e690负责人确认技术smoke与drawer10ep offline完成，GPU1显存1MiB/0%、
 
 
 16:01接口迁移：不要再将job list输出按JSON解析；用task status里的jobs取ID，再逐个job status获取实时结构化结果。既定监控频率不变。新增mam wait jobs/list/stop可按需使用，自动CODEX_THREAD_ID；停止等待不影响实验。
+## 16:11 GPU0 配对项放行
+
+BF16负责人报告63f2857已确认100条完成、16:01:58自有GPU0进程退出/端口释放/无计算进程、job归档。现在授权本机GPU0启动先前明确的 pi05_rmbench_put_back_block_full_t_plus_30 seed2，exp_name memory20k_e7e5ac54_put_back_full_t_plus_30_s2。沿原冻结d10cc01、同数据/norm/base、单卡bs32/20k实际update、BF16仅最终checkpoint、python -u -B及metadata；不重跑50step、不覆盖。启动前核对实际显存，启动后登记job与首次更新/有限loss证据。现有13路不变，后续14路按小时合并监控。MAM结构化实时查询用job status，不解析job list表格。
