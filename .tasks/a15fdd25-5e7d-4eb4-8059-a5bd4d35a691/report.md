@@ -2,11 +2,15 @@ task_revision: eebd4b82e23caebe3886e3749f879f0e83348845
 
 完成与剩余：
 
+最新阶段：row30/GPU0已于09:29:23.210完成92/100，相对历史93/100低1个百分点。100条/汇总/1479query/前5条视频/全部子进程退出核查通过；失败首因按压不足6、未按1、重复按1。09:31已归档job a19ad5c6-4449-41c3-a077-2d67e80c5286。该smoke全部33文件含视频/原始日志已压缩进正式run、逐文件SHA校验并清理原目录，未丢失唯一证据。
+
+随后已启动row1/GPU0匹配2rollout smoke，runner PID2354686，host is-dcfi2kjdq7g3k6aa-devmachine-0；短smoke无需长job。实际目录/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row1_smoke_20260910/。沿用冻结入口--row 1 --gpu 0 --mode smoke --detach，完成完整检查后直接正式100。row20/GPU1继续，未提前汇总其成功率。
+
 09:10计划巡检于2026-09-10 09:12:25 +08:00完成：row30/GPU0为89/100，最近10条完整周期均值92.025秒、39.12条/小时，预计100条09:28:47（窗口09:25—09:35）；row20/GPU1为24/100，均值94.564秒、38.07条/小时，预计50条09:53:02（窗口09:48—10:00）。本轮未汇总row20成功率，也未重算row30成绩。两路所有已完成scheduler均退出0，未见runtime_error/Traceback/超时/连接故障，runner/robot/policy均存活。GPU0/1快照分别34439 MiB/4%、33419 MiB/0%；三库HEAD/clean继续符合冻结要求。各run已保存progress_check_20260910_091225.json。
 
-下一事件为row30完成，计划约09:29完整核对100条与退出、记录结果及失败/时序后归档job，并把该smoke证据归入正式run再清理原smoke目录；GPU0接续row1匹配2rollout smoke→正式100。row20下一结果检查为其50条事件约09:53；当前GPU授权不变，不提前查成功率。
+09:12巡检后已执行上述row30完成和GPU0接续动作。下一事件为row1 smoke完成及正式首条检查；row20下一结果检查为其50条事件约09:53。GPU授权不变，不提前查row20成功率。
 
-Manager已接受row30/GPU0的45/50人工中点，并于08:15释放GPU1。已完成row20/GPU1独立2rollout smoke的全部产物/source/视频/时序/退出检查，于2026-09-10 08:23:48 +08:00直接启动同卡正式100并登记MAM job；真实服务metadata握手及原完整smoke兼容性检查通过，首条episode检查已完成。两路正式进程继续运行，尚未完成各自100，不归档活跃job。未修改任何运行源码、配置或实验README。
+Manager已接受row30/GPU0的45/50人工中点，并于08:15释放GPU1。row20/GPU1独立2rollout smoke全部检查通过后，已于2026-09-10 08:23:48 +08:00启动同卡正式100并登记job；真实服务metadata、原完整smoke兼容性检查和首条检查完成。当前row30正式已收尾、row20正式仍运行、row1 smoke已启动。未修改任何运行源码、配置或实验README。
 
 冻结workspace与实际commit：
 
@@ -20,7 +24,7 @@ Manager已接受row30/GPU0的45/50人工中点，并于08:15释放GPU1。已完�
 
 当前进程与MAM job：
 
-共同host：is-dcfi2kjdq7g3k6aa-devmachine-0。两路runner均PPID=1，各自独立session；每run完整100始终同一GPU串行，sim/policy共用该卡。
+共同host：is-dcfi2kjdq7g3k6aa-devmachine-0。正式runner均PPID=1、独立session；每run完整100始终同一GPU串行，sim/policy共用该卡。表中row30 PID已退出、job已归档，保留为历史身份；row20仍运行，新row1短smoke runner为2354686。
 
 | run | GPU | 正式启动时间（+08:00） | runner PID | robot / policy PID | MAM job |
 | --- | ---: | --- | ---: | --- | --- |
@@ -34,9 +38,11 @@ Manager已接受row30/GPU0的45/50人工中点，并于08:15释放GPU1。已完�
 - row30正式：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_100ep_seed0/
 - row20正式：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row20_100ep_seed0/
 - row20 smoke：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row20_smoke_20260910/
-- row30已验收smoke：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_smoke_20260910/
+- row30 smoke完整证据归档：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_100ep_seed0/row30_smoke_evidence.tar.gz（原smoke目录已清理）。
 
-所有目录均为共享主RMBench真实位置，worktree的eval_result软链接只提供访问入口。每run保留config.yaml、command.txt、checkpoint_metadata/、processes.jsonl、episode_diagnostics.jsonl、video_checks.jsonl及进程日志。两个正式run仍依赖各自smoke门禁，暂不清理这些证据。
+所有产物均为共享主RMBench真实位置，worktree的eval_result软链接只提供访问入口。每run保留config.yaml、command.txt、checkpoint_metadata/、processes.jsonl、episode_diagnostics.jsonl、video_checks.jsonl及进程日志。row20仍依赖其smoke，继续保留；row30正式已通过核查并退出，其smoke证据已归档，不再保留被替代目录。
+
+row30最终证据为正式目录final_review_0100.json、smoke_cleanup_receipt.json、row30_smoke_evidence.tar.gz。归档共33文件、原878688字节、压缩568271字节，SHA256 baa53f9d769108013a7343ecab35417a4a8bcf5cc52ce21b6d61f5f9a2ea90dc。100条均accepted且seed100000—100099连续唯一，无候选拒绝/运行错误；100个scheduler退出0，robot/policy由runner_shutdown收尾。总耗时9439.21秒，整体38.14条/小时；95个无视频完整周期均值89.055秒、中位86.749秒。1479query中1380完整K30、99partial；所有字段与step/terminal检查通过，100条终止后next_query均false。前5条视频帧数700/406/406/405/405，逐帧读取与记录一致。源码hash与启动身份仍一致，GPU0收尾后12 MiB/0%。
 
 row20/GPU1 smoke检查：
 
@@ -84,7 +90,7 @@ row30/GPU0保留的人工中点结论：
 
 下一检查与剩余责任：
 
-- 09:10巡检已于09:12完成；row30最新完成估计09:28:47，下一次核对为100条和退出事件，窗口09:25—09:35。GPU0接续row1匹配两条smoke及正式100。
+- 09:10巡检和row30正式100收尾已完成；当前先核对row1/GPU0匹配smoke，再正式100登记与首条检查。
 - row20以正式最近10条无视频完整周期修正50条中心为09:53:02，窗口09:48—10:00，替代启动时粗估。不到50不重复查成功率，到50固定前50条人工比较历史93/100及辅助同seed first50，记录首因和协议/基础设施边界。
 - 后续只按约小时巡检及50/完成事件检查，不新建常驻队列。首条/短smoke事件等待均已退出。
 - 各run完成100后核对结果、失败分布、时序及退出，先记录和处理临时产物，再archive对应job。两路活跃job当前不归档。
