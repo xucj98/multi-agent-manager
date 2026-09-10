@@ -73,3 +73,5 @@ wuwen-1 的现有训练自然结束、完成 checkpoint 保存并释放资源后
 
 ## 9月11日07:03 模型目录统一
 用户要求OpenPI模型统一位于checkpoints，不再使用user_checkpoints。Manager交47a91a44-4efa-48d7-b162-93d097763376迁移已完成精度验证的BF16副本到openpi/checkpoints/precision_validation/rearrange_full_key_state_30k_bf16/30000，保留权重和历史原始留痕。此前本任务“原位保留user_checkpoints”改为保留迁移后副本；你不要并发移动或重建旧路径，不改变正在训练的输出。后续简报引用新位置并注明迁移完成状态，以迁移owner报告为准。
+
+07:04用户再次明确：该BF16验证副本实验已完成，应直接清理，不迁入checkpoints。47a91a44负责清理，仅保留源FP32和正式实验/导出留痕。替代上一条迁移安排；不要重建副本，wash训练不变。
