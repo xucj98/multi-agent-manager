@@ -25,7 +25,7 @@ row30/GPU0已于09:29完成92/100，Manager接受最终协议、视频和退出�
 
 ## 产物、范围与交付
 
-写范围为RMBench experiments/memory_chunk_20260910的F0配置/命令/中文README；模型/runtime由其他owner负责。需要新增核心诊断先报告Manager，不修改主checkout。所有调用本树的正式进程结束后再更新实验文档并交付commit。
+写范围为RMBench experiments/memory_chunk_20260910的F0配置/命令/中文README；模型/runtime由其他owner负责。需要新增核心诊断先报告Manager，不修改主checkout。所有调用本树的正式进程结束后再更新实验文档并交付commit。主xcj-dev已在7b872c5合入新schema评测说明；最后更新本组README时补README_memory_schema.zh-CN.md导航链接即可，不复制其正文，运行期间仍保持f022冻结。
 
 结果统一/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/<run>，说明归RMBench/experiments/memory_chunk_20260910；不在bridge保存，不增加日志根。每步完整继承metadata/config/command+commit，不复制代码。README直接命令，不使用root export设置段。正式实验替代的smoke在无需再使用门禁引用后清理。保留正式metadata中的smoke通过结论与原检查摘要即可，依用户要求不保留smoke原始视频/日志，也不将整个smoke压缩包搬入正式run。row30的92/100最终检查已被Manager接受，已生成的row30_smoke_evidence.tar.gz可删除，清理记录注明正式结论与摘要保留。活跃run仍依赖的smoke不提前删除；不改运行源码。
 
