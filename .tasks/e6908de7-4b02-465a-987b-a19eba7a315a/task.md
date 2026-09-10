@@ -85,3 +85,8 @@ wuwen-1 的现有训练自然结束、完成 checkpoint 保存并释放资源后
 
 ## MAM 项目配置迁移完成（2026-09-11）
 在/mnt/public/xcj/Projects及其子目录内直接使用mam；已取消--root参数，自动读取项目配置。MAM根目录不变，已发布任务/报告改到project/state-vla，main只用于工具开发。现有task/job/workspace不变；报告仍在原路径编辑，mam task publish正常发布。本轮main已重写历史；后续若开发MAM必须从新的main基线创建worktree，不从旧任务或项目分支合回main。训练与评测业务代码基线不受影响。
+
+## 9月11日04:32 正式评测排期准备（暂不占GPU）
+复用保留的三个worktree，读取两个训练owner最新报告，为14个仿真20k模型（12个Q2受控重复+rearrange serial/no-memory基线）列出对应checkpoint、单GPU smoke2/formal100 run名和先后顺序。优先rearrange/put-back per-frame与repeated-endpoint按训练seed成对进入队列，不按中途成绩筛选。每模型先自身smoke（同一run两条rollout，一条video一条无video），核对产物/现有门禁后才能正式100；每run在一张卡串行执行，第50次做正常诊断。产物统一RMBench/eval_result/memory_chunk_20260910/<run>及对应experiments记录。
+同时核对wash full/serial新20k的固定5ep offline入口与数据，必须复用已验证的通用memory/S2M机制；读取wash owner已固定的5ep，不另选episode。只准备命令及必要配置，不因脚本名drawer而另写wash专用实现。若接口存在实际缺口，给代码证据和最小修复建议交Manager裁决。
+当前本机8卡全在训练，wuwen-1结束后全部停用。现阶段只做CPU/元数据/命令准备，不加载GPU模型、不重新运行已验收的technical smoke或旧drawer回归。预计07:20以后本机4–7先释放供仿真；wash GPU2/3预计07:27后优先完成其checkpoint恢复及5ep offline，再转仿真，具体授权由Manager确认。报告清楚“已准备”和“已运行”的边界；可在现有实验说明补紧凑队列，不新增调度框架。完成准备后报告即可，等待Manager分配卡。
