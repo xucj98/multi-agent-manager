@@ -68,3 +68,6 @@ Pascal实际复核已关闭drain后的latency偏移，真实ffa308d transforms�
 2. 实时tick可以跨过中间端点。3个目标1/2/3、间隔20ms，90ms后才启动实际loop/worker，只成功发送3，tracker报completed1/queued2，Context误反馈model row0=1且旧pending永久残留。不要补发过期动作；将进度定义为一次成功handoff确认执行器推进到的轨迹位置/已消费前缀，与policy row映射一致。仅墙钟推进或单纯累加SDK发送次数都不正确。被取消的旧epoch/proposal不贡献新进度；较旧图像snapshot不能被后来的无图请求提前推进。
 
 可沿现有轻量tracker调整成功handoff的前缀语义和wait条件，不需要新状态框架；generic执行能力/等待条件仍归controller，memory语义归scheduler。测试覆盖上述两项真实loop/worker复现、同期正常/跳tick、partial、terminal、takeover/reset。每条命令“被执行器消费”不等于机器人物理到位，在文档/trace命名中准确说明。先交独立commit供Pascal增量复核；不重跑已通过的跨wire或旧F0。
+## 交付收尾：跨库回归草稿
+
+ed2f2f3已交Pascal增量复核；期间不重复修改live实现。未跟踪的test_openpi_memory_transform_contract.py目前454行，需在归档前处理。保留有价值的边界回归，但优先复用真实已注册full/serial/no-memory配置与现有测试helper，删除为测试复制的大块schema/factory构造；实际tokenizer、input/output transforms和MemoryContext应进入测试，只替换昂贵模型计算。覆盖非initial输入、robot-only输出后IDs保留、full K30选行和serial实际condition一致的关键契约；单/多字段可参数化。代码控制在清楚表达这些边界所需范围，目标约200行，遇到合理必要性可说明，不为行数破坏验证。独立小commit给reviewer；不安装到真机/其他task环境，不占GPU，不为这项重建worktree。已通过的CPU证据不因测试整理被重开。
