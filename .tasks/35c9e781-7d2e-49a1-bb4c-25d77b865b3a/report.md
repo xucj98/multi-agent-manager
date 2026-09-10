@@ -1,6 +1,25 @@
 task_revision: 1dc0d33b8783f532702f33e597802d390d943c41
 
-## CPU 留痕修正完成，GPU0 已移交
+## 14:59 中点检查完成，正式 run 继续
+
+2026-09-10 14:58:55 +08:00 快照：完成 **57/100**，成功 **51/57（89.47%）**。
+实时 `mam job list --task 35c9e781-7d2e-49a1-bb4c-25d77b865b3a` 确认原 job/PID
+`577e7ab0-eb55-4c65-bed5-3b725e958435` / `2710786` 仍为 running。
+
+前50条 **45/50（90%）**，相对本次F0 row30完整92/100为 **−2个百分点**；相对
+同seed F0前50条45/50为0个百分点，既有中点gate未触发（阈值绝对差>10个百分点）。
+逐seed配对：共同成功41、共同失败1、BF16成功/F0失败4、BF16失败/F0成功4。
+成功率相同不代表轨迹一致或统计等价，最终仍需完整100条配对。
+
+当前6次失败均到700步：button_not_pressed为seeds 100007、100034、100056；
+button_press_insufficient为100008、100022、100029。未发现runtime_error或异常子进程退出。
+已检查57条连续seed、855个已执行query的K30/index29/row30与terminal trace，以及57条视频
+ON/OFF检查（前5视频帧数匹配步数）。有效policy设置和scheduler与F0一致，三库固定SHA且干净，
+私有manifest哈希与5个lineage副本均一致。未修改运行参数或重启进程。
+
+证据：正式run中的 `midpoint_checks.jsonl` 和 `midpoint_review_0050.json`。
+近期10条完整episode终止间隔估算 **41.55 ep/h**，剩余约62分钟，预计约16:01完成。
+**下一检查：2026-09-10 15:55 +08:00**；提前完成或异常时按事件检查。
 
 未改动三库源码，未重新导出、训练或复核全量权重。Manager 已在本 task 的 13:04
 末节确认 F0 row1 完成、GPU0 的自有 PID/端口均已退出；GPU1 仍属 F0，不使用。
@@ -82,13 +101,12 @@ trace 全部为 selector index29 / row30。runner 已在 formal 中接受同卡 
 
 保持同一连续 run、GPU0 与冻结输入。按最新 MAM 规则以
 `mam job list --task 35c9e781-7d2e-49a1-bb4c-25d77b865b3a` 刷新实际 job 状态；第 50 条按
-92/100 主基线与 45/50 同 seed 辅助基线检查，完成后做逐 seed 配对统计、失败类别与结果 README。
+92/100 主基线与 45/50 同 seed 辅助基线的中点检查已完成，完成后做逐 seed 配对统计、失败类别与结果 README。
 
 完成与未完成：CPU 环境、输入留痕、基线修正、CPU/真实输出继承检查与两条 BF16 smoke 已完成；
-正式 100 运行中，首条检查通过；50 条检查、100 条收尾、逐 seed 配对统计和结果 README 尚未完成。
+正式 100 运行中，首条和50条检查通过；100 条收尾、完整逐 seed 配对统计和结果 README 尚未完成。
 
 workspace、各库交付 commit：RMBench
 `f022badd11228e5763a301339a5d1fe5574962b4`；robot-bridge
 `bc842036e3735390f35fe1138aa7b19f5ae2f95b`；openpi
 `58d6f2155acc3af03017677bb3f536101e6699f4`。三库工作树干净，无源码交付 commit。
-
