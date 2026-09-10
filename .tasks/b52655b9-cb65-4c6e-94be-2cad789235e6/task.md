@@ -9,3 +9,6 @@
 
 # Manager 验收补充
 默认一键环境须覆盖当前实际 ManiSkill/reference 工作流，不能只安装 CPU/dev 测试依赖而让后续 agent 手动补核心 simulator/torch。按现有 README/pyproject/旧环境核验依赖；至少执行真实资产加载及场景 smoke，GPU 可用时包含渲染/模拟。可以合理分层安装但默认入口需完成当前工作流。参考 wuwen-2 的版本化脚本加 .local wrapper 模式。验证任意 cwd 的底层入口、重复执行与失败恢复、独立 venv 以及真实 cache inode hardlink 证据。
+
+# 用户追加：outputs 也纳入软链接管理
+用户询问软链接数量并明确 outputs 类目录也应软链接。当前 primary 与 task worktree 各只有 .cache 一条顶层链接。请完善集中成果目录：PROJECT_ROOT/outputs/main 供 primary，PROJECT_ROOT/outputs/TASK-ID 供 task worktree，并在各 repo 创建 outputs 软链接指向对应目录，避免多 agent 覆盖且归档 worktree 后保留成果。已有 worktree outputs 内容要安全迁移，遇冲突不能覆盖；不要把历史研究备份当默认输出目录。对数据流核验是否还有其他真正需要共享/集中留存的 repo 顶层目录，按必要性实现并列清单。更新文档、smoke 与 report，明确每个 worktree 顶层业务软链总数/去向（区分 Python venv 内部软链）。
