@@ -4,7 +4,7 @@ task_revision: 03e23da22e39a090cb44d1f5956492560d6231a6
 
 Manager已验收row30/GPU0 smoke，并一并授权F0四个run预算及同GPU后续各row的“匹配smoke→正式100”。已立即按冻结入口启动row30/GPU0正式100，登记真实host/PID的MAM job；真实服务metadata握手、原完整smoke兼容门禁与首条episode检查均完成。正式进程继续运行，尚未达到50条或100条，不归档活跃job。
 
-本轮恢复检查时间为2026-09-10 07:29:09 +08:00：已完成19/100，第20条（episode_id=19）正在运行，19个已完成scheduler均returncode0。不到50条，本轮只检查完成计数、耗时和进程，不汇总成功率或重新检查成绩。runner/robot/policy正常存活，进程未干预，源码/文档未修改。GPU1尚未获准、未使用；后续同GPU各row匹配smoke验收后可直接正式100，无需再次等待用户许可。
+本轮恢复检查时间为2026-09-10 08:00:14 +08:00：已完成41/100，正处于episode40结束到episode41启动的间隔，41个已完成scheduler均returncode0。不到50条，本轮只检查完成计数、耗时、进程和基础设施异常，不汇总成功率。runner/robot/policy正常存活，没有accepted runtime_error、Traceback、超时或连接故障；日志关键词只匹配启动时Orbax的一条INFO说明，之后未报加载异常。进程未干预，源码/文档未修改。GPU1仍由训练full/serial smoke及保存恢复准备占用，未释放、未使用；后续GPU0各row匹配smoke验收后可直接正式100，无需再次等待用户许可。
 
 冻结workspace与实际代码：
 
@@ -41,7 +41,7 @@ mam job add a15fdd25-5e7d-4eb4-8059-a5bd4d35a691 --note 'F0 row30 H50 K30 正式
 
 正式run：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_100ep_seed0/
 
-本轮进度/吞吐记录：上述目录progress_check_20260910_072909.json。首条检查记录progress_check_0001.json继续保留。config.yaml、command.txt、checkpoint_metadata/、processes.jsonl、episode_diagnostics.jsonl、video_checks.jsonl和各进程日志均已产生。eval_result是共享主RMBench真实位置，不依赖临时worktree保存。
+本轮进度/吞吐记录：上述目录progress_check_20260910_080014.json。前次progress_check_20260910_072909.json与首条检查progress_check_0001.json继续保留。config.yaml、command.txt、checkpoint_metadata/、processes.jsonl、episode_diagnostics.jsonl、video_checks.jsonl和各进程日志均已产生。eval_result是共享主RMBench真实位置，不依赖临时worktree保存。
 
 门禁引用的已验收smoke：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_smoke_20260910/。该smoke为1/2、video700帧/另一条无video，38个query检查通过；不以smoke成功率推断正式结果。唯一证据及活跃正式run的smoke依赖仍保留。
 
@@ -67,9 +67,11 @@ mam job add a15fdd25-5e7d-4eb4-8059-a5bd4d35a691 --note 'F0 row30 H50 K30 正式
 
 中点预计时机与后续责任：
 
-07:30检查点已在07:29完成。本轮取最近10个无视频episode（episode_id 9—18）的完成时间间隔，包含reset/preflight与实际执行：85/95/84/84/86/82/82/84/86/80秒，平均84.8秒、中位84秒，约42.45条/小时。最近完成时间07:28:18；按剩余31条外推，第50条中心估计08:12:06，更新检查窗口为08:10—08:20 +08:00。
+08:00检查点已完成。本轮取最近10个无视频episode（episode_id 31—40）的完整完成周期，包含reset/preflight与实际执行：81.920/87.754/84.818/83.650/84.346/81.204/82.848/81.605/76.221/101.538秒，平均84.590秒、中位83.249秒，约42.56条/小时。最近完成时间07:59:58.316；按剩余9条外推，第50条中心估计08:12:40，窗口收敛为08:10—08:16 +08:00。与07:29估计基本一致，没有持续吞吐下降证据。
 
-下一次进度检查计划为2026-09-10 08:00 +08:00，先按实际计数修正中点时间，到50条再进行结果/偏差检查。该预测用最近稳定周期替代首条冷启动外推，仍受episode长度和reset耗时变化影响，不是完成时刻承诺。GPU0本次快照为37222 MiB/2%，三个服务进程存活，episode19已于07:29:04进入scheduler loop；没有停止、重启或修改运行。三库HEAD仍为上述冻结版本且均干净。本轮未检查训练进度或GPU1。
+下一检查为50条事件，预计2026-09-10 08:13 +08:00；届时一次性汇总固定前50条，核查主基线偏差和失败首因。不到50不重复汇总成绩，后续按约小时巡检与50/完成事件安排。GPU0本次快照为33433 MiB/0%，处于episode切换间隔，瞬时利用率不作吞吐结论。三库HEAD仍为上述冻结版本且均干净。本轮未检查训练进度或GPU1。
+
+中点主基线已定位并确认原始_result.txt为93/100：/mnt/public/xcj/Projects/RMBench/eval_result/pi05_rearrange_shared_memory_representation/full_key_state_seed0@ckpt30k_step30_100ep_seed0/。历史config记录相同checkpoint、demo_clean_eval、K30、eval seed0和前5条video；历史前50条seed为100000—100049。完整历史93/100是主比较，同seed前50仅作辅助，不以另一份bridge 92/100替代。
 
 达到50条时由实验负责人对历史93/100主基线检查绝对偏差是否超过10个百分点，同seed前50只作辅助；调查协议/基础设施和失败原因，区分反馈行实验效应与运行错误，不为接近93而改配置或丢弃不利episode。人工检查结论写run目录和本report。
 
