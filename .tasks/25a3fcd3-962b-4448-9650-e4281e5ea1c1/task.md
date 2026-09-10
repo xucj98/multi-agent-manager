@@ -13,3 +13,6 @@ MAM_ROOT隔离所有task/job/wait/锁/归档登记，PROJECT_ROOT/workspace管�
 用户已确认本轮由Manager在实现/review完成后重写main历史，仅从main全历史过滤.tasks；project/state-vla保留原始完整历史。MAM开发worktree从main取基线，代码交付回main；生产MAM checkout处于project/state-vla。不要让新代码要求发布分支必须名为main，也不要把项目记录合回main。你无需执行历史迁移；在报告中核对独立发布分支与开发main共存是否受现有workspace add/primary逻辑影响。README已由Manager提交bdccfd0，可只读核对。
 
 接口使用者审计：scripts/create_worktree.sh 当前最后一行使用 --root，删除参数时需同步修正并实际验证一键创建，避免新main无法创建worktree。所有仓库内入口对移除参数的调用需扫描（不改历史.tasks）。安装从main取代码，不依赖生产checkout分支为main。
+
+## 多项目可用性补齐
+Manager核对发现REPOS写死五个仓库，另一个项目无法使用自己的仓库名。移除硬编码仓库枚举，--repo接收PROJECT_ROOT下单层仓库目录名；统一校验非空单个普通名称，拒绝绝对路径、.、..、分隔符和路径逃逸，继续校验真实primary仓库及.local/create_worktree.sh与已有安全边界。不增加仓库注册配置。修改实现/help/测试和必要文档，补充任意合法新仓库名及非法路径测试，重新提交并发布报告。独立review会检查最终提交。
