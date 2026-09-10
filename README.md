@@ -105,12 +105,6 @@ mam wait stop --agent AGENT-ID
 
 ## 开发验证
 
-修改 MAM 工具时，从 `main` 创建 worktree，验收后将代码合并回 `main`。
-
-修改 MAM 实现时，在自己的 worktree 运行：
-
-```bash
-.venv/bin/python -B -m unittest discover -s tests -v
-```
+MAM 自身的开发 worktree、环境、验证和合并步骤见[开发说明](docs/development.md)。
 
 详细接口、状态语义和归档保护见[任务管理 CLI 接口说明](docs/task-management-design.zh-CN.md)；参数以 `mam task --help`、`mam workspace --help`、`mam job --help`、`mam wait --help` 及相应子命令的帮助为准。
