@@ -1,6 +1,5 @@
-# 06:53正式仿真安排：八份20k CPU准备完成，等待本机释放
+# 07:29状态：GPU4/6已接用，rearrange seed0匹配smoke运行中
 
-task_revision: 1ecd0431d361e738b25ab5aba43e07aa0b1b729a
 
 复用原三树/干净版本，无新代码提交。训练owner已发布远端八份最终20000保存和CPU全参数门禁通过。本轮对这八份实际checkpoint逐项运行原入口 --prepare-audit、smoke --dry-run、formal --dry-run（共24次），全部exit0。metadata→Context验证H50/K30、schema/字段/反馈和demo_clean_state来源，审计生成物仅在本worktree .local/memory_schema_eval；未改写checkpoint，未加载GPU模型。
 
@@ -8,7 +7,7 @@ task_revision: 1ecd0431d361e738b25ab5aba43e07aa0b1b729a
 
 首批按发布分配：GPU4=rearrange t+1 seed0（19440/19442），GPU6=rearrange t+30 seed0（19460/19462），GPU5=put-back t+1 seed0（19450/19452），GPU7=put-back t+30 seed0（19470/19472）；各卡独立Warp缓存。仍须owner发布各卡保存/退出/释放且启动前显存确认才执行。GPU0/1不抢占，GPU2/3留wash，wuwen-1停用。
 
-目前八份仅CPU准备完成，GPU smoke/formal尚未启动，无本任务GPU job。保持active turn，通过mam wait等待训练结束事件，再读取owner释放报告；不得将事件或ETA本身当作释放授权。正式运行将登记各job、做50条诊断与100条收尾。旧配置/训练步数不一致的F0成绩不作强制可比基准。
+owner于07:23/07:24分别发布GPU4/6保存、CPU门禁、进程退出和释放，本任务启动前分别复核显存1MiB/空闲81038MiB/利用率0%，独立端口与run名空闲，三树干净。GPU4于07:24:57启动rearrange_full_t_plus_1_s0_20k_smoke2，GPU6于07:25:51启动rearrange_full_t_plus_30_s0_20k_smoke2；均已恢复实际20k并进入rollout。目前为短smoke，尚未启动formal，尚无正式job；各自smoke验收后立即从当前干净版本进入100并登记job，无需再次等许可。GPU5/7继续等待各自owner释放。旧配置/训练步数不一致的F0成绩不作强制可比基准。
 
 下文保留前轮CPU队列与wash接口交付；wash公共修复由Manager协调，本轮专注正式sim。
 
