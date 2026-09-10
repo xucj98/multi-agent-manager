@@ -55,3 +55,5 @@ CPU实现7378904及空白review95ece0eb已经验收，主库已合入。此次�
 - 删除 CHECKPOINT=... 以及后续 $CHECKPOINT；具体路径直接写入参数。不用 $PWD 或拼接继承的PYTHONPATH占位来猜工作目录。确有必要的进程环境设置可用具体值放在对应命令前，不建立export变量准备区；技术/正式模板明确指定实际worktree解释器、checkpoint路径与GPU0。
 - 保留只读checkpoint、技术50不能替代20k门禁、逐步metadata与清理规则，但避免重复同一说明。暂不改可执行代码、配置或公共框架。
 只需核对文字命令与现有CLI/路径、diff-check，不重复CPU模型与GPU检查。提交文档小修并发布report。F0 row1预计约12:50释放GPU0，Manager另通知你开始真实技术smoke及drawer offline；本轮不先启动GPU程序。
+
+12:38资源调整：用户追加BF16导出模型的真实100rollout验证（任务35c9e781-7d2e-49a1-bb4c-25d77b865b3a），本机GPU0在F0 row1完成后优先交给该验证。你的GPU技术smoke与drawer offline顺延到下一张释放的卡，预计F0 row50的GPU1；具体分配由Manager检查后发布。本任务CPU和文档交付均已验收并合入，现阶段继续保留三树，不启动GPU。后续实际命令按分配卡调整，README的GPU0是可复制示例，不代表已经占有该卡。
