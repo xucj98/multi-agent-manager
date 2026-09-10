@@ -24,6 +24,17 @@ if [[ -e "$worktree" || -L "$worktree" ]]; then
 else
   git -C "$source_root" worktree add -b "$branch" "$worktree" "$base"
 fi
+source_readme="$source_root/.local/README.md"
+local_directory="$worktree/.local"
+local_readme="$local_directory/README.md"
+if [[ -f "$source_readme" ]]; then
+  if [[ ! -e "$local_directory" && ! -L "$local_directory" ]]; then
+    mkdir -- "$local_directory"
+  fi
+  if [[ -d "$local_directory" && ! -L "$local_directory" && ! -e "$local_readme" && ! -L "$local_readme" ]]; then
+    ln -s -- "$source_readme" "$local_readme"
+  fi
+fi
 [[ ! -L "$worktree/.venv" ]] || exit 2
 # Ignore the independent environment even when the selected base predates it.
 git -C "$worktree" check-ignore -q .venv/ || {

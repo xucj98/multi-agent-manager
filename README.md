@@ -97,6 +97,7 @@ mam job archive JOB-ID --note NOTE
 ```text
 mam wait jobs [--task TASK-ID] [--timeout TIMEOUT]
 mam wait list
+mam wait stop manager
 mam wait stop --agent AGENT-ID
 ```
 
