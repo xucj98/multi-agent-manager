@@ -1,4 +1,20 @@
-task_revision: 3d8c0c6e4bf4cecd74499c345958a0197d00fa57
+task_revision: 826da63c2f4a7d404645e486795ff971fef12890
+
+增量复验结论：GO。原报告两项阻塞已修复；以下为最终验收结果，后附旧报告仅保留历史。
+
+workspace、最终 commit：
+- 复用 `/mnt/public/xcj/Projects/workspace/362daf44-9644-41b7-9ec9-8893bea1abb4/multi-agent-manager`，从原提交快进到 `e6892fe7d9d29be71f03d69a5c32318706207090`，未修改源码或创建新环境。
+- 固定源要求 `6da327722bf9e5834aebbd0475d554de6fdc3479`；源 report `7bd9b9f802369bd4f0f6cf96229e648802522787`。已阅读最新发布要求及增量 diff。
+
+验证与结论：
+- deadline：每个 target 前检查剩余预算，probe 使用 min(0.5, remaining)。临时 root 登记自己 wuwen-1 短进程的 8 个 remote job，真实 CLI `wait jobs --timeout 0.01` 耗时 0.080 秒，`--timeout 0.75` 耗时 0.820 秒，均返回 timeout，退出后无等待记录；约 0.07 秒 CLI/运行时开销符合最新非硬实时裁定。
+- attention：真实本地 sleep 注册后停止，绑定不可用 agent；`job list --attention` 显示 `unknown/待核实`，普通 job list 仍显示 `stopped`。保留六列、完整 UUID，带换行描述清理为物理单行。
+- 必要标准库回归 8/8 通过（3.419 秒）：全部 4 个 wait 测试、attention 新增测试、job 筛选/实时状态、job identity/attention/history、task 表头/status 测试。覆盖受控 0.01/0.75 秒预算、取消不杀 job、双等待隔离、empty/unknown/stale 等受影响路径。
+- 增量 `git diff --check 1b8f4265 HEAD` 通过。生产代码仅增加预算判断及保留 needs_verification 来源的渲染；指定中文设计文档同步解释行为，无新增框架。
+- 正常远端探测可用性及其他已通过验证沿用首轮证据；未重复全套无关测试。当前无阻塞问题，无本次必需未验项。此前 task renderer join/split 简化建议仍为非阻塞建议。
+- 临时 root（包含测试 workspace）、本地进程均清理；自建 remote 短进程自然退出且 SSH 回收。使用 PYTHONDONTWRITEBYTECODE=1，保留干净 review worktree 待 Manager 归档。
+
+以下为旧提交 1b8f4265 的历史 NO-GO 报告（依据任务 revision 3d8c0c6e4bf4cecd74499c345958a0197d00fa57），已由上方 GO 结论替代。
 
 完成与未完成：
 - 结论：NO-GO。固定交付的等待、列表、详情主体可运行，但以下两项已违反明确验收约定。
