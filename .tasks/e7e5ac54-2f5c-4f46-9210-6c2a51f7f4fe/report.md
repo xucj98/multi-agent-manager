@@ -1,5 +1,15 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日04:42 第二份20000 checkpoint收尾
+
+wuwen-1 GPU6，rearrange full_t_plus_1 seed1，job `95a88ee3-1a90-4e2e-baa1-50a1cd6f4eb0`，PID4186835，04:41:29.545最终保存并完成Save Finalize，MAM wait 04:41:34返回stopped；随后/proc PID及同session/直接子进程均不存在，GPU6已用4MiB、空闲81046MiB、0%。无自有残留需清理；数值exit code未留存，退出与保存成功分别有证据。
+
+交接checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1/20000`。父目录仅20000；commit_timestamp存在，items仅params/assets/metadata，无optimizer。command记录d10完整SHA/clean/冻结cwd/GPU6/seed1，数据记录demo_clean_state，norm及上游metadata已保存。
+
+本机显式CUDA_VISIBLE_DEVICES为空、JAX_PLATFORMS=cpu，固定树解释器实际restore_params为numpy；51叶、3353433872元素全BF16且有限，参数路径与jax.eval_shape注册模型逐项shape一致，检查exit0。缓冲退出后200条标量全部有限，Step20000：loss=0.0007、grad_norm=0.0352、param_norm=1804.5416。
+
+training job按结果归档，GPU6/7释放后保持空闲。两份seed1配对checkpoint已完成CPU参数完整性与释放检查；完整policy恢复/wire/GPU评测仍待本机空闲卡及Manager排期。其余12路继续冻结，mam wait接续事件；运行项下次05:32小时巡检。
+
 ## 9月11日04:39 首份20000 checkpoint收尾与交接
 
 wuwen-1 GPU7，rearrange full_t_plus_30 seed1，job `fa1d8437-1fb7-48a5-8d37-2233e8e06767`，PID4186832，已自然结束。04:36:01日志确认最终20000原子提交、Save Finalize done；MAM wait于04:36:05返回stopped（当时zombie），随后/proc PID已不存在，同session/直接子进程为空。GPU7已用4MiB、空闲81046MiB、利用率0%，没有需要清理的自有残留。原detach未留独立exit-code文件，数值退出码不可追溯；实际退出及保存成功分别由进程检查和finalize日志证实，不将stopped直接等同exit0。
