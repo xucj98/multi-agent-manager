@@ -1,6 +1,33 @@
-task_revision: a3a5c390b8daac7f74637988edd712142c5c16af
+task_revision: 7a4f4bcbc54871434f70a43e1be6dd72ee068b97
 
-# Memory 20k：远端八路与本机五路
+# Memory 20k：远端八路与本机六路
+
+## GPU0 配对项启动（发布 task 的 16:11 授权段）
+
+已读取发布 `7a4f4bcbc54871434f70a43e1be6dd72ee068b97` 的 GPU0 放行要求。实际启动主机时钟为 `2026-09-10T16:10:23+08:00`，启动既定 Q2 put-back full_t_plus_30 seed2，与 GPU1 的 t+1 seed2 配对，不扩展实验清单。
+
+启动前本机 GPU0 已用1 MiB、空闲81,038 MiB、利用率0；MemAvailable=886,691,171 KiB。固定 worktree HEAD=`d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`，git status 为空；解释器可执行，put-back norm SHA-256=`7a014e42dc9d51c8601b05dca5c876c58dda1308e61d1619e3d1c367baa7f261`。独立日志和 checkpoint exp 目录均未存在，未覆盖或混写。
+
+- host：`is-dcfi2kjdq7g3k6aa-devmachine-0`；GPU0；PID/session ID：`2944062`；start_ticks：`27664648`。
+- MAM job：`dcb7d214-5351-4301-b0cd-1bac56f59de3`；16:10:52 登记实时状态 running。
+- config：`pi05_rmbench_put_back_block_full_t_plus_30`；seed2；exp_name：`memory20k_e7e5ac54_put_back_full_t_plus_30_s2`。
+- 实际日志：`/mnt/public/xcj/Projects/openpi/logs/memory20k_e7e5ac54_put_back_full_t_plus_30_s2.log`。
+- 最终 checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_30/memory20k_e7e5ac54_put_back_full_t_plus_30_s2/20000`。
+
+沿原 d10 配置：单GPU batch32、实际20k updates、同 pi05_base/demo_clean_state/norm、H50/K30，save_full_state=False、save_dtype=bfloat16、save_interval=20000，仅最终模型和metadata；未重跑门禁或改源码。用一次性 subprocess.Popen、start_new_session=True、stdin=DEVNULL、排他创建日志、stderr=STDOUT、close_fds=True 脱离工具会话。实际 command/cwd/env：
+
+```bash
+cd /mnt/public/xcj/Projects/workspace/e7e5ac54-2f5c-4f46-9210-6c2a51f7f4fe/openpi
+export OPENPI_DATA_HOME=/mnt/public/cache/openpi
+export HF_HUB_OFFLINE=1
+export HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot
+export XLA_PYTHON_CLIENT_MEM_FRACTION=0.90
+export PYTHONDONTWRITEBYTECODE=1
+unset JAX_PLATFORMS PYTHONPATH
+CUDA_VISIBLE_DEVICES=0 .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_back_block_full_t_plus_30 --exp-name=memory20k_e7e5ac54_put_back_full_t_plus_30_s2 --seed=2 --no-wandb-enabled
+```
+
+首次 update/有限落盘 loss 待约16:26读取新路日志确认；原十三路本轮未提前复查。后续实时结构化状态使用 `mam job status <job-id>`，不解析 job list 表格；14路合并巡检保持16:57。
 
 ## 15:41 授权的本机 GPU1：put-back t+1 seed2 启动
 
@@ -26,7 +53,7 @@ unset JAX_PLATFORMS PYTHONPATH
 CUDA_VISIBLE_DEVICES=1 .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_back_block_full_t_plus_1 --exp-name=memory20k_e7e5ac54_put_back_full_t_plus_1_s2 --seed=2 --no-wandb-enabled
 ```
 
-15:58:21 合并快照首次确认：新路原 PID 身份、cwd/command/env 均匹配，日志确认 local_batch_size: 32，15:58:12 已完成 119 次真实 optimizer update，近期 3.7 秒/update，剩余 ETA 约 20h25m。Step100 实际落盘 grad_norm=1.1383、loss=0.1523、param_norm=1802.3861，三项均有限。GPU1 已用 73,405 MiB、空闲 7,633 MiB、利用率100%、67°C，未见训练错误；未提前轮询原十二路。配对 full_t_plus_30 seed2/GPU0 仍未授权启动。
+15:58:21 合并快照首次确认：新路原 PID 身份、cwd/command/env 均匹配，日志确认 local_batch_size: 32，15:58:12 已完成 119 次真实 optimizer update，近期 3.7 秒/update，剩余 ETA 约 20h25m。Step100 实际落盘 grad_norm=1.1383、loss=0.1523、param_norm=1802.3861，三项均有限。GPU1 已用 73,405 MiB、空闲 7,633 MiB、利用率100%、67°C，未见训练错误；未提前轮询原十二路。截至该15:58快照，配对项未获授权；最新GPU0授权/启动见报告首节。
 
 ## 15:57 十三路合并小时巡检
 
@@ -66,7 +93,7 @@ progress 的 kit 为三位有效数字取整，表中保留约数；新 GPU1 的
 
 这些是落盘区间均值，不代表每个 update 的原始 loss 证明。旧远端 GPU0/1/2/3/6/7 的 Step 标量仍各为零，有限 loss 尚未证实；保留 stdout 缓冲边界和原进程，不以无 nan 文本代替数值证据。
 
-两机 HEAD 仍为 `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`，git status 均为空；源码和参数保持冻结。GPU0 的配对 put-back t+30 seed2 尚未授权，未启动。十三路实际20k、唯一20000 BF16 checkpoint、metadata/完整参数/无optimizer/恢复验证及评测交接仍待完成。
+两机 HEAD 仍为 `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`，git status 均为空；源码和参数保持冻结。该15:58快照时GPU0配对项未授权，最新启动见首节。十三路实际20k、唯一20000 BF16 checkpoint、metadata/完整参数/无optimizer/恢复验证及评测交接仍待完成。
 
 ## 本机四路启动留痕（10:39 授权，10:58 已验收）
 
@@ -202,4 +229,4 @@ CUDA_VISIBLE_DEVICES=7 nohup setsid .venv/bin/python -B scripts/train.py pi05_rm
 | 6 | rearrange full t+1 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_1_s1` | `checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1/20000` | `logs/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1.log` |
 | 7 | rearrange full t+30 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_30_s1` | `checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s1/20000` | `logs/memory20k_e7e5ac54_rearrange_full_t_plus_30_s1.log` |
 
-下一检查：`2026-09-10T16:57:00+08:00`，远端八路、本机原四路及新 GPU1 合并为十三路巡检，由 Manager 按计划唤醒。若收到 MAM job attention 或异常通知则提前处理。十三路的 20k 完成、唯一 20000 BF16 checkpoint、完整参数/无 optimizer/恢复验证与评测交接仍待训练结束后完成。
+下一检查：`2026-09-10T16:57:00+08:00`，远端八路与本机GPU0/1/4–7合并为十四路巡检，由 Manager 按计划唤醒。若收到 MAM job attention 或异常通知则提前处理。十四路的 20k 完成、唯一 20000 BF16 checkpoint、完整参数/无 optimizer/恢复验证与评测交接仍待训练结束后完成。
