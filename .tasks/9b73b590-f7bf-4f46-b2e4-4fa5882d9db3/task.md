@@ -6,7 +6,9 @@
 
 你此前6a32847报告的d10cc01 CPU GO已被Manager接受。真实tokenizer条件、P2损失/梯度、LeRobot/sidecar窗口、serial条件与wire、更新计数、R1/R2自包含恢复、metadata继承均已通过。Manager后续验收了full/serial各50次实际GPU更新、完整BF16保存和checkpoint-only恢复。put-back专用14维norm及两种full实际归一化loader也已验收。首批八路正式20k已放行，运行树固定d10；这些已通过范围不重测或暂停。
 
-R3/R4的d49c1a1已由你独立通过，Manager已合入主库41fca908。当前增量候选为062d12a5effbaf183718c9c208d880983693e64d与7a629204b4ab6d3cd113443c538837f8fb5f08d4，后者为当前作者HEAD。复核wash full/serial训练配置与运行时字段序列化边界，不重做已接受的核心训练评审。
+R3/R4的d49c1a1已由你独立通过，Manager已合入主库41fca908。你在1efc1294已接受062d12a/7a62920的wash CPU范围，仅留下d10 metadata恢复P1。当前修复候选为056bcc887637cc6eda565a8ad7d45c88021d4bcd，作者report 1ab252d。只复验通用init=False YAML过滤是否关闭该P1，同时保持新格式roundtrip，不重做下列已通过的wash数据/模型测试。
+
+本次关注tagged与safe YAML恢复、保留字段/标签/嵌套结构、旧两份真实50step metadata在fresh-process可加载并重建runtime、新wash full/serial保存后仍只有唯一schema。原metadata文件应保持不变；不能凭helper剪掉一个字符串就冒称真实入口通过。无需GPU。代码约50行通用处理，无按版本分叉，Manager接受这个必要范围；有具体回归再报告，不为假设的所有第三方YAML格式扩展审查。
 
 ## 本轮范围
 
