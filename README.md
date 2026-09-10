@@ -8,7 +8,7 @@ MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`�
 
 MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 由 codex 生成，标识执行 agent。
 
-在对应项目目录内运行 `mam`。项目初始化见[安装说明](docs/install.md)。
+在对应项目目录内运行 `mam`。下文 `MAM_ROOT` 表示 MAM 根目录，`PROJECT_ROOT` 表示项目根目录。
 
 MAM 使用共享根目录：Manager 编辑其中的 `task.md`，执行者编辑自己的 `report.md`。任务和报告通过 `mam task publish` 发布，未发布的修改是草稿。修改 MAM 工具时，从 `main` 创建 worktree，验收后将代码合并回 `main`。
 
