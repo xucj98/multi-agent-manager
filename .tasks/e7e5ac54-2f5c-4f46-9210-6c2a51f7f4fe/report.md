@@ -1,5 +1,22 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日07:32 本机剩余4路小时巡检
+
+07:32:25–27逐项job status均running，无error；最新日志均前进、全部已落盘loss/grad_norm/param_norm有限，无可见训练报错。累计10项完成收尾并归档，本轮未重复已验收checkpoint读取。
+
+| 本机GPU | updates≈ | 最新实际标量 | 日志剩余ETA |
+| --- | --- | --- | --- |
+| 0 | 15.0kit/20.0kit | Step 15000: grad_norm=0.0312, loss=0.0007, param_norm=1804.1228 | 5:00:27 |
+| 1 | 15.2kit/20.0kit | Step 15200: grad_norm=0.0331, loss=0.0009, param_norm=1804.2634 | 4:48:45 |
+| 5 | 19.9kit/20.0kit | Step 19900: grad_norm=0.0287, loss=0.0006, param_norm=1804.5247 | 04:48 |
+| 7 | 20.0kit/20.0kit | Step 19900: grad_norm=0.0354, loss=0.0006, param_norm=1804.2734 | 01:40 |
+
+kit为取整进度，GPU7尚未完成，不能以20.0kit判定保存成功。ETA不含保存：GPU7约07:34，GPU5约07:37；GPU1约12:21、GPU0约12:33。运行树仍d10完整SHA且git status为空，未改参数。
+
+本机资源：GPU0/1/5/7各约73405–73406MiB已用/7633MiB空闲/100%；GPU2/3/4/6当前均1MiB/81038MiB空闲/0%，RAM可用876GiB。GPU4/6已由本任务收尾释放；GPU2/3当前空闲仅为资源快照，未检查其他task产物。可用卡及本任务checkpoint交Manager安排eval，本任务不启动新GPU任务。
+
+继续MAM等待并仅按新完成事件核验；剩余运行项下一小时08:32巡检。远端8项已完成，自有进程全退出；此前不可见外部占用边界仍见06:06汇总，本轮未重复探测远端。
+
 ## 9月11日07:24 GPU6完成收尾
 
 本机 GPU6，memory20k_e7e5ac54_put_back_full_t_plus_1_s1，job `f04d1b9c-4a77-4034-ac6c-c7240d9b20a8`，PID2467722。最终20000保存与Save Finalize完成，MAM wait返回stopped；随后PID及同session/直接子进程均不存在，GPU6=1MiB已用/81038MiB空闲/0%。无自有残留需清理；未留存数值exit code，退出及保存分别有证据。
