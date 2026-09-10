@@ -101,3 +101,9 @@ wash v3正式172转换已完成并通过最终独立review a2ee264：data/lerobo
 ## 50step产物的短期交接
 
 full/serial两项GPU gate已被Manager验收。新评测准备task e6908de7-4b02-465a-987b-a19eba7a315a正用这两份checkpoint做新schema元数据/入口验证，请暂保留gpu_smoke_checkpoints及其简短日志，待Manager确认该接口验证完成后由本owner统一清理。它们不是正式20k实验结果，不复制到正式checkpoint树。当前仍优先put-back norm/实际loader，随后R3/R4与wash配置；不因此再占GPU。
+
+## 09:35 wash增量review修复
+
+Banach报告1efc1294接受7a62920的wash CPU loader、S2M transforms/wire、15Hz metadata及新格式恢复，但独立复现旧d10 full/serial真实50step metadata加载均报unexpected keyword argument 'memory_adapter'。修复当前配置反序列化对init=False运行时字段的处理，遵守dataclass定义并重新构建runtime对象；不增加按checkpoint版本分叉的兼容层，不改写既有checkpoint/metadata，不改运行中的八路d10源码。保持新YAML只有resolved memory_config的简化。
+
+交一个最小修复commit与fresh-process full/serial旧metadata及新wash roundtrip验证，通知同一reviewer增量复验。若必须触及此前checkpoint owner文件，此处明确授权最小通用反序列化修复；该owner已归档，不为此重建任务/环境。其余checkpoint保存精度和步数逻辑保持既有验收。
