@@ -62,10 +62,13 @@ base在/mnt/public/cache/openpi/openpi-assets/checkpoints/pi05_base。新机器�
 
 ## MAM 查询更新（2026-09-10）
 
-系统 MAM 已更新：`mam task list` 默认单行列表，`mam task show` 默认 Markdown；脚本读取结构化结果时为这两个命令加 `--json`。`mam task status` 仅显示保存的 job 状态与 checked_at，不刷新进程。按既定频率监控时使用 `mam job list --task e7e5ac54-2f5c-4f46-9210-6c2a51f7f4fe` 获取实时进程状态，再结合已有日志检查进度。训练/评测协议、GPU 分配与检查频率不变。
+系统 MAM 已更新：`mam task list` 和 `mam job list` 为带表头的简表，无 --json；完整task信息使用 `mam task status <id>`，实时job结构化详情使用 `mam job status <job-id>`。`mam task show` 仍默认Markdown，保留 --json。`mam task status` 仅显示保存的 job 状态与 checked_at，不刷新进程。按既定频率监控时使用 `mam job list --task e7e5ac54-2f5c-4f46-9210-6c2a51f7f4fe` 获取实时进程状态，再结合已有日志检查进度。训练/评测协议、GPU 分配与检查频率不变。
 
 ## 15:41 Q2 最后一对 seed2
 
 e690负责人确认技术smoke与drawer10ep offline完成，GPU1显存1MiB/0%、相关端口与自有进程已退出。现在授权本机GPU1启动 pi05_rmbench_put_back_block_full_t_plus_1 seed2，沿已验收冻结d10cc01环境、同pi05_base/数据/norm、单卡bs32/实际20k更新、BF16仅最终20000模型及metadata，使用独立exp_name memory20k_e7e5ac54_put_back_full_t_plus_1_s2，禁止覆盖混写。使用python -u -B避免旧缓冲。先确认GPU实际可用，启动后MAM登记与首次真实update/loss检查，不重跑已验收50step。现有12路训练不变。
 
 配对 full_t_plus_30 seed2 使用exp_name memory20k_e7e5ac54_put_back_full_t_plus_30_s2，等待GPU0的BF16正式100收尾后由Manager单独放行；本条尚不授权GPU0。此二者是既定Q2三seed实验清单的剩余两项，不额外扩展实验。
+
+
+16:01接口迁移：不要再将job list输出按JSON解析；用task status里的jobs取ID，再逐个job status获取实时结构化结果。既定监控频率不变。新增mam wait jobs/list/stop可按需使用，自动CODEX_THREAD_ID；停止等待不影响实验。
