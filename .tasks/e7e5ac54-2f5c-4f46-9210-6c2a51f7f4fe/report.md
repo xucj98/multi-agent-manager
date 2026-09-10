@@ -1,5 +1,22 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日06:32 本机剩余6路小时巡检
+
+06:32:20–24逐项job status均running，无error；最新日志全部前进，已落盘loss/grad_norm/param_norm均有限，无可见训练报错。远端8项已收尾归档，本轮未重复读取其checkpoint或探测远端。
+
+| 本机GPU | updates≈ | 最新实际标量 | 日志剩余ETA |
+| --- | --- | --- | --- |
+| 0 | 14.0kit/20.0kit | Step 14000: grad_norm=0.0366, loss=0.0010, param_norm=1804.0712 | 6:04:07 |
+| 1 | 14.2kit/20.0kit | Step 14200: grad_norm=0.0356, loss=0.0010, param_norm=1804.2085 | 5:57:06 |
+| 4 | 19.2kit/20.0kit | Step 19100: grad_norm=0.0290, loss=0.0005, param_norm=1804.5385 | 50:36 |
+| 5 | 19.0kit/20.0kit | Step 18900: grad_norm=0.0320, loss=0.0006, param_norm=1804.4998 | 1:04:59 |
+| 6 | 19.2kit/20.0kit | Step 19100: grad_norm=0.0305, loss=0.0006, param_norm=1804.3707 | 50:36 |
+| 7 | 19.0kit/20.0kit | Step 19000: grad_norm=0.0316, loss=0.0006, param_norm=1804.2550 | 1:01:03 |
+
+kit为取整进度，ETA不含保存。GPU4/6预计约07:23、GPU7约07:33、GPU5约07:37；GPU1约12:29、GPU0约12:36完成更新。资源快照：本任务六卡各约73405–73406MiB已用、7633MiB空闲、100%利用率，本机8卡均仍占用；RAM可用836GiB、共享盘9.1TiB。运行树d10cc01完整SHA、git status为空；未改源码/参数。
+
+保持MAM wait等待新完成事件；本机GPU恢复/wire/评测仍待可用卡与Manager排期，未抢占训练。远端06:05不可见外部占用边界仍以已发布收尾汇总为准，不将本任务退出等同整机空闲。下一运行项小时巡检07:32，先到的结束事件立即处理。
+
 ## 9月11日06:06 远端八路收尾交接汇总
 
 远端8路均已自然完成实际20000 updates，最终保存成功；8份checkpoint的CPU全参数读取/BF16/有限值/注册config逐参数shape、metadata解析、norm与资产一致性检查通过。各exp下仅最终20000，原子提交完成，无optimizer。8个training job均已按结果归档，旧六路缓冲已全部落盘，每路200条标量均有限；未重复已验收checkpoint全量读取。
