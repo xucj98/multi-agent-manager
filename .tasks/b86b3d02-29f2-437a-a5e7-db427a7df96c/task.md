@@ -19,3 +19,10 @@ wash训练owner ad6bb77e-3892-4730-ae1a-7d9cd99a5728最新task/report：两20k c
 
 ## 验收与交付
 本轮不占GPU。做有意义的CPU边界测试：相同配置目标与训练样本时序一致、mask缺失正确、单/双字段与不同H/K，旧drawer配置不变；真实5ep输入/文件映射与命令dry-run。不要重复全量转换或旧模型测试。若必须改变算法或需大量重构，先提出具体证据/最小方案供Manager裁决。提交代码和简短报告，列文件/commit、测试、剩余GPU验收及可复制命令。清理自己的临时文件，保留workspace供Manager安排空白独立review；不要自己充当独立review或再建review任务，不自行合并部署。
+
+## 9月11日07:22 Manager裁定：独立review修复
+读取review任务65a3c29f-08c0-4025-8c29-c4567b26f775的report草稿/发布稿。接受P1：实际policy源码clean门禁与顶层留痕不能来自checkpoint root alias；须绑定--policy-python实际导入的OpenPI源码，且和served_metadata现有provenance校验。用最小CPU探针解析模块根/commit及解释器；复用现有git检查与served字段，不另造依赖快照或provenance框架。探针不加载模型/不占GPU。任意实际源码dirty或握手不符必须在episode执行前拒绝并正确回收服务。
+接受P2：dataset与expected_policy_metadata/expected_execution_rows同时出现时，冲突明确报错；新wash manifest删除重复时间字段，只保留一个来源。支持旧drawer现有manifest，不改变其有效参数。
+范围收敛：删除当前输入未用的--replay任意选节；保留必要的OpenPI/RMBench root映射及旧格式适配，不为了删行数重写整个launcher。不要增加新的通用配置格式。已有memory指标算法CPU review通过，除具体错误外不改controller/scheduler。
+更正报告计数：5525是逻辑执行行/模型，K30对应各集41/51/24/38/33次infer，共187次/模型；此前报告的5525 query不可当成实际infer次数。正式GPU最终按实际日志验证。
+提交小修并发布report，给出新增失败保护的定向CPU测试及新commit。目标20分钟，若需要扩大范围先说明。仍不占GPU；Manager交原独立reviewer复查后分配wash offline。本任务实现完成后允许继续负责本代码的GPU offline，但必须等Manager明确授权与checkpoint通过。
