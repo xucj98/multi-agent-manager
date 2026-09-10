@@ -13,3 +13,6 @@
 
 ## 交付
 先给阻塞级问题及证据（文件/行、复现、影响、最小修改），区分正确性阻塞、建议简化和非问题；Manager裁定，review意见不是自动修改指令。不改业务实现，可临时编写必要独立测试并清理。报告含测试命令/结果、两库commit、剩余GPU验收，写report并mam发布。保留worktree供Manager验收。目标约30分钟首轮结论，若遇环境阻塞及时报告实际错误，不凭路径猜测另建框架。
+
+## 07:27 修复增量复查
+作者新commit fda269c1f333dabdb5628c083a4dba3db0938333，report已发布。将自己bridge worktree在自己的task分支推进到该commit，独立核对P1实际policy源码/clean/served握手、P2冲突拒绝及--replay删除，无需重复已通过全部controller时序验证。定向反例至少覆盖dirty实际OpenPI与干净checkpoint根不混淆、握手源码不符/解释器不符拒绝、重复时序冲突拒绝及两有效manifest。若通过明确可进入GPU offline，剩余实际权重验收如实标出。不占GPU，报告新commit与检查结果；目标10–15分钟。
