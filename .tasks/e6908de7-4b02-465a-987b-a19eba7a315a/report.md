@@ -1,48 +1,41 @@
-# 07:29状态：GPU4/6已接用，rearrange seed0匹配smoke运行中
+# 07:34 正式仿真阶段：rearrange seed0两项smoke通过，formal100已启动
 
+复用原三树、既有入口和recorder，无源码变更；GPU0/1仍训练，GPU2/3留wash，wuwen-1停用。按06:53授权，owner发布GPU4/6保存、CPU验收及释放后，本任务各自检查显存1MiB/81038MiB空闲/0%、独立端口空闲再启动。
 
-复用原三树/干净版本，无新代码提交。训练owner已发布远端八份最终20000保存和CPU全参数门禁通过。本轮对这八份实际checkpoint逐项运行原入口 --prepare-audit、smoke --dry-run、formal --dry-run（共24次），全部exit0。metadata→Context验证H50/K30、schema/字段/反馈和demo_clean_state来源，审计生成物仅在本worktree .local/memory_schema_eval；未改写checkpoint，未加载GPU模型。
+## 已完成的20k匹配smoke
 
-已准备：rearrange t+1/t+30 seed0/1、put-back t+1/t+30 seed0、serial/no-memory seed0。每份实际CPU输出保留于 RMBench/.local/memory_schema_eval/cpu_20k_20260911，既有manifest/evidence位于其inputs同级目录，开跑后由config_source继承到结果run。
+| checkpoint项 | GPU | smoke run | 结果 | video0帧数 | logical steps |
+| --- | ---: | --- | --- | ---: | --- |
+| rearrange t+1 seed0 | 4 | rearrange_full_t_plus_1_s0_20k_smoke2 | 2/2 success，门禁PASS | 393 | 393/407 |
+| rearrange t+30 seed0 | 6 | rearrange_full_t_plus_30_s0_20k_smoke2 | 2/2 success，门禁PASS | 392 | 392/405 |
 
-首批按发布分配：GPU4=rearrange t+1 seed0（19440/19442），GPU6=rearrange t+30 seed0（19460/19462），GPU5=put-back t+1 seed0（19450/19452），GPU7=put-back t+30 seed0（19470/19472）；各卡独立Warp缓存。仍须owner发布各卡保存/退出/释放且启动前显存确认才执行。GPU0/1不抢占，GPU2/3留wash，wuwen-1停用。
+两项启动分别07:24:57/07:25:51，最外层CLI均exit0。既有validate_smoke_run核对当前manifest与bridge source通过，两条accepted rollout无runtime_error，video/no-video各一集；MP4逐帧读通。input_audit/input_manifest经config_source继承副本逐字节一致。每项两scheduler exit0，policy/robot按runner_shutdown退出-15，所有start对应PID已不存在。实际20k checkpoint-only恢复已由smoke覆盖，不重复技术50。
 
-owner于07:23/07:24分别发布GPU4/6保存、CPU门禁、进程退出和释放，本任务启动前分别复核显存1MiB/空闲81038MiB/利用率0%，独立端口与run名空闲，三树干净。GPU4于07:24:57启动rearrange_full_t_plus_1_s0_20k_smoke2，GPU6于07:25:51启动rearrange_full_t_plus_30_s0_20k_smoke2；均已恢复实际20k并进入rollout。目前为短smoke，尚未启动formal，尚无正式job；各自smoke验收后立即从当前干净版本进入100并登记job，无需再次等许可。GPU5/7继续等待各自owner释放。旧配置/训练步数不一致的F0成绩不作强制可比基准。
+smoke config SHA256：
+- t+1: 6f1d367559353dc42fa548f5ab9f700d216dfa08dd0f746dd98234f1d43a3afb
+- t+30: 336b3e2454acdb33328d491a834c9ef81ed2f5d4514581d90f2e26ed94ba1bb5
 
-下文保留前轮CPU队列与wash接口交付；wash公共修复由Manager协调，本轮专注正式sim。
+上述2/2只是smoke结果，不替代正式100统计。
 
----
+## 已启动正式100
 
-# 9月11日04:32 CPU评测准备交付
+| GPU | run | 启动时间（CST） | PID | MAM job |
+| --- | --- | --- | ---: | --- |
+| 4 | rearrange_full_t_plus_1_s0_20k_100ep | 2026-09-11 07:32:29 | 3319712 | af7dd7c9-682c-4a78-9e6e-946cbf47672f |
+| 6 | rearrange_full_t_plus_30_s0_20k_100ep | 2026-09-11 07:33:30 | 3321184 | 1e72397f-0602-4018-bc7c-4e112ad7501a |
 
-已准备：原README新增14个仿真模型的checkpoint绝对路径和28个独立run名，12个Q2按seed0/1/2、每seed rearrange与put-back各t+1→t+30成对排队，最后serial/no-memory基线。补齐put-back seed2；继续复用原prepare-audit/smoke/formal命令、既有runner/recorder，不新增launcher或调度框架。
+host均is-dcfi2kjdq7g3k6aa-devmachine-0。可靠detach（Popen start_new_session、stdin=DEVNULL、排他创建日志），实际command/cwd/时间/PID位于本RMBench .local/memory_schema_eval/launches/<run>.json，临时启动日志同名.log；正式run沿既有recorder保存实际配置/命令/继承metadata。各自使用匹配smoke，GPU4端口19440/19442，GPU6端口19460/19462，独立Warp cache。登记时MAM均running，当前正在检查正式首条，尚未声称100完成。
 
-每checkpoint须完成保存、owner验收后才准备audit并执行自身smoke2（同run video/no-video）→门禁/产物核对→单GPU串行formal100，第50条按既定10个百分点约定诊断。共同eval候选seed100000起，不按成绩筛选，未就绪整对保留等待项。GPU只允许后续Manager分配的本机空闲卡；wuwen-1结束后停用。
+每run在单卡串行100，不按中途成绩重采样；第50条做正常诊断。新20k没有真正可比的旧配置基准，不能强行套用不同训练/模型/F0成功率作为10个百分点门槛。保持active turn，mam wait jobs --task本任务结合日志中检，结束核验完整产物与退出、归档job、清理自身smoke/临时缓存并保留门禁摘要。
 
-wash已准备输入映射：两20k目标路径、计划结果run、固定LeRobot index0–4及对应原始episode全名见README。按owner“全172ep训练、offline前5ep”要求，从v3 conversion.accepted_episode_ids读取，未另选episode。五集query数1216/1509/702/1115/983（训练长度，不是已完成offline帧数）。五份raw JSON、anno/subtasks.json和15份相机MP4均存在。未扫描全量视频。
+## 后续队列与CPU准备
 
-## 实际公共接口缺口，需Manager裁定
+GPU5/7仍待owner分别发布释放，再核对显存后跑put-back t+1/t+30 seed0。14项队列继续按README训练seed成对推进。8份远端20k已完成audit/smoke dry/formal dry（24次exit0）；本机新验收的rearrange t+1 seed2、put-back t+1 seed1也各完成同三项CPU检查，共10份就绪。其余项按owner保存/CPU门禁交接后准备；CPU检查不加载GPU权重。
 
-固定bridge 8ea的scripts/launch/drawer_offline.py：64–65拒绝除旧[1,22,23,24,26]外的episode列表；111–112要求15Hz/H30/K15；123固定move_steps15；90仅支持RMBench checkpoint根。新wash为index0–4、H50/K30，checkpoint在共享OpenPI，不能通过只换manifest运行。现有交互式test_pi0_offline_e2e.sh可起通用服务，但不能补齐下述新memory评估留痕。
-
-底层OpenPiOfflineScheduler已有MemoryContext/S2M反馈，但robot_bridge/scheduler/openpi_offline.py:291–305只配置旧memory/key_state，478–482只为旧memory路径发送评估memory_prediction。robot_bridge/robot/controllers/x2robot_offline.py:499–502只建立旧drawer GT，639–646要求旧双字段固定宽度(执行行数,6)/(1,2)。新wash单phase memory_config无法沿该路径生成完整memory指标/mask；不把action-only运行当新wash offline已验收。
-
-最小修复建议交公共owner：在原offline入口允许manifest定义episode/时序/checkpoint根，保留既有process/metadata/exit管理；在现有controller/scheduler评估接线复用新schema预测及v3 sidecar phase/availability/query-source索引，机器人目标沿已对齐action_at_row/offset0、不二次移位。保留原MemoryContext反馈，不另造wash实现。本任务未改bridge/OpenPI，没有伪造可运行的wash命令；wash命令交付受此接口缺口阻塞，待Manager决定修复范围后继续。
-
-## CPU验证与版本
-
-JAX_PLATFORMS=cpu、CUDA_VISIBLE_DEVICES为空、PYTHONDONTWRITEBYTECODE=1，原OpenPI解释器-B：六类sim配置的repo/schema id/representation/fields与本组规范匹配，MemoryContext均H50/K30；wash两配置Context为H50/K30、单phase。仅解析配置，没有加载权重或做模型infer；尚未对未交接的最终20000运行checkpoint dry-run/audit，这些仍是开跑前门禁。
-
-检查14行checkpoint config/exp_name/seed映射、28个run名唯一且未占用；git diff --check通过。只提交原README（76增/3删），三树干净，未创建临时audit或结果缓存。
-
-workspace: /mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a
+真实结果根：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/。
+原worktree根：/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a。
 - RMBench: 3e69b1e665a8eac0104d261b233f1b3339007e00
 - robot-bridge: 8ea6078543a875b5ae223df16891cdc1fe975c66
 - openpi: a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4
 
-读取的训练报告发布版本：
-- sim owner: a42a004a422c3c0793fc25c41b7996451c9bbd47
-- wash owner: a6958430f0a8165a0ee89b38572b1b39445864a5
-
-成果: RMBench/experiments/memory_chunk_20260910/README_memory_schema.zh-CN.md。
-本轮已运行仅CPU检查；未启动GPU、smoke/formal/offline，未巡检训练日志或GPU，未登记新job。旧技术验证与drawer结果未重跑，历史已验收结论和清理见report publication 391a9ed18000a98da4f27081e9187aac914c067f。原三树与正式drawer产物继续保留。sim队列已准备，等待checkpoint交接/GPU分配；wash等待上述公共接口裁定，当前不承诺修复耗时。
+三树源码冻结。CPU queue与wash公共缺口详见前轮report bf6d8e8f167bf5e1d705afcc3eb1f06b5f82c28b；旧drawer正式结果原样保留，不重跑。本阶段不修改wash公共实现。
