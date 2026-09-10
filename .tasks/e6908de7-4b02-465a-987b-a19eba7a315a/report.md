@@ -1,4 +1,4 @@
-# 07:34 正式仿真阶段：rearrange seed0两项smoke通过，formal100已启动
+# 07:40 正式仿真阶段：rearrange formal推进，put-back两项smoke已启动
 
 复用原三树、既有入口和recorder，无源码变更；GPU0/1仍训练，GPU2/3留wash，wuwen-1停用。按06:53授权，owner发布GPU4/6保存、CPU验收及释放后，本任务各自检查显存1MiB/81038MiB空闲/0%、独立端口空闲再启动。
 
@@ -24,13 +24,13 @@ smoke config SHA256：
 | 4 | rearrange_full_t_plus_1_s0_20k_100ep | 2026-09-11 07:32:29 | 3319712 | af7dd7c9-682c-4a78-9e6e-946cbf47672f |
 | 6 | rearrange_full_t_plus_30_s0_20k_100ep | 2026-09-11 07:33:30 | 3321184 | 1e72397f-0602-4018-bc7c-4e112ad7501a |
 
-host均is-dcfi2kjdq7g3k6aa-devmachine-0。可靠detach（Popen start_new_session、stdin=DEVNULL、排他创建日志），实际command/cwd/时间/PID位于本RMBench .local/memory_schema_eval/launches/<run>.json，临时启动日志同名.log；正式run沿既有recorder保存实际配置/命令/继承metadata。各自使用匹配smoke，GPU4端口19440/19442，GPU6端口19460/19462，独立Warp cache。登记时MAM均running，当前正在检查正式首条，尚未声称100完成。
+host均is-dcfi2kjdq7g3k6aa-devmachine-0。可靠detach（Popen start_new_session、stdin=DEVNULL、排他创建日志），实际command/cwd/时间/PID位于本RMBench .local/memory_schema_eval/launches/<run>.json，临时启动日志同名.log；正式run沿既有recorder保存实际配置/命令/继承metadata。各自使用匹配smoke，GPU4端口19440/19442，GPU6端口19460/19462，独立Warp cache。登记时MAM均running，两项正式首条均已正常完成（各1/100、首条success），尚未声称100完成。
 
 每run在单卡串行100，不按中途成绩重采样；第50条做正常诊断。新20k没有真正可比的旧配置基准，不能强行套用不同训练/模型/F0成功率作为10个百分点门槛。保持active turn，mam wait jobs --task本任务结合日志中检，结束核验完整产物与退出、归档job、清理自身smoke/临时缓存并保留门禁摘要。
 
 ## 后续队列与CPU准备
 
-GPU5/7仍待owner分别发布释放，再核对显存后跑put-back t+1/t+30 seed0。14项队列继续按README训练seed成对推进。8份远端20k已完成audit/smoke dry/formal dry（24次exit0）；本机新验收的rearrange t+1 seed2、put-back t+1 seed1也各完成同三项CPU检查，共10份就绪。其余项按owner保存/CPU门禁交接后准备；CPU检查不加载GPU权重。
+owner已分别于07:34/07:37发布GPU7/5保存/CPU验收/退出/释放。本任务各自启动前复核1MiB/0%、端口空闲，已启动put_back_full_t_plus_30_s0_20k_smoke2（GPU7，07:36:49，19470/19472）及put_back_full_t_plus_1_s0_20k_smoke2（GPU5，07:39:34，19450/19452）。两项为短smoke，尚未完成门禁；通过后立即同卡formal，与GPU4/6并行。14项队列继续按README训练seed成对推进。8份远端20k已完成audit/smoke dry/formal dry（24次exit0）；本机新验收的rearrange t+1 seed2、put-back t+1 seed1也各完成同三项CPU检查，共10份就绪。其余项按owner保存/CPU门禁交接后准备；CPU检查不加载GPU权重。
 
 真实结果根：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/。
 原worktree根：/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a。
