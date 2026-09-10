@@ -14,3 +14,6 @@ manager 已 git fetch origin main (351c3a3) 并成功 merge 到 project/table-10
 
 # Manager 实施裁决
 接受分析的最小可迁移性修复：版本化模板移除站点专属Python3.10.19绝对路径，真正.local配置保留本地选择；通用脚本移除/mnt/public前缀限制并验证解释器>=3.10，错误清楚；真实worktree测试使用测试解释器而保留原业务断言。可把现有静默校验改清楚，避免其他重构。不把打包网络依赖混入本修复，文档声明其前提即可。请从main（manager已快进到origin/main 351c3a3）建立独立MAM worktree实施，可先创建ignored .local bootstrap选择现已安装的3.10.19以通过旧base建树，正式代码/test不应依赖此精确路径。跑完整单测并特别验证不在/mnt/public的测试解释器/路径可用。提交并发布report；manager安排独立review后合并main及project分支。
+
+# 用户最新文档重组要求
+用户明确要求：docs/install.md仅讲如何安装/使用MAM及配置；新增docs/development.md讲开发MAM自身（开发worktree、Python选择、editable/build后端、测试与合并等）；README中“开发验证”仅保留一句引用development.md；AGENTS.md最后关于修改MAM实现/开发验证的那句删除，日常AGENTS不指挥MAM开发。请在原任务独立worktree继续实现。manager已先提交798bb01澄清两段作用域并合入main/project，你的原worktree HEAD也为798bb01，从这里继续。docs/development要自包含且不把Python>=3.10当其他repo要求；正确链接，简洁，不新增流程。纯文档无需再跑完整单测，检查链接与diff即可。完成commit并发布report后给manager合并，后续独立文档review。cache迁移仍在进行，不运行uv/pip写cache。
