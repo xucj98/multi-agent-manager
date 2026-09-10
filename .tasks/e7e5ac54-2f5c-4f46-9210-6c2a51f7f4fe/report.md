@@ -13,6 +13,7 @@ task_revision: a32c69c813e7e7f66c4b199859d799bdbccc15f9
 - 已完成：Manager 于 `08:44` 放行 put-back 两路；远端共享 `assets/memory_v1/rmbench_put_back_block_robot/norm_stats.json` 已只读复核为 SHA-256 `7a014e42dc9d51c8601b05dca5c876c58dda1308e61d1619e3d1c367baa7f261`，与发布要求一致。固定树仍为 `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`。
 - 已完成：GPU4/5 于约 `08:47` 以实际 `.venv/bin/python -u -B` 命令启动。两种 put-back loader 已进入，日志各自确认 `local_batch_size: 32`，GPU4/5 各占约 73.4 GiB。
 - 已完成：GPU4/5 均在 `08:52` 通过首次 XLA 编译并实际完成第 1 个 optimizer update；首个 13.2–13.4 s/update 计时包含编译，不用于 ETA。
+- 已完成：截至 `08:56:07`，GPU4/5 均已到 22 updates，速率已收敛到约 3.8–3.9 s/update；按当前进度估计剩余约 21h16–21h36。
 - 待补充：等待 `Step 100` 的 `-u` 落盘标量以确认 loss 有限；不会重启或调整八路的源码、数据、norm 或训练参数。
 
 ## 正式运行状态
@@ -23,8 +24,8 @@ task_revision: a32c69c813e7e7f66c4b199859d799bdbccc15f9
 | 1 | full t+30 / 0 | `memory20k_e7e5ac54_rearrange_full_t_plus_30_s0` | 4186841 | `db46bdd0-0ec2-41c1-9c98-baca9ffd6f5b` | 08:08 启动；365 updates | 约 20h21m |
 | 2 | serial lag30 / 0 | `memory20k_e7e5ac54_rearrange_serial_lag30_s0` | 9003 | `d682fab7-3cbc-4b7e-a31a-b959bbd2695c` | 08:18 启动；221 updates | 约 20h33m |
 | 3 | no-memory / 0 | `memory20k_e7e5ac54_rearrange_no_memory_s0` | 4186839 | `2774d038-5a23-4184-b16a-92fa1fd88019` | 08:08 启动；362 updates | 约 20h38m |
-| 4 | put-back full t+1 / 0 | `memory20k_e7e5ac54_put_back_full_t_plus_1_s0` | 12435 | `463092be-02b4-4bfa-bf12-8eae2416a244` | 08:47 启动；08:52 已完成 1 update | 稳定后估计 |
-| 5 | put-back full t+30 / 0 | `memory20k_e7e5ac54_put_back_full_t_plus_30_s0` | 12436 | `6e2601ea-e091-4e63-9c31-e90895ca5ffe` | 08:47 启动；08:52 已完成 1 update | 稳定后估计 |
+| 4 | put-back full t+1 / 0 | `memory20k_e7e5ac54_put_back_full_t_plus_1_s0` | 12435 | `463092be-02b4-4bfa-bf12-8eae2416a244` | 08:47 启动；08:56 为 22 updates，约 3.9 s/update | 约 21h36m |
+| 5 | put-back full t+30 / 0 | `memory20k_e7e5ac54_put_back_full_t_plus_30_s0` | 12436 | `6e2601ea-e091-4e63-9c31-e90895ca5ffe` | 08:47 启动；08:56 为 22 updates，约 3.8 s/update | 约 21h16m |
 | 6 | full t+1 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_1_s1` | 4186835 | `95a88ee3-1a90-4e2e-baa1-50a1cd6f4eb0` | 08:08 启动；380 updates | 约 20h04m |
 | 7 | full t+30 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_30_s1` | 4186832 | `fa1d8437-1fb7-48a5-8d37-2233e8e06767` | 08:08 启动；380 updates | 约 20h01m |
 
