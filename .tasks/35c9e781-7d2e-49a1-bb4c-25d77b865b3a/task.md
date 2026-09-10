@@ -30,3 +30,10 @@ GPU0预留给本对照，从Manager确认F0 row1结束并移交后生效；当�
 产物RMBench/eval_result/memory_chunk_20260910/precision_rearrange_full_row30_bf16_100ep_seed0，smoke独立同组leaf。不要输出到robot-bridge/eval_result。Formal完成并核验继承副本后清理自己smoke、.local临时输入和无用日志；BF16导出checkpoint是有价值成果，保留。处理job后发报告，工作区待Manager归档。
 
 先交CPU准备简报，列三个SHA、底层命令/manifest预期差异、导出依赖状态、预计GPU时间；不重复已有模型50step训练/大范围CPU测试。正式完成后只在本RMBench的experiments/memory_chunk_20260910/README_precision_validation.zh-CN.md写结果说明，避免与F0 owner修改同一README。报告含task_revision、真实产物、完成/未完成与commit。保持简洁，不另造provenance系统、不派agent。
+
+## 12:55 CPU交付裁定
+
+三库版本、BF16路径/hash与模型协议准备可接受，启动前补齐两项manifest/留痕细节：
+- 当前派生run.baseline仍引用历史93/100及55.1ep/h，本次主配对参照应是已完成F0 row30的92/100，配置、命令与诊断路径也应明确来自该run；原历史参照可保留为继承背景，但不能在最终报告或中点比较中冒充此次FP32对照。更新这一诊断/来源字段不改变policy协议。近期实际F0吞吐约38–39ep/h，资源预算先约3小时，后续用自己实测更新，不沿旧55.1排2小时。
+- 私有manifest/evidence最终必须随run留下完整文件。当前config_source仍指历史单个config.yaml，不保证新增hash-evidence随现有recorder继承。参考已验收的新schema入口的Audit别名+config_source目录做法，用任务私有输入目录作为来源，并在其中保留本次FP32参照的config/command小型metadata副本。通过既有inherit_metadata做一次CPU实际复制检查，确认新manifest/evidence及基线config/command均进入lineage；不更改公共runner，不仅凭hash摘要就删去唯一输入文件。正式smoke时再次确认真实输出继承。不要把私有目录放到checkpoint内。
+修正后给短报告/差异确认即可，不重复权重全量数值比较。GPU0仍待Manager移交。
