@@ -98,3 +98,6 @@ put-back独立adapter窗口已通过，但其专用robot-only norm尚未生成/�
 新task e7e5ac54-2f5c-4f46-9210-6c2a51f7f4fe（Locke）从d10建立独立冻结运行树，专门执行/监控远端首批8个20k；收到你full/serial50step及CPU GO后由Manager放行该owner启动。你保持实现/smoke职责，不自行启动20k，后续可继续R3/R4和wash训练注册配置而不影响其源码。
 
 wash v3正式172转换已完成并通过最终独立review a2ee264：data/lerobot/wash_cup_x1pro_s2m_memory_v1/all_172_15hz_s2m_master_v3_source_frame_aligned，143698 query、13944缺GT、M+1低维sidecar，固定5个训练episode供offline。首批八卡按既定sim六项+Q2 seed1两项准备。先完成GPU gate和put-back norm，再接wash full/serial训练注册与真实loader/self-contained config roundtrip；仅配置/显式bindings差异，复用同一通用训练机制，不引入第二套代码。转换代码和中文说明已在主库b0a68f8合入（代码46e619e、文档377ddff），作者和reviewer工作区已进入归档阶段；使用主库共享数据，不依赖其临时环境。
+## 50step产物的短期交接
+
+full/serial两项GPU gate已被Manager验收。新评测准备task e6908de7-4b02-465a-987b-a19eba7a315a正用这两份checkpoint做新schema元数据/入口验证，请暂保留gpu_smoke_checkpoints及其简短日志，待Manager确认该接口验证完成后由本owner统一清理。它们不是正式20k实验结果，不复制到正式checkpoint树。当前仍优先put-back norm/实际loader，随后R3/R4与wash配置；不因此再占GPU。
