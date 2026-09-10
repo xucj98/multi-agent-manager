@@ -30,3 +30,6 @@ row30/GPU0已于09:29完成92/100，Manager接受最终协议、视频和退出�
 结果统一/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/<run>，说明归RMBench/experiments/memory_chunk_20260910；不在bridge保存，不增加日志根。每步完整继承metadata/config/command+commit，不复制代码。README直接命令，不使用root export设置段。正式实验替代的smoke在无需再使用门禁引用后清理。保留正式metadata中的smoke通过结论与原检查摘要即可，依用户要求不保留smoke原始视频/日志，也不将整个smoke压缩包搬入正式run。row30的92/100最终检查已被Manager接受，已生成的row30_smoke_evidence.tar.gz可删除，清理记录注明正式结论与摘要保留。活跃run仍依赖的smoke不提前删除；不改运行源码。
 
 本任务report记录task_revision、workspace、实际三库commit、四run当前状态/结果表、job/PID、成果路径、下一检查时机。保持简报，详细smoke、逐query与旧进度引用已保存的JSON或Git报告版本，不累积复制同一历史段落；下一次发布时整理。运行期间可发布report而不结束责任；约小时巡检加50/完成事件检查，不频繁监控训练。不要自行派agent，不创建游离workspace。
+# 12:55 GPU0后续安排
+
+用户追加同一旧模型BF16转存后的100rollout验证。row1完成、验收并确认所有自有进程退出后，GPU0交接给35c9e781-7d2e-49a1-bb4c-25d77b865b3a（Carver）；e690的新schema技术验证改等下一张释放卡。既定row1/row50原run与三库冻结规则不变，row50仍完成100。Manager已接受row1中点调查为当前配置的性能退化，继续保留所有正常失败。
