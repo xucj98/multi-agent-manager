@@ -76,3 +76,7 @@ PYTHONPATH=packages/openpi-client/src .venv/bin/python -m pytest -q \
 - 独立 worktree 保留于 `/mnt/public/xcj/Projects/workspace/65a3c29f-08c0-4025-8c29-c4567b26f775/{robot-bridge,openpi}`；未修改业务代码、作者树、主树或训练树，未合并。
 
 本次 wash dry-run 中两个目标 `.../20000` checkpoint 均为 `ready: false`，所以真实权重 GPU replay 目前也受训练产物未就绪阻塞。P1 修复并出现 checkpoint 后，由 Manager 在分配 GPU 的环境执行正式 full/serial 回放；验收时应核对顶层/served runtime provenance 一致、每模型 187 次 infer 与 5,525 个执行行的实际记录，以及 full/serial NPZ 的行数和 mask。
+
+## 本轮结案状态
+
+Manager 已接受 P1 与 P2，并已向作者发布小修：补实际 policy source 的 clean gate / 顶层 provenance 绑定，拒绝冲突的 metadata 字段，同时删除当前未使用的 `--replay` 与 wash manifest 重复字段。本报告据此结案；上述修复尚未包含在本审阅基线中。收到指定的新 commit 后，仅对这些变更及其直接回归作定向复查，不重复本报告已通过的全套时序验证。两个独立 worktree 保持原样供后续复查。
