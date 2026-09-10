@@ -80,3 +80,25 @@ PYTHONPATH=packages/openpi-client/src .venv/bin/python -m pytest -q \
 ## 本轮结案状态
 
 Manager 已接受 P1 与 P2，并已向作者发布小修：补实际 policy source 的 clean gate / 顶层 provenance 绑定，拒绝冲突的 metadata 字段，同时删除当前未使用的 `--replay` 与 wash manifest 重复字段。本报告据此结案；上述修复尚未包含在本审阅基线中。收到指定的新 commit 后，仅对这些变更及其直接回归作定向复查，不重复本报告已通过的全套时序验证。两个独立 worktree 保持原样供后续复查。
+
+## 07:27 增量复查：`fda269c1f333dabdb5628c083a4dba3db0938333`（通过）
+
+自己的 bridge task 分支已推进至 `fda269c1f333dabdb5628c083a4dba3db0938333`；OpenPI 仍为 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。本节只复核 P1/P2 和直接 launcher 回归，未重复 controller/scheduler 时序或模型测试。
+
+**P1 通过。** `scripts/launch/drawer_offline.py:59-102` 以 `--policy-python` 的无模型探针解析实际 `openpi.policies.policy_config` module、Git root/commit 和解释器二进制身份，并对该实际 root 做 clean 检查。正式路径在 `:458-480` 于创建 output 或启动 policy 前保存这份 `policy_runtime`，将 checkpoint roots 单列为路径；不再把它们的 Git HEAD 当作 OpenPI source。握手后的 `served_metadata.provenance` 在 `:527-538` 逐项与预解析的 source / interpreter 匹配，并再次检查 clean 和 commit，随后才进入 episode；ExitStack 已登记 policy process 回收。
+
+独立隔离探针创建了两个 Git root：dirty 的实际 OpenPI package 与干净的 checkpoint root。实际 source 被拒绝，干净 checkpoint root 未能掩盖该失败；再分别伪造 served source commit 与 interpreter executable，均被 identity gate 拒绝。真实 policy interpreter 的无模型 probe 解析到本 task OpenPI worktree 的 `src/openpi/policies/policy_config.py`、commit `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，clean 检查通过。真实权重 policy server 未按本 task 的 CPU-only 边界启动，故真实握手将在正式 GPU run 中由该 gate 执行并留痕。
+
+**P2 通过。** `:160-200` 现在拒绝 dataset 与 `expected_policy_metadata` 的三项 timing 冲突，也拒绝 `execution_rows` 冲突。独立探针逐项篡改 `target_fps`、`horizon`、`query_stride` 和 execution rows，四种情况均得到 `Conflicting timing`。wash manifest 已只保留 dataset timing（无 `expected_policy_metadata`、`expected_execution_rows` 或 scheduler `move_steps`）；legacy drawer 继续使用 dataset fallback。
+
+**直接验证。** 以下 CPU-only、无模型检查通过：
+
+```bash
+CUDA_VISIBLE_DEVICES='' PYTHONPATH=<openpi-worktree>/packages/openpi-client/src \
+  .venv/bin/python -m pytest -q \
+  tests/launcher/test_offline_preflight.py tests/policy/test_openpi_provenance.py
+```
+
+结果为 `13 passed in 1.39s`。它与上述独立探针覆盖 dirty actual source、source/interpreter handshake mismatch、三项 metadata 与 execution-row 冲突。新旧有效 manifest 的实际 dry-run 都通过：wash 仍固定 index 0–4、H50/K30，两个 `20000` checkpoint 现均为 `ready: true`；drawer 仍为固定 `[1,22,23,24,26]`、H30/K15，两个 checkpoint 均为 `ready: true`。`--help` 不再出现 `--replay`，带该参数运行按预期以 argparse `unrecognized arguments` 拒绝。`py_compile` 和 `git diff --check 3a364a6d..fda269c` 也通过。
+
+**准入结论。** P1/P2 代码门禁、manifest 输入门禁和 checkpoint-ready 门禁均已通过，可以进入 Manager 分配 GPU 后的正式 full/serial offline。实际权重回放、served handshake 产物、5,525 执行行/模型和指标仍未在本 task 运行，必须由正式 GPU 验收如实记录；本结论不替代那次实际运行。两个 worktree 保持干净并保留。
