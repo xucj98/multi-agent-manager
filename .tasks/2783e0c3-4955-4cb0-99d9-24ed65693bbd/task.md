@@ -8,3 +8,6 @@
 
 # Review 裁决补充
 迁移 review bd0a1f84-faa8-4823-8ccd-94c659e36a6a 通过；接受其 P3：旧 outputs/ 含不可再生的人类研究标注等历史产物，不能一概称可再生缓存。请将约13M outputs 完整备份到本任务 migration-backup 下独立 historical-outputs/（不加入共享资产、不建立默认 worktree 链接），保持源不变、目标仅当前用户可访问（目录0700/文件0600），若存在 SQLite 使用一致性备份方式或确认无人写入并做一致性验证。不要打印文件内容或 token。记录总体哈希/文件数、恢复方式，修正文档和报告分类并重新发布。
+
+# 用户最新布局要求（覆盖之前路径约定）
+主repo不应有业务软链接；PROJECT_ROOT只放 workspace/MAM/repos（保留MAM必要隐藏配置）。环境任务负责将共享资产实体移动到 canonical/.cache 及worktree软链更新；本迁移任务仅负责将备份（含正在补充的历史outputs）收拢 canonical/.local/migration-backup/TASK-ID，不要竞争移动资产。请与environment协调，修正 MANIFEST/report 所有最终路径和分类，验证迁移后完整性。不得保留PROJECT_ROOT/migration-backup业务目录。
