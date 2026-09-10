@@ -1,4 +1,18 @@
-task_revision: db65224a8ca9928f1112b5a198c9ed4c42d6e569
+task_revision: 10b138a76b1bbf3a0a6401bdcee27a8ff7b34e82
+
+CPU追加验证：FP32保存与BF16导出在当前BF16恢复入口下的参数一致性（非新一轮巡检）。
+
+- 真实输入只读：/mnt/public/xcj/Projects/RMBench/policy/pi05/checkpoints/pi05_full_key_state/shared_memory_full_key_state_seed0/30000/params。Orbax metadata证实全部51浮点叶子为FP32，共3353433872元素；不是将BF16文件上转FP32伪造来源。
+- 执行环境为本任务056bcc8独立.venv，CUDA_VISIBLE_DEVICES=''、JAX_PLATFORMS=cpu，实际设备仅CpuDevice(id=0)。耗时37.00秒，退出码0，没有GPU调用、训练/源码/config修改或本小时重复巡检。
+- 路径A：当前openpi.models.model.restore_params(原FP32 checkpoint, dtype=jnp.bfloat16)，默认恢复为JAX数组，与现有policy入口的restore调用相同。
+- 路径B：同一原checkpoint经restore_params保留FP32 → 当前training.checkpoints._cast_floating_params(params, 'bfloat16') → 实际Orbax PyTreeCheckpointer/PyTreeSave落盘 → 当前restore_params(临时BF16 checkpoint, dtype=jnp.bfloat16)。临时导出metadata确认51叶子全部BF16；不是仅比较两个内存cast，也未替换导出函数实现。
+- 全部51叶子的键、shape、恢复dtype相同；全部3353433872元素逐值不一致数0、uint16位模式不一致数0，没有使用宽松allclose。原FP32全部有限。
+- BF16对原FP32并非无损：有3352332446个元素在FP32→BF16→FP32后数值改变，最大绝对舍入差0.5948486328125（张量PaliGemma/img/pos_embedding）；此项是权重舍入量，不是动作误差或性能下降量。
+- 结论仅限这份真实FP32 checkpoint的完整参数：先导出BF16再按BF16恢复，相比现有“FP32文件→BF16恢复”没有额外权重差异。不能据此宣称与真正FP32推理等价、可恢复原FP32训练精度或保证rollout性能不变；未运行动作/rollout对照，也未覆盖新增serial head。原RMBench与独立openpi的policy_config均已核对显式restore dtype=jnp.bfloat16，但此次实际执行使用本任务独立openpi的restore实现。
+- 完整逐叶证据：/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/cpu_norm_logs/fp32_bf16_equivalence_20260910.json；执行日志：/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/cpu_norm_logs/fp32_bf16_equivalence_20260910.log。
+- 临时副本及辅助脚本清理：结果写入本report后，已删除本任务新建fp32_bf16_cpu_check_sqgrpml9整个目录（含BF16导出、辅助脚本），并确认路径不存在；原checkpoint和既有d10/wash smoke不在清理范围。
+
+以下保留原12:02巡检状态和训练产物定位；本轮没有重新采样训练进度。下一小时检查仍为2026-09-10 13:02 CST。
 
 当前结果：完成约定的12:02一次小时巡检，实际资源/日志快照为2026-09-10 12:04:03 CST。wash full/serial两路正式20k均running，更新持续推进，全部已落盘loss/grad_norm/param_norm有限，没有发现新增训练异常。本次仅只读巡检与发布报告，结束本次巡检；下一次检查2026-09-10 13:02 CST。
 
