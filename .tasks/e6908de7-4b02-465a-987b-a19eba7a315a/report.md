@@ -1,4 +1,4 @@
-# 07:40 正式仿真阶段：rearrange formal推进，put-back两项smoke已启动
+# 07:44 正式仿真阶段：三项formal100运行，GPU5 smoke继续
 
 复用原三树、既有入口和recorder，无源码变更；GPU0/1仍训练，GPU2/3留wash，wuwen-1停用。按06:53授权，owner发布GPU4/6保存、CPU验收及释放后，本任务各自检查显存1MiB/81038MiB空闲/0%、独立端口空闲再启动。
 
@@ -8,6 +8,7 @@
 | --- | ---: | --- | --- | ---: | --- |
 | rearrange t+1 seed0 | 4 | rearrange_full_t_plus_1_s0_20k_smoke2 | 2/2 success，门禁PASS | 393 | 393/407 |
 | rearrange t+30 seed0 | 6 | rearrange_full_t_plus_30_s0_20k_smoke2 | 2/2 success，门禁PASS | 392 | 392/405 |
+| put-back t+30 seed0 | 7 | put_back_full_t_plus_30_s0_20k_smoke2 | 2/2 success，门禁PASS | 332 | 332/329 |
 
 两项启动分别07:24:57/07:25:51，最外层CLI均exit0。既有validate_smoke_run核对当前manifest与bridge source通过，两条accepted rollout无runtime_error，video/no-video各一集；MP4逐帧读通。input_audit/input_manifest经config_source继承副本逐字节一致。每项两scheduler exit0，policy/robot按runner_shutdown退出-15，所有start对应PID已不存在。实际20k checkpoint-only恢复已由smoke覆盖，不重复技术50。
 
@@ -30,7 +31,7 @@ host均is-dcfi2kjdq7g3k6aa-devmachine-0。可靠detach（Popen start_new_session
 
 ## 后续队列与CPU准备
 
-owner已分别于07:34/07:37发布GPU7/5保存/CPU验收/退出/释放。本任务各自启动前复核1MiB/0%、端口空闲，已启动put_back_full_t_plus_30_s0_20k_smoke2（GPU7，07:36:49，19470/19472）及put_back_full_t_plus_1_s0_20k_smoke2（GPU5，07:39:34，19450/19452）。两项为短smoke，尚未完成门禁；通过后立即同卡formal，与GPU4/6并行。14项队列继续按README训练seed成对推进。8份远端20k已完成audit/smoke dry/formal dry（24次exit0）；本机新验收的rearrange t+1 seed2、put-back t+1 seed1也各完成同三项CPU检查，共10份就绪。其余项按owner保存/CPU门禁交接后准备；CPU检查不加载GPU权重。
+owner已分别于07:34/07:37发布GPU7/5保存/CPU验收/退出/释放。本任务各自启动前复核1MiB/0%、端口空闲，已启动put_back_full_t_plus_30_s0_20k_smoke2（GPU7，07:36:49，19470/19472）及put_back_full_t_plus_1_s0_20k_smoke2（GPU5，07:39:34，19450/19452）。GPU7的t+30 smoke已通过既有门禁，视频可读、config_source副本逐字节一致、两个scheduler exit0及policy/robot正常shutdown -15、CLI exit0、全部子进程退出；config SHA256 c0b903e28db9d52717a6ca61c873c692156ae3ea711e4ee5881c3e0e9e83ae5b。07:43:56已于GPU7启动put_back_full_t_plus_30_s0_20k_100ep（PID3344284，job1803ad5f-b94a-4b64-bdc1-2c7f8ed9339c），启动前1MiB/81037MiB空闲/0%。GPU5的t+1 smoke继续，完成门禁后立即同卡formal，与其他三卡并行。14项队列继续按README训练seed成对推进。8份远端20k已完成audit/smoke dry/formal dry（24次exit0）；本机新验收的rearrange t+1 seed2、put-back t+1 seed1也各完成同三项CPU检查，另两份rearrange t+30 seed2、put-back t+30 seed1也通过同三项检查，共12份就绪。其余项按owner保存/CPU门禁交接后准备；CPU检查不加载GPU权重。
 
 真实结果根：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/。
 原worktree根：/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a。
