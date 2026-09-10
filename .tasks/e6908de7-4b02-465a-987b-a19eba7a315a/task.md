@@ -46,3 +46,12 @@
 先提交CPU准备commit并发布简短report，注明task_revision、三库实际SHA/workspace、命令dry-run与metadata检查、GPU待办和预计耗时。Manager验收后分配GPU进行新schema必要smoke或正式模型评测；未分配前不占本机GPU0/1或远端八卡，它们已有任务。超过1小时的正式进程用mam job add登记。
 
 任务自己的smoke和临时文件自行清理，正式产物留共享主repo。正式运行期间冻结所有被调用worktree；结束、处理job并完成交付后由Manager归档环境/分支。
+
+## 12:11 Manager文档修正（本轮仍不占GPU）
+
+CPU实现7378904及空白review95ece0eb已经验收，主库已合入。此次只修改 README_memory_schema.zh-CN.md：
+- 新20k训练实际保存在 /mnt/public/xcj/Projects/openpi/checkpoints/<config>/<exp_name>/20000；README目前表格/示例的policy/pi05/checkpoints路径不成立。主RMBench此目录是真实独立目录，只供旧模型；不要通过搬checkpoint或补软链来让错命令成立，修正文档即可。按训练owner最新report列实际路径，full的seed已含0/1/2与put-back的0/1；旧drawer仍用原RMBench checkpoint路径。
+- README是操作说明，不需复述CPU review人名/旧版本等待和“未获GPU授权”等瞬时对话。简要说明调用入口和checkpoint自身smoke→formal约束，再给可复制命令。
+- 删除 CHECKPOINT=... 以及后续 $CHECKPOINT；具体路径直接写入参数。不用 $PWD 或拼接继承的PYTHONPATH占位来猜工作目录。确有必要的进程环境设置可用具体值放在对应命令前，不建立export变量准备区；技术/正式模板明确指定实际worktree解释器、checkpoint路径与GPU0。
+- 保留只读checkpoint、技术50不能替代20k门禁、逐步metadata与清理规则，但避免重复同一说明。暂不改可执行代码、配置或公共框架。
+只需核对文字命令与现有CLI/路径、diff-check，不重复CPU模型与GPU检查。提交文档小修并发布report。F0 row1预计约12:50释放GPU0，Manager另通知你开始真实技术smoke及drawer offline；本轮不先启动GPU程序。
