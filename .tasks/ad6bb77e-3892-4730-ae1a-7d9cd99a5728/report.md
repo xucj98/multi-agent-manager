@@ -1,4 +1,4 @@
-task_revision: 0d9ae60b182ae1b4ba66ecc78061d80f89b11755
+task_revision: 3484bdbe09beb7752e5dfe509f1b7e8e5a17ab2e
 
 完成与未完成：
 
@@ -8,7 +8,7 @@ task_revision: 0d9ae60b182ae1b4ba66ecc78061d80f89b11755
 - 两个实际训练均读取 `rearrange_blocks_demo_clean_state_shared_memory`，没有使用或 fallback `demo_clean`。GPU1 全部 smoke 和恢复已结束，可释放；Locke 已按 full gate 自行获准启动冻结 worktree 的正式 20k，本任务不会启动正式训练。
 - put-back 已解除 GPU4/5 的唯一数据门：专用 `rmbench_put_back_block_robot` norm 已从 `put_back_block_demo_clean_state_shared_memory` 生成。两个 full 实际 loader（t+1、t+30）均读取该 asset，state/actions stats 都是 14 维；批次 state `(32,32)`、actions/weights `(32,50,32)`，末尾 padding weights 为零。两臂没有复用 rearrange stats。
 - R3/R4 已独立固定为 `d49c1a1`：`source=initial` 不再要求不存在的 train mask，推理也不会消费非 initial cache；conditional decoder 保持公共 schema 的 first-match case 语义。
-- 后续仅剩 wash full/serial 注册与真实 loader/config roundtrip，以及将这两项的结果交回 review；不会修改 Locke 的冻结运行树或自行启动 20k。
+- wash full/serial 注册、全量 robot-only norm、真实 loader 与 checkpoint metadata roundtrip 已完成；当前等待 Banach 对 `062d12a + 7a62920` 的独立复核。不会修改 Locke 的冻结运行树或自行启动 20k。
 
 workspace、各库交付 commit：
 
@@ -16,7 +16,7 @@ workspace、各库交付 commit：
 - openpi CPU integration: `ffa308d5485a2c8222d3e7735b08723c6e93a237`
 - CLI repair: `5e3bfd6d46f13643c53271c1e3e1bc116dd4ff06`
 - R1/R2 repair: `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50` (`fix: make memory checkpoint factories self-contained`)
-- R3/R4 repair and current HEAD: `d49c1a1` (`fix: honor initial memory inputs and decoder case order`)，其父级已包含主库合入的 `42011a3` wash 数据增量。
+- R3/R4 repair: `d49c1a1` (`fix: honor initial memory inputs and decoder case order`)；wash templates: `062d12a`；当前 HEAD: `7a629204b4ab6d3cd113443c538837f8fb5f08d4`（runtime-only memory YAML fields omitted）。
 - checkpoint dependency chain: `489359f -> 3d4fe31 -> cc706e37`; this task does not modify its owner files.
 
 验证结果与成果位置：
@@ -33,5 +33,13 @@ workspace、各库交付 commit：
 
 - `7a629204b4ab6d3cd113443c538837f8fb5f08d4` 固定 checkpoint YAML 边界：`DataConfig.memory_adapter` 与 `memory_model_spec` 为运行时注入字段，不进入 YAML；真实 wash serial metadata roundtrip 验证 resolved `memory_config` 只保存一次。相关 `arx_policy/config/config_memory/memory_data` 回归共 `23 passed`。
 - put-back 在当前 HEAD 以实际共享根 `HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot` 重新取样。t+1/t+30 各一批：asset `rmbench_put_back_block_robot`、robot_dim 14、state `(32,32)`、actions/weights `(32,50,32)`，已用 memory 宽度为 23，尾部 padding 的非零 weight 数均为 0。简短日志：`/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/gpu_smoke_logs/put_back_block_loader_smoke_7a62920.log`。GPU4/5 可据此放行。
-- wash v3 全量 robot-only norm 已启动为 CPU-only MAM job `396366a5-71b0-4185-82ee-a3963b4b004b`（PID 2323375），不占 GPU；日志：`/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/cpu_norm_logs/wash_cup_s2m_robot_norm_7a62920.log`，目标为 `assets/memory_v1/x1pro_wash_cup_s2m_robot/norm_stats.json`。启动后的稳定吞吐约 16 batch/s，4490 batches 预计数分钟完成；完成后将做 full/serial 实际 loader 与 checkpoint roundtrip。
+- wash v3 全量 robot-only norm 已成功完成并归档 MAM job `396366a5-71b0-4185-82ee-a3963b4b004b`：4,490 batches、约 5 分钟、CPU-only。日志：`/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/cpu_norm_logs/wash_cup_s2m_robot_norm_7a62920.log`；产物：`assets/memory_v1/x1pro_wash_cup_s2m_robot/norm_stats.json`，state/actions 的 mean/std/q01/q99 均为 14 维。
 - 遵照 e6908de7 的短期交接，两个已验收的 50-step checkpoint 与其日志仍留在本 task workspace，仅供新 schema metadata/入口核验，未清理、未复制、未占用 GPU。
+
+阶段更新（wash v3 实际联通）：
+
+- 以 `HF_LEROBOT_HOME=/mnt/public/xcj/Projects/openpi/data/lerobot`、本 task `.venv` 和 `num_workers=0` 从已保存的 checkpoint metadata 恢复两个配置后，各取真实第一批。两臂均来自 `wash_cup_x1pro_s2m_memory_v1/all_172_15hz_s2m_master_v3_source_frame_aligned`，robot-only norm 宽度为 14，完整模型 batch 的 state `(32,32)`、actions/weights `(32,50,32)`。
+- full (`joint_dense`) 的 memory 终止宽度为 20，padding weight 非零数为 0；首批有 212 个 memory-zero 时间格，212 个同格仍有 robot loss，验证缺 phase GT 只屏蔽 memory 监督。
+- serial (`serial_token`) 的 `key_state_input_ids` 和 target IDs 都是 `(32,1)`；首批 8 条 target mask 为 false，8 条仍有 robot loss；非机器人 action weight 非零数为 0，memory supervision 走 token head。
+- 两个实际 `checkpoint_metadata.save → load_train_config → create_data_config(training=False)` roundtrip 都只写一份 `memory_config`，不写 `memory_adapter`/`memory_model_spec`，且 inference factory 未读取训练 norm stats。完整可复核日志：`/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/cpu_norm_logs/wash_cup_loader_roundtrip_7a62920.log`。
+- 两份 50-step checkpoint 及简短日志仍按 e6908de7 交接要求保留；未占用 GPU，等待 Manager 确认后统一清理。
