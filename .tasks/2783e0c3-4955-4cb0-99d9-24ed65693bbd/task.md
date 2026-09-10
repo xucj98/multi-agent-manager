@@ -11,3 +11,6 @@
 
 # 用户最新布局要求（覆盖之前路径约定）
 主repo不应有业务软链接；PROJECT_ROOT只放 workspace/MAM/repos（保留MAM必要隐藏配置）。环境任务负责将共享资产实体移动到 canonical/.cache 及worktree软链更新；本迁移任务仅负责将备份（含正在补充的历史outputs）收拢 canonical/.local/migration-backup/TASK-ID，不要竞争移动资产。请与environment协调，修正 MANIFEST/report 所有最终路径和分类，验证迁移后完整性。不得保留PROJECT_ROOT/migration-backup业务目录。
+
+# 用户明确授权：统一用户缓存目录
+用户已明确同意将 ~/.cache 下现有内容移动到 /mnt/public/xcj/cache，校验后删除旧实体并建立 ~/.cache -> /mnt/public/xcj/cache。同时与 environment 协调，将 table1000 canonical/.local/uv-cache 中已下载的完整包仓库整合到 /mnt/public/xcj/cache/uv，避免两套。请你负责迁移、校验与替换路径，environment负责脚本/local配置。先与其确认停止uv写入窗口；注意MAM review或其他短任务可能用默认uv/pip cache，不覆盖或静默丢失目录冲突。采用分阶段复制/校验/最后切换，冲突内容要保全并报告，不使用危险盲目覆盖。~/.cache 有软链子项须保留语义，记录目录计数、大小、复制校验、最终readlink。保留 /mnt/public/xcj/cache/shared-python（这次创建）以及MAM独立worktree。全局uv目录现在是symlink环境的持久包仓库：不可cache clean/prune或手工删除包。不要展示cache中敏感内容。完成发布报告，写清此前备份依旧存在。
