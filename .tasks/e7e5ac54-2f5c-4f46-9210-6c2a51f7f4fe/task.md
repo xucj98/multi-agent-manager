@@ -8,7 +8,9 @@
 
 2026-09-10 08:05 Manager已验收full GPU50：实际50updates、51参数leaf全部BF16、3353433872元素、仅checkpoint恢复得到actions(50,14)与memory_prediction_ids(50,3)。结合CPU独立GO 6a32847，现放行wuwen-1 GPU0/1/3/6/7的五个rearrange full/no-memory正式20k，立即按下表启动并登记；保持d10源码冻结。GPU2等serial自身50step恢复通过；GPU4/5等put-back专用norm和实际归一化loader核验。不要等全部八项就绪才启动已通过的项，不向用户再次请求许可。
 
-full证据在ad6任务workspace的gpu_smoke_logs/full_tplus1_d10cc01.log、full_tplus1_d10cc01_dtype_restore.log、full_tplus1_d10cc01_restore_wire.log；实际checkpoint为gpu_smoke_checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/full_tplus1_d10cc01/50。它们用于本次验收，正式训练仍从同一pi05_base初始化。
+2026-09-10 08:15 serial GPU gate也已通过：50updates、56参数leaf全BF16、3353474844元素，checkpoint-only恢复actions(50,14)与memory_prediction_ids(1,3)。现追加放行GPU2的serial lag30 seed0正式20k，保持同一d10源码；GPU4/5仍待put-back norm/loader。full/serial验收由Manager读取真实日志/产物完成，不再等第三轮review。
+
+full证据在ad6任务workspace的gpu_smoke_logs/full_tplus1_d10cc01.log、full_tplus1_d10cc01_dtype_restore.log、full_tplus1_d10cc01_restore_wire.log；实际checkpoint为gpu_smoke_checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/full_tplus1_d10cc01/50。serial对应serial_lag30_d10cc01三个日志及同名config/run的50目录。它们用于本次验收，正式训练仍从同一pi05_base初始化。
 
 ## 第一批配置和资源
 
