@@ -1,23 +1,26 @@
-task_revision: 1e0ca4b161d99917d15f2fbd5f0b4c6f1ef5ba0c
+task_revision: bfab30b8285b76c20bd6f4ceed8bd73bf957b684
 
-本阶段完成跨库回归草稿收尾；未启动 GPU、真机、rollout 或长进程。此前 live P1 修复 `ed2f2f3` 保持不变，仍由 Pascal 增量复核。
+本阶段完成 Pascal `ff00b8f` 指出的 X1 非零 wait 回归修复，并保留此前跨库回归整理。未启动 GPU、真机、rollout 或长进程；任务保持等待 Pascal 增量复核。
 
 交付 workspace 与 commit：
 
 - robot-bridge：`/mnt/public/xcj/Projects/workspace/9f5a3889-49a6-4f00-af84-096d8042c3bc/robot-bridge`
-  - live：`ed2f2f34a1eea74e8449d39b889555fdfcc659fc`
-  - 跨库回归：`29a5638f4a6bdfef2f107d331c2afde9daa03697`（`test: cover openpi memory transform contract`）
+  - `8ea6078543a875b5ae223df16891cdc1fe975c66`（`fix: keep x1 pipeline waits asynchronous`）
+  - 前序 live 修复：`ed2f2f34a1eea74e8449d39b889555fdfcc659fc`
+  - 前序独立跨库回归：`29a5638f4a6bdfef2f107d331c2afde9daa03697`
 - openpi：`/mnt/public/xcj/Projects/workspace/9f5a3889-49a6-4f00-af84-096d8042c3bc/openpi`
-  - `86d1adff94d5135988edd8dcca915606c1172872`：合入已审 `ffa308d` 父链中缺失的 RMBench 配置/sidecar 依赖；未自行修改训练实现。
+  - `86d1adff94d5135988edd8dcca915606c1172872`（已审训练交付依赖链；无本轮训练实现改动）。
 
-回归从未跟踪的 454 行草稿压缩为 259 行独立测试，删除测试自建 schema、data factory 和 recording tokenizer。它直接加载已注册的 full、serial、no-memory RMBench 配置；单字段由正式 full schema 的字段筛选参数化，多字段使用原配置。真实 `PaligemmaTokenizer`、完整 input/output transform 顺序和 `MemoryContext` 都参与，只有模型采样替换为确定性 CPU 输出。
+实现：X1 `_wait` 恢复非零 `action_queue_remaining` 的原有 `TimestampedBuffer.count_after(base)` 异步判断，不获取 `_action_execution_lock`。阈值为零时才在该锁内同时检查排期剩余与成功 handoff，故同步 drain 仍不会把过期时间戳当作完成证据。没有改写调度循环、发送顺序、X1Pro 路径或新增 RPC。
 
-覆盖：非 initial cache 改变真实 Pi0.5 `tokenized_prompt`；full 32 维 raw action 裁为 14 维并保留 `memory_prediction_ids`，K30 消费 model index 29/row 30；serial 返回实际动作条件 ID（特意与 logits argmax 不同）；F=0 不发送/接收 memory wire 字段。
+新增真实 X1 exec-loop/Event 回归：SDK 发送持执行锁时，`action_queue_remaining=1` 的 get_obs 在 release 前返回 `completed=0, queued=1`；现有零剩余用例仍要求 release 后才返回 `1, 0`。
 
-验证：
+验证（CPU/fake SDK）：
 
-- `JAX_PLATFORMS=cpu CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /mnt/public/xcj/Projects/workspace/9f5a3889-49a6-4f00-af84-096d8042c3bc/openpi/.venv/bin/python -m pytest -q -p no:cacheprovider tests/scheduler/test_openpi_memory_transform_contract.py`：4 passed（8.24s）。
-- 同一 OpenPI 环境 `ruff check tests/scheduler/test_openpi_memory_transform_contract.py` 与 `git diff --check`：通过。
-- bridge 自身 `.venv` 运行该模块：1 skipped（缺少训练依赖，预期行为）。
+- `CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/robot/controllers/test_execution_progress.py`：20 passed（1.99s）。
+- `CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/scheduler/test_memory_context.py tests/scheduler/test_memory_v1_schedulers.py tests/scheduler/test_openpi_takeover.py`：47 passed（16.17s）。
+- 新增测试文件 ruff 与提交 diff check：通过。X1 文件的 33 条 ruff 历史告警在父版本和当前版本数量相同，未扩展或整理无关代码。
 
-剩余：Pascal 对 live 提交和本独立回归提交的 review；正式真机/rollout 验收按既有流程另行执行，CPU 结果不代表硬件完成。
+此前跨库回归：454 行草稿已压缩为 259 行，直接使用正式 full/serial/no-memory 配置、实际 tokenizer、input/output transforms 与 MemoryContext；本任务 OpenPI CPU 环境为 4 passed，bridge 常规环境预期 1 skipped。
+
+剩余：Pascal 对 `8ea6078` 的增量 review；正式硬件/rollout 验收依既有流程执行，CPU 结果不代表硬件完成。
