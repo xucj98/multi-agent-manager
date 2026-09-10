@@ -4,33 +4,30 @@ task_revision: a32c69c813e7e7f66c4b199859d799bdbccc15f9
 
 ## 完成与未完成
 
-- 已完成：按 task 创建独立 openpi worktree、两端独立解释器与 CPU CLI/data/memory 配置核对、demo_clean_state 来源核实、八个无冲突的输出目录和实际启动命令准备完毕。
-- 已完成：Manager 的 CPU firstfull `6a32847`、full GPU50 和 serial GPU50/restore 验收已同步到发布版 `a192a2f…`；当前运行树仍固定为 `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`。
-- 已完成：GPU0/1/2/3/4/5/6/7 八个正式 20,000-update run 均已用独立 exp_name 启动、可靠 detach，并登记到 MAM。
-- 已完成：截至 `2026-09-10T09:01:48+08:00` 的计划内只读巡检，八个 MAM job 均为 `running`；GPU0/1/2/3/4/5/6/7 分别到 713/716/572/707/112/112/737/737 updates，全部持续推进。
-- 已完成：只读核对输出通道。非交互式 `tqdm_loggable` 把 progress 交给 logger（落盘行来自 `tqdm_logging.py:145`），而 `scripts/train.py:337` 的标量通过继承的 `tqdm.write` 写到 `sys.stdout`，该方法不强制 flush。六个进程的 fd 1/2 因启动时 `2>&1` 都指向各自 log；目前仅 progress 落盘，符合 stdout 仍缓冲的判断。
-- 待补充：现有六路没有从落盘标量取得“loss 为有限数”的证据；日志未出现 `nan`/`inf` 不能替代该证据。保持只读观察，既不重启健康 run，也不向活跃解释器注入代码或变更 logging/model/data 参数。
-- 已完成：Manager 于 `08:44` 放行 put-back 两路；远端共享 `assets/memory_v1/rmbench_put_back_block_robot/norm_stats.json` 已只读复核为 SHA-256 `7a014e42dc9d51c8601b05dca5c876c58dda1308e61d1619e3d1c367baa7f261`，与发布要求一致。固定树仍为 `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`。
-- 已完成：GPU4/5 于约 `08:47` 以实际 `.venv/bin/python -u -B` 命令启动。两种 put-back loader 已进入，日志各自确认 `local_batch_size: 32`，GPU4/5 各占约 73.4 GiB。
-- 已完成：GPU4/5 均在 `08:52` 通过首次 XLA 编译并实际完成第 1 个 optimizer update；首个 13.2–13.4 s/update 计时包含编译，不用于 ETA。
-- 已完成：截至 `08:56:07`，GPU4/5 均已到 22 updates，速率已收敛到约 3.8–3.9 s/update；按当前进度估计剩余约 21h16–21h36。
-- 已完成：`-u` 已在 Step 100 落盘有限标量。GPU4 为 `grad_norm=1.1402, loss=0.1549, param_norm=1802.3861`；GPU5 为 `grad_norm=1.1507, loss=0.1521, param_norm=1802.3861`。这只证明新启动的 GPU4/5；六路既有 run 仍保持原先“未取得落盘标量”的边界。
-- 待补充：不重启或调整八路的源码、数据、norm 或训练参数；后续按小时只读巡检。
+- 已完成：八个正式单卡 batch32、20,000-update run 已通过独立 worktree/解释器、独立 exp_name 可靠 detach，并登记到 MAM。CPU firstfull `6a32847`、full/serial GPU50/restore 和 put-back loader 的授权沿发布 task 执行。
+- 本次为计划中 `10:02` 小时巡检：MAM 于 `2026-09-10T10:02:11–12+08:00` 核验八个原 PID/进程身份均为 `running`；日志、资源与 `/proc` 只读快照采样于 `10:03:15+08:00`。八路 progress 较 09:01 全部增加，最新日志距采样 2.3–10.6 秒，未见 Traceback/CUDA/OOM 错误行。
+- GPU4 最新落盘 `Step 1000: grad_norm=0.0779, loss=0.0059, param_norm=1802.4484`；GPU5 最新落盘 `Step 1100: grad_norm=0.0743, loss=0.0051, param_norm=1802.4668`。逐条解析 GPU4 的 10 条（100–1000）、GPU5 的 11 条（100–1100）标量，数值均有限；这是已落盘的区间均值证据，不扩展成每个 update 的原始 loss 证明。
+- 旧 GPU0/1/2/3/6/7 的 Step 标量计数仍全部为零：optimizer progress 已前进，有限 loss 尚未由落盘标量证实。此前只读核对的 stdout 缓冲解释仍适用：`tqdm.write` 默认 stdout 且不强制 flush，progress 交给 logger；无 nan/inf 文本不能替代有限 loss 证据。
+- 冻结核验：远端 HEAD=`d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`，`git diff --name-status HEAD` 与 `git status --porcelain=v1 --untracked-files=normal` 输出均为空。八 PID 的 cwd 均为本任务固定树，实际命令/分配 GPU/HF 与数据根一致，未设置外部 PYTHONPATH。
+- put-back norm SHA-256 再次核验为 `7a014e42dc9d51c8601b05dca5c876c58dda1308e61d1619e3d1c367baa7f261`。GPU4/5 于 `08:47` 使用 `.venv/bin/python -u -B` 启动，旧六路保持原 `-B`。Manager 本轮告知主树已合入 `a869498` 并获 CPU GO，本运行树继续固定 d10。
+- 未完成：八路 20k、最终唯一 20000 checkpoint、完整参数/BF16/无 optimizer 与 checkpoint-only 恢复验收、评测交接。此次仅巡检与发布报告，无注入、重启或额外训练。
 
 ## 正式运行状态
 
 | GPU | config / seed | exp_name | remote PID | MAM job | 启动与当前进度 | 当前 ETA |
 | --- | --- | --- | ---: | --- | --- | --- |
-| 0 | full t+1 / 0 | `memory20k_e7e5ac54_rearrange_full_t_plus_1_s0` | 4186829 | `89dcc92f-365e-409a-87d3-e6e82b66adba` | 09:01；713 updates，约 3.8 s/update | 约 20h07m |
-| 1 | full t+30 / 0 | `memory20k_e7e5ac54_rearrange_full_t_plus_30_s0` | 4186841 | `db46bdd0-0ec2-41c1-9c98-baca9ffd6f5b` | 09:01；716 updates，约 3.7 s/update | 约 19h56m |
-| 2 | serial lag30 / 0 | `memory20k_e7e5ac54_rearrange_serial_lag30_s0` | 9003 | `d682fab7-3cbc-4b7e-a31a-b959bbd2695c` | 09:01；572 updates，约 3.7 s/update | 约 20h07m |
-| 3 | no-memory / 0 | `memory20k_e7e5ac54_rearrange_no_memory_s0` | 4186839 | `2774d038-5a23-4184-b16a-92fa1fd88019` | 09:01；707 updates，约 3.8 s/update | 约 20h17m |
-| 4 | put-back full t+1 / 0 | `memory20k_e7e5ac54_put_back_full_t_plus_1_s0` | 12435 | `463092be-02b4-4bfa-bf12-8eae2416a244` | 09:01；112 updates，约 3.8 s/update，Step-100 loss=0.1549 | 约 21h05m |
-| 5 | put-back full t+30 / 0 | `memory20k_e7e5ac54_put_back_full_t_plus_30_s0` | 12436 | `6e2601ea-e091-4e63-9c31-e90895ca5ffe` | 09:01；112 updates，约 3.7 s/update，Step-100 loss=0.1521 | 约 20h34m |
-| 6 | full t+1 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_1_s1` | 4186835 | `95a88ee3-1a90-4e2e-baa1-50a1cd6f4eb0` | 09:01；737 updates，约 3.7 s/update | 约 19h40m |
-| 7 | full t+30 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_30_s1` | 4186832 | `fa1d8437-1fb7-48a5-8d37-2233e8e06767` | 09:01；737 updates，约 3.7 s/update | 约 19h33m |
+| 0 | full t+1 / 0 | `memory20k_e7e5ac54_rearrange_full_t_plus_1_s0` | 4186829 | `89dcc92f-365e-409a-87d3-e6e82b66adba` | 10:03；约 1.70k updates，3.7 s/update；标量未落盘 | 约 18h59m |
+| 1 | full t+30 / 0 | `memory20k_e7e5ac54_rearrange_full_t_plus_30_s0` | 4186841 | `db46bdd0-0ec2-41c1-9c98-baca9ffd6f5b` | 10:03；约 1.71k updates，3.7 s/update；标量未落盘 | 约 18h54m |
+| 2 | serial lag30 / 0 | `memory20k_e7e5ac54_rearrange_serial_lag30_s0` | 9003 | `d682fab7-3cbc-4b7e-a31a-b959bbd2695c` | 10:03；约 1.56k updates，3.7 s/update；标量未落盘 | 约 19h07m |
+| 3 | no-memory / 0 | `memory20k_e7e5ac54_rearrange_no_memory_s0` | 4186839 | `2774d038-5a23-4184-b16a-92fa1fd88019` | 10:03；约 1.68k updates，3.8 s/update；标量未落盘 | 约 19h15m |
+| 4 | put-back full t+1 / 0 | `memory20k_e7e5ac54_put_back_full_t_plus_1_s0` | 12435 | `463092be-02b4-4bfa-bf12-8eae2416a244` | 10:03；约 1.08k updates，3.8 s/update；loss=0.0059@1000 | 约 20h02m |
+| 5 | put-back full t+30 / 0 | `memory20k_e7e5ac54_put_back_full_t_plus_30_s0` | 12436 | `6e2601ea-e091-4e63-9c31-e90895ca5ffe` | 10:03；约 1.10k updates，3.8 s/update；loss=0.0051@1100 | 约 19h51m |
+| 6 | full t+1 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_1_s1` | 4186835 | `95a88ee3-1a90-4e2e-baa1-50a1cd6f4eb0` | 10:03；约 1.74k updates，3.7 s/update；标量未落盘 | 约 18h38m |
+| 7 | full t+30 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_30_s1` | 4186832 | `fa1d8437-1fb7-48a5-8d37-2233e8e06767` | 10:03；约 1.75k updates，3.6 s/update；标量未落盘 | 约 18h30m |
 
-八项实际使用 `CUDA_VISIBLE_DEVICES=<分配卡>`、`XLA_PYTHON_CLIENT_MEM_FRACTION=0.90`、`HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot`、`OPENPI_DATA_HOME=/mnt/public/cache/openpi`，均从本任务固定 worktree 的独立解释器启动。GPU0/1/2/3/6/7 使用原实际 `.venv/bin/python -B`；新放行 GPU4/5 使用实际 `.venv/bin/python -u -B`。09:01 快照八卡均占约 73.49–73.51 GiB、利用率 100%。
+progress 的 `kit` 为日志三位有效数字取整，表中保留约数；ETA 取日志按近期稳定速率计算的剩余时间并四舍五入到分钟，瞬时会有波动。旧六路当前约 1.56k–1.75k，相较 09:01 的 572–737 updates 已持续前进。
+
+八项实际使用 `CUDA_VISIBLE_DEVICES=<分配卡>`、`XLA_PYTHON_CLIENT_MEM_FRACTION=0.90`、`HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot`、`OPENPI_DATA_HOME=/mnt/public/cache/openpi`，均从本任务固定 worktree 的独立解释器启动。GPU0/1/2/3/6/7 使用原实际 `.venv/bin/python -B`；GPU4/5 使用实际 `.venv/bin/python -u -B`。
 
 ## workspace、各库交付 commit
 
@@ -46,6 +43,10 @@ task_revision: a32c69c813e7e7f66c4b199859d799bdbccc15f9
 - 远端 CPU 下六个 config 都可解析并创建 MemoryDataAdapter，sidecar 路径指向本树 `data/memory_v1/rmbench/<repo_id>/episode_memory.json`。rearrange 的 robot-only norm 可读且只含 `state`、`actions`，每个 mean/std/q01/q99 为 14 维；base 参数完成标记可读。
 
 ## 远端资源快照
+
+`2026-09-10T10:03:15+08:00`：八卡各有且仅有对应已登记训练 PID，GPU 内存使用 73,489–73,507 MiB（约 71.8 GiB；更正此前把 MiB/1000 标为 GiB 的单位），空闲 7,543–7,561 MiB；八卡利用率均 100%，温度 51–68°C。主机 MemAvailable=831,395,431 KiB（约 792.9 GiB），无 swap；`/mnt/public` 可用 10,014,271,995,904 bytes（约 9.11 TiB）。资源未见压力异常。
+
+历史准备快照：
 
 采样于 `2026-09-10T07:53:19+08:00`，只读检查、未分配 GPU：`wuwen-1` 的 GPU0..7 均为 A100-SXM4-80GB，单卡 `memory.used=4 MiB`、`memory.free=81,046 MiB`、utilization=0。主机可用 RAM 895 GiB，`/mnt/public` 可用 9.2 TiB；`logs/` 可写且 `/usr/bin/setsid` 存在。此为快照，正式每一路启动前仍要重新检查实际显存，且不根据进程列表推断空闲。
 
@@ -105,4 +106,4 @@ CUDA_VISIBLE_DEVICES=7 nohup setsid .venv/bin/python -B scripts/train.py pi05_rm
 | 6 | rearrange full t+1 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_1_s1` | `checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1/20000` | `logs/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1.log` |
 | 7 | rearrange full t+30 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_30_s1` | `checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s1/20000` | `logs/memory20k_e7e5ac54_rearrange_full_t_plus_30_s1.log` |
 
-下一检查：约 `2026-09-10T10:02:00+08:00` 做八路小时巡检。任何 MAM job attention 或显存异常均立即检查；不等待 R3/R4/wash。
+下一检查：计划 `2026-09-10T11:02:00+08:00` 做八路小时巡检，由 Manager 按计划唤醒；如收到 MAM job attention 或异常通知则提前处理。
