@@ -2,7 +2,7 @@
 
 ## 核心原则
 
-MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job`、`mam wait`。本集群的信息查看[本地说明](.local/README.md)，所有 `mam` 命令以及 agent 均在本机运行。安装与更新见[安装说明](docs/install.md)。
+MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job`、`mam wait`。本集群的信息查看[本地说明](.local/README.md)，所有 `mam` 命令以及 agent 均在本机运行。
 
 使用细节可用 `mam --help` 查询，语法中的大写词需要替换为实际值，方括号表示可选参数。
 
@@ -21,6 +21,10 @@ PROJECT_ROOT/
   workspace/TASK-ID/          # 执行者的独立工作空间
     REPO/                     # 按需创建的 worktree，分支为 task/TASK-ID
 ```
+
+## 安装
+
+安装与更新见[安装说明](docs/install.md)。
 
 ## 任务管理
 
