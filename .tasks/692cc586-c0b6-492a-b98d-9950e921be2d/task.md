@@ -56,3 +56,6 @@ commit: b338dbdd4398af307fd070606288101b8c1d2901
 重点status投影：实际临时数据验证正常/unknown（保留具体error及lastknown）/archived/review/requirements_changed/workspace交付版本；task status不触发进程探测，只汇总未归档job、缓存语义清楚；job status仍只刷新目标。不能把最新unknown误写旧running，不丢定位路径/版本/收尾异常。不为正常状态dump内部identity/probe或重复revision。列表/其他命令逻辑保持不变。
 
 结合diff检查，必要回归一次，避免纯文案重复大量测试和遍历。结果GO/NO-GO、具体阻塞与建议、简短命令证据/workspace/commit写report并发布。清理临时root/进程/pycache，留干净worktree供归档。Manager检查实际轨迹，别进行无目的搜索。
+# 文档增量复验
+
+原b338dbdd代码/help/status已通过，源要求新revision 2e29129286945eec128f2fd04efe194ec923007c，文档修复commit 9d2a2fc（先用git解析完整ID），交付report publication 89db7af。复用本worktree快进到该commit，只核对你报告的README必要操作说明与workspace措辞、链接/diff；不重跑模型、32测试或全部help。发布最终GO/NO-GO并在report注明最终完整commit与实际source版本。原NO-GO保留历史即可。
