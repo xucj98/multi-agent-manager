@@ -1,18 +1,18 @@
-当前结果：完成04:32 wash两路小时巡检，实际快照2026-09-11 04:33:56 CST。两路实时running、日志持续推进，全部可见标量有限，无新增异常，ETA仍为07:27左右。下一检查2026-09-11 05:32 CST，由Manager唤醒；结束本次巡检。
+当前结果：完成05:32 wash两路小时巡检，实际快照2026-09-11 05:33:25 CST。两路实时running、日志持续推进，全部可见标量有限，无新增异常，ETA仍为07:27左右。下一检查2026-09-11 06:32 CST，由Manager唤醒；结束本次巡检。
 
 workspace: /mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/openpi
 实际SHA: 056bcc887637cc6eda565a8ad7d45c88021d4bcd；工作树干净，源码/环境/config/训练进程保持冻结。
 
 | GPU/配置 | progress约数 | 可见标量step | loss | grad_norm | param_norm | 秒/更新 | ETA（北京时间） |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 2 / full | 17200 | 17100 | 0.0058 | 0.0472 | 1806.5537 | 3.6884 | 2026-09-11 07:27左右 |
-| 3 / serial | 17200 | 17100 | 0.0146 | 0.1302 | 1806.6560 | 3.6904 | 2026-09-11 07:27左右 |
+| 2 / full | 18100 | 18100 | 0.0052 | 0.0462 | 1806.6306 | 3.6882 | 2026-09-11 07:27左右 |
+| 3 / serial | 18200 | 18100 | 0.0086 | 0.1160 | 1806.7228 | 3.6890 | 2026-09-11 07:27左右 |
 
-- 两路各171组已落盘loss/grad_norm/param_norm全部有限，较03:34快照各新增9组。标量为每100更新区间均值，不代表逐update原始标量。
-- progress按百位取整，约17200；最近精确标量仍17100。吞吐取精确scalar step16100→17100后首条progress时间差，两路约975–976 updates每小时。ETA为估算，最终保存另需耗时。
-- job status于04:33:09实时确认两路running，未返回error；身份由MAM内部核对。原PID、cwd和python -u -B/batch32/seed0/20000更新/仅最终保存命令匹配。
-- 全日志无所检错误或非有限标量，无新增警告；日志距采样full3.5秒、serial2.5秒。GPU2/3占用73406/73408MiB、空闲7633/7631MiB，利用率均100%，温度68/55°C；只查询本任务GPU2/3。
-- 已读取最新任务。wuwen-1自然结束保存释放后整机空闲，不接续GPU任务；实际20000 checkpoint GPU恢复/评测仅安排本机空闲卡，启动前核对可用性，不抢占训练卡。本次未重复smoke或恢复验证。
+- 两路各181组已落盘loss/grad_norm/param_norm全部有限，较04:33快照各新增10组。标量为每100更新区间均值，不代表逐update原始标量。
+- progress按百位取整；serial约18200时最近精确标量仍18100。吞吐取精确scalar step17100→18100后首条progress时间差，两路约976 updates每小时。ETA为估算，最终保存另需耗时。
+- job status于05:32:44实时确认两路running，未返回error；身份由MAM内部核对。原PID、cwd和python -u -B/batch32/seed0/20000更新/仅最终保存命令匹配。
+- 全日志无所检错误或非有限标量，无新增警告；日志距采样full5.7秒、serial3.8秒。GPU2/3占用73406/73408MiB、空闲7633/7631MiB，利用率均100%，温度69/55°C；只查询本任务GPU2/3。
+- 通用offline入口修复由Boole任务b86b3d02负责；本训练树保持冻结。GPU须等待训练自然结束，实际20000 checkpoint恢复/评测仅在本机空闲卡进行，不抢占训练卡；wuwen-1结束后不接续GPU任务。本次未重复smoke或恢复验证。
 - 两路20k仍未结束。完成后按任务核对保存完整性、退出状态、唯一20000、完整参数/metadata/assets及本任务进程/子进程退出、显存释放；CPU完整性检查不占GPU。仅清理确认属于本任务的残留并记录。
 
 | GPU/配置 | PID | MAM job |
@@ -34,7 +34,7 @@ serial:
 - 最终checkpoint目标：/mnt/public/xcj/Projects/openpi/checkpoints/pi05_x1pro_wash_cup_s2m_serial_lag30/memory20k_ad6bb77e_wash_serial_s0/20000
 - 完整command/env/启动记录：/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/wash_gpu_logs/formal_serial_launch.json
 
-本次快照：/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/wash_gpu_logs/formal_hourly_20260911_0432.json
+本次快照：/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/wash_gpu_logs/formal_hourly_20260911_0532.json
 
 已接受产物与保留要求：
 
@@ -42,4 +42,4 @@ serial:
 - F0正式BF16评测输入：/mnt/public/xcj/Projects/openpi/user_checkpoints/precision_validation/rearrange_full_key_state_30k_bf16/30000；params/assets/metadata均原位保留。CPU参数验证及交接已获Manager接受，证据publication 04eee7a5cf20b4011406dbddc99bbbb148d7e1b8；后续Carver负责100 rollout，本owner未宣称rollout结果。
 - 原d10 full/serial两份50在本workspace/gpu_smoke_checkpoints下，params/assets/metadata均原位存在，继续供e690使用；没有清理/重载。当前wash smoke也保留。
 
-剩余：两路20k继续运行；下一巡检2026-09-11 05:32 CST。完成后按task验收唯一20000、完整shape/BF16/model-only、metadata/assets和checkpoint-only恢复，交Manager安排5ep offline，再处理产物与MAM job收尾。
+剩余：两路20k继续运行；下一巡检2026-09-11 06:32 CST。完成后按task验收唯一20000、完整shape/BF16/model-only、metadata/assets和checkpoint-only恢复，交Manager安排5ep offline，再处理产物与MAM job收尾。
