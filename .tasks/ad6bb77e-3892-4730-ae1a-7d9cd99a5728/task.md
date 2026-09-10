@@ -49,3 +49,8 @@ report注明最新task_revision、workspace/实际SHA、两配置gate/正式状�
 使用当前_model.restore_params、_cast_floating_params及实际Orbax保存/恢复机制比较全部浮点叶子（键、shape、dtype、逐值一致性及不一致计数，不用宽松allclose隐藏差异）。分别报告原文件dtype、推理恢复dtype，以及两条路径是否相等；若存在差异，先报告具体值/张量/转换路径，不假定不会影响性能。范围是验证当前BF16推理是否引入额外权重变化，不能据此声称与真正FP32推理等价，不能声称BF16导出可恢复FP32训练精度。若只完成参数一致性，不冒充已经跑了动作/rollout对比。
 
 原checkpoint只读；临时导出放本任务workspace的明确新建子目录，验收数值结论写report后删除该临时副本和辅助脚本。无需额外持久provenance框架。CPU耗时预计少于一小时，若实际预计超过则登记job。不要重做本小时训练巡检；13:02仍按已约定时间巡检。发布简短report，保留原训练状态与产物定位。
+
+
+## MAM 查询更新（2026-09-10）
+
+系统 MAM 已更新：`mam task list` 默认单行列表，`mam task show` 默认 Markdown；脚本读取结构化结果时为这两个命令加 `--json`。`mam task status` 仅显示保存的 job 状态与 checked_at，不刷新进程。按既定频率监控时使用 `mam job list --task ad6bb77e-3892-4730-ae1a-7d9cd99a5728` 获取实时进程状态，再结合已有日志检查进度。训练/评测协议、GPU 分配与检查频率不变。
