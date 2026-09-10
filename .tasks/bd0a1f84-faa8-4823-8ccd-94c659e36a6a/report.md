@@ -3,8 +3,8 @@
 ## 结论
 
 **通过（无 P0/P1/P2 迁移缺陷）。** canonical clone、源工作区 dirty
-保留以及当前 ManiSkill/Table-1000 运行资产均可由只读核验复现。发现一项
-不阻断的 P3 历史成果归档风险，见下文；它不影响当前 benchmark/runtime 启动。
+保留以及当前 ManiSkill/Table-1000 运行资产均可由只读核验复现。初审提出的
+P3 历史成果归档风险已由最终补充交付闭环，增量复核见文末。
 
 本次按 review 要求未创建运行环境 worktree、未修改 source、canonical、资产或环境脚本，
 也未派发下级 agent。源和 canonical 均无 `AGENTS.md`。
@@ -90,3 +90,27 @@ scene/config 的资产路径，而不只是目录级复制结果。
 - 未执行 ManiSkill simulation 或完整 CLI 数据校验：独立的一键环境任务仍在实施，且本机
   system `python3` 缺少 `numpy`。这正是本迁移不复制旧 venv 后应由环境任务解决的依赖，
   不是资产迁移失败；本 review 没有借用旧 venv 或改动环境来掩盖该边界。
+
+## 最终布局与历史备份增量复核（源 report `c9c5c33…`）
+
+**P3 已闭环；无新增问题。** 本段仅检查用户纠正后的最终布局、私有历史备份和其
+一致性证据，没有重复此前完成的全量 Git/运行环境验收。
+
+- `PROJECT_ROOT` 的一级目录仅为 `.mam`、`multi-agent-manager`、`table-1000` 和
+  `workspace`，没有一级业务软链接，也没有旧的 `assets/` 或 `migration-backup/`。
+- canonical 的 `.cache` 是实体目录而非软链接，一级仅有 `assets/` 与 `maniskill/`。
+  两树仍分别为 3,280 / 1,816,375,429 和 470 / 87,217,479（文件数 / bytes），且没有
+  软链接；ManiSkill 必需的 YCB metadata sentinel 存在。
+- 私有迁移记录位于 canonical
+  `.local/migration-backup/2783e0c3-4955-4cb0-99d9-24ed65693bbd/`，受 Git 忽略。
+  该受限树的 11 个目录均为 `0700`、59 个普通文件均为 `0600`、均属于当前用户，且无
+  软链接；尽管通用 `.local` 父目录是环境任务使用的 `0755` 目录，受限
+  `migration-backup` 根目录本身为 `0700`，因此历史备份不能由其他用户穿透访问。
+- `historical-outputs/` 为 56 文件、13,266,644 bytes，原始字节 aggregate 为
+  `9758b4462046bc86f9f2ef8b7285d723cf791f672a267e10a1687cb1bc0c10b6`。对源与备份执行
+  仅输出差异计数的 `rsync -rnc --delete`，差异为 0。SQLite 文件在两树均为 2 个、共
+  172,032 bytes，且源/备份均无 WAL、SHM 或 journal sidecar。
+- 未打开、查询或导出 SQLite 内容，也没有创建 sidecar。只审查备份 `MANIFEST.md` 的
+  非敏感证据标记；其中记录了 immutable 源、SQLite `backup()`、`integrity_check`、逻辑
+  dump digest、受限权限、aggregate 和显式 `rsync` 恢复方式。因而既保留了迁移者的
+  一致性证明，也没有把人类标注或 participant token 泄露到本 review 中。
