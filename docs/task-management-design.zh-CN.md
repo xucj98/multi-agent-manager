@@ -14,7 +14,7 @@ MAM 通过文件和 CLI 管理当前集群的任务，顶层命令为 `mam task`
 
 `MAM_ROOT` 是保存任务、job、wait、锁和归档登记的 Git worktree 根，可为普通 checkout 或 linked worktree；工具不会将 linked worktree 归并到 primary checkout。`PROJECT_ROOT` 包含业务仓库和 workspace。路径在读取配置时解析为实际目录，避免同一目录的别名形成不同边界。
 
-日常命令和交付步骤见 [README 的任务管理](../README.md#任务管理)、[执行与交付](../README.md#执行与交付)、[进程管理](../README.md#进程管理)、[等待](../README.md#等待)与[工作区](../README.md#工作区)。本文保留接口设计、状态语义和归档保护；安装见[安装说明](install.md)。
+日常命令和交付步骤见 [README 的任务管理](../README.md#任务管理)、[执行与交付](../README.md#执行与交付)、[进程管理](../README.md#进程管理)与[休眠管理](../README.md#休眠管理)。本文保留接口设计、状态语义和归档保护；安装见[安装说明](install.md)。
 
 使用者分为 Manager 和执行者。Manager 为 subagent 登记任务，自己的工作无需创建任务。代码实现、review、实验等是不同的任务内容，负责完成任务的 agent 统一称为执行者。
 
