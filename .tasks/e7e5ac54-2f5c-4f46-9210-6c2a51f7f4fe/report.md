@@ -1,46 +1,46 @@
 # Memory 20k：远端八路与本机六路
 
-## 9月11日01:32 十四路小时巡检
+## 9月11日02:32 十四路小时巡检
 
-已读最新任务，沿项目分支project/state-vla和冻结训练协议执行。从task status的jobs.unarchived取ID，逐个job status实时检查：2026-09-11 01:33:30–32+08:00，14路均running、无error，身份由MAM内部核对。
+已读最新任务、核心原则和本地说明，沿冻结协议执行。逐个job status实时检查：2026-09-11 02:33:31–33+08:00，14路均running、无error，身份由MAM内部核对。
 
-日志/资源快照为 `2026-09-11T01:34:17+08:00`。14路更新较上次全部前进，最新日志距采样0.5–10.8秒，未见Traceback/CUDA error/OOM/RESOURCE_EXHAUSTED错误。全部仍未达到20k，本轮无结束后的清理或归档。
+日志/资源快照为 `2026-09-11T02:34:08+08:00`。14路更新较上次全部前进，最新日志距采样0.4–10.6秒，未见Traceback/CUDA error/OOM/RESOURCE_EXHAUSTED错误。全部仍未达到20k，无提前结束，本轮无清理或归档。
 
 | host/GPU | config / seed | PID | MAM job | 最新 updates | 最新可见 loss@step | s/update | 剩余 ETA |
 | --- | --- | ---: | --- | ---: | --- | ---: | --- |
-| wuwen-1/0 | rearrange full t+1 / 0 | 4186829 | `89dcc92f-365e-409a-87d3-e6e82b66adba` | 约 16.6k | 未落盘 | 3.7 | 约 3h28m |
-| wuwen-1/1 | rearrange full t+30 / 0 | 4186841 | `db46bdd0-0ec2-41c1-9c98-baca9ffd6f5b` | 约 16.7k | 未落盘 | 3.7 | 约 3h24m |
-| wuwen-1/2 | rearrange serial lag30 / 0 | 9003 | `d682fab7-3cbc-4b7e-a31a-b959bbd2695c` | 约 16.5k | 未落盘 | 3.7 | 约 3h34m |
-| wuwen-1/3 | rearrange no-memory / 0 | 4186839 | `2774d038-5a23-4184-b16a-92fa1fd88019` | 约 16.4k | 未落盘 | 3.8 | 约 3h44m |
-| wuwen-1/4 | put-back full t+1 / 0 | 12435 | `463092be-02b4-4bfa-bf12-8eae2416a244` | 约 15.7k | 0.0008@15700 | 3.8 | 约 4h30m |
-| wuwen-1/5 | put-back full t+30 / 0 | 12436 | `6e2601ea-e091-4e63-9c31-e90895ca5ffe` | 约 16.1k | 0.0008@16100 | 3.7 | 约 4h00m |
-| wuwen-1/6 | rearrange full t+1 / 1 | 4186835 | `95a88ee3-1a90-4e2e-baa1-50a1cd6f4eb0` | 约 16.9k | 未落盘 | 3.7 | 约 3h07m |
-| wuwen-1/7 | rearrange full t+30 / 1 | 4186832 | `fa1d8437-1fb7-48a5-8d37-2233e8e06767` | 约 17.0k | 未落盘 | 3.7 | 约 3h02m |
-| 本机/0 | put-back full t+30 / 2 | 2944062 | `dcb7d214-5351-4301-b0cd-1bac56f59de3` | 约 9.12k | 0.0014@9100 | 3.6 | 约 11h00m |
-| 本机/1 | put-back full t+1 / 2 | 2918573 | `ee13298c-d10c-4fa4-9be9-875b417fb9a1` | 约 9.42k | 0.0014@9400 | 3.7 | 约 10h55m |
-| 本机/4 | rearrange full t+1 / 2 | 2467720 | `b3d46ac6-b2b7-4ea2-b3ad-df74a2bdac7e` | 约 14.3k | 0.0010@14300 | 3.7 | 约 5h48m |
-| 本机/5 | rearrange full t+30 / 2 | 2467721 | `0c82949f-f5c6-4772-aea6-1967e9cc2680` | 约 14.2k | 0.0010@14100 | 3.7 | 约 6h03m |
-| 本机/6 | put-back full t+1 / 1 | 2467722 | `f04d1b9c-4a77-4034-ac6c-c7240d9b20a8` | 约 14.3k | 0.0010@14300 | 3.7 | 约 5h48m |
-| 本机/7 | put-back full t+30 / 1 | 2467723 | `3e67c9de-fc4f-4a94-a2da-7dccbdec9b2e` | 约 14.2k | 0.0008@14200 | 3.7 | 约 5h59m |
+| wuwen-1/0 | rearrange full t+1 / 0 | 4186829 | `89dcc92f-365e-409a-87d3-e6e82b66adba` | 约 17.6k | 未落盘 | 3.7 | 约 2h29m |
+| wuwen-1/1 | rearrange full t+30 / 0 | 4186841 | `db46bdd0-0ec2-41c1-9c98-baca9ffd6f5b` | 约 17.7k | 未落盘 | 3.7 | 约 2h24m |
+| wuwen-1/2 | rearrange serial lag30 / 0 | 9003 | `d682fab7-3cbc-4b7e-a31a-b959bbd2695c` | 约 17.5k | 未落盘 | 3.7 | 约 2h34m |
+| wuwen-1/3 | rearrange no-memory / 0 | 4186839 | `2774d038-5a23-4184-b16a-92fa1fd88019` | 约 17.4k | 未落盘 | 3.8 | 约 2h44m |
+| wuwen-1/4 | put-back full t+1 / 0 | 12435 | `463092be-02b4-4bfa-bf12-8eae2416a244` | 约 16.7k | 0.0008@16600 | 3.8 | 约 3h31m |
+| wuwen-1/5 | put-back full t+30 / 0 | 12436 | `6e2601ea-e091-4e63-9c31-e90895ca5ffe` | 约 17.1k | 0.0006@17000 | 3.7 | 约 3h00m |
+| wuwen-1/6 | rearrange full t+1 / 1 | 4186835 | `95a88ee3-1a90-4e2e-baa1-50a1cd6f4eb0` | 约 17.9k | 未落盘 | 3.7 | 约 2h07m |
+| wuwen-1/7 | rearrange full t+30 / 1 | 4186832 | `fa1d8437-1fb7-48a5-8d37-2233e8e06767` | 约 18.0k | 未落盘 | 3.6 | 约 2h01m |
+| 本机/0 | put-back full t+30 / 2 | 2944062 | `dcb7d214-5351-4301-b0cd-1bac56f59de3` | 约 10.1k | 0.0011@10100 | 3.6 | 约 10h00m |
+| 本机/1 | put-back full t+1 / 2 | 2918573 | `ee13298c-d10c-4fa4-9be9-875b417fb9a1` | 约 10.4k | 0.0012@10300 | 3.7 | 约 9h54m |
+| 本机/4 | rearrange full t+1 / 2 | 2467720 | `b3d46ac6-b2b7-4ea2-b3ad-df74a2bdac7e` | 约 15.3k | 0.0009@15300 | 3.6 | 约 4h45m |
+| 本机/5 | rearrange full t+30 / 2 | 2467721 | `0c82949f-f5c6-4772-aea6-1967e9cc2680` | 约 15.1k | 0.0009@15100 | 3.7 | 约 5h03m |
+| 本机/6 | put-back full t+1 / 1 | 2467722 | `f04d1b9c-4a77-4034-ac6c-c7240d9b20a8` | 约 15.3k | 0.0008@15300 | 3.7 | 约 4h48m |
+| 本机/7 | put-back full t+30 / 1 | 2467723 | `3e67c9de-fc4f-4a94-a2da-7dccbdec9b2e` | 约 15.2k | 0.0009@15100 | 3.7 | 约 5h00m |
 
-kit为日志三位有效数字取整，保留约数；ETA按近期速率估计并四舍五入至分钟，不计最终保存。当前约3.6–3.8秒/update。wuwen-1预计今日04:36–06:05完成更新，当前未见超出12:00预留截止时间风险；本机GPU4–7约07:22–07:37，GPU0/1约12:29–12:35完成更新。
+kit为日志三位有效数字取整；ETA按近期速率估计并四舍五入至分钟，不计最终保存。当前约3.6–3.8秒/update。wuwen-1预计今日04:35–06:05完成更新，当前未见超出12:00预留截止时间风险；本机GPU4–7约07:19–07:37，GPU0/1约12:29–12:34完成更新。
 
-远端GPU4/5各157/161条、本机GPU0/1各91/94条、本机GPU4/5/6/7各143/141/143/142条已落盘loss/grad_norm/param_norm全部有限。最新完整标量：
+远端GPU4/5各166/170条、本机GPU0/1各101/103条、本机GPU4/5/6/7各153/151/153/151条已落盘loss/grad_norm/param_norm全部有限。最新完整标量：
 
 | host/GPU | Step | loss | grad_norm | param_norm |
 | --- | ---: | ---: | ---: | ---: |
-| wuwen-1/4 | 15700 | 0.0008 | 0.0341 | 1804.2865 |
-| wuwen-1/5 | 16100 | 0.0008 | 0.0326 | 1804.1781 |
-| 本机/0 | 9100 | 0.0014 | 0.0390 | 1803.6815 |
-| 本机/1 | 9400 | 0.0014 | 0.0381 | 1803.7982 |
-| 本机/4 | 14300 | 0.0010 | 0.0356 | 1804.3253 |
-| 本机/5 | 14100 | 0.0010 | 0.0356 | 1804.2834 |
-| 本机/6 | 14300 | 0.0010 | 0.0335 | 1804.1809 |
-| 本机/7 | 14200 | 0.0008 | 0.0330 | 1804.0753 |
+| wuwen-1/4 | 16600 | 0.0008 | 0.0357 | 1804.3262 |
+| wuwen-1/5 | 17000 | 0.0006 | 0.0286 | 1804.2124 |
+| 本机/0 | 10100 | 0.0011 | 0.0355 | 1803.7804 |
+| 本机/1 | 10300 | 0.0012 | 0.0377 | 1803.8939 |
+| 本机/4 | 15300 | 0.0009 | 0.0353 | 1804.3881 |
+| 本机/5 | 15100 | 0.0009 | 0.0360 | 1804.3462 |
+| 本机/6 | 15300 | 0.0008 | 0.0329 | 1804.2350 |
+| 本机/7 | 15100 | 0.0009 | 0.0329 | 1804.1206 |
 
 以上为区间均值证据，不扩展为每个update原始loss证明。旧远端GPU0/1/2/3/6/7的Step标量仍各为零，有限loss尚未证实；保持stdout缓冲边界，不注入/重启。
 
-两机HEAD均为 `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`，git status为空，未改运行树或参数，未重复smoke。自然结束后按任务核对退出状态、唯一20000 BF16 checkpoint/metadata、完整参数/无optimizer/恢复要求及本任务残留进程/显存释放，仅清理确认属于本任务的残留并留痕。wuwen-1保存释放后整机不再使用，直到另行允许；本机八卡可按授权继续，启动前核对资源。
+两机HEAD均为 `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`，git status为空。未改运行树或参数，未重复smoke和恢复验证。结束后按任务核对退出状态、唯一20000 BF16 checkpoint/metadata及完整参数/无optimizer/恢复要求、登记进程及子进程退出和显存释放；仅清理确认属于本任务的残留。wuwen-1保存释放后整机不再使用，直到另行允许；本机八卡可按授权继续，启动前核对资源。
 
 ## GPU0 配对项启动（发布 task 的 16:11 授权段）
 
@@ -164,14 +164,14 @@ CUDA_VISIBLE_DEVICES=7 .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_
 - LeRobot 根 `HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot` 在本机和远端均可由 metadata API 打开：rearrange 50 episodes / 20,103 frames，put-back 50 episodes / 17,588 frames。两份 sidecar 在远端可读；其 `M` query / `M+1` series 留痕与任务要求一致。
 - 远端 CPU 下六个 config 都可解析并创建 MemoryDataAdapter，sidecar 路径指向本树 `data/memory_v1/rmbench/<repo_id>/episode_memory.json`。rearrange 的 robot-only norm 可读且只含 `state`、`actions`，每个 mean/std/q01/q99 为 14 维；base 参数完成标记可读。
 
-## 01:34:17 两机资源快照
+## 02:34:08 两机资源快照
 
 | host / GPU | 每卡已用 / 空闲 MiB | 利用率 | 温度 | 主机 MemAvailable |
 | --- | --- | --- | --- | --- |
-| wuwen-1 / 0–7 | 73,489–73,507 / 7,543–7,561 | 全部100% | 52–68°C | 831,293,015 KiB（约 792.8 GiB） |
-| 本机 / 0,1,4–7 | 73,405–73,406 / 各7,633 | 全部100% | 57–71°C | 876,589,966 KiB（约 836.0 GiB） |
+| wuwen-1 / 0–7 | 73,489–73,507 / 7,543–7,561 | 全部100% | 51–68°C | 831,292,653 KiB（约 792.8 GiB） |
+| 本机 / 0,1,4–7 | 73,405–73,406 / 各7,633 | 全部100% | 58–71°C | 877,343,260 KiB（约 836.7 GiB） |
 
-共享/mnt/public可用9,994,879,631,360 bytes（约 9.09 TiB），未见资源压力；本轮无异常扩查。
+共享/mnt/public可用9,994,901,651,456 bytes（约 9.09 TiB），未见资源压力；无异常扩查。
 
 历史准备快照：
 
@@ -233,4 +233,4 @@ CUDA_VISIBLE_DEVICES=7 nohup setsid .venv/bin/python -B scripts/train.py pi05_rm
 | 6 | rearrange full t+1 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_1_s1` | `checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1/20000` | `logs/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1.log` |
 | 7 | rearrange full t+30 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_30_s1` | `checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s1/20000` | `logs/memory20k_e7e5ac54_rearrange_full_t_plus_30_s1.log` |
 
-下一检查：`2026-09-11T02:32:00+08:00`，远端八路与本机GPU0/1/4–7合并为十四路巡检，由 Manager 按计划唤醒。若收到 MAM job attention 或异常通知则提前处理。十四路的 20k 完成、唯一 20000 BF16 checkpoint、完整参数/无 optimizer/恢复验证与评测交接仍待训练结束后完成。
+下一检查：`2026-09-11T03:32:00+08:00`，远端八路与本机GPU0/1/4–7合并为十四路巡检，由 Manager 按计划唤醒。若收到 MAM job attention 或异常通知则提前处理。十四路的 20k 完成、唯一 20000 BF16 checkpoint、完整参数/无 optimizer/恢复验证与评测交接仍待训练结束后完成。
