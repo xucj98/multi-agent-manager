@@ -1,6 +1,6 @@
 # Multi-Agent Manager（MAM）
 
-MAM 提供 `mam task`、`mam workspace`、`mam job`。本集群统一从本仓库启动 agent；所有 agent、代码修改和管理命令在本机运行，GPU 作业可通过 SSH 在 `wuwen-1` 运行。两端共享 `/mnt/public`，`wuwen-1` 无需安装 MAM。
+MAM 提供 `mam task`、`mam workspace`、`mam job`、`mam wait`。本集群统一从本仓库启动 agent；所有 agent、代码修改和管理命令在本机运行，GPU 作业可通过 SSH 在 `wuwen-1` 运行。两端共享 `/mnt/public`，`wuwen-1` 无需安装 MAM。
 
 [安装与更新](docs/install.md)。`mam` 可从任意目录调用，默认管理根目录为 `/mnt/public/xcj/Projects/multi-agent-manager`；全局 `--root <目录>` 可覆盖该位置，日常无需指定。
 
@@ -9,6 +9,7 @@ multi-agent-manager/
   .tasks/<uuid>/task.md       # 任务要求，进入 Git
   .tasks/<uuid>/report.md     # 结果简报，进入 Git
   .local/tasks/<uuid>.json    # CLI 维护的状态，不进入 Git
+  .local/waits/*.json         # 当前等待和取消标记，不进入 Git
 Projects/workspace/<uuid>/<repo>/
 ```
 
@@ -67,11 +68,17 @@ mam workspace add <uuid> --repo <repo> --base <commit>
 
 执行者通过 `mam job add <uuid> --note "用途" --host <host> --pid <pid>` 登记自己启动的长进程，同一任务可登记多个 job。
 
-`mam job list` 查询进程状态。进程停止后，执行者记录结果、处理临时文件，再用 `mam job archive <job-id> --note "处理结论"` 标记已处理。Manager 用 `mam job list --attention` 查找已停止、未处理且执行者已空闲的进程，通知负责人继续收尾。
+`mam job list` 有表头，每行依次为描述、job 状态、实际进程启动时间、job-id、任务描述、task-id；无法换算启动时间显示 `unknown`，探测失败显示 `unknown/待核实`。`mam job status <job-id>` 只刷新该 job，并以 JSON 输出登记、身份、实时探测、所属任务和 agent。进程停止后，执行者记录结果、处理临时文件，再用 `mam job archive <job-id> --note "处理结论"` 标记已处理。Manager 用 `mam job list --attention` 查找已停止、未处理且执行者已空闲的 job，通知负责人继续收尾。
 
-具体参数按需查阅 `mam task --help`、`mam workspace --help`、`mam job --help` 及相应子命令的帮助。
+## 等待
 
-`mam task list` 默认每个任务输出一行，以制表符分隔标题、任务状态、完整 UUID、绑定的 agent ID 和 agent 状态；使用 `--json` 可取得完整任务记录，供脚本处理。`mam task show` 默认先输出实际发布 revision，再原样输出 Markdown 正文；使用 `--json` 可取得原有的结构化文档对象。
+`mam wait jobs [--task <task-id>] [--timeout <seconds>] [--agent <agent-id>]` 等待当前未归档 job：已有确定停止的 job 立即返回 `stopped`，任一运行 job 停止时返回 `stopped`，无匹配返回 `empty`，超时返回 `timeout`。探测为 unknown 时不会当作停止。未给 `--agent` 时只读取 `CODEX_THREAD_ID`，不会从 `CODEX_SESSION_ID` 推测身份；ID 必须是非空单行文本。
+
+`mam wait list` 即使为空也输出表头，列为 agent-id、绑定 task 标题、task-id、等待内容、等待开始时间。关联使用等待者自己的未归档 task 绑定，与其监控 job 的负责人无关；未绑定显示“未绑定”。`mam wait stop --agent <agent-id>` 只写入该等待者的取消标记并唤醒等待，返回 `cancelled` 或 `not_waiting`，不会向 job 进程发信号或归档 job。每个 agent 同时只能有一个等待；异常退出留下的登记会由 PID 启动身份检查清理。
+
+具体参数按需查阅 `mam task --help`、`mam workspace --help`、`mam job --help`、`mam wait --help` 及相应子命令的帮助。
+
+`mam task list` 即使为空也输出表头；每个任务一行，以制表符分隔标题、task 状态、完整 UUID、agent 和 agent 状态。详情使用 `mam task status`，其中保存的 job 观测不会隐式刷新。`task list` 不提供 `--json`。`mam task show` 默认先输出实际发布 revision，再原样输出 Markdown 正文；既有 `--json` 保留。
 
 ## 开发验证
 

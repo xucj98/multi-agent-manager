@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import os
 import re
 import shlex
@@ -44,7 +45,17 @@ except OSError:
     raise SystemExit(5)
 if not boot_id:
     raise SystemExit(5)
+boot_time = ''
+try:
+    with open('/proc/stat', encoding='ascii') as handle:
+        for line in handle:
+            if line.startswith('btime '):
+                boot_time = line.split(None, 1)[1].strip()
+                break
+except OSError:
+    pass
 print(boot_id)
+print(boot_time)
 print(stat, end='')
 """
 _AGENT_STATUSES = {"active", "idle", "notLoaded", "systemError"}
@@ -92,6 +103,36 @@ def _parse_proc_stat(stat: str) -> tuple[str, int]:
     return fields[0], int(fields[19])
 
 
+def _boot_time() -> int | None:
+    try:
+        with open("/proc/stat", encoding="ascii") as handle:
+            for line in handle:
+                if line.startswith("btime "):
+                    return int(line.split(None, 1)[1])
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def _started_at(boot_time: int | None, start_ticks: int) -> str | None:
+    if boot_time is None:
+        return None
+    try:
+        clock_ticks = os.sysconf("SC_CLK_TCK")
+        started = datetime.fromtimestamp(boot_time + start_ticks / clock_ticks, timezone.utc)
+    except (OSError, OverflowError, ValueError, ZeroDivisionError):
+        return None
+    return started.isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _identity(host: str, boot_id: str, start_ticks: int, boot_time: int | None) -> dict[str, Any]:
+    identity = {"host": host, "boot_id": boot_id, "start_ticks": start_ticks}
+    started_at = _started_at(boot_time, start_ticks)
+    if started_at:
+        identity["started_at"] = started_at
+    return identity
+
+
 def _read_local_process(host: str, pid: int) -> tuple[dict[str, Any], str] | None:
     try:
         with open("/proc/sys/kernel/random/boot_id", encoding="ascii") as handle:
@@ -107,10 +148,10 @@ def _read_local_process(host: str, pid: int) -> tuple[dict[str, Any], str] | Non
         raise _ProbeError(f"cannot read process: {exc}") from exc
     if not boot_id:
         raise _ProbeError("empty boot identity")
-    return {"host": host, "boot_id": boot_id, "start_ticks": start_ticks}, state
+    return _identity(host, boot_id, start_ticks, _boot_time()), state
 
 
-def _read_remote_process(host: str, pid: int) -> tuple[dict[str, Any], str] | None:
+def _read_remote_process(host: str, pid: int, timeout: float) -> tuple[dict[str, Any], str] | None:
     if not _SAFE_REMOTE_HOST.fullmatch(host):
         raise _ProbeError("invalid remote host")
     remote_command = f"python3 -c {shlex.quote(_REMOTE_PROC_SCRIPT)} {pid}"
@@ -119,7 +160,7 @@ def _read_remote_process(host: str, pid: int) -> tuple[dict[str, Any], str] | No
         "-o",
         "BatchMode=yes",
         "-o",
-        f"ConnectTimeout={int(PROCESS_TIMEOUT_SECONDS)}",
+        f"ConnectTimeout={max(1, math.ceil(timeout))}",
         "--",
         host,
         remote_command,
@@ -131,7 +172,7 @@ def _read_remote_process(host: str, pid: int) -> tuple[dict[str, Any], str] | No
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            timeout=PROCESS_TIMEOUT_SECONDS,
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired as exc:
         raise _ProbeError("SSH query timed out") from exc
@@ -144,14 +185,19 @@ def _read_remote_process(host: str, pid: int) -> tuple[dict[str, Any], str] | No
     if completed.returncode != 0:
         detail = completed.stderr.strip().replace("\n", " ")
         raise _ProbeError(f"SSH query failed ({completed.returncode}): {detail or 'no detail'}")
-    boot_id, separator, stat = completed.stdout.partition("\n")
-    if not separator or not boot_id.strip():
+    boot_id, separator, remainder = completed.stdout.partition("\n")
+    boot_time, separator2, stat = remainder.partition("\n")
+    if not separator or not separator2 or not boot_id.strip():
         raise _ProbeError("invalid SSH process response")
     state, start_ticks = _parse_proc_stat(stat)
-    return {"host": host, "boot_id": boot_id.strip(), "start_ticks": start_ticks}, state
+    try:
+        parsed_boot_time = int(boot_time) if boot_time else None
+    except ValueError:
+        parsed_boot_time = None
+    return _identity(host, boot_id.strip(), start_ticks, parsed_boot_time), state
 
 
-def probe_process(host: str, pid: int, identity: dict | None = None) -> dict:
+def probe_process(host: str, pid: int, identity: dict | None = None, timeout: float | None = None) -> dict:
     """Return the current state of a local or SSH-reachable registered process."""
 
     checked_at = _checked_at()
@@ -161,8 +207,11 @@ def probe_process(host: str, pid: int, identity: dict | None = None) -> dict:
         return _process_result("unknown", checked_at, error="pid must be a positive integer")
     if identity is not None and (not isinstance(identity, Mapping) or not _valid_identity(identity)):
         return _process_result("unknown", checked_at, error="invalid registered process identity")
+    timeout = PROCESS_TIMEOUT_SECONDS if timeout is None else timeout
+    if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or timeout <= 0:
+        return _process_result("unknown", checked_at, error="timeout must be positive")
     try:
-        current = _read_local_process(host, pid) if _is_local_host(host) else _read_remote_process(host, pid)
+        current = _read_local_process(host, pid) if _is_local_host(host) else _read_remote_process(host, pid, timeout)
     except _ProbeError as exc:
         return _process_result("unknown", checked_at, error=str(exc))
     if current is None:
