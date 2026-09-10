@@ -36,3 +36,6 @@ Manager已于2026-09-10 06:52验收row30/GPU0的2rollout smoke。依据已发布
 结果统一/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/<run>，说明归RMBench/experiments/memory_chunk_20260910；不在bridge保存，不增加日志根。每步完整继承metadata/config/command+commit，不复制代码。README直接命令，不使用root export设置段。正式实验替代的smoke在无需再使用门禁引用后清理，不删除唯一证据或活跃run依赖。
 
 本任务report记录task_revision、workspace、实际三库commit、完成/剩余、job/PID、成果路径、下一检查时机。运行期间可发布report而不结束责任；无需频繁检查训练，用预定评测中点检查即可。不要自行派agent，不创建游离workspace。
+## 2026-09-10 08:15 资源释放
+
+本机GPU1的full/serial训练与恢复smoke均已结束，现交本任务使用。先按既定冻结入口启动row20/GPU1的一个2rollout smoke（一次video、一次no-video）；核对全部产物与metadata后，立即启动同GPU串行正式100并登记MAM job。GPU0当前row30继续，约50条时按原要求分析，不改其源码/协议。两run需独立端口、进程、输出目录；既定入口已支持逐GPU端口，沿用即可。其后rows1/50按空闲GPU调度，每row仍各自先smoke再100；不创建第三块GPU占用，不重新寻求许可。
