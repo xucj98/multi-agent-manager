@@ -73,3 +73,6 @@ Source report:
 - `git fsck --no-dangling` 在 canonical clone 通过；origin URL、HEAD 与 `origin/main` 一致。
 - environment agent 已获得 canonical 路径、精确 base、资产一级布局和完整性值，负责后续 `.local`/独立 venv/worktree 实现。本报告撰写前其在 canonical 中创建的 untracked `.local/` bootstrap 属于该任务，不是迁移改动。
 - 当前资产覆盖 ManiSkill reference 路径；未来启用 RoboTwin/Kubric 后需要按其许可、provenance 与运行需求单独迁移/下载未复制缓存。
+
+# 最终补充验收
+用户修改布局且P3已处理，源任务report已重新发布c9c5c33。请读取源任务最新已发布要求/report，对最终 canonical/.cache 实体、canonical/.local/migration-backup/TASK-ID（含historical-outputs）和PROJECT_ROOT仅业务repo/workspace/MAM目录做增量review；抽查备份模式/一致性报告、不输出敏感内容、不用SQLite只读连接创建源sidecar（immutable只读）。确认P3闭环，更新自己的report，避免重复无关全量检查。
