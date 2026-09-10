@@ -1,3 +1,15 @@
+# 正式 offline 首次启动失败（2026-09-11 07:40）
+
+Manager 授权后从固定干净 bridge `fda269c1f333dabdb5628c083a4dba3db0938333`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4` 启动，GPU2 启动前 1MiB/0%，独立端口 19580/19582 空闲。原 launcher 顺序 wash_full/wash_serial，统一目录 `/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_20k_offline5ep`。
+
+首因：full 真实权重加载和 source/interpreter provenance 握手通过后，episode 执行前 metadata 门禁拒绝 `Served metadata query_stride=None does not match manifest 30`。实际 policy_hz=15、action_horizon=50，memory_config.protocol.execution.rows=30、completion=synchronous_rows。没有 infer/执行行/指标产物，serial 未启动，不能宣称 offline 验收通过。
+
+launcher 返回1；policy_exit.json 为 returncode=-15、shutdown_requested=true，属于失败后的服务回收。full/0/exit.json 原始 starting 状态保留，另保存 launcher_exit.json 说明失败发生在 iteration 前；launcher.log、served_metadata.json、provenance.json、checkpoint metadata/config 等首轮产物完整保留。退出后核查 GPU2 1MiB/0%，19580/19582 无监听。未修改源码，未覆盖输出、未重试。
+
+恢复方案待 Manager 裁定：针对 Memory v1 使用已存在的 schema execution.rows 验证 K/stride；保留 legacy query_stride 校验，若同时有显式 query_stride 与 schema rows 则拒绝冲突。只小修 launcher 并加该真实 metadata 形状的 CPU 回归，经指定 reviewer 复查后以 Manager 指定的新输出位置恢复；不在原失败目录覆盖重跑。原 fda CPU/mock 验证未覆盖真实 checkpoint 缺失顶层 query_stride 的情形，此次真实启动已暴露该缺口。
+
+以下保留此前代码交付记录；其中 checkpoint 尚未就绪的描述仅为历史状态，两个20k现已就绪。
+
 # 交付报告（2026-09-11 05:45 CST；正式 GPU offline 待 Manager 调度）
 
 ## 实施范围
