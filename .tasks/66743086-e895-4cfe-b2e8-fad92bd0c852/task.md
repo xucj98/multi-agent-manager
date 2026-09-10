@@ -21,3 +21,12 @@
 - 状态函数内部返回值被其他调用复用时优先增加轻量render投影，不破坏job归档/等待/其他command输出。更新必要测试验证真实状态不冒充缓存，精简后仍可拿到job IDs与工作区/版本。不改变task show行为。README只写怎么查询，不添加输出字段规格；必要规格进入设计文档。
 
 此项与此前文案一起交付，但可单独commit便于review；当前base task文字中“不改行为”指原功能语义，这里明确授权status展示精简。若此前文案已提交，保留并增量实施。任务预计适度延长，不增加环境/agent。
+# 18:10 README必要步骤修复
+
+Manager与独立review均确认精简时误删必要操作信息；状态代码和测试已通过，这轮只恢复简短操作说明，不恢复输出字段规格：
+- 管理仓库共享checkout，Manager在其中编辑task.md，执行者在其中编辑自己report.md；main提交内容已发布，工作目录修改是草稿，使用mam task publish发布。
+- 途中追加要求先更新task.md并publish，再通知执行者读取新版本。
+- 交付后清理任务要求的临时文件，保留worktree供Manager验收归档。
+- “讨论/只读调查/监控无需创建workspace”改成“无需创建worktree或代码环境”，因为task create仍自动分配空workspace。
+
+用两三段简短句子放在对应操作附近，避免复述AGENTS/设计文档。不改已通过代码，不重跑全套测试，只核对README链接与diff-check。原worktree提交增量，更新report task_revision；独立review复核文档后集成安装。
