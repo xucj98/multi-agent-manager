@@ -1,16 +1,10 @@
-# Memory实验：F0反馈行评测与新checkpoint评测准备
+# Memory实验：F0反馈行评测
 
 ## 当前授权与验收
 
-Manager已于2026-09-10 06:52验收row30/GPU0的2rollout smoke。依据已发布报告598cd4538b2b9ad293f4274bd01eb862029be53b及smoke_verification.json/video_metadata_verification.json：2个accepted episode，1success/1button_press_insufficient，视频700帧可读/另一集无视频，38个query反馈链、metadata/source匹配、terminal路径和进程收尾通过。RPC抓包不完整仅作辅助；不以smoke成功率推断正式结果。
+row30/GPU0已于09:29完成92/100，Manager接受最终协议、视频和退出检查；其job已归档。GPU0接续row1，GPU1的row20继续到100后接row50。两个GPU均已明确交本任务，按匹配2rollout smoke→正式100执行剩余配置，不再次请求许可、不重跑row30。四个run预算均已授权；新schema入口和drawer准备由任务e6908de7负责，本任务只收尾F0。
 
-现在直接启动row30/GPU0正式100，无需等待再次许可。使用本任务RMBench worktree运行：
-
-```bash
-../robot-bridge/.venv/bin/python experiments/memory_chunk_20260910/commands/run_f0.py --row 30 --gpu 0 --mode formal --detach
-```
-
-启动后立即登记真实host/PID的mam job，检查服务和第一条episode，报告实际run路径和预计50条检查时机。GPU1仍留训练50step smoke，Manager确认释放后才能用于第二个F0。远端八卡留新训练，不使用。F0四个run的预算均已授权；后续同一卡上row20/1/50各自先通过匹配的2rollout smoke，确认产物后可依次正式100，不需再次等待许可。GPU1释放前按GPU0串行安排。每个run完整100条在同一GPU串行，sim/policy共用该GPU，不拆分。
+每个run完整100条在同一GPU串行，sim/policy共卡。使用本任务冻结入口run_f0.py；启动正式进程后登记真实host/PID的mam job，检查服务与首条episode，报告预计50条检查时机。两GPU保持独立端口/输出/缓存。远端八卡留新训练，不使用其他GPU。
 
 ## 固定代码与实验协议
 
@@ -31,11 +25,8 @@ Manager已于2026-09-10 06:52验收row30/GPU0的2rollout smoke。依据已发布
 
 ## 产物、范围与交付
 
-写范围为RMBench experiments/memory_chunk_20260910的配置/命令/中文README；模型/runtime由其他owner负责。需要新增核心诊断先报告Manager，不修改主checkout。新checkpoint评测准备只在其代码/数据验收后推进。
+写范围为RMBench experiments/memory_chunk_20260910的F0配置/命令/中文README；模型/runtime由其他owner负责。需要新增核心诊断先报告Manager，不修改主checkout。所有调用本树的正式进程结束后再更新实验文档并交付commit。
 
 结果统一/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/<run>，说明归RMBench/experiments/memory_chunk_20260910；不在bridge保存，不增加日志根。每步完整继承metadata/config/command+commit，不复制代码。README直接命令，不使用root export设置段。正式实验替代的smoke在无需再使用门禁引用后清理。保留正式metadata中的smoke通过结论与原检查摘要即可，依用户要求不保留smoke原始视频/日志，也不将整个smoke压缩包搬入正式run。row30的92/100最终检查已被Manager接受，已生成的row30_smoke_evidence.tar.gz可删除，清理记录注明正式结论与摘要保留。活跃run仍依赖的smoke不提前删除；不改运行源码。
 
-本任务report记录task_revision、workspace、实际三库commit、完成/剩余、job/PID、成果路径、下一检查时机。运行期间可发布report而不结束责任；无需频繁检查训练，用预定评测中点检查即可。不要自行派agent，不创建游离workspace。
-## 2026-09-10 08:15 资源释放
-
-本机GPU1的full/serial训练与恢复smoke均已结束，现交本任务使用。先按既定冻结入口启动row20/GPU1的一个2rollout smoke（一次video、一次no-video）；核对全部产物与metadata后，立即启动同GPU串行正式100并登记MAM job。GPU0当前row30继续，约50条时按原要求分析，不改其源码/协议。两run需独立端口、进程、输出目录；既定入口已支持逐GPU端口，沿用即可。其后rows1/50按空闲GPU调度，每row仍各自先smoke再100；不创建第三块GPU占用，不重新寻求许可。
+本任务report记录task_revision、workspace、实际三库commit、四run当前状态/结果表、job/PID、成果路径、下一检查时机。保持简报，详细smoke、逐query与旧进度引用已保存的JSON或Git报告版本，不累积复制同一历史段落；下一次发布时整理。运行期间可发布report而不结束责任；约小时巡检加50/完成事件检查，不频繁监控训练。不要自行派agent，不创建游离workspace。
