@@ -1,30 +1,22 @@
-task_revision: 0d304cc88fcd38b3cdd443e44126ac7926954faa
+task_revision: 91a1667e8585e473d4e6df9009c06b509e4973a4
 
-完成本次小修：
+12:11 文档修正已完成：
 
-- RMBench 最终 HEAD：737890494d38486c6335feed6fe55f550b271234（基于 CPU 准备提交 498cc4c49e8669dab822e55a2dd060a5e1c68d98）。
-- technical、常规 smoke 和 formal 的 input_audit.json / input_manifest.json 统一生成在本任务 RMBench worktree 的 `.local/memory_schema_eval/inputs/<variant>--<resolved-checkpoint-path-hash>/`。checkpoint 不再写入 `eval_inputs` 或任何 sidecar；同一 checkpoint 可由多个实验组或 worktree 只读复用。
-- 不新增公共 API 或 runner。BenchmarkRunner 既有 `--source-root` / `config_source` 已可读取该目录，RMBench recorder 既有 metadata inheritance 将两个输入文件复制到正式 run 的 `checkpoint_metadata/lineage/config_source/`。
-- README 已说明：technical 结论记录后删除其 local 输入与技术结果；20k local 输入保留到匹配 formal 完成并确认继承副本后删除。它们不是持久缓存，也不在 eval_result 下创建输入目录。
+- RMBench 文档 commit：f414eda7cfc9fb18fa3ccdfd902accdb9908b2e6。仅修改 experiments/memory_chunk_20260910/README_memory_schema.zh-CN.md；入口和配置保持已验收的 7378904 实现。
+- 按训练 owner 已发布 report 1df8b8255d6967eb9858c3d3365ce06a65eb1f3c，将新 20k checkpoint 根改为 /mnt/public/xcj/Projects/openpi/checkpoints，修正 put-back exp_name 中误加的 block，补齐 rearrange full seed0/1/2、put-back seed0/1。旧 drawer 仍引用原 RMBench checkpoint 目录。
+- 技术、正式与 drawer 模板采用本任务实际 worktree 解释器、具体 checkpoint 路径及 GPU0；删除 CHECKPOINT、$PWD、继承式 PYTHONPATH 和端口/GPU 占位符。去掉临时授权/旧 review 状态及冗余准备说明，保留必要 prepare-audit、checkpoint 自身 smoke→formal、只读 checkpoint、metadata 继承与清理规则。
 
-CPU 验证（未加载模型、未启动仿真或 GPU）：
+验证：
 
-- 对保留 d10 full 50-step checkpoint 执行 `--technical-smoke --prepare-audit`：metadata 经 `_runtime_metadata -> MemoryContext`，得到 joint_dense、H50/K30、padded action 32、demo_clean_state 和 chunk_completed/last_executed；audit 落在新的 worktree-local 路径。
-- Bridge `verify_audited_checkpoint` 验证 27 个 params/assets 文件、`verify_audited_metadata` 验证 29 个 metadata 文件均通过；checkpoint 下确认没有 `eval_inputs`。
-- 使用既有 `inherit_metadata` 验证 `config_source` 复制 `input_audit.json` 与 `input_manifest.json` 到 `checkpoint_metadata/lineage/config_source/`。
-- technical dry-run 和一个仅在 /tmp 构造、结束即删除的 canonical 20k checkpoint 的 formal dry-run，均传递 worktree-local `Audit` source root；未执行任何服务或 rollout。
-- AST/YAML、`git diff --check` 通过。两类 local audit、/tmp canonical checkpoint、/tmp 输出和本任务 bytecode 均已清理。
+- 只提取现有 CLI 的 argparse 声明核对文档中的 8 条命令；3 个 bash 块通过 bash -n，未调用模型或运行入口。
+- 表格展开后的 12 个输出路径与训练 report 一致，实际 exp_name 父目录均存在；本次核对时 20000 尚未生成，README 明确保存完成后才能执行。
+- 实际解释器、保留的两个 50-step 路径、旧 drawer 两模型路径、原始数据路径和 manifest 均存在；git diff --check 通过。
+- 本轮没有启动 CPU 模型、GPU 程序或 MAM job，没有搬移 checkpoint、添加软链接或重建环境。
 
-固定工作区与依赖：
+复用工作区：/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a
 
-- RMBench：`/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench`，`task/e6908de7-4b02-465a-987b-a19eba7a315a`，737890494d38486c6335feed6fe55f550b271234，干净。
-- robot-bridge：同级 `robot-bridge`，8ea6078543a875b5ae223df16891cdc1fe975c66，干净。
-- openpi：同级 `openpi`，a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4，干净。
+- RMBench：上述工作区 /RMBench，f414eda7cfc9fb18fa3ccdfd902accdb9908b2e6。
+- robot-bridge：上述工作区 /robot-bridge，8ea6078543a875b5ae223df16891cdc1fe975c66。
+- openpi：上述工作区 /openpi，a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4。
 
-没有 MAM job 或 GPU 进程。GPU 授权后仍按既有规则：完成 20k checkpoint 先 prepare-audit、匹配两集 smoke，再用同 checkpoint 的 smoke 启动 formal；超过一小时的正式任务立即登记 MAM job。
-
-最终 CPU 状态（冻结）：
-
-- CPU 交付固定在 RMBench `737890494d38486c6335feed6fe55f550b271234`；三库 worktree 均干净。
-- 没有本任务 MAM job、GPU 进程或 `.local/memory_schema_eval` 残留。
-- GPU 未分配；保持暂停，待独立 review 提出具体问题后在本 task 恢复。
+文档交付完成；GPU 技术 sim 与 drawer offline 等 Manager 在 F0 row1 完成后另行安排。
