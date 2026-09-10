@@ -1,22 +1,24 @@
 # 任务管理 CLI 接口说明
 
-MAM 通过文件和 CLI 管理当前集群的任务，顶层命令为 `mam task`、`mam job`、`mam wait`、`mam workspace`。所有 agent 和管理命令在本机运行；GPU 作业可通过 SSH 在 wuwen-1 运行，两端共享 `/mnt/public`。以下为已确认的实施接口。全局 `mam --root <目录> …` 可覆盖管理资料根目录；默认使用 `/mnt/public/xcj/Projects/multi-agent-manager`，日常无需指定。
+MAM 通过文件和 CLI 管理当前集群的任务，顶层命令为 `mam task`、`mam job`、`mam wait`、`mam workspace`。所有 agent 和管理命令在本机运行；GPU 作业可通过 SSH 在 wuwen-1 运行，两端共享 `/mnt/public`。全局 `mam --root ROOT …` 可覆盖管理资料根目录；默认使用 `/mnt/public/xcj/Projects/multi-agent-manager`，日常无需指定。
+
+日常命令和交付步骤见 [README 的任务管理](../README.md#任务管理)、[执行与交付](../README.md#执行与交付)、[进程管理](../README.md#进程管理)、[等待](../README.md#等待)与[工作区](../README.md#工作区)。本文保留接口设计、状态语义和归档保护；安装见[安装说明](install.md)。
 
 使用者分为 Manager 和执行者。Manager 为 subagent 登记任务，自己的工作无需创建任务。代码实现、review、实验等是不同的任务内容，负责完成任务的 agent 统一称为执行者。
 
 ## 文件与版本
 
-任务、workspace 和工作分支使用同一个 UUID，由工具生成：
+任务、workspace 和工作分支使用同一个 `TASK-ID`，由工具生成：
 
 ```text
 multi-agent-manager/
-  .tasks/<uuid>/task.md       # Manager 编辑任务要求
-  .tasks/<uuid>/report.md     # 执行者编辑结果简报
-  .local/tasks/<uuid>.json    # 工具维护的登记与状态，不进入 Git
-  .local/waits/*.json         # 当前等待和取消标记，不进入 Git
+  .tasks/TASK-ID/task.md       # Manager 编辑任务要求
+  .tasks/TASK-ID/report.md     # 执行者编辑结果简报
+  .local/tasks/TASK-ID.json    # 工具维护的登记与状态，不进入 Git
+  .local/waits/*.json          # 当前等待登记，不进入 Git
 
-Projects/workspace/<uuid>/
-  <repo>/                    # 按需创建的 worktree，分支为 task/<uuid>
+Projects/workspace/TASK-ID/
+  REPO/                        # 按需创建的 worktree，分支为 task/TASK-ID
 ```
 
 大家共享管理仓库的工作目录，通过编辑工具修改各自负责的文件。`main` 上的 task.md、report.md 是已发布内容，工作目录中的修改是草稿；发布由 CLI 提交到 `main`。读取已发布内容无需 checkout。
@@ -25,37 +27,41 @@ Projects/workspace/<uuid>/
 
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
-| `mam task create --title "…"` | Manager | 生成 UUID，登记任务，创建 task.md、report.md 草稿和空 workspace；返回 UUID 与文件、目录路径，状态为“进行中” |
-| `mam task create --title "…" --review <source-uuid>` | Manager | 创建任务，并在任务草稿中引用源任务已发布的要求、简报及其代码 commit，固定所引用的版本，供执行者 review |
-| `mam task bind <uuid> --agent <agent-id>` | Manager | 将已启动的 subagent 绑定到任务；一个未归档任务对应一个执行 agent，一个 agent 同时绑定一个任务 |
-| `mam workspace add <uuid> --repo <repo> --base <commit>` | 执行者 | 调用该库的 `.local/create_worktree.sh`，从 base commit 新建 `task/<uuid>` 分支及对应 worktree，同时创建环境和共享软链接；登记并返回路径与分支名 |
+| `mam task create --title TITLE` | Manager | 生成 `TASK-ID`，登记任务，创建 task.md、report.md 草稿和空 workspace；返回 `TASK-ID` 与文件、目录路径，状态为“进行中” |
+| `mam task create --title TITLE --review TASK-ID` | Manager | 创建任务，并在任务草稿中引用源 `TASK-ID` 已发布的要求、简报及其代码 commit，固定所引用的版本，供执行者 review |
+| `mam task bind TASK-ID --agent AGENT-ID` | Manager | 将已启动的 subagent 绑定到任务；一个未归档任务对应一个执行 agent，一个 agent 同时绑定一个任务 |
+| `mam workspace add TASK-ID --repo REPO --base COMMIT` | 执行者 | 调用该库的 `.local/create_worktree.sh`，从 base commit 新建 `task/TASK-ID` 分支及对应 worktree，同时创建环境和共享软链接；登记并返回路径与分支名 |
 
-涉及哪些库及其 base commit 由任务说明确定，每个库分别调用 workspace add。具体安装和软链接规则由各库脚本负责。同一任务在不同库使用相同分支名。
+涉及哪些库及其 base commit 由任务说明确定，每个库分别调用 workspace add。具体安装和软链接规则由各库脚本负责。同一任务在不同库使用同名 `task/TASK-ID` 分支。
 
 ## 编辑、发布与查看
 
+`FILE` 为 `task` 或 `report`；`COMMIT` 是已发布 commit。
+
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
-| `mam task show <uuid> [--file task\|report] [--revision <commit>]` | 所有人 | 返回已发布的文件内容及版本；默认读取 main 上的 task.md，也可读取指定 commit |
-| `mam task publish <uuid> --file task\|report` | 文件负责人 | 加锁，将指定文件的草稿单独提交到 main，返回发布 commit；同步本次文件的暂存内容，保留其他文件的暂存内容及所有草稿；发布 report 时关联简报中注明的任务版本，状态改为“待验收” |
-| `mam task list [--archived\|--all]` | 所有人 | 即使为空也输出表头；每行固定为标题、task 状态、完整 UUID、agent、agent 状态。保留既有筛选，不提供 `--json` |
-| `mam task status <uuid>` | 所有人 | 显示任务及简报版本、简报依据的任务版本、workspace、各库分支与交付 commit 和归档结果；返回保存的 job 观测而不隐式刷新；提示草稿，以及当前要求与简报所依据的要求是否不同 |
+| `mam task show TASK-ID [--file FILE] [--revision COMMIT]` | 所有人 | 返回已发布的文件内容及版本；默认读取 main 上的 task.md，也可读取指定 commit |
+| `mam task publish TASK-ID --file FILE` | 文件负责人 | 加锁，将指定文件的草稿单独提交到 main，返回发布 commit；同步本次文件的暂存内容，保留其他文件的暂存内容及所有草稿；发布 report 时关联简报中注明的任务版本，状态改为“待验收” |
+| `mam task list [--archived\|--all]` | 所有人 | 即使为空也输出表头；每行固定为标题、任务状态、`TASK-ID`、agent、agent 状态。保留既有筛选，不提供 `--json` |
+| `mam task status TASK-ID` | 所有人 | 返回任务、workspace、各库交付和已保存 job 观测的精简 JSON 展示；不隐式刷新 job，并提示草稿及当前要求与简报所依据要求是否不同 |
 
 修改要求和简报使用普通编辑工具，再通过 publish 发布。执行者通过 show 获取任务及版本，在 report.md 中注明实际依据的任务 commit。版本差异以本任务文件内容为准，其他任务的提交不会使本任务失效。
 
 ## 长任务进程
 
-job 指执行者登记的一个长时间运行的进程。预计运行超过 1 小时的程序（如正式数据生成、训练、评估）通过 `mam job add` 登记，通常的短 smoke 无需登记。同一执行者可为自己的任务登记多个进程，每条登记记录生成一个 job-id，并关联所属任务，以便 Manager 找到对应执行者。
+job 指执行者登记的一个长时间运行的进程。预计运行超过 1 小时的程序（如正式数据生成、训练、评估）通过 `mam job add` 登记，通常的短 smoke 无需登记。同一执行者可为自己的任务登记多个进程，每条登记记录生成一个 `JOB-ID`，并关联所属任务，以便 Manager 找到对应执行者。
 
 job 状态为“进行中／已停止／已归档”：查询确认进程结束后变为“已停止”，表示尚待执行者处理；执行者完成结果记录、文件清理等任务要求后，通过 job archive 标记“已归档”。
 
+`STATUS` 可为 `running`、`stopped`、`archived` 或 `all`。
+
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
-| `mam job add <uuid> --note "…" --host <host> --pid <pid>` | 执行者 | 将指定进程登记到自己的任务下，记录用途、主机、PID 和实际启动时间；无法换算时列表显示 unknown，生成并返回 job-id |
-| `mam job list [--task <uuid>] [--status running\|stopped\|archived\|all]` | 所有人 | 默认有表头，每行固定为描述、job 状态、开始时间、job-id、任务描述、task-id；保留筛选，不提供 `--json`。unknown 探测显示 `unknown/待核实`，不冒充 running 或 stopped |
+| `mam job add TASK-ID --note NOTE --host HOST --pid PID` | 执行者 | 将指定进程登记到自己的任务下，记录用途、主机、PID 和实际启动时间；无法换算时列表显示 unknown，生成并返回 `JOB-ID` |
+| `mam job list [--task TASK-ID] [--status STATUS]` | 所有人 | 默认有表头，每行固定为描述、job 状态、开始时间、`JOB-ID`、任务描述、`TASK-ID`；保留筛选，不提供 `--json`。unknown 探测显示 `unknown/待核实`，不冒充 running 或 stopped |
 | `mam job list --attention` | Manager | 查询进程和 agent 状态，筛选已停止、未归档且执行者已不在运行的 job；不确定项仍在同一表中显示 `unknown/待核实` |
-| `mam job status <job-id>` | 所有人 | 只刷新该 job，不扫描其他进程；完整 JSON 返回登记、实时探测及其 checked_at、身份、所属 task 和 agent |
-| `mam job archive <job-id> --note "…"` | 执行者 | 记录简短的处理结论或成果位置，将该 job 标记为“已归档”，保留历史记录 |
+| `mam job status JOB-ID` | 所有人 | 只刷新该 job，不扫描其他进程；返回该次探测的精简 JSON 展示及所属任务和 agent |
+| `mam job archive JOB-ID --note NOTE` | 执行者 | 记录简短的处理结论或成果位置，将该 job 标记为“已归档”，保留历史记录 |
 
 进程查询在其所属主机执行，远端通过 SSH 查询，核对 PID 和启动时间；查询失败时保留上次状态与时间，并标注“本次查询失败”，不据此判定进程停止。agent 状态由 CLI 连接承载这些线程的现有 Codex App Server，通过 `thread/read` 查询；`active` 对应执行者仍在运行，查询失败显示“待核实”。本机现有 Unix socket 的只读查询已验证可用，接口见 [App Server 文档](https://learn.chatgpt.com/docs/app-server)。
 
@@ -63,17 +69,25 @@ job 状态为“进行中／已停止／已归档”：查询确认进程结束�
 
 job archive 只记录收尾结果，不删除 workspace；任务归档也保留各 job 的独立状态与历史。
 
+## 状态展示
+
+`task status` 是对登记的轻量展示，不改变存储记录，也不探测进程。它保留任务的 `id`、标题、状态、agent 和 workspace；每个仓库保留路径、分支、状态、必要的 base 与交付 commit。`publications` 中的任务和简报 revision 各出现一次；已发布简报另保留其依据的 `task_revision`。
+
+未归档 job 位于 `jobs.unarchived`，每项只含 `id`、`note`、`status` 和 `checked_at`；`jobs.cached` 明确这些是已保存的观测，已归档 job 只给出 `archived_count`。有变化时才显示 drafts 和 `requirements_changed`。任务归档或出错时保留归档结论或失败原因；review 任务保留固定源任务、版本和成果 commit 引用。空值及正常的 false 清理标记可省略。
+
+`job status` 只刷新所请求的 `JOB-ID` 一次。正常结果保留该 job 的 `id`、`note`、所属任务与标题、agent、主机、PID、启动时间、状态和检查时间，不重复输出 `identity` 或 `probe`。探测为 unknown 时，`status` 为 `unknown`，并返回 `error` 及必要的最后已知状态和时间；进程身份不匹配等诊断以错误文本给出。已归档 job 保持 `archived`，并保留归档结论。
+
 ## 可停止等待
 
-等待只读取已登记的 job，不启动 daemon、数据库或调度器。临时登记和取消标记保存在本机共享 `.local/waits/`；每个 agent 一条活跃等待，记录本地 PID、启动身份和 token。start、stop、退出清理使用同一 agent 锁和 token，因此陈旧等待不能取消后来者；异常退出后 PID 身份已停止的登记会被清理，不会显示为仍在等待或阻止重开。
+等待只读取已登记的 job，不启动 daemon、数据库或调度器。临时登记保存在本机共享 `.local/waits/`；每个 agent 一条活跃等待，记录本地 PID、启动身份和 token。start、stop、退出清理使用同一 agent 锁和 token，因此陈旧等待不能取消后来者；异常退出后 PID 身份已停止的登记会被清理，不会显示为仍在等待或阻止重开。
 
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
-| `mam wait jobs [--task <uuid>] [--timeout <seconds>] [--agent <agent-id>]` | 所有人 | 默认监控当前所有未归档 job，`--task` 缩小范围。已有确定 stopped job 立即返回 `stopped`；任一运行 job 停止时返回 `stopped`；空集返回 `empty`，超时返回 `timeout`。unknown 探测不视作 stopped。轮询只探测必要 job，不探测 agent，也不持有 task 锁睡眠 |
-| `mam wait list` | 所有人 | 即使为空也输出表头；每行是 agent-id、绑定 task 标题、task-id、等待内容、等待开始时间。绑定取等待者自己的未归档 task；没有绑定显示“未绑定”，不使用被监控 job 的负责人代替 |
-| `mam wait stop --agent <agent-id>` | 所有人 | 仅为该 agent 写取消标记并唤醒等待，返回 `cancelled`；不存在当前等待返回 `not_waiting`。不向 job 进程发信号，不归档 job |
+| `mam wait jobs [--task TASK-ID] [--timeout TIMEOUT] [--agent AGENT-ID]` | 所有人 | 默认监控当前所有未归档 job，`--task` 缩小范围。已有确定 stopped job 立即返回 `stopped`；任一运行 job 停止时返回 `stopped`；空集返回 `empty`，超时返回 `timeout`。unknown 探测不视作 stopped。轮询只探测必要 job，不探测 agent，也不持有任务锁睡眠 |
+| `mam wait list` | 所有人 | 即使为空也输出表头；每行是 `AGENT-ID`、绑定任务标题、`TASK-ID`、等待内容、等待开始时间。绑定取等待者自己的未归档任务；没有绑定显示“未绑定”，不使用被监控 job 的负责人代替 |
+| `mam wait stop --agent AGENT-ID` | 所有人 | 仅为该 agent 写取消标记并唤醒等待，返回 `cancelled`；不存在当前等待返回 `not_waiting`。不向 job 进程发信号，不归档 job |
 
-等待者未指定 `--agent` 时，只读取 `CODEX_THREAD_ID`；不从继承的 `CODEX_SESSION_ID` 推测身份。ID 缺失、空白或含换行会明确报错。每次 target 探测前检查 deadline，单次远端探测预算不超过 0.5 秒与剩余时限的较小值；允许小幅运行时调度开销。stop 不会被长 SSH 查询无限拖住。
+等待者未指定 `--agent` 时，只读取 `CODEX_THREAD_ID`；不从继承的 `CODEX_SESSION_ID` 推测身份。`AGENT-ID` 缺失、空白或含换行会明确报错。每次 target 探测前检查 deadline，单次远端探测预算不超过 0.5 秒与剩余时限的较小值；允许小幅运行时调度开销。stop 不会被长 SSH 查询无限拖住。
 
 `job list --attention` 中，即使 job 已确认 stopped，只要 agent 状态未知或查询失败，也明确显示 `unknown/待核实`，与普通待处理项区分。
 
@@ -81,6 +95,6 @@ job archive 只记录收尾结果，不删除 workspace；任务归档也保留�
 
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
-| `mam task archive <uuid> --note "…"` | Manager | 记录结束结论，移除已登记的各库 worktree 及独立环境，删除对应的本地任务分支，移除 workspace；保留任务说明、简报和历史登记，状态改为“已归档” |
+| `mam task archive TASK-ID --note NOTE` | Manager | 记录结束结论，移除已登记的各库 worktree 及独立环境，删除对应的本地任务分支，移除 workspace；保留任务说明、简报和历史登记，状态改为“已归档” |
 
 分支删除使用创建时登记的“仓库＋分支名”。移除软链接时保留其指向的共享数据。归档返回各项清理结果；未全部完成则保留未归档状态，再次调用继续清理。是否归档由 Manager 根据任务要求决定。
