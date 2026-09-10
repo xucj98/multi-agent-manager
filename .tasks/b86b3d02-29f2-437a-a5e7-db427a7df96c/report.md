@@ -4,7 +4,7 @@
 
 已在独立 worktree `/mnt/public/xcj/Projects/workspace/b86b3d02-29f2-437a-a5e7-db427a7df96c/robot-bridge` 的分支 `task/b86b3d02-29f2-437a-a5e7-db427a7df96c` 完成公共 offline 入口和指标修复。新 wash-cup 单 phase full/serial（H50/K30）与既有 drawer 双字段配置共用同一 controller、scheduler 和 launcher；新增固定 wash 5 集 manifest（LeRobot index 0–4），保留既有 drawer 入口、真机反馈路径、process/exit/metadata 产物管理。
 
-实现提交：`3a364a6dd87c08753a804e5598ddc85ef832d9b1`（`feat(offline): support memory v1 replay metrics`）。worktree 干净，保留给 Manager 安排独立 review；未自行 review、合并或部署。
+实现提交：`fda269c1f333dabdb5628c083a4dba3db0938333`（`fix(offline): gate actual policy source and reject timing conflicts`）。worktree 干净，保留给 Manager 安排独立 review；未自行 review、合并或部署。
 
 ## 关键决定
 
@@ -13,14 +13,24 @@
 - 仅对实际 drain 的 action 计分；NPZ 保存 action/memory prediction、GT、mask、query/source/model-row 和执行行。count 求和，accuracy 按 sample 或 transition count 加权。
 - 从既有 `drawer_offline.py` 泛化为配置驱动的 `offline_replay`，没有复制 launcher 或另建 wash 专用调度器；legacy drawer payload 仍走原分支。
 
-## Launcher 泛化范围与可简化空间
+## 07:22 Manager 裁定修复
 
-这次 launcher 的约 520 行增量不全是 root/路径/metadata 兼容层；其中必要的新逻辑还包括 Memory v1 sidecar 的 15 Hz 时钟与 query-count 预检、H/K/执行行门禁、missing-future-checkpoint 的无 GPU dry-run、以及沿用现有的 provenance、metadata 和退出产物。
+新提交 `fda269c1f333dabdb5628c083a4dba3db0938333`，基于首版 `3a364a6`。本次仅改 launcher、wash manifest 和定向测试，controller/scheduler 未改。
 
-- **root 注册**：现有输入确实需要两个根。旧 drawer manifest 的 checkpoint 是 `RMBench/...`，继续由已有 `--rmbench` 解析；新 wash manifest 的 checkpoint 和 sidecar 都是 `{root: "OpenPI", path: "..."}`，需要 `--checkpoint-root OpenPI=...`。泛化成可重复的 `NAME=PATH` 并非这两个输入唯一可行的 CLI 设计，`--openpi` 也能满足；保留 alias 形式是为了让 manifest 不写机器绝对路径。可由独立 review 判断是否值得缩为两个固定 flag。
-- **多形式路径**：当前两种格式都被实际输入使用：旧 drawer 的 `RMBench/...` 相对前缀和新 wash 的 `{root, path}` 映射。纯绝对路径字符串 fallback 未被这两个 manifest 使用，只是窄的兼容余量，可在确认没有外部 manifest 依赖后删除。
-- **多 metadata 模式**：两种现有输入也都需要。旧 drawer 没有 `expected_policy_metadata`，必须从 `dataset` 推导 15 Hz / H30 / stride15；新 wash 明确提供该 mapping，以门禁 15 Hz / H50 / stride30，并额外要求 K30。若允许改写旧 manifest 可以统一成显式 mapping；在“不改旧 drawer 配置”边界下，两种读取方式是必要的。
-- `--replay` 显式选节和自动探测中，当前两个 manifest 都可走自动探测；显式选节不是现有输入的必需项，也属于可审查的简化候选。
+- P1：启动服务和创建正式输出前，使用 `--policy-python` 的 CPU 探针解析实际 `openpi.policies.policy_config` 模块位置、Git root/commit、解释器路径/prefix/version 和二进制 SHA256；不导入 policy_config，不加载模型。对实际 root 执行 Git clean 检查（包括 untracked 与 submodule dirty）。顶层 `source_commits.OpenPI` 与 `policy_runtime` 来自实际源码；checkpoint root 只记录路径，不充当源码身份。
+- 握手后校验现有 served provenance 的 source root/module/commit 和 interpreter 字段，重新检查源码 clean/commit；任何缺失或不一致在 episode 前拒绝，沿用 ExitStack 回收 policy 服务。scheduler 的 shutdown callback 也提前到 metadata 验证前注册。
+- P2：dataset 与显式 expected metadata/execution rows 同时出现且冲突时明确报错。wash 删除重复 expected 字段及 scheduler.move_steps，时序只由 dataset 声明并与 checkpoint 校验；旧 drawer 有效参数不变。
+- 删除未使用的 `--replay` 任意选节，保留现有两种节自动识别、必要 root 映射及旧路径适配。没有新增配置格式或依赖快照框架。
+
+定向 CPU 验证：`21 passed`（新增 launcher 失败保护测试、memory offline、legacy drawer、已有 policy provenance）；ruff E/F 和 git diff --check 通过。真实 wash/drawer dry-run 通过；实际独立 OpenPI 解释器探针确认模块来自本任务 OpenPI worktree，commit `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，clean 检查通过。测试包含 dirty 源码拒绝、root/commit/module/interpreter/binary 握手不符拒绝、episode 前拒绝并回收 policy、三种 metadata 时序冲突及 execution rows 冲突。
+
+复测命令（bridge worktree 根）：
+
+```bash
+CUDA_VISIBLE_DEVICES='' PYTHONPATH=../openpi/packages/openpi-client/src .venv/bin/python -m pytest -q tests/launcher/test_offline_preflight.py tests/robot/controllers/test_memory_v1_offline.py tests/robot/controllers/test_drawer_offline.py tests/policy/test_openpi_provenance.py
+```
+
+本轮 CPU 修复已完成，等待 Manager 交原独立 reviewer 复查；GPU offline 仍须 Manager 明确授权及 checkpoint 门禁通过。
 
 ## CPU 验证
 
@@ -31,9 +41,9 @@
 
 ## 预计剩余时间与 07:27 安排
 
-接口实现、CPU 门禁和提交已于 05:44 完成，剩余实现时间为 0；因此能赶上 07:27 后安排 wash offline，不需要为赶时间省略验证。
+接口实现、CPU 门禁和提交已于 05:44 完成，剩余实现时间为 0；原版之后已按 07:22 裁定完成上述小修；安排 wash offline 需原独立 reviewer 复查通过，不省略该门禁。
 
-正式 offline 仍需训练产物出现后由 Manager 分配 GPU。固定输入共 5,525 个 query / 模型，正式运行会评估 full 和 serial 两个模型；没有在本轮加载模型或占用 GPU，故不把未经测得的 GPU 吞吐时间写成 ETA。启动前先重跑同一 dry-run 确认两个 `20000` 目录转为 `ready: true`。
+正式 offline 仍需训练产物出现后由 Manager 分配 GPU。固定输入共 5,525 个逻辑执行行 / 模型；K30 对应各集 41/51/24/38/33 次 infer，共 187 次 / 模型（最终以实际日志验证），正式运行会评估 full 和 serial 两个模型；没有在本轮加载模型或占用 GPU，故不把未经测得的 GPU 吞吐时间写成 ETA。启动前先重跑同一 dry-run 确认两个 `20000` 目录转为 `ready: true`。
 
 正式命令草案（**不要在本 task 中自行启动**；由 Manager 在已分配 GPU 后执行，替换输出目录名）：
 
@@ -45,7 +55,7 @@ PYTHONPATH=/mnt/public/xcj/Projects/workspace/b86b3d02-29f2-437a-a5e7-db427a7df9
   --raw-root /mnt/public/datasets/x1pro/wash-cup \
   --checkpoint-root OpenPI=/mnt/public/xcj/Projects/openpi \
   --policy-python /mnt/public/xcj/Projects/workspace/b86b3d02-29f2-437a-a5e7-db427a7df96c/openpi/.venv/bin/python \
-  --output /mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_5ep_<timestamp>
+  --output /mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_5ep_RUN_ID
 ```
 
 桥接 worktree 的 `.venv` 未安装 light `openpi_client`，所以该 `PYTHONPATH` 是命令的一部分；policy 进程继承 Manager 的 GPU 分配环境。
