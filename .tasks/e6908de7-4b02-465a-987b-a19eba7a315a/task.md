@@ -90,3 +90,8 @@ wuwen-1 的现有训练自然结束、完成 checkpoint 保存并释放资源后
 复用保留的三个worktree，读取两个训练owner最新报告，为14个仿真20k模型（12个Q2受控重复+rearrange serial/no-memory基线）列出对应checkpoint、单GPU smoke2/formal100 run名和先后顺序。优先rearrange/put-back per-frame与repeated-endpoint按训练seed成对进入队列，不按中途成绩筛选。每模型先自身smoke（同一run两条rollout，一条video一条无video），核对产物/现有门禁后才能正式100；每run在一张卡串行执行，第50次做正常诊断。产物统一RMBench/eval_result/memory_chunk_20260910/<run>及对应experiments记录。
 同时核对wash full/serial新20k的固定5ep offline入口与数据，必须复用已验证的通用memory/S2M机制；读取wash owner已固定的5ep，不另选episode。只准备命令及必要配置，不因脚本名drawer而另写wash专用实现。若接口存在实际缺口，给代码证据和最小修复建议交Manager裁决。
 当前本机8卡全在训练，wuwen-1结束后全部停用。现阶段只做CPU/元数据/命令准备，不加载GPU模型、不重新运行已验收的technical smoke或旧drawer回归。预计07:20以后本机4–7先释放供仿真；wash GPU2/3预计07:27后优先完成其checkpoint恢复及5ep offline，再转仿真，具体授权由Manager确认。报告清楚“已准备”和“已运行”的边界；可在现有实验说明补紧凑队列，不新增调度框架。完成准备后报告即可，等待Manager分配卡。
+
+## 9月11日06:53 正式仿真执行安排
+本机GPU4–7由训练owner e7e5ac54确认各自训练保存/进程退出并发布释放后，授权本任务依次接用已释放卡；启动前再核对显存，不能抢占尚未结束的卡。GPU0/1仍训练，GPU2/3留给wash offline，wuwen-1停用。本任务负责14个既定模型的各自smoke2与正式100，沿上面已验收入口及固定队列，不修改公共backend/controller/scheduler。先在GPU4/6可用后分别运行rearrange full t+1/t+30 seed0，GPU5/7释放后运行put-back两变体seed0；后续按既定seed配对队列填充。每卡一次一个run，每个run100条串行，sim与policy同卡。为每个并行run使用独立端口、输出路径和必要的进程cache。
+必须先确认该20k保存和训练owner CPU门禁完成；实际GPU恢复由本模型匹配smoke覆盖，不另重复整套技术smoke。每个checkpoint的smoke是同一run的2条rollout（视频开/关各一次），核对结果文件、视频可读、metadata及进程退出，再从已提交干净版本进入正式100。若入口或算法有问题，报告首因及最小修复建议，不用变更参数绕过门禁。
+正式运行预计超1小时均mam job add，任务内多个job分别登记。50条时对照真正可比的旧实验，偏差超过10个百分点开始诊断；新训练未有可比基准时明确说明，不能强行引用不同配置成功率。保留正常失败与全部100条结果，不能按中途表现重新抽样。完成后更新本组实验说明，按协议清理自己的smoke/临时产物，保留正式结果及smoke门禁必要摘要；进程退出核验并archive job。保持active turn，使用mam wait jobs --task等待并结合日志做50条中检。报告阶段结果，不把CPU准备或smoke替代正式实验。
