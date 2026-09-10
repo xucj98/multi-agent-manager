@@ -1,6 +1,6 @@
-task_revision: 5081029b1a90ea818ecd577f7d66944fc694f96b
+task_revision: 6ffd5ca86a4c00b35de2971dee180f97ea1ed174
 
-# Runtime增量review：当前CPU范围GO，无剩余P1
+# Runtime最终CPU review：GO，无剩余P1
 
 **本轮变化：29a5638f的4项跨库回归通过；8ea6078修复X1非零wait，最后一项P1关闭。** 原两项live P1及prefix/cut/epoch结论沿用已接受的 `ff00b8f`；F0/sim、此前7项wire、latency、wheel结论沿用 `f51353f`、`05ba1a0`，本轮不重开。
 
