@@ -57,3 +57,8 @@ CPU实现7378904及空白review95ece0eb已经验收，主库已合入。此次�
 只需核对文字命令与现有CLI/路径、diff-check，不重复CPU模型与GPU检查。提交文档小修并发布report。F0 row1预计约12:50释放GPU0，Manager另通知你开始真实技术smoke及drawer offline；本轮不先启动GPU程序。
 
 12:38资源调整：用户追加BF16导出模型的真实100rollout验证（任务35c9e781-7d2e-49a1-bb4c-25d77b865b3a），本机GPU0在F0 row1完成后优先交给该验证。你的GPU技术smoke与drawer offline顺延到下一张释放的卡，预计F0 row50的GPU1；具体分配由Manager检查后发布。本任务CPU和文档交付均已验收并合入，现阶段继续保留三树，不启动GPU。后续实际命令按分配卡调整，README的GPU0是可复制示例，不代表已经占有该卡。
+
+
+## MAM 查询更新（2026-09-10）
+
+系统 MAM 已更新：`mam task list` 默认单行列表，`mam task show` 默认 Markdown；脚本读取结构化结果时为这两个命令加 `--json`。`mam task status` 仅显示保存的 job 状态与 checked_at，不刷新进程。按既定频率监控时使用 `mam job list --task e6908de7-4b02-465a-987b-a19eba7a315a` 获取实时进程状态，再结合已有日志检查进度。训练/评测协议、GPU 分配与检查频率不变。
