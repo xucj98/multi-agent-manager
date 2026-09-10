@@ -71,3 +71,6 @@ Pascal实际复核已关闭drain后的latency偏移，真实ffa308d transforms�
 ## 交付收尾：跨库回归草稿
 
 ed2f2f3已交Pascal增量复核；期间不重复修改live实现。未跟踪的test_openpi_memory_transform_contract.py目前454行，需在归档前处理。保留有价值的边界回归，但优先复用真实已注册full/serial/no-memory配置与现有测试helper，删除为测试复制的大块schema/factory构造；实际tokenizer、input/output transforms和MemoryContext应进入测试，只替换昂贵模型计算。覆盖非initial输入、robot-only输出后IDs保留、full K30选行和serial实际condition一致的关键契约；单/多字段可参数化。代码控制在清楚表达这些边界所需范围，目标约200行，遇到合理必要性可说明，不为行数破坏验证。独立小commit给reviewer；不安装到真机/其他task环境，不占GPU，不为这项重建worktree。已通过的CPU证据不因测试整理被重开。
+## ed2增量review裁定
+
+Pascal报告ff00b8f已独立关闭同步wait和跳tick两P1，但发现X1非零wait回归：_wait无条件取得_action_execution_lock，而X1发送SDK持同一锁；即使threshold=1的排期条件已满足，观察也被慢SDK阻塞。Manager接受此发现，优先作最小修复，使新增handoff等待仅作用于零剩余drain，非零wait保留原异步返回行为。父版本/X1Pro的对照和复现在review任务report；加入该具体回归即可，不重写调度循环。小commit交Pascal，跨库测试整理可随后完成，不阻塞此修正。
