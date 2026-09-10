@@ -63,3 +63,6 @@ git diff --check
 ```
 
 结果：完整测试 `Ran 42 tests in 64.079s`，`OK`。针对真实入口和非 Python 诊断的两项测试也单独通过；未配置的版本化 local 模板会明确提示在 `.local/create_worktree.sh` 或 `MAM_SHARED_PYTHON` 中选择 Python，且不会创建 workspace。
+
+# 用户文档拆分增量review
+源任务新增文档commit 798bb01 与 fd28c23e72d49951ef508aea7d80361365598ec2（已发布report d15a026）。用户要求install.md仅讲使用安装，development.md讲MAM自身开发，README开发验证仅一句引用，AGENTS最后开发指引删除。请在已有独立review worktree只读审查git diff fbfded..fd28或ff到fd28，核对以上意图与信息无丢失/误导、相对链接正确。纯文档无需重跑tests或安装，禁止cache写入。尽快发布增量结论，manager合main/project并push main已获用户授权。
