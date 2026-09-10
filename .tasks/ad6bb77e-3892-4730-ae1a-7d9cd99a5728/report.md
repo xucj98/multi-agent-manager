@@ -38,7 +38,7 @@ serial:
 已接受产物与保留要求：
 
 - wash GPU50与实际恢复已验收，详细证据publication f74959a622e84a294448f967b90576561bfccb3f；本次未重复gate/恢复/dtype验证。
-- F0 BF16副本迁移目标：/mnt/public/xcj/Projects/openpi/checkpoints/precision_validation/rearrange_full_key_state_30k_bf16/30000。07:03新要求由owner 47a91a44-4efa-48d7-b162-93d097763376迁移，完成状态以该owner报告为准；本任务尚未核验迁移完成，不并发移动或重建旧路径。保留迁移后的副本及历史留痕，不再要求user_checkpoints旧路径原位保留。此前CPU参数验证证据publication 04eee7a5cf20b4011406dbddc99bbbb148d7e1b8。
+- F0 BF16临时评测副本：按07:04替代要求不再迁移，交owner 47a91a44清理；清理完成状态以该owner报告为准。本任务不移动、不重建副本。原FP32 checkpoint和正式实验结果保留，历史CPU参数验证证据publication 04eee7a5cf20b4011406dbddc99bbbb148d7e1b8保留。
 - 原d10 full/serial两份50在本workspace/gpu_smoke_checkpoints下，params/assets/metadata均原位存在，继续供e690使用；没有清理/重载。当前wash smoke也保留。
 
 剩余：两路20k继续运行；接下来使用mam wait jobs --task保持active turn，任一路停止后立即收尾。完成后按task验收唯一20000、完整shape/BF16/model-only、metadata/assets和checkpoint-only恢复，交Manager安排5ep offline，再处理产物与MAM job收尾。
