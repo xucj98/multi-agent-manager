@@ -1,6 +1,32 @@
-task_revision: 952f420ec4b91d5d97aab87a29dd7997f55e2179
+task_revision: a3a5c390b8daac7f74637988edd712142c5c16af
 
-# Memory 20k：远端八路与本机四路
+# Memory 20k：远端八路与本机五路
+
+## 15:41 授权的本机 GPU1：put-back t+1 seed2 启动
+
+已读发布 task `a3a5c390b8daac7f74637988edd712142c5c16af` 末节授权，于 `2026-09-10T15:42:52+08:00` 启动既定 Q2 剩余的 put-back full_t_plus_1 seed2。启动前 GPU1 实测已用 1 MiB、空闲 81,038 MiB、利用率 0；MemAvailable=885,382,269 KiB。固定树 HEAD 为 `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`，git status 为空，解释器可执行；put-back norm SHA-256 为 `7a014e42dc9d51c8601b05dca5c876c58dda1308e61d1619e3d1c367baa7f261`。独立 log/checkpoint exp 路径均未存在。
+
+- host：`is-dcfi2kjdq7g3k6aa-devmachine-0`；GPU1；PID/session ID：`2918573`；start_ticks：`27499635`。
+- MAM job：`ee13298c-d10c-4fa4-9be9-875b417fb9a1`，15:43:16 登记实时确认 running。
+- config：`pi05_rmbench_put_back_block_full_t_plus_1`；seed2；exp_name：`memory20k_e7e5ac54_put_back_full_t_plus_1_s2`。
+- log：`/mnt/public/xcj/Projects/openpi/logs/memory20k_e7e5ac54_put_back_full_t_plus_1_s2.log`。
+- 最终 checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s2/20000`。
+- 原 config/环境：batch32、实际20k updates、H50/K30、同 pi05_base/demo_clean_state/norm，save_full_state=False、save_dtype=bfloat16、save_interval=20000；未改源码或重复50step。
+
+实际 cwd 为本任务 d10 固定 openpi worktree；通过一次性 subprocess.Popen、start_new_session=True、stdin=DEVNULL、stdout=独占创建的日志、stderr=STDOUT、close_fds=True 脱离短工具会话。实际 command/env：
+
+```bash
+cd /mnt/public/xcj/Projects/workspace/e7e5ac54-2f5c-4f46-9210-6c2a51f7f4fe/openpi
+export OPENPI_DATA_HOME=/mnt/public/cache/openpi
+export HF_HUB_OFFLINE=1
+export HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot
+export XLA_PYTHON_CLIENT_MEM_FRACTION=0.90
+export PYTHONDONTWRITEBYTECODE=1
+unset JAX_PLATFORMS PYTHONPATH
+CUDA_VISIBLE_DEVICES=1 .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_back_block_full_t_plus_1 --exp-name=memory20k_e7e5ac54_put_back_full_t_plus_1_s2 --seed=2 --no-wandb-enabled
+```
+
+本次启动登记完成，首次真实 update/有限落盘 loss 待 15:57 合并检查确认；原十二路本轮尚未提前复查。配对 full_t_plus_30 seed2/GPU0 仍未授权启动。
 
 ## 14:57 十二路合并小时巡检
 
@@ -38,7 +64,7 @@ progress 的 `kit` 为三位有效数字取整，表中保留约数；ETA 采用
 
 旧远端 GPU0/1/2/3/6/7 的 Step 标量计数仍各为零，有限 loss 尚未由落盘标量证实。此前 stdout 缓冲的可观察边界继续保留，不能以无 nan/inf 文本替代有限数值证据；保留原 `python -B` 进程。
 
-两机固定源码均为 `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`，`git status --porcelain=v1 --untracked-files=normal` 均为空。远端 GPU4/5 和本机四路仍为 `python -u -B`；既定 batch32/20k、仅最终 BF16 checkpoint 配置保持冻结。本轮仅做一次只读巡检与报告发布，无修改源码/参数、注入、重启、重复门禁或启动新 GPU；本任务十二路以外的 GPU 分配沿 Manager 安排，新 put-back seed2 仍待后续排期。
+两机固定源码均为 `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`，`git status --porcelain=v1 --untracked-files=normal` 均为空。远端 GPU4/5 和本机四路仍为 `python -u -B`；既定 batch32/20k、仅最终 BF16 checkpoint 配置保持冻结。本轮仅做一次只读巡检与报告发布，无修改源码/参数、注入、重启、重复门禁或启动新 GPU；该 14:57 快照为历史检查；新增 put-back seed2 授权与启动见本报告首节。
 
 ## 本机四路启动留痕（10:39 授权，10:58 已验收）
 
@@ -174,4 +200,4 @@ CUDA_VISIBLE_DEVICES=7 nohup setsid .venv/bin/python -B scripts/train.py pi05_rm
 | 6 | rearrange full t+1 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_1_s1` | `checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1/20000` | `logs/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1.log` |
 | 7 | rearrange full t+30 / 1 | `memory20k_e7e5ac54_rearrange_full_t_plus_30_s1` | `checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s1/20000` | `logs/memory20k_e7e5ac54_rearrange_full_t_plus_30_s1.log` |
 
-下一检查：`2026-09-10T15:57:00+08:00`，远端八路与本机四路合并为十二路小时巡检，由 Manager 按计划唤醒。若收到 MAM job attention 或异常通知则提前处理。十二路的 20k 完成、唯一 20000 BF16 checkpoint、完整参数/无 optimizer/恢复验证与评测交接仍待训练结束后完成。
+下一检查：`2026-09-10T15:57:00+08:00`，远端八路、本机原四路及新 GPU1 合并为十三路巡检，由 Manager 按计划唤醒。若收到 MAM job attention 或异常通知则提前处理。十三路的 20k 完成、唯一 20000 BF16 checkpoint、完整参数/无 optimizer/恢复验证与评测交接仍待训练结束后完成。
