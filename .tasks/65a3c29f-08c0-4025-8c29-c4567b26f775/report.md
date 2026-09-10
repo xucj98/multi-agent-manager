@@ -102,3 +102,5 @@ CUDA_VISIBLE_DEVICES='' PYTHONPATH=<openpi-worktree>/packages/openpi-client/src 
 结果为 `13 passed in 1.39s`。它与上述独立探针覆盖 dirty actual source、source/interpreter handshake mismatch、三项 metadata 与 execution-row 冲突。新旧有效 manifest 的实际 dry-run 都通过：wash 仍固定 index 0–4、H50/K30，两个 `20000` checkpoint 现均为 `ready: true`；drawer 仍为固定 `[1,22,23,24,26]`、H30/K15，两个 checkpoint 均为 `ready: true`。`--help` 不再出现 `--replay`，带该参数运行按预期以 argparse `unrecognized arguments` 拒绝。`py_compile` 和 `git diff --check 3a364a6d..fda269c` 也通过。
 
 **准入结论。** P1/P2 代码门禁、manifest 输入门禁和 checkpoint-ready 门禁均已通过，可以进入 Manager 分配 GPU 后的正式 full/serial offline。实际权重回放、served handshake 产物、5,525 执行行/模型和指标仍未在本 task 运行，必须由正式 GPU 验收如实记录；本结论不替代那次实际运行。两个 worktree 保持干净并保留。
+
+归档收尾：已清理本 task 两个 worktree 内共 14 个测试缓存目录（.pytest_cache / __pycache__）及本地字节码，复查无残留；未沿软链访问或删除共享目标，未重跑测试，两树保留供 Manager 归档。
