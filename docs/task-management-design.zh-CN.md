@@ -1,6 +1,18 @@
 # 任务管理 CLI 接口说明
 
-MAM 通过文件和 CLI 管理当前集群的任务，顶层命令为 `mam task`、`mam job`、`mam wait`、`mam workspace`。所有 agent 和管理命令在本机运行；GPU 作业可通过 SSH 在 wuwen-1 运行，两端共享 `/mnt/public`。全局 `mam --root ROOT …` 可覆盖管理资料根目录；默认使用 `/mnt/public/xcj/Projects/multi-agent-manager`，日常无需指定。
+MAM 通过文件和 CLI 管理当前集群的任务，顶层命令为 `mam task`、`mam job`、`mam wait`、`mam workspace`。所有 agent 和管理命令在本机运行；GPU 作业可通过 SSH 在 wuwen-1 运行，两端共享 `/mnt/public`。除 `--help` 外，命令从当前目录逐级向上寻找最近的 `.mam/env.json`；没有配置或最近配置无效都会报错，且不会回退到更上层的配置。
+
+配置是唯一的项目选择来源，不提供 `--root` 或环境变量默认值。文件必须包含绝对路径的 `MAM_ROOT`、`PROJECT_ROOT` 和现有本地分支名 `MAM_BRANCH`：
+
+```json
+{
+  "MAM_ROOT": "/mnt/public/xcj/Projects/multi-agent-manager",
+  "PROJECT_ROOT": "/mnt/public/xcj/Projects",
+  "MAM_BRANCH": "project/state-vla"
+}
+```
+
+`MAM_ROOT` 是保存任务、job、wait、锁和归档登记的 Git worktree 根，可为普通 checkout 或 linked worktree；工具不会将 linked worktree 归并到 primary checkout。`PROJECT_ROOT` 包含业务仓库和 workspace。路径在读取配置时解析为实际目录，避免同一目录的别名形成不同边界。
 
 日常命令和交付步骤见 [README 的任务管理](../README.md#任务管理)、[执行与交付](../README.md#执行与交付)、[进程管理](../README.md#进程管理)、[等待](../README.md#等待)与[工作区](../README.md#工作区)。本文保留接口设计、状态语义和归档保护；安装见[安装说明](install.md)。
 
@@ -11,17 +23,17 @@ MAM 通过文件和 CLI 管理当前集群的任务，顶层命令为 `mam task`
 任务、workspace 和工作分支使用同一个 `TASK-ID`，由工具生成：
 
 ```text
-multi-agent-manager/
+MAM_ROOT/
   .tasks/TASK-ID/task.md       # Manager 编辑任务要求
   .tasks/TASK-ID/report.md     # 执行者编辑结果简报
   .local/tasks/TASK-ID.json    # 工具维护的登记与状态，不进入 Git
   .local/waits/*.json          # 当前等待登记，不进入 Git
 
-Projects/workspace/TASK-ID/
+PROJECT_ROOT/workspace/TASK-ID/
   REPO/                        # 按需创建的 worktree，分支为 task/TASK-ID
 ```
 
-大家共享管理仓库的工作目录，通过编辑工具修改各自负责的文件。`main` 上的 task.md、report.md 是已发布内容，工作目录中的修改是草稿；发布由 CLI 提交到 `main`。读取已发布内容无需 checkout。
+`MAM_BRANCH` 上的 task.md、report.md 是已发布内容，工作目录中的修改是草稿。读取已发布内容无需切换 checkout；发布前 `MAM_ROOT` 必须已 checkout 到 `MAM_BRANCH`，CLI 不自动切换分支。这样代码可从 `main` 安装或开发，而生产管理 worktree 使用独立的项目分支保存项目记录。
 
 ## 创建与执行
 
@@ -30,7 +42,7 @@ Projects/workspace/TASK-ID/
 | `mam task create --title TITLE` | Manager | 生成 `TASK-ID`，登记任务，创建 task.md、report.md 草稿和空 workspace；返回 `TASK-ID` 与文件、目录路径，状态为“进行中” |
 | `mam task create --title TITLE --review TASK-ID` | Manager | 创建任务，并在任务草稿中引用源 `TASK-ID` 当前已发布的要求、简报及已登记的交付代码 commit，供执行者 review |
 | `mam task bind TASK-ID --agent AGENT-ID` | Manager | 将已启动的 subagent 绑定到任务；一个未归档任务对应一个执行 agent，一个 agent 同时绑定一个任务 |
-| `mam workspace add TASK-ID --repo REPO --base COMMIT` | 执行者 | 调用该库的 `.local/create_worktree.sh`，从 base commit 新建 `task/TASK-ID` 分支及对应 worktree，同时创建环境和共享软链接；登记并返回路径与分支名 |
+| `mam workspace add TASK-ID --repo REPO --base COMMIT` | 执行者 | 从 `PROJECT_ROOT/REPO` 调用该库的 `.local/create_worktree.sh`，从 base commit 新建 `task/TASK-ID` 分支及对应 `PROJECT_ROOT/workspace` worktree，同时创建环境和共享软链接；登记并返回路径与分支名 |
 
 涉及哪些库及其 base commit 由任务说明确定，每个库分别调用 workspace add。具体安装和软链接规则由各库脚本负责。同一任务在不同库使用同名 `task/TASK-ID` 分支。
 
@@ -40,8 +52,8 @@ Projects/workspace/TASK-ID/
 
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
-| `mam task show TASK-ID [--file FILE]` | 所有人 | 直接返回当前已发布的文件内容；默认读取 main 上的 task.md，`--file report` 读取 report.md |
-| `mam task publish TASK-ID --file FILE` | 文件负责人 | 加锁，将指定文件的草稿单独提交到 main，返回发布 commit；同步本次文件的暂存内容，保留其他文件的暂存内容及所有草稿；发布 report 时记录各 ready worktree 的当前 HEAD 为交付代码 commit，状态改为“待验收” |
+| `mam task show TASK-ID [--file FILE]` | 所有人 | 直接返回 `MAM_BRANCH` 上当前已发布的文件内容；默认读取 task.md，`--file report` 读取 report.md |
+| `mam task publish TASK-ID --file FILE` | 文件负责人 | 加锁，将指定文件的草稿单独提交到 `MAM_BRANCH`，返回发布 commit。发布要求 `MAM_ROOT` 当前 checkout 正是该分支；同步本次文件的暂存内容，保留其他文件的暂存内容及所有草稿；发布 report 时记录各 ready worktree 的当前 HEAD 为交付代码 commit，状态改为“待验收” |
 | `mam task list [--archived\|--all]` | 所有人 | 即使为空也输出表头；每行固定为标题、任务状态、`TASK-ID`、agent、agent 状态。保留既有筛选，不提供 `--json` |
 | `mam task status TASK-ID` | 所有人 | 返回任务、workspace、各库交付和已保存 job 观测的精简 JSON 展示；不隐式刷新 job，并提示未发布草稿 |
 

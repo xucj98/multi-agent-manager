@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import datetime as dt
+from dataclasses import dataclass
 import fcntl
 import hashlib
 import json
@@ -17,8 +18,8 @@ import tempfile
 import time
 import uuid
 
-DEFAULT_ROOT = Path("/mnt/public/xcj/Projects/multi-agent-manager")
 REPOS = ("multi-agent-manager", "RMBench", "opendm", "openpi", "robot-bridge")
+ENV_FILE = Path(".mam") / "env.json"
 WAIT_POLL_SECONDS = 0.2
 WAIT_PROBE_TIMEOUT_SECONDS = 0.5
 
@@ -64,10 +65,33 @@ def safe_path(path):
     return path
 
 
+def configured_directory(key, raw):
+    if not isinstance(raw, str) or not raw:
+        raise Error(f"{key} must be a non-empty absolute path")
+    path = Path(raw)
+    if not path.is_absolute():
+        raise Error(f"{key} must be an absolute path: {raw}")
+    try:
+        path = path.resolve(strict=True)
+    except (OSError, ValueError) as exc:
+        raise Error(f"{key} cannot be resolved: {raw}: {exc}") from exc
+    if not path.is_dir():
+        raise Error(f"{key} must be a directory: {path}")
+    return safe_path(path)
+
+
+def worktree_root(repo, key):
+    root = safe_path(repo)
+    top = safe_path(Path(value(root, "rev-parse", "--show-toplevel")))
+    if top != root:
+        raise Error(f"{key} must be a repository worktree root: {root}")
+    return root
+
+
 def primary(repo):
     common = Path(value(repo, "rev-parse", "--path-format=absolute", "--git-common-dir"))
     if common.name != ".git":
-        raise Error("management and source repositories must have a primary checkout")
+        raise Error("source repository must have a primary checkout")
     return safe_path(common.parent)
 
 
@@ -81,17 +105,69 @@ def branch_exists(repo, branch):
     return git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}", check=False).returncode == 0
 
 
+@dataclass(frozen=True)
+class ProjectConfig:
+    mam_root: Path
+    project_root: Path
+    branch: str
+
+
+def environment_file(cwd=None):
+    try:
+        current = (Path.cwd() if cwd is None else Path(cwd)).resolve(strict=True)
+    except (OSError, ValueError) as exc:
+        raise Error(f"cannot resolve current directory for project configuration: {exc}") from exc
+    if not current.is_dir():
+        raise Error(f"current directory is not a directory: {current}")
+    while True:
+        candidate = current / ENV_FILE
+        if candidate.exists() or candidate.is_symlink():
+            return candidate
+        if current.parent == current:
+            break
+        current = current.parent
+    raise Error(f"no {ENV_FILE} found from {Path.cwd() if cwd is None else cwd}")
+
+
+def project_config(cwd=None):
+    path = environment_file(cwd)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        raise Error(f"invalid project configuration {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise Error(f"invalid project configuration {path}: expected a JSON object")
+    required = ("MAM_ROOT", "PROJECT_ROOT", "MAM_BRANCH")
+    missing = [key for key in required if key not in data]
+    if missing:
+        raise Error(f"invalid project configuration {path}: missing required keys: {', '.join(missing)}")
+    mam_root = worktree_root(configured_directory("MAM_ROOT", data["MAM_ROOT"]), "MAM_ROOT")
+    project_root = configured_directory("PROJECT_ROOT", data["PROJECT_ROOT"])
+    branch = data["MAM_BRANCH"]
+    if not isinstance(branch, str) or not branch:
+        raise Error("MAM_BRANCH must be a non-empty local branch name")
+    if git(mam_root, "check-ref-format", "--branch", branch, check=False).returncode:
+        raise Error(f"MAM_BRANCH is not a valid local branch name: {branch}")
+    if not branch_exists(mam_root, branch):
+        raise Error(f"MAM_BRANCH is not an existing local branch: {branch}")
+    return ProjectConfig(mam_root=mam_root, project_root=project_root, branch=branch)
+
+
 def wait_key(agent):
     return hashlib.sha256(agent.encode("utf-8")).hexdigest()
 
 
 class Store:
-    def __init__(self, root):
-        self.root = primary(safe_path(root))
+    def __init__(self, config):
+        if not isinstance(config, ProjectConfig):
+            raise Error("Store requires a project configuration")
+        self.root = config.mam_root
+        self.project_root = config.project_root
+        self.branch = config.branch
         self.state = safe_path(self.root / ".local" / "tasks")
         self.waits = safe_path(self.root / ".local" / "waits")
         self.logs = safe_path(self.root / ".tasks")
-        self.workspaces = safe_path(self.root.parent / "workspace")
+        self.workspaces = safe_path(self.project_root / "workspace")
         self.state.mkdir(parents=True, exist_ok=True)
         self.waits.mkdir(parents=True, exist_ok=True)
 
@@ -172,7 +248,7 @@ class Store:
 
 def published(store, task, kind):
     path = f".tasks/{identifier(task)}/{kind}.md"
-    commit = head(store.root, "main")
+    commit = head(store.root, store.branch)
     result = git(store.root, "show", f"{commit}:{path}", check=False)
     if result.returncode:
         raise Error(f"no published {kind} for TASK-ID {task} at {commit}")
@@ -190,7 +266,7 @@ def optional_doc(store, task, kind):
 def repo_context(store, data, name, record):
     if name not in REPOS:
         raise Error(f"unknown registered repository: {name}")
-    source = safe_path(store.root.parent / name)
+    source = safe_path(store.project_root / name)
     workspace = safe_path(data["workspace"])
     path = safe_path(workspace / name)
     branch = f"task/{identifier(data['id'])}"
@@ -264,7 +340,7 @@ def bind(store, args):
 def workspace_add(store, args):
     with store.lock(args.task):
         data = store.read(args.task, writable=True)
-        source = safe_path(store.root.parent / args.repo)
+        source = safe_path(store.project_root / args.repo)
         if primary(source) != source:
             raise Error(f"source is not a primary checkout: {source}")
         base = head(source, args.base)
@@ -304,8 +380,16 @@ def workspace_add(store, args):
     return record
 
 
+def publish_branch(store):
+    current = value(store.root, "branch", "--show-current")
+    if current != store.branch:
+        observed = current or "detached HEAD"
+        raise Error(f"MAM_ROOT must be checked out on MAM_BRANCH {store.branch}; current branch is {observed}")
+
+
 def publish(store, args):
     with store.lock(args.task), store.lock("publish"):
+        publish_branch(store)
         data = store.read(args.task, writable=True)
         draft = store.doc(args.task, args.file)
         if not draft.is_file():
@@ -327,7 +411,7 @@ def publish(store, args):
                 raise Error("delivery HEAD changed; update the report draft before publishing")
             git(store.root, "update-index", "--add", "--cacheinfo", "100644", existing["blob"], path)
             return {"id": args.task, "file": args.file, "revision": existing["revision"], "unchanged": True}
-        parent = head(store.root, "main")
+        parent = head(store.root, store.branch)
         with tempfile.TemporaryDirectory(prefix="task-publish-") as temporary:
             env = {**os.environ, "GIT_INDEX_FILE": str(Path(temporary) / "index")}
             git(store.root, "read-tree", parent, env=env)
@@ -335,7 +419,7 @@ def publish(store, args):
             git(store.root, "update-index", "--add", "--cacheinfo", "100644", blob, path, env=env)
             tree = git(store.root, "write-tree", env=env).stdout.decode().strip()
             commit = git(store.root, "commit-tree", tree, "-p", parent, "-m", f"Publish {args.task} {args.file}").stdout.decode().strip()
-            git(store.root, "update-ref", "refs/heads/main", commit, parent)
+            git(store.root, "update-ref", f"refs/heads/{store.branch}", commit, parent)
         if report is not None:
             data["report"] = {**report, "revision": commit}
             data["status"] = "pending"
@@ -949,7 +1033,6 @@ def parser():
 
     cli = argparse.ArgumentParser(prog="mam", description="Manage local cluster tasks, workspaces and processes.",
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    cli.add_argument("--root", type=Path, default=DEFAULT_ROOT, metavar="ROOT", help="stable management checkout")
     commands = cli.add_subparsers(required=True)
     task = command(commands, "task", "manage tasks and publications")
     sub = task.add_subparsers(dest="command", required=True)
@@ -966,7 +1049,7 @@ def parser():
     p.add_argument("--file", choices=("task", "report"), default="task", metavar="FILE", help="published document: task or report (default: task)")
     p.add_argument("--json", action="store_true", help="emit the published document as JSON")
     p.set_defaults(func=lambda s, a: published(s, a.task, a.file), renderer="published")
-    p = command(sub, "publish", "publish only one draft to main using an isolated index")
+    p = command(sub, "publish", "publish one draft to the configured branch using an isolated index")
     p.add_argument("task", metavar="TASK-ID", help="registered task")
     p.add_argument("--file", choices=("task", "report"), required=True, metavar="FILE", help="draft to publish: task or report")
     p.set_defaults(func=publish)
@@ -1021,12 +1104,12 @@ def parser():
     return cli
 
 
-def main(argv=None):
+def main(argv=None, *, cwd=None):
     args = parser().parse_args(argv)
     try:
         if getattr(args, "task", None):
             identifier(args.task)
-        result = args.func(Store(args.root), args)
+        result = args.func(Store(project_config(cwd)), args)
         if getattr(args, "renderer", None) == "task_list":
             print_task_list(result)
         elif getattr(args, "renderer", None) == "job_list":

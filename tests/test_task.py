@@ -25,13 +25,14 @@ class TaskTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.projects = Path(self.temp.name) / "Projects"
         self.root = self.source("multi-agent-manager")
-        self.store = cli.Store(self.root)
+        self.config = self.configure(self.projects, self.root)
+        self.store = cli.Store(self.config)
 
     def git(self, repo, *args):
         return subprocess.check_output(["git", "-C", str(repo), *args], stderr=subprocess.PIPE).decode().strip()
 
-    def source(self, name):
-        repo = self.projects / name
+    def source(self, name, projects=None):
+        repo = (projects or self.projects) / name
         repo.mkdir(parents=True)
         self.git(repo, "init", "-b", "main")
         self.git(repo, "config", "user.name", "Task test")
@@ -54,8 +55,19 @@ printf env > "$target/.venv/marker"
 ''')
         return repo
 
+    def configure(self, project, mam_root, branch="main", location=None):
+        location = location or project
+        directory = location / ".mam"
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "env.json").write_text(json.dumps({
+            "MAM_ROOT": str(mam_root),
+            "PROJECT_ROOT": str(project),
+            "MAM_BRANCH": branch,
+        }))
+        return cli.project_config(location)
+
     def call(self, *args, command="task", ok=True):
-        result = subprocess.run([str(MAM), "--root", str(self.root), command, *args], capture_output=True, text=True)
+        result = subprocess.run([str(MAM), command, *args], capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0 if ok else 2, result.stdout + result.stderr)
         return json.loads(result.stdout if ok else result.stderr)
 
@@ -74,26 +86,26 @@ printf env > "$target/.venv/marker"
 
     def task_output(self, *args):
         with patch("sys.stdout", new_callable=io.StringIO) as output:
-            self.assertEqual(cli.main(["--root", str(self.root), "task", *args]), 0)
+            self.assertEqual(cli.main(["task", *args], cwd=self.projects), 0)
         return output.getvalue()
 
     def task_command_output(self, *args):
-        result = subprocess.run([str(MAM), "--root", str(self.root), "task", *args], capture_output=True, text=True)
+        result = subprocess.run([str(MAM), "task", *args], capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
     def job_command_output(self, *args):
-        result = subprocess.run([str(MAM), "--root", str(self.root), "job", *args], capture_output=True, text=True)
+        result = subprocess.run([str(MAM), "job", *args], capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
     def wait_call(self, *args, env=None, ok=True):
-        result = subprocess.run([str(MAM), "--root", str(self.root), "wait", *args], capture_output=True, text=True, env=env)
+        result = subprocess.run([str(MAM), "wait", *args], capture_output=True, text=True, env=env, cwd=self.projects)
         self.assertEqual(result.returncode, 0 if ok else 2, result.stdout + result.stderr)
         return json.loads(result.stdout if ok else result.stderr)
 
     def wait_list_lines(self):
-        result = subprocess.run([str(MAM), "--root", str(self.root), "wait", "list"], capture_output=True, text=True)
+        result = subprocess.run([str(MAM), "wait", "list"], capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout.splitlines()
 
@@ -104,8 +116,8 @@ printf env > "$target/.venv/marker"
         (self.root / "code.py").write_text("unstaged = True\n")
         index = self.git(self.root, "ls-files", "--stage", "--", "code.py", ".gitignore")
         draft_bytes = self.store.doc(draft, "task").read_bytes()
-        commands = [[str(MAM), "--root", str(self.root), "task", "publish", task, "--file", "task"] for task in (first, second)]
-        processes = [subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for command in commands]
+        commands = [[str(MAM), "task", "publish", task, "--file", "task"] for task in (first, second)]
+        processes = [subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.projects) for command in commands]
         for process in processes:
             stdout, stderr = process.communicate(timeout=20)
             self.assertEqual(process.returncode, 0, stderr)
@@ -184,7 +196,7 @@ printf env > "$target/.venv/marker"
     def test_task_list_text_has_header_and_status_keeps_records(self):
         header = "标题\t任务状态\tTASK-ID\tAGENT-ID\tagent状态"
         self.assertEqual(self.task_command_output("list").splitlines(), [header])
-        rejected = subprocess.run([str(MAM), "--root", str(self.root), "task", "list", "--json"], capture_output=True, text=True)
+        rejected = subprocess.run([str(MAM), "task", "list", "--json"], capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(rejected.returncode, 2)
         unbound = self.call("create", "--title", "中文\n标题\twith whitespace")["id"]
         self.assertEqual(self.task_command_output("list").splitlines()[1].split("\t"),
@@ -214,8 +226,8 @@ printf env > "$target/.venv/marker"
         self.assertEqual(json.loads(self.task_command_output("show", task, "--json"))["content"],
                          "# 更新后的要求\n\n正文不应被 JSON 转义。\n")
         self.assertEqual(self.task_command_output("show", task), "# 更新后的要求\n\n正文不应被 JSON 转义。\n")
-        rejected = subprocess.run([str(MAM), "--root", str(self.root), "task", "show", task, "--revision", first],
-                                  capture_output=True, text=True)
+        rejected = subprocess.run([str(MAM), "task", "show", task, "--revision", first],
+                                  capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(rejected.returncode, 2)
 
     def test_status_preserves_saved_job_observation_without_probing(self):
@@ -470,11 +482,14 @@ printf env > "$target/.venv/marker"
         self.git(self.root, "add", "scripts", "multi_agent_manager", "pyproject.toml")
         self.git(self.root, "commit", "-m", "environment entry")
         (self.root / ".local/create_worktree.sh").write_bytes((scripts / "local_create_worktree.sh").read_bytes())
+        linked = self.projects / "production state"
+        self.git(self.root, "worktree", "add", "-b", "project/state-vla", str(linked), "main")
+        self.configure(self.projects, linked, "project/state-vla")
         task = self.task()
         path = Path(self.add(task)["path"])
-        command = [str(path / ".venv/bin/python"), "-B", str(path / ".venv/bin/mam"), "--root", str(self.root), "task", "status", task]
-        self.assertEqual(json.loads(subprocess.check_output(command, cwd=self.temp.name))["id"], task)
-        self.assertEqual(cli.Store(path).root, self.root)
+        command = [str(path / ".venv/bin/python"), "-B", str(path / ".venv/bin/mam"), "task", "status", task]
+        self.assertEqual(json.loads(subprocess.check_output(command, cwd=path))["id"], task)
+        self.assertEqual(cli.Store(cli.project_config(path)).root, linked)
         self.call("archive", task, "--note", "stdlib smoke finished")
         self.assertFalse(path.parent.exists())
 
@@ -490,17 +505,147 @@ printf env > "$target/.venv/marker"
         shutil.rmtree(source)
         command = str(environment / "bin/mam")
         help_text = subprocess.check_output([command, "--help"], cwd="/tmp", text=True)
-        self.assertIn(str(cli.DEFAULT_ROOT), help_text)
+        self.assertNotIn("--root", help_text)
         archive_help = subprocess.check_output([command, "task", "archive", "--help"], cwd="/tmp", text=True)
         self.assertIn("remove owned worktrees and task branches", " ".join(archive_help.split()))
-        self.assertEqual(cli.DEFAULT_ROOT, Path("/mnt/public/xcj/Projects/multi-agent-manager"))
-        rows = subprocess.check_output([command, "--root", str(self.root), "task", "list"], cwd="/tmp", text=True)
+        rows = subprocess.check_output([command, "task", "list"], cwd=self.projects, text=True)
         self.assertEqual(rows.splitlines(), ["标题\t任务状态\tTASK-ID\tAGENT-ID\tagent状态"])
         installed = subprocess.check_output([str(python), "-I", "-c",
             "import multi_agent_manager; print(multi_agent_manager.__file__)"], cwd="/tmp", text=True)
         self.assertTrue(Path(installed.strip()).is_relative_to(environment))
-        old = subprocess.run([command, "list"], cwd="/tmp", capture_output=True)
+        old = subprocess.run([command, "task", "list"], cwd="/tmp", capture_output=True)
         self.assertEqual(old.returncode, 2)
+
+    def test_project_configuration_discovers_subdirectories_uses_nearest_and_isolates_projects(self):
+        nested = self.projects / "nested" / "deeper"
+        nested.mkdir(parents=True)
+        self.assertEqual(cli.project_config(nested), self.config)
+
+        other_projects = Path(self.temp.name) / "Other Projects"
+        other_root = self.source("multi-agent-manager", other_projects)
+        other_config = self.configure(other_projects, other_root)
+
+        def create(project, title):
+            result = subprocess.run([str(MAM), "task", "create", "--title", title], cwd=project,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            return json.loads(result.stdout)["id"]
+
+        first, second = create(self.projects, "first project"), create(other_projects, "second project")
+        self.assertTrue((self.root / ".local" / "tasks" / f"{first}.json").is_file())
+        self.assertFalse((self.root / ".local" / "tasks" / f"{second}.json").exists())
+        self.assertTrue((other_root / ".local" / "tasks" / f"{second}.json").is_file())
+        self.assertEqual(cli.Store(self.config).read(first)["workspace"], str(self.projects / "workspace" / first))
+        self.assertEqual(cli.Store(other_config).read(second)["workspace"], str(other_projects / "workspace" / second))
+
+        self.configure(other_projects, other_root, location=nested.parent)
+        self.assertEqual(cli.project_config(nested), other_config)
+        nearest = create(nested, "nearest configuration")
+        self.assertTrue((other_root / ".local" / "tasks" / f"{nearest}.json").is_file())
+        self.assertFalse((self.root / ".local" / "tasks" / f"{nearest}.json").exists())
+
+    def test_missing_or_invalid_nearest_configuration_does_not_fall_back_or_change_records(self):
+        task = self.task()
+        data = self.store.read(task)
+        data["jobs"] = [{"id": "existing-job", "note": "preserve", "host": "local", "pid": 1,
+                         "identity": {"host": "local", "boot_id": "boot", "start_ticks": 1}, "status": "running",
+                         "checked_at": "saved", "probe": {"status": "unknown", "checked_at": "saved", "error": "offline"},
+                         "archive": None}]
+        self.store.write(data)
+        record = self.store.state / f"{task}.json"
+        before = record.read_bytes()
+
+        nested = self.projects / "invalid" / "child"
+        nested.mkdir(parents=True)
+        invalid = nested.parent / ".mam"
+        invalid.mkdir()
+        (invalid / "env.json").write_text(json.dumps({"MAM_ROOT": str(self.root)}))
+        with self.assertRaisesRegex(cli.Error, "missing required keys"):
+            cli.project_config(nested)
+        rejected = subprocess.run([str(MAM), "task", "list"], cwd=nested, capture_output=True, text=True)
+        self.assertEqual(rejected.returncode, 2)
+        self.assertIn("invalid project configuration", rejected.stderr)
+        (invalid / "env.json").write_text("{")
+        with self.assertRaisesRegex(cli.Error, "invalid project configuration"):
+            cli.project_config(nested)
+        (invalid / "env.json").write_text(json.dumps({
+            "MAM_ROOT": str(self.root), "PROJECT_ROOT": "relative", "MAM_BRANCH": "main"}))
+        with self.assertRaisesRegex(cli.Error, "PROJECT_ROOT must be an absolute path"):
+            cli.project_config(nested)
+        (invalid / "env.json").write_text(json.dumps({
+            "MAM_ROOT": str(self.root), "PROJECT_ROOT": str(self.projects), "MAM_BRANCH": "missing-branch"}))
+        with self.assertRaisesRegex(cli.Error, "not an existing local branch"):
+            cli.project_config(nested)
+        self.assertEqual(record.read_bytes(), before)
+
+        outside = Path(self.temp.name) / "without configuration"
+        outside.mkdir()
+        missing = subprocess.run([str(MAM), "task", "list"], cwd=outside, capture_output=True, text=True)
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn("no .mam/env.json found", missing.stderr)
+        help_result = subprocess.run([str(MAM), "--help"], cwd=outside, capture_output=True, text=True)
+        self.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
+
+    def test_configuration_resolves_path_aliases_and_keeps_linked_mam_root_distinct(self):
+        alias = self.projects / "path alias"
+        alias.mkdir()
+        (self.projects / ".mam" / "env.json").write_text(json.dumps({
+            "MAM_ROOT": str(alias / ".." / "multi-agent-manager"),
+            "PROJECT_ROOT": str(alias / ".."),
+            "MAM_BRANCH": "main",
+        }))
+        aliases = cli.project_config(self.projects)
+        self.assertEqual((aliases.mam_root, aliases.project_root), (self.root, self.projects))
+
+        linked = self.projects / "project state"
+        self.git(self.root, "worktree", "add", "-b", "project/state-vla", str(linked), "main")
+        config = self.configure(self.projects, linked, "project/state-vla")
+        store = cli.Store(config)
+        self.assertEqual(store.root, linked)
+        self.assertEqual(cli.primary(linked), self.root)
+        self.assertEqual(store.workspaces, self.projects / "workspace")
+
+        created = subprocess.run([str(MAM), "task", "create", "--title", "linked MAM root"], cwd=self.projects,
+                                 capture_output=True, text=True)
+        self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
+        task = json.loads(created.stdout)["id"]
+        self.assertTrue((linked / ".local" / "tasks" / f"{task}.json").is_file())
+        self.assertFalse((self.root / ".local" / "tasks" / f"{task}.json").exists())
+        main_before = self.git(self.root, "rev-parse", "main")
+        state_before = self.git(self.root, "rev-parse", "project/state-vla")
+        published = subprocess.run([str(MAM), "task", "publish", task, "--file", "task"], cwd=self.projects,
+                                   capture_output=True, text=True)
+        self.assertEqual(published.returncode, 0, published.stdout + published.stderr)
+        self.assertEqual(self.git(self.root, "rev-parse", "main"), main_before)
+        self.assertNotEqual(self.git(self.root, "rev-parse", "project/state-vla"), state_before)
+        self.assertIn("linked MAM root", self.git(linked, "show", f"project/state-vla:.tasks/{task}/task.md"))
+
+    def test_publish_rejects_wrong_configured_branch_without_changing_existing_job(self):
+        self.git(self.root, "branch", "project/state-vla")
+        config = self.configure(self.projects, self.root, "project/state-vla")
+        store = cli.Store(config)
+        created = subprocess.run([str(MAM), "task", "create", "--title", "wrong publication branch"], cwd=self.projects,
+                                 capture_output=True, text=True)
+        self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
+        task = json.loads(created.stdout)["id"]
+        data = store.read(task)
+        data["jobs"] = [{"id": "existing-job", "note": "preserve", "host": "local", "pid": 1,
+                         "identity": {"host": "local", "boot_id": "boot", "start_ticks": 1}, "status": "running",
+                         "checked_at": "saved", "probe": {"status": "unknown", "checked_at": "saved", "error": "offline"},
+                         "archive": None}]
+        store.write(data)
+        record = store.state / f"{task}.json"
+        before = record.read_bytes()
+        main_before = self.git(self.root, "rev-parse", "main")
+        branch_before = self.git(self.root, "rev-parse", "project/state-vla")
+
+        rejected = subprocess.run([str(MAM), "task", "publish", task, "--file", "task"], cwd=self.projects,
+                                  capture_output=True, text=True)
+        self.assertEqual(rejected.returncode, 2)
+        self.assertIn("must be checked out on MAM_BRANCH", rejected.stderr)
+        self.assertEqual(record.read_bytes(), before)
+        self.assertEqual(self.git(self.root, "rev-parse", "main"), main_before)
+        self.assertEqual(self.git(self.root, "rev-parse", "project/state-vla"), branch_before)
 
     def test_archived_records_keep_historical_paths(self):
         task = self.task()
@@ -522,10 +667,10 @@ printf env > "$target/.venv/marker"
     def test_job_and_workspace_are_top_level_only(self):
         for command, description in (("job", "register, query and archive process records"),
                                      ("workspace", "manage repository worktrees and their environments")):
-            help_result = subprocess.run([str(MAM), "--root", str(self.root), command, "--help"], capture_output=True, text=True)
+            help_result = subprocess.run([str(MAM), command, "--help"], capture_output=True, text=True)
             self.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
             self.assertIn(description, help_result.stdout)
-            old = subprocess.run([str(MAM), "--root", str(self.root), "task", command, "--help"], capture_output=True, text=True)
+            old = subprocess.run([str(MAM), "task", command, "--help"], capture_output=True, text=True)
             self.assertEqual(old.returncode, 2, old.stdout + old.stderr)
         self.assertEqual(self.job_command_output("list").splitlines(), ["描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID"])
 
@@ -587,8 +732,9 @@ printf env > "$target/.venv/marker"
         try:
             self.call("add", monitored, "--note", "wait smoke", "--host", "localhost", "--pid", str(child.pid), command="job")
             environment = {**os.environ, "CODEX_THREAD_ID": "waiter-one"}
-            waiter = subprocess.Popen([str(MAM), "--root", str(self.root), "wait", "jobs", "--task", monitored,
-                                       "--timeout", "10"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=environment)
+            waiter = subprocess.Popen([str(MAM), "wait", "jobs", "--task", monitored,
+                                       "--timeout", "10"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                       env=environment, cwd=self.projects)
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:
                 rows = self.wait_list_lines()
@@ -610,7 +756,7 @@ printf env > "$target/.venv/marker"
             self.assertEqual(self.wait_call("stop", "--agent", "waiter-one")["status"], "not_waiting")
         finally:
             if waiter and waiter.poll() is None:
-                subprocess.run([str(MAM), "--root", str(self.root), "wait", "stop", "--agent", "waiter-one"], capture_output=True)
+                subprocess.run([str(MAM), "wait", "stop", "--agent", "waiter-one"], capture_output=True, cwd=self.projects)
                 waiter.terminate()
                 waiter.wait(timeout=3)
             if child.poll() is None:
@@ -624,9 +770,9 @@ printf env > "$target/.venv/marker"
         try:
             self.call("add", task, "--note", "shared wait", "--host", "localhost", "--pid", str(child.pid), command="job")
             for agent in ("waiter-left", "waiter-right"):
-                waiters.append(subprocess.Popen([str(MAM), "--root", str(self.root), "wait", "jobs", "--task", task,
+                waiters.append(subprocess.Popen([str(MAM), "wait", "jobs", "--task", task,
                                                   "--agent", agent, "--timeout", "10"], stdout=subprocess.PIPE,
-                                                 stderr=subprocess.PIPE, text=True))
+                                                 stderr=subprocess.PIPE, text=True, cwd=self.projects))
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:
                 agents = {row.split("\t")[0] for row in self.wait_list_lines()[1:]}
@@ -648,7 +794,7 @@ printf env > "$target/.venv/marker"
         finally:
             for agent, waiter in zip(("waiter-left", "waiter-right"), waiters):
                 if waiter.poll() is None:
-                    subprocess.run([str(MAM), "--root", str(self.root), "wait", "stop", "--agent", agent], capture_output=True)
+                    subprocess.run([str(MAM), "wait", "stop", "--agent", agent], capture_output=True, cwd=self.projects)
                     waiter.terminate()
                     waiter.wait(timeout=3)
             if child.poll() is None:
@@ -733,7 +879,7 @@ printf env > "$target/.venv/marker"
                 data["agent"] = agent
                 self.store.write(data)
                 with self.subTest(agent=agent), patch("sys.stdout", new_callable=io.StringIO) as output:
-                    self.assertEqual(cli.main(["--root", str(self.root), "job", "list", "--attention"]), 0)
+                    self.assertEqual(cli.main(["job", "list", "--attention"], cwd=self.projects), 0)
                 rows = output.getvalue().splitlines()
                 self.assertEqual(len(rows), 2)
                 self.assertEqual(len(rows[1].split("\t")), 6)
