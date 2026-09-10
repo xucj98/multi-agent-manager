@@ -5,3 +5,6 @@
 本任务为首次仓库引入，允许先创建 canonical clone；需要修改 tracked 文件时仍建立独立 worktree。与环境实施 agent 协商共享资产位置、canonical branch/base；环境代码交由对方完成，不竞争修改。请尽快向 manager 报告 clone 可用路径/base 和资产概况。
 # 交付验收
 提供 clone remote/commit、源 dirty 状态处理、资产清单及完整性检查、后续风险；遵循 mam report 发布协议，保留验收材料。不得启动正式训练或数据生成。不要自行派发下级 agent。
+
+# Review 裁决补充
+迁移 review bd0a1f84-faa8-4823-8ccd-94c659e36a6a 通过；接受其 P3：旧 outputs/ 含不可再生的人类研究标注等历史产物，不能一概称可再生缓存。请将约13M outputs 完整备份到本任务 migration-backup 下独立 historical-outputs/（不加入共享资产、不建立默认 worktree 链接），保持源不变、目标仅当前用户可访问（目录0700/文件0600），若存在 SQLite 使用一致性备份方式或确认无人写入并做一致性验证。不要打印文件内容或 token。记录总体哈希/文件数、恢复方式，修正文档和报告分类并重新发布。
