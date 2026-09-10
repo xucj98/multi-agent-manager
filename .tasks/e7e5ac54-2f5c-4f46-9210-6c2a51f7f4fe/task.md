@@ -43,6 +43,8 @@ base在/mnt/public/cache/openpi/openpi-assets/checkpoints/pi05_base。新机器�
 
 开跑前交准备报告：独立解释器两端可运行、实际checkout SHA、八条命令、exp_name/输出路径、数据/norm就绪状态、可用GPU快照；相对路径按项目根，来源命令中实际环境设置如GPU/JAX/HF根要可还原。Manager放行后立即分阶段启动，每进程用mam job add登记wuwen-1真实PID/用途。
 
+当前六路日志的progress已证实持续推进，但Step标量尚未写出，不能把无nan文本当作loss有限的证据。最可能是pbar.write走带缓冲stdout、progress走stderr；只读核对原因即可，不向活跃解释器注入代码或改源码，也不为刷新日志重启健康训练。后续尚未启动的GPU4/5使用python -u -B并据实记录命令，避免同类缓冲。现有六路在缓冲落盘后核对数值；报告保留当前可观察范围，沿既有约小时进度/异常监控。
+
 每步沿现有机制保存真实command/cwd/git commit、resolved TrainConfig、上游数据/sidecar metadata/config；不复制代码或新增重复runtime/provenance。首次检查确认不是仅服务启动：实际optimizer更新前进、loss有限、batch32/单GPU与配置一致。根据稳定step耗时估计剩余时间，之后每小时检查一次，不频繁轮询；异常及时处理。agent可报告阶段结果，Manager在计划检查时机唤醒；进程必须保持可靠detach且MAM登记。
 
 完成核对20,000更新、唯一20000 checkpoint、完整参数shape/BF16/无optimizer、assets与metadata、仅checkpoint路径可恢复。base约3.35B参数，裸BF16约6.71GB，不按旧12GB估算硬凑大小。随后向Manager/评测owner提供checkpoint和metadata；每个正式eval仍需自身2rollout video/no-video smoke后100，不在本任务未经安排启动eval。
