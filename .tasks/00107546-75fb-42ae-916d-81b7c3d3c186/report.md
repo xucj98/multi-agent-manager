@@ -1,7 +1,5 @@
 # State-VLA 论文式实验台账
 
-task_revision: `a840811feac144a2532c1023bf2309105a270c7a`
-
 ## 交付
 
 - 独立 RMBench worktree：`/mnt/public/xcj/Projects/workspace/00107546-75fb-42ae-916d-81b7c3d3c186/RMBench`
