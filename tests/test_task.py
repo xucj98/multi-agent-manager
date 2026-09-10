@@ -623,6 +623,54 @@ printf env > "$target/.venv/marker"
         self.assertEqual(self.wait_list_lines(), ["agent-id\t绑定task标题\ttask-id\t等待内容\t等待开始时间"])
         self.assertEqual(self.wait_call("jobs", "--task", unknown, "--agent", "stale-agent", "--timeout", "0.05")["status"], "timeout")
 
+    def test_wait_deadline_limits_each_remote_probe(self):
+        task = self.task()
+        data = self.store.read(task)
+        data["jobs"] = [{"id": str(index), "status": "running", "host": "remote",
+                         "pid": index + 1, "identity": None} for index in range(8)]
+        self.store.write(data)
+        real_probe = cli.runtime().probe_process
+        for duration, expected in ((0.01, [0.01]), (0.75, [0.5, 0.25])):
+            clock, budgets = [100.0], []
+
+            def probe(host, pid, identity=None, timeout=None):
+                if host == "local":
+                    return real_probe(host, pid, identity)
+                budgets.append(timeout)
+                clock[0] += timeout
+                return {"status": "unknown", "error": "SSH query timed out"}
+
+            with self.subTest(duration=duration), patch.object(cli.time, "monotonic", side_effect=lambda: clock[0]), \
+                    patch.object(cli, "runtime", return_value=types.SimpleNamespace(probe_process=probe)):
+                result = cli.wait_jobs(self.store, types.SimpleNamespace(
+                    task=task, agent="deadline-agent", timeout=duration))
+            self.assertEqual(result["status"], "timeout")
+            self.assertEqual(len(budgets), len(expected))
+            for actual, wanted in zip(budgets, expected):
+                self.assertAlmostEqual(actual, wanted)
+            self.assertFalse(self.store.wait_path("deadline-agent").exists())
+
+    def test_attention_marks_stopped_job_with_unknown_agent(self):
+        task = self.task()
+        process = {"status": "running", "identity": {"boot_id": "boot", "start_ticks": 10},
+                   "checked_at": "checked", "error": None}
+        fake = types.SimpleNamespace(probe_process=lambda *args: dict(process),
+                                     probe_agents=lambda ids: {})
+        with patch.object(cli, "runtime", return_value=fake):
+            job = cli.job_add(self.store, types.SimpleNamespace(task=task, note="stopped job", host="local", pid=10))
+            process["status"] = "stopped"
+            for agent in (None, "unavailable-agent"):
+                data = self.store.read(task)
+                data["agent"] = agent
+                self.store.write(data)
+                with self.subTest(agent=agent), patch("sys.stdout", new_callable=io.StringIO) as output:
+                    self.assertEqual(cli.main(["--root", str(self.root), "job", "list", "--attention"]), 0)
+                rows = output.getvalue().splitlines()
+                self.assertEqual(len(rows), 2)
+                self.assertEqual(len(rows[1].split("\t")), 6)
+                self.assertEqual(rows[1].split("\t")[1], "unknown/待核实")
+                self.assertEqual(rows[1].split("\t")[3], job["id"])
+
     def test_job_identity_attention_and_history(self):
         task = self.task()
         self.call("bind", task, "--agent", "agent-1")

@@ -73,7 +73,9 @@ job archive 只记录收尾结果，不删除 workspace；任务归档也保留�
 | `mam wait list` | 所有人 | 即使为空也输出表头；每行是 agent-id、绑定 task 标题、task-id、等待内容、等待开始时间。绑定取等待者自己的未归档 task；没有绑定显示“未绑定”，不使用被监控 job 的负责人代替 |
 | `mam wait stop --agent <agent-id>` | 所有人 | 仅为该 agent 写取消标记并唤醒等待，返回 `cancelled`；不存在当前等待返回 `not_waiting`。不向 job 进程发信号，不归档 job |
 
-等待者未指定 `--agent` 时，只读取 `CODEX_THREAD_ID`；不从继承的 `CODEX_SESSION_ID` 推测身份。ID 缺失、空白或含换行会明确报错。远端 job 探测在等待中使用短超时，stop 不会被长 SSH 查询无限拖住。
+等待者未指定 `--agent` 时，只读取 `CODEX_THREAD_ID`；不从继承的 `CODEX_SESSION_ID` 推测身份。ID 缺失、空白或含换行会明确报错。每次 target 探测前检查 deadline，单次远端探测预算不超过 0.5 秒与剩余时限的较小值；允许小幅运行时调度开销。stop 不会被长 SSH 查询无限拖住。
+
+`job list --attention` 中，即使 job 已确认 stopped，只要 agent 状态未知或查询失败，也明确显示 `unknown/待核实`，与普通待处理项区分。
 
 ## 归档
 
