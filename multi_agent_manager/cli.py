@@ -5,17 +5,22 @@ import argparse
 import contextlib
 import datetime as dt
 import fcntl
+import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 
 DEFAULT_ROOT = Path("/mnt/public/xcj/Projects/multi-agent-manager")
 REPOS = ("multi-agent-manager", "RMBench", "opendm", "openpi", "robot-bridge")
+WAIT_POLL_SECONDS = 0.2
+WAIT_PROBE_TIMEOUT_SECONDS = 0.5
 
 
 class Error(RuntimeError):
@@ -76,13 +81,19 @@ def branch_exists(repo, branch):
     return git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}", check=False).returncode == 0
 
 
+def wait_key(agent):
+    return hashlib.sha256(agent.encode("utf-8")).hexdigest()
+
+
 class Store:
     def __init__(self, root):
         self.root = primary(safe_path(root))
         self.state = safe_path(self.root / ".local" / "tasks")
+        self.waits = safe_path(self.root / ".local" / "waits")
         self.logs = safe_path(self.root / ".tasks")
         self.workspaces = safe_path(self.root.parent / "workspace")
         self.state.mkdir(parents=True, exist_ok=True)
+        self.waits.mkdir(parents=True, exist_ok=True)
 
     @contextlib.contextmanager
     def lock(self, name):
@@ -119,6 +130,41 @@ class Store:
         finally:
             if temporary and temporary.exists():
                 temporary.unlink()
+
+    def wait_path(self, agent):
+        return safe_path(self.waits / f"{wait_key(agent)}.json")
+
+    def read_wait(self, agent):
+        path = self.wait_path(agent)
+        if not path.is_file():
+            return None
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, ValueError):
+            path.unlink(missing_ok=True)
+            return None
+        if not isinstance(data, dict) or data.get("agent") != agent or wait_key(agent) != path.stem:
+            path.unlink(missing_ok=True)
+            return None
+        return data
+
+    def write_wait(self, data):
+        target = self.wait_path(data["agent"])
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", dir=self.waits, delete=False) as handle:
+                temporary = Path(handle.name)
+                json.dump(data, handle, ensure_ascii=False, indent=2)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, target)
+        finally:
+            if temporary and temporary.exists():
+                temporary.unlink()
+
+    def remove_wait(self, agent):
+        self.wait_path(agent).unlink(missing_ok=True)
 
     def doc(self, task, kind):
         return safe_path(self.logs / identifier(task) / f"{kind}.md")
@@ -340,6 +386,9 @@ def refresh_jobs(data, jobs=None):
             continue
         observation = runtime().probe_process(job["host"], job["pid"], job["identity"])
         job["probe"] = observation
+        identity = observation.get("identity")
+        if not job.get("started_at") and isinstance(identity, dict) and identity.get("started_at"):
+            job["started_at"] = identity["started_at"]
         if observation["status"] in ("running", "stopped"):
             job["status"] = observation["status"]
             job["checked_at"] = observation["checked_at"]
@@ -355,7 +404,7 @@ def job_add(store, args):
             raise Error(f"cannot register process without confirmed running identity: {observation}")
         job = {"id": str(uuid.uuid4()), "note": args.note, "host": args.host, "pid": args.pid,
                "identity": observation["identity"], "status": "running", "checked_at": observation["checked_at"],
-               "probe": observation, "archive": None}
+               "started_at": observation["identity"].get("started_at"), "probe": observation, "archive": None}
         data["jobs"].append(job)
         store.write(data)
     return {"task": args.task, **job}
@@ -384,22 +433,22 @@ def job_list(store, args):
             if current and data["status"] != "archived":
                 refresh_jobs(data, current)
                 store.write(data)
-            entries.extend((data["id"], data["agent"], data["status"], job) for job in jobs)
+            entries.extend((data["id"], data["title"], data["agent"], data["status"], job) for job in jobs)
     if args.status in ("running", "stopped"):
-        entries = [entry for entry in entries if entry[3]["status"] == args.status]
+        entries = [entry for entry in entries if entry[4]["status"] == args.status]
     if args.attention:
         agents = agent_observations(
-            agent for _, agent, task_status, job in entries
+            agent for _, _, agent, task_status, job in entries
             if task_status != "archived" and job["probe"]["status"] == "stopped" and agent
         )
     else:
         agents = agent_observations(
-            agent for _, agent, task_status, job in entries
+            agent for _, _, agent, task_status, job in entries
             if task_status != "archived" and job["status"] != "archived" and agent
         )
     selected, uncertain = [], []
-    for task, agent, _, job in entries:
-        row = {"task": task, "agent": agent, **job}
+    for task, task_title, agent, _, job in entries:
+        row = {"task": task, "task_title": task_title, "agent": agent, **job}
         row["agent_state"] = agent_state(agent, agents)
         if args.attention:
             if row["status"] == "archived":
@@ -414,6 +463,21 @@ def job_list(store, args):
         else:
             selected.append(row)
     return {"jobs": selected, "needs_verification": uncertain}
+
+
+def job_status(store, args):
+    for item in store.all():
+        if not any(job["id"] == args.job for job in item["jobs"]):
+            continue
+        with store.lock(item["id"]):
+            data = store.read(item["id"])
+            job = next(job for job in data["jobs"] if job["id"] == args.job)
+            if data["status"] != "archived" and job["status"] != "archived":
+                refresh_jobs(data, [job])
+                store.write(data)
+            return {"task": data["id"], "task_title": data["title"], "task_status": data["status"],
+                    "agent": data["agent"], **job}
+    raise Error(f"job is not registered: {args.job}")
 
 
 def job_archive(store, args):
@@ -451,6 +515,176 @@ def status(store, args):
             "drafts": drafts, "requirements_changed": changed}
 
 
+def wait_agent(args):
+    supplied = getattr(args, "agent", None)
+    source = "--agent" if supplied is not None else "CODEX_THREAD_ID"
+    agent = supplied if supplied is not None else os.environ.get("CODEX_THREAD_ID")
+    if not isinstance(agent, str) or not agent or agent != agent.strip() or any(char in agent for char in "\r\n\t"):
+        raise Error(f"{source} must be a non-empty single-line agent ID")
+    return agent
+
+
+def wait_timeout(value):
+    if value is None:
+        return None
+    if not math.isfinite(value) or value < 0:
+        raise Error("--timeout must be a finite number of seconds greater than or equal to zero")
+    return value
+
+
+def wait_lock(agent):
+    return f"wait-{wait_key(agent)}"
+
+
+def valid_wait_record(record, agent):
+    identity = record.get("identity") if isinstance(record, dict) else None
+    return (isinstance(record, dict) and record.get("agent") == agent and isinstance(record.get("token"), str)
+            and bool(record["token"]) and isinstance(record.get("pid"), int) and not isinstance(record["pid"], bool)
+            and record["pid"] > 0 and isinstance(identity, dict)
+            and isinstance(identity.get("host"), str) and isinstance(identity.get("boot_id"), str)
+            and isinstance(identity.get("start_ticks"), int) and not isinstance(identity["start_ticks"], bool))
+
+
+def active_wait(store, agent):
+    record = store.read_wait(agent)
+    if record is None:
+        return None, "empty"
+    if not valid_wait_record(record, agent):
+        store.remove_wait(agent)
+        return None, "stale"
+    observation = runtime().probe_process("local", record["pid"], record["identity"])
+    if observation["status"] == "stopped":
+        store.remove_wait(agent)
+        return None, "stale"
+    return record, observation["status"]
+
+
+def begin_wait(store, agent, task, timeout):
+    observation = runtime().probe_process("local", os.getpid())
+    if observation["status"] != "running" or not isinstance(observation.get("identity"), dict):
+        raise Error("cannot confirm this wait process identity")
+    record = {"agent": agent, "pid": os.getpid(), "identity": observation["identity"], "token": str(uuid.uuid4()),
+              "kind": "jobs", "task": task, "timeout": timeout, "started_at": now(), "cancelled": None}
+    with store.lock(wait_lock(agent)):
+        existing, state = active_wait(store, agent)
+        if existing:
+            if state == "unknown":
+                raise Error("existing wait cannot be verified")
+            raise Error("agent is already waiting")
+        store.write_wait(record)
+    return record
+
+
+def wait_cancelled(store, record):
+    with store.lock(wait_lock(record["agent"])):
+        current = store.read_wait(record["agent"])
+        return (not current or current.get("token") != record["token"]
+                or current.get("identity") != record["identity"] or bool(current.get("cancelled")))
+
+
+def finish_wait(store, record):
+    with store.lock(wait_lock(record["agent"])):
+        current = store.read_wait(record["agent"])
+        if current and current.get("token") == record["token"] and current.get("identity") == record["identity"]:
+            store.remove_wait(record["agent"])
+
+
+def wait_targets(store, task):
+    tasks = [store.read(task)] if task else store.all()
+    return [{"task": data["id"], "job": dict(job)} for data in tasks if data["status"] != "archived"
+            for job in data["jobs"] if job["status"] != "archived"]
+
+
+def stopped_target(target):
+    probe = target["job"].get("probe")
+    return target["job"].get("status") == "stopped" or isinstance(probe, dict) and probe.get("status") == "stopped"
+
+
+def wait_result(status, agent, task, target=None, observation=None):
+    result = {"status": status, "agent": agent}
+    if task:
+        result["task_filter"] = task
+    if target:
+        result.update({"task": target["task"], "job": target["job"]["id"]})
+    if observation:
+        result["probe"] = observation
+    return result
+
+
+def wait_jobs(store, args):
+    agent, timeout = wait_agent(args), wait_timeout(args.timeout)
+    targets = wait_targets(store, args.task)
+    stopped = next((target for target in targets if stopped_target(target)), None)
+    if stopped:
+        return wait_result("stopped", agent, args.task, stopped)
+    if not targets:
+        return wait_result("empty", agent, args.task)
+    if timeout == 0:
+        return wait_result("timeout", agent, args.task)
+    record = begin_wait(store, agent, args.task, timeout)
+    deadline = None if timeout is None else time.monotonic() + timeout
+    try:
+        while True:
+            if wait_cancelled(store, record):
+                return wait_result("cancelled", agent, args.task)
+            if deadline is not None and time.monotonic() >= deadline:
+                return wait_result("timeout", agent, args.task)
+            for target in targets:
+                if wait_cancelled(store, record):
+                    return wait_result("cancelled", agent, args.task)
+                job = target["job"]
+                observation = runtime().probe_process(job["host"], job["pid"], job["identity"], WAIT_PROBE_TIMEOUT_SECONDS)
+                if observation["status"] == "stopped":
+                    return wait_result("stopped", agent, args.task, target, observation)
+            if deadline is not None and time.monotonic() >= deadline:
+                return wait_result("timeout", agent, args.task)
+            remaining = WAIT_POLL_SECONDS if deadline is None else max(0, deadline - time.monotonic())
+            time.sleep(min(WAIT_POLL_SECONDS, remaining))
+    finally:
+        finish_wait(store, record)
+
+
+def wait_description(record):
+    return f"jobs task={record['task']}" if record.get("task") else "jobs (all unarchived)"
+
+
+def wait_list(store, args):
+    records = []
+    for path in sorted(store.waits.glob("*.json")):
+        if path.is_symlink() or not re.fullmatch(r"[0-9a-f]{64}", path.stem):
+            continue
+        with store.lock(f"wait-{path.stem}"):
+            try:
+                raw = json.loads(path.read_text())
+            except (OSError, ValueError):
+                path.unlink(missing_ok=True)
+                continue
+            agent = raw.get("agent") if isinstance(raw, dict) else None
+            if not isinstance(agent, str) or wait_key(agent) != path.stem:
+                path.unlink(missing_ok=True)
+                continue
+            record, state = active_wait(store, agent)
+            if record and state == "running":
+                records.append(record)
+    bindings = {data["agent"]: data for data in store.all() if data["status"] != "archived" and data["agent"]}
+    return [{"agent": record["agent"], "task_title": bindings[record["agent"]]["title"] if record["agent"] in bindings else "未绑定",
+             "task": bindings[record["agent"]]["id"] if record["agent"] in bindings else "未绑定",
+             "waiting": wait_description(record), "started_at": record["started_at"]} for record in records]
+
+
+def wait_stop(store, args):
+    agent = wait_agent(args)
+    with store.lock(wait_lock(agent)):
+        record, state = active_wait(store, agent)
+        if not record:
+            return {"status": "not_waiting", "agent": agent}
+        if state != "running":
+            raise Error("waiter identity cannot be verified")
+        record["cancelled"] = now()
+        store.write_wait(record)
+    return {"status": "cancelled", "agent": agent}
+
+
 def task_list(store, args):
     tasks = [data for data in store.all() if args.all or (data["status"] == "archived") == args.archived]
     agents = agent_observations(data["agent"] for data in tasks if data["agent"])
@@ -458,7 +692,14 @@ def task_list(store, args):
 
 
 def one_line(value):
-    return " ".join(str(value).split())
+    return "" if value is None else " ".join(str(value).split())
+
+
+def print_table(header, rows):
+    rows = list(rows)
+    sys.stdout.write("\t".join(header) + "\n")
+    if rows:
+        sys.stdout.write("\n".join("\t".join(one_line(value) for value in row) for row in rows) + "\n")
 
 
 def print_task_list(tasks):
@@ -468,8 +709,37 @@ def print_task_list(tasks):
         state = task["agent_state"]["status"]
         rows.append("\t".join((one_line(task["title"]), one_line(task["status"]), task["id"], one_line(agent),
                               "未绑定" if state == "unbound" else one_line(state))))
-    if rows:
-        sys.stdout.write("\n".join(rows) + "\n")
+    print_table(("标题", "task状态", "UUID", "agent", "agent状态"), (row.split("\t") for row in rows))
+
+
+def displayed_job_status(job):
+    if job["status"] == "archived":
+        return "archived"
+    probe = job.get("probe")
+    if not isinstance(probe, dict) or probe.get("status") not in ("running", "stopped"):
+        return "unknown/待核实"
+    return job["status"]
+
+
+def job_started_at(job):
+    identity = job.get("identity")
+    started_at = job.get("started_at")
+    if not started_at and isinstance(identity, dict):
+        started_at = identity.get("started_at")
+    return started_at or "unknown"
+
+
+def print_job_list(result):
+    rows = []
+    for job in [*result["jobs"], *result["needs_verification"]]:
+        rows.append((job["note"], displayed_job_status(job), job_started_at(job), job["id"], job["task_title"], job["task"]))
+    print_table(("描述", "job状态", "开始时间", "job-id", "任务描述", "task-id"), rows)
+
+
+def print_wait_list(records):
+    print_table(("agent-id", "绑定task标题", "task-id", "等待内容", "等待开始时间"),
+                ((record["agent"], record["task_title"], record["task"], record["waiting"], record["started_at"])
+                 for record in records))
 
 
 def print_published(document):
@@ -598,7 +868,7 @@ def parser():
     p.add_argument("--file", choices=("task", "report"), default="task", help="published document (default: task)")
     p.add_argument("--revision", help="published commit to read; defaults to main")
     p.add_argument("--json", action="store_true", help="emit the published document as JSON")
-    p.set_defaults(func=lambda s, a: published(s, a.task, a.file, a.revision))
+    p.set_defaults(func=lambda s, a: published(s, a.task, a.file, a.revision), renderer="published")
     p = command(sub, "publish", "publish only one draft to main using an isolated index")
     p.add_argument("task", help="task UUID")
     p.add_argument("--file", choices=("task", "report"), required=True, help="draft to publish; reports require task_revision on the first line")
@@ -607,8 +877,7 @@ def parser():
     group = p.add_mutually_exclusive_group()
     group.add_argument("--archived", action="store_true", help="show only archived tasks")
     group.add_argument("--all", action="store_true", help="include archived tasks")
-    p.add_argument("--json", action="store_true", help="emit complete task records as JSON")
-    p.set_defaults(func=task_list)
+    p.set_defaults(func=task_list, renderer="task_list")
     p = command(sub, "status", "query jobs, versions, drafts and archive progress")
     p.add_argument("task", help="task UUID")
     p.set_defaults(func=status)
@@ -627,11 +896,25 @@ def parser():
     p.add_argument("--task", help="filter jobs by task UUID")
     p.add_argument("--status", choices=("running", "stopped", "archived", "all"), help="filter jobs; default excludes archived records")
     p.add_argument("--attention", action="store_true", help="show stopped jobs with inactive agents; list unknowns separately")
-    p.set_defaults(func=job_list)
+    p.set_defaults(func=job_list, renderer="job_list")
+    p = command(jobs, "status", "refresh and show one registered process record as JSON")
+    p.add_argument("job", help="job UUID")
+    p.set_defaults(func=job_status)
     p = command(jobs, "archive", "record the handling of a stopped process; retain history")
     p.add_argument("job", help="job UUID")
     p.add_argument("--note", required=True, help="purpose, result or reason for this operation")
     p.set_defaults(func=job_archive)
+    waits = command(commands, "wait", "wait for registered jobs and manage wakeups").add_subparsers(required=True)
+    p = command(waits, "jobs", "wait until a selected unarchived job stops")
+    p.add_argument("--task", help="limit monitoring to one task UUID")
+    p.add_argument("--timeout", type=float, help="return timeout after this many seconds")
+    p.add_argument("--agent", help="waiter agent ID; defaults to CODEX_THREAD_ID")
+    p.set_defaults(func=wait_jobs)
+    p = command(waits, "list", "list current waits")
+    p.set_defaults(func=wait_list, renderer="wait_list")
+    p = command(waits, "stop", "wake one waiter without changing its monitored jobs")
+    p.add_argument("--agent", required=True, help="waiter agent ID")
+    p.set_defaults(func=wait_stop)
     w = command(commands, "workspace", "manage repository worktrees and their environments").add_subparsers(required=True)
     p = command(w, "add", "create a repository worktree using its local environment entry")
     p.add_argument("task", help="task UUID")
@@ -647,9 +930,13 @@ def main(argv=None):
         if getattr(args, "task", None):
             identifier(args.task)
         result = args.func(Store(args.root), args)
-        if getattr(args, "command", None) == "list" and not args.json:
+        if getattr(args, "renderer", None) == "task_list":
             print_task_list(result)
-        elif getattr(args, "command", None) == "show" and not args.json:
+        elif getattr(args, "renderer", None) == "job_list":
+            print_job_list(result)
+        elif getattr(args, "renderer", None) == "wait_list":
+            print_wait_list(result)
+        elif getattr(args, "renderer", None) == "published" and not args.json:
             print_published(result)
         else:
             print(json.dumps(result, ensure_ascii=False, indent=2))
