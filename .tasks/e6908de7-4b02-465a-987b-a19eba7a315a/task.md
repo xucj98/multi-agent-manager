@@ -62,3 +62,7 @@ CPU实现7378904及空白review95ece0eb已经验收，主库已合入。此次�
 ## MAM 查询更新（2026-09-10）
 
 系统 MAM 已更新：`mam task list` 默认单行列表，`mam task show` 默认 Markdown；脚本读取结构化结果时为这两个命令加 `--json`。`mam task status` 仅显示保存的 job 状态与 checked_at，不刷新进程。按既定频率监控时使用 `mam job list --task e6908de7-4b02-465a-987b-a19eba7a315a` 获取实时进程状态，再结合已有日志检查进度。训练/评测协议、GPU 分配与检查频率不变。
+
+## 15:06 GPU1移交与执行
+
+F0负责人15:01确认GPU1所有自有进程退出、端口19310/19312释放、job已归档。现在授权本任务使用本机GPU1，sim和policy共卡；GPU0仍属于BF16正式100，不占用。复用已验收三库worktree，不创建新环境、不切换正在调用的代码版本。按前述范围依次执行：d10 step50 full/serial各一个technical smoke（各含video/no-video两条），然后旧drawer full/serial各固定5ep offline。实际参数用GPU1和已确认空闲的独立端口，留痕记录真实命令。技术模型效果不作20k模型性能判断；不以技术smoke替代各正式20k匹配smoke。预计超过1小时的程序按MAM登记。发现具体接线bug先报告，禁止绕过schema/gate掩盖问题。结束核对产物与进程、释放GPU1供后续Q2 seed2训练，发布简报。
