@@ -15,3 +15,6 @@
 
 # 用户最新布局要求（覆盖之前路径约定）
 用户明确：主仓库不要软链接，PROJECT_ROOT 下面只有 workspace、mam 及各个 repo。保留 MAM 必需隐藏 .mam 配置；所有业务实体目录归属 canonical repo。请由本环境任务协调并完成：将项目 assets 实体迁为 canonical/.cache 实体（先安全移除已核验旧软链），canonical/outputs 为实体，worktree/.cache -> canonical/.cache，worktree/outputs -> canonical/outputs/TASK-ID。uv cache 和本机配置收拢 canonical/.local 内；不再保留 PROJECT_ROOT/assets、outputs、cache 等业务目录。迁移任务负责备份目录收拢 canonical/.local/migration-backup，与你直接协调。更新所有路径、文档、已有worktree软链与验收；确保主repo顶层无业务软链，worktree仅链接实际需要资产/成果，清理先前空目录。主repo Python自身venv内部系统解释器软链无需改变。
+
+# 用户纠正：wuwen-2 是不同集群
+wuwen-2只作只读设计参考，与本机并不共享/mnt/public；禁止通过远端创建环境/hardlink解决本机需求。此前manager基于同路径可能共享的探针/远端方案已撤销。如果已创建本任务临时探针，仅清理这些探针并报告。现有本机copy安装可继续真实smoke及代码review，但不能宣称hardlink验收通过。针对本机yrfs跨目录硬链EPERM给出可行选择，等待manager裁决；不得擅自将环境迁/root或改变用户主repo无软链布局。
