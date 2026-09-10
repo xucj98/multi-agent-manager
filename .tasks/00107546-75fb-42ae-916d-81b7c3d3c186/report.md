@@ -1,13 +1,14 @@
 # State-VLA 论文式实验台账
 
-task_revision: `3a953bca393b051fcf497e8b280d3adce12c437a`
+task_revision: `a840811feac144a2532c1023bf2309105a270c7a`
 
 ## 交付
 
 - 独立 RMBench worktree：`/mnt/public/xcj/Projects/workspace/00107546-75fb-42ae-916d-81b7c3d3c186/RMBench`
 - branch：`task/00107546-75fb-42ae-916d-81b7c3d3c186`
 - task base：`6ce7290feca710a9b41adb45f8b647853d6bf389`
-- 交付 commit：`d4b2e11`（`Document State-VLA experiment ledger`）
+- 初始交付 commit：`d4b2e11`（`Document State-VLA experiment ledger`）
+- 07:28 小修 commit：`bc43568`（`Clarify experiment ledger data and wash schema`）
 
 仅修改 `experiments/memory_chunk_20260910/README.md` 顶部的统一导航，并新增
 `experiments/memory_chunk_20260910/EXPERIMENT_LEDGER.zh-CN.md`；未改代码、训练树、其他实验说明、
@@ -35,3 +36,12 @@ metadata 或结果目录。
 - 全程仅做文档和路径只读核对，未启动 GPU、训练、评测或模型加载，未复制运维日志。
 
 Manager 可据此裁定论文叙事；后续实验 owner 应在对应行补充匹配 smoke、formal 结果、配对差异和结论边界。
+
+## 07:28 Manager 审阅小修
+
+- 将 `demo_clean_state` 限定为仿真 Q2/能力基线的数据约束；wash 明确使用已筛选的 172 集 S2M 真机数据。
+- wash 按 resolved schema 分开记录训练输入、监督目标和运行时反馈：full 为当前 `t` 输入、`t+1…t+50`
+  输出、chunk 完成后取 `last_executed`；serial 为 previous lag30 输入、当前 query 目标，训练/运行
+  condition 分别为 reference/selected，并在 `query_selected` 反馈 selected 当前值。
+- 未更新 07:16 训练/评测状态快照、计数、结果或路径；台账仍为 16 个新模型、8 个训练完成状态、8 个训练中状态、16 个尚未创建的计划评测目录。
+- `git diff --check` 通过，两个实际 schema 链接存在；全程 CPU-only，未启动模型、训练或评测。
