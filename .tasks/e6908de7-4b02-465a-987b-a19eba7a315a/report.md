@@ -1,4 +1,23 @@
-task_revision: e831fd8646c900d433edfb409a1fffdd28574dee
+task_revision: 5e14ec1a3d992d908d976bc22a374ba18483b65c
+
+# 16:05 要求收尾完成
+
+仅修改原 README_memory_schema.zh-CN.md，记录技术 PASS 的边界、drawer 两模型各5ep robot MAE 表和真实结果路径，区分旧命令示例 output；保留20k命令与每checkpoint自身匹配smoke要求。未改代码或配置，未重跑模型、未使用GPU。
+
+交付 commit：
+- RMBench：a9fc5e828dac2eede81d612095473cedf0cceb02。
+- robot-bridge：8ea6078543a875b5ae223df16891cdc1fe975c66。
+- openpi：a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4。
+
+验证：git diff --check 通过，提交仅1份README（27增/1删）；三库工作树均干净。原三树及环境保留于 `/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a`，供后续20k复用。
+
+清理：确认两份技术结果 benchmark.status=completed 后，删除共享结果根内 `technical_rearrange_full_t_plus_1_gpu1_20260910` 与 `technical_rearrange_serial_lag30_gpu1_20260910`；未打包全量smoke。删除本任务bridge的robot_bridge及scheduler、openpi的openpi_client及openpi四处自有__pycache__。本任务 `.local/memory_schema_eval` 与 GPU1 Warp缓存仍不存在。未触碰ad6 step50 checkpoint、其他任务产物或进程。
+
+正式drawer目录保留：`/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/drawer_s2m_v2_regression_5ep_gpu1_20260910/`，含真实命令、metadata和10集结果。此前技术验收依据为已发布report `8eab15f13a247cdd0bf4bbf9d2d69c83d3a33b51`，其详细历史记录保留如下；下文当时的“保留供验收”状态已由上述清理完成状态取代。GPU1现归训练，本轮无job、无待修问题，暂停等待后续20k安排。
+
+---
+
+以下为已验收GPU运行历史（运行时RMBench为f414eda，非本次文档commit）。
 
 # GPU1 执行完成，已交回
 
