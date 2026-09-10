@@ -2,9 +2,9 @@ task_revision: 03e23da22e39a090cb44d1f5956492560d6231a6
 
 完成与剩余：
 
-Manager已验收row30/GPU0 smoke，并一并授权F0四个run预算及同GPU后续各row的“匹配smoke→正式100”。已立即按冻结入口启动row30/GPU0正式100，登记真实host/PID的MAM job；真实服务metadata握手、原完整smoke兼容门禁与首条episode检查均完成。正式进程继续运行，尚未达到50条或100条，不归档活跃job。
+Manager已验收row30/GPU0 smoke，并一并授权F0四个run预算及同GPU后续各row的“匹配smoke→正式100”。已按冻结入口启动row30/GPU0正式100，登记真实host/PID的MAM job；真实服务metadata握手、原完整smoke兼容门禁、首条检查、08:00巡检和50条人工中点比较均完成。第50条于2026-09-10 08:12:39.242 +08:00终止，固定前50条为45/50（90%），相对历史93/100低3个百分点，未触发超过10个百分点的阈值。正式进程继续运行，未完成100条，不归档活跃job。
 
-本轮恢复检查时间为2026-09-10 08:00:14 +08:00：已完成41/100，正处于episode40结束到episode41启动的间隔，41个已完成scheduler均returncode0。不到50条，本轮只检查完成计数、耗时、进程和基础设施异常，不汇总成功率。runner/robot/policy正常存活，没有accepted runtime_error、Traceback、超时或连接故障；日志关键词只匹配启动时Orbax的一条INFO说明，之后未报加载异常。进程未干预，源码/文档未修改。GPU1仍由训练full/serial smoke及保存恢复准备占用，未释放、未使用；后续GPU0各row匹配smoke验收后可直接正式100，无需再次等待用户许可。
+本轮08:00:14检查时已完成41/100，41个已完成scheduler均returncode0；当时只核对进度、吞吐和基础设施异常，未汇总成功率。随后准备基线和协议证据，使用短期文件事件等待第50条日志与scheduler退出落盘，于08:12:54完成固定前50条人工核查。该事件等待进程已自行退出，没有新增常驻监控或队列。runner/robot/policy于08:13仍正常存活，没有accepted runtime_error、Traceback、超时或连接故障；日志关键词只匹配启动时Orbax的一条INFO说明，之后未报加载异常。进程未干预，源码/文档未修改。GPU1仍由训练full/serial smoke及保存恢复准备占用，未释放、未使用；后续GPU0各row匹配smoke验收后可直接正式100，无需再次等待用户许可。
 
 冻结workspace与实际代码：
 
@@ -41,7 +41,7 @@ mam job add a15fdd25-5e7d-4eb4-8059-a5bd4d35a691 --note 'F0 row30 H50 K30 正式
 
 正式run：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_100ep_seed0/
 
-本轮进度/吞吐记录：上述目录progress_check_20260910_080014.json。前次progress_check_20260910_072909.json与首条检查progress_check_0001.json继续保留。config.yaml、command.txt、checkpoint_metadata/、processes.jsonl、episode_diagnostics.jsonl、video_checks.jsonl和各进程日志均已产生。eval_result是共享主RMBench真实位置，不依赖临时worktree保存。
+本轮进度/吞吐记录：上述目录progress_check_20260910_080014.json。50条人工核查结果为midpoint_review_0050.json，协议比对证据为protocol_review_0050.json，一次性离线复算脚本为review_midpoint_0050.py（只读日志，位于ignored run内，不属于运行源码）。recorder的midpoint_checks.jsonl数值与人工复算一致；人工首因/协议/trace审查仍由本任务完成，不宣称runner自动执行人工检查。前次progress_check_20260910_072909.json与首条检查progress_check_0001.json继续保留。eval_result是共享主RMBench真实位置，不依赖临时worktree保存。
 
 门禁引用的已验收smoke：/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/f0_rearrange_full_h50_k30_row30_smoke_20260910/。该smoke为1/2、video700帧/另一条无video，38个query检查通过；不以smoke成功率推断正式结果。唯一证据及活跃正式run的smoke依赖仍保留。
 
@@ -69,10 +69,18 @@ mam job add a15fdd25-5e7d-4eb4-8059-a5bd4d35a691 --note 'F0 row30 H50 K30 正式
 
 08:00检查点已完成。本轮取最近10个无视频episode（episode_id 31—40）的完整完成周期，包含reset/preflight与实际执行：81.920/87.754/84.818/83.650/84.346/81.204/82.848/81.605/76.221/101.538秒，平均84.590秒、中位83.249秒，约42.56条/小时。最近完成时间07:59:58.316；按剩余9条外推，第50条中心估计08:12:40，窗口收敛为08:10—08:16 +08:00。与07:29估计基本一致，没有持续吞吐下降证据。
 
-下一检查为50条事件，预计2026-09-10 08:13 +08:00；届时一次性汇总固定前50条，核查主基线偏差和失败首因。不到50不重复汇总成绩，后续按约小时巡检与50/完成事件安排。GPU0本次快照为33433 MiB/0%，处于episode切换间隔，瞬时利用率不作吞吐结论。三库HEAD仍为上述冻结版本且均干净。本轮未检查训练进度或GPU1。
+50条事件实际为08:12:39，与08:00估计一致。中点最近10个完整周期平均86.246秒，约41.74条/小时；按剩余50条估计100条完成中心为09:24:32，窗口09:20—09:35 +08:00。下一人工巡检计划为2026-09-10 09:10 +08:00，修正完成时机；随后在100条与退出事件收尾。只在约小时巡检和50/完成事件读取汇总，不频繁轮询。08:00的GPU0快照33433 MiB/0%位于episode切换间隔，瞬时利用率不作吞吐结论。三库HEAD在08:13仍为上述冻结版本且均干净。本轮未检查训练进度或GPU1。
 
 中点主基线已定位并确认原始_result.txt为93/100：/mnt/public/xcj/Projects/RMBench/eval_result/pi05_rearrange_shared_memory_representation/full_key_state_seed0@ckpt30k_step30_100ep_seed0/。历史config记录相同checkpoint、demo_clean_eval、K30、eval seed0和前5条video；历史前50条seed为100000—100049。完整历史93/100是主比较，同seed前50仅作辅助，不以另一份bridge 92/100替代。
 
-达到50条时由实验负责人对历史93/100主基线检查绝对偏差是否超过10个百分点，同seed前50只作辅助；调查协议/基础设施和失败原因，区分反馈行实验效应与运行错误，不为接近93而改配置或丢弃不利episode。人工检查结论写run目录和本report。
+50条人工检查结论：
+
+- 固定episode0—49、seed100000—100049，连续唯一且与历史前50条成对；50个accepted episode，无候选拒绝。45success、5failure；主比较90%对93%，差-3个百分点；辅助比较45/50对历史46/50，差-2个百分点。两项均不超过10个百分点，主阈值未触发。
+- 失败首因为button_press_insufficient四条（seed100000/100029/100040/100047）、button_not_pressed一条（seed100005）。五条都以700步step_limit_reached正常结束，press_count=0、valid_press_reached_stage_1=false；属于记录到的任务按钮失败，无runtime_error或非零scheduler退出。不由这份中点结果单独归因于反馈行，也不为接近93而改协议或删除episode。
+- 50个scheduler全部returncode0；按episode/query_id取最后状态共753个query。703个完整actual_k30，50个terminal partial，逐项核对K/step增量、index29/row30、三个字段raw argmax及before/after连续性、was_executed与terminal next_query=false，问题列表为空。trace不能冒充独立RPC抓包；真实terminal infer边界沿用已验收runtime review/smoke依据。
+- checkpoint、任务场景、seed、K30、视频设置与历史配置一致；训练配置、key_state配置、source_data配置和转换命令与历史继承metadata逐字节一致。当前RMBench/bridge source hash与正式启动保存值一致，三库HEAD/clean符合冻结要求。
+- 历史task_args的left_embodiment默认head camera记录为D435，而当前初始化后快照为LargeView；两版本envs/camera/camera.py内容完全相同，line55读取task camera类型、line186在创建相机前覆盖默认值，实际task camera均LargeView。当前task_args.eval_video_log=false反映第5条后的无视频模式，五条video协议未变；这些快照差异不构成协议漂移证据。
+
+结论：保持原运行继续row30正式100；中点不触发阈值调查或干预。人工检查证据均已写主RMBench真实run路径和本report。
 
 row30完成100后记录结果、失败分布、时序和完整source/命令，确认进程收尾再archive本job。GPU1释放前按GPU0依次处理row20/1/50，各自匹配两条smoke确认后直接正式100，不再次请求已授权scope的许可。源码与实验文档保持冻结，workspace不删除。
