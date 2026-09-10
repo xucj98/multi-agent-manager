@@ -11,3 +11,6 @@ manager 已 git fetch origin main (351c3a3) 并成功 merge 到 project/table-10
 # 用户最新要求：分析 MAM 可迁移性，不能为不合理测试迎合旧机配置
 用户质疑为何需要3.10.19，并指出MAM仅在wuwen-2验证过，其他环境考虑可能不足。请继续原任务做针对性分析：区分 pyproject Python>=3.10 的真实要求、本机 .local 配置和被版本化脚本/测试不合理固化的约束；核查硬编码 Python路径、/mnt/public前缀、测试是否依赖网络/主机用户目录、错误输出是否足够。给 manager 一个最小修复方案和真实应保留的测试语义，避免过度跨平台抽象。此前装Python只是复现证明，不应作为可迁移性的修复结论。
 先提交分析/方案给manager，不直接改共享源码。若后续实施需独立MAM worktree，从同步后的main创建，按开发验证合并main再带入project分支。保留之前事实，报告结论需修正为测试通过仅适配了原主机假设。
+
+# Manager 实施裁决
+接受分析的最小可迁移性修复：版本化模板移除站点专属Python3.10.19绝对路径，真正.local配置保留本地选择；通用脚本移除/mnt/public前缀限制并验证解释器>=3.10，错误清楚；真实worktree测试使用测试解释器而保留原业务断言。可把现有静默校验改清楚，避免其他重构。不把打包网络依赖混入本修复，文档声明其前提即可。请从main（manager已快进到origin/main 351c3a3）建立独立MAM worktree实施，可先创建ignored .local bootstrap选择现已安装的3.10.19以通过旧base建树，正式代码/test不应依赖此精确路径。跑完整单测并特别验证不在/mnt/public的测试解释器/路径可用。提交并发布report；manager安排独立review后合并main及project分支。
