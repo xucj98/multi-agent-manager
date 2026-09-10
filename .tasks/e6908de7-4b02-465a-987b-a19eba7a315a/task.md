@@ -95,3 +95,7 @@ wuwen-1 的现有训练自然结束、完成 checkpoint 保存并释放资源后
 本机GPU4–7由训练owner e7e5ac54确认各自训练保存/进程退出并发布释放后，授权本任务依次接用已释放卡；启动前再核对显存，不能抢占尚未结束的卡。GPU0/1仍训练，GPU2/3留给wash offline，wuwen-1停用。本任务负责14个既定模型的各自smoke2与正式100，沿上面已验收入口及固定队列，不修改公共backend/controller/scheduler。先在GPU4/6可用后分别运行rearrange full t+1/t+30 seed0，GPU5/7释放后运行put-back两变体seed0；后续按既定seed配对队列填充。每卡一次一个run，每个run100条串行，sim与policy同卡。为每个并行run使用独立端口、输出路径和必要的进程cache。
 必须先确认该20k保存和训练owner CPU门禁完成；实际GPU恢复由本模型匹配smoke覆盖，不另重复整套技术smoke。每个checkpoint的smoke是同一run的2条rollout（视频开/关各一次），核对结果文件、视频可读、metadata及进程退出，再从已提交干净版本进入正式100。若入口或算法有问题，报告首因及最小修复建议，不用变更参数绕过门禁。
 正式运行预计超1小时均mam job add，任务内多个job分别登记。50条时对照真正可比的旧实验，偏差超过10个百分点开始诊断；新训练未有可比基准时明确说明，不能强行引用不同配置成功率。保留正常失败与全部100条结果，不能按中途表现重新抽样。完成后更新本组实验说明，按协议清理自己的smoke/临时产物，保留正式结果及smoke门禁必要摘要；进程退出核验并archive job。保持active turn，使用mam wait jobs --task等待并结合日志做50条中检。报告阶段结果，不把CPU准备或smoke替代正式实验。
+
+## 07:52 资源与实验台账补充
+wash训练owner已验收并释放GPU2/3、归档任务。正式wash offline只使用GPU2串行两模型，因此GPU3现授权本任务接用（先核对实际显存/端口），按既定队列启动rearrange t+1 seed1自身smoke→formal；与其配对t+30 seed1保留优先队列，下一张释放卡执行，不按成绩挑选。GPU0/1仍训练，本任务不使用GPU2。4–7原分配不变，wuwen-1停用。
+用户今天暂停统一架构重构，所有实验继续冻结源码。后续文档结果应更新本组EXPERIMENT_LEDGER.zh-CN.md对应模型行：已合入RMBench主xcj-dev（bc43568及整合commit），包含研究动机/假设和固定模型路径。勿在正在被formal使用的源码树中merge/修改文档；先完成这轮运行，后续安全整合文档并更新结果/实际eval链接，保持快照时间准确。重点继续50条诊断与完整100结果，不把training loss或smoke当正式成绩。
