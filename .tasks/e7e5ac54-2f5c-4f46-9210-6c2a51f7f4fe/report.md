@@ -1,5 +1,15 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日04:59 第三份20000 checkpoint收尾
+
+wuwen-1 GPU1，rearrange full_t_plus_30 seed0，job `db46bdd0-0ec2-41c1-9c98-baca9ffd6f5b`，PID4186841。04:58:03.156完成最终保存，04:58:08 MAM wait返回stopped；随后PID及同session/直接子进程均消失，GPU1=4MiB/81046MiB空闲/0%。数值exit code未留存；退出和保存完成证据分别成立，无自有残留需清理。
+
+checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s0/20000`。
+
+本机固定解释器显式禁用GPU，CPU实际读取51叶/3353433872元素，全BF16/全有限且注册模型参数路径与shape逐项匹配，exit0。父目录仅20000，原子commit存在，仅params/assets/metadata，无optimizer。metadata的9JSON/6JSONL/6YAML解析通过，d10/clean/command/config协议一致，demo_clean_state来源及norm hash5d84df27…吻合。200条落盘标量全有限；Step20000 loss=0.0007、grad_norm=0.0348、param_norm=1804.5471，无可见训练报错。
+
+完整CPU审计（含逐参数shape）保存在 `/mnt/public/xcj/Projects/workspace/e7e5ac54-2f5c-4f46-9210-6c2a51f7f4fe/closure/memory20k_e7e5ac54_rearrange_full_t_plus_30_s0.json`。该training job按结果归档；累计3项完成/11项未完成。GPU1/6/7释放后保持空闲；GPU完整policy恢复/评测继续等待本机空闲卡及Manager排期。MAM继续等待，运行项05:32巡检。
+
 ## 9月11日04:42 第二份20000 checkpoint收尾
 
 04:47补齐两份seed1 metadata内容核验：每份9个JSON、6个JSONL、6个YAML均解析成功；保存norm与已验收共享资产JSON一致，SHA256=`5d84df27e9fce3c6ec28585319ed293fa59fc1822063ecfa0e95c5bf4478606b`。该检查仍在本机显式禁用GPU，仅检查已结束两项。
