@@ -170,11 +170,9 @@ class Store:
         return safe_path(self.logs / identifier(task) / f"{kind}.md")
 
 
-def published(store, task, kind, revision=None):
+def published(store, task, kind):
     path = f".tasks/{identifier(task)}/{kind}.md"
-    commit = head(store.root, revision or "main")
-    if git(store.root, "merge-base", "--is-ancestor", commit, "main", check=False).returncode:
-        raise Error(f"revision is not published on main: {commit}")
+    commit = head(store.root, "main")
     result = git(store.root, "show", f"{commit}:{path}", check=False)
     if result.returncode:
         raise Error(f"no published {kind} for TASK-ID {task} at {commit}")
@@ -222,10 +220,12 @@ def create(store, args):
             task_doc = published(store, args.review, "task")
             report_doc = published(store, args.review, "report")
             report = source.get("report")
-            if not report or report["revision"] != report_doc["revision"]:
+            if not isinstance(report, dict) or report.get("revision") != report_doc["revision"]:
                 raise Error("source report has no registered published delivery")
-            review = {"task": args.review, "task_revision": task_doc["revision"],
-                      "report_revision": report_doc["revision"], "commits": report["commits"]}
+            commits = report.get("commits")
+            if not isinstance(commits, dict):
+                raise Error("source report has no registered delivery commits")
+            review = {"task": args.review, "commits": commits}
     task = str(uuid.uuid4())
     data = {"id": task, "title": args.title, "agent": None, "status": "working", "created_at": now(),
             "workspace": str(store.workspaces / task), "repos": {}, "jobs": [], "report": None,
@@ -238,7 +238,7 @@ def create(store, args):
             draft.parent.mkdir(parents=True)
             content = f"# {args.title}\n"
             if review:
-                content += f"\nReview fixed source delivery (source TASK-ID: {args.review}):\n" + json.dumps(review, indent=2) + "\n"
+                content += f"\nReview source delivery (source TASK-ID: {args.review}):\n" + json.dumps(review, indent=2) + "\n"
                 content += "\nSource task requirements:\n\n" + task_doc["content"] + "\nSource report:\n\n" + report_doc["content"]
             draft.write_text(content)
             store.doc(task, "report").write_text("")
@@ -313,19 +313,13 @@ def publish(store, args):
         content = draft.read_bytes()
         report = None
         if args.file == "report":
-            first = content.decode().splitlines()
-            match = re.fullmatch(r"task_revision: ([0-9a-f]{40})", first[0] if first else "")
-            if not match:
-                raise Error("report first line must be task_revision: COMMIT (a 40-character published commit)")
-            revision = match[1]
-            published(store, args.task, "task", revision)
             delivery = {}
             for name, record in data["repos"].items():
                 if record["state"] != "ready" or record["removed"]:
                     raise Error(f"cannot publish delivery from incomplete worktree: {name}")
                 _, path, _ = live(store, data, name, record)
                 delivery[name] = head(path)
-            report = {"task_revision": revision, "commits": delivery}
+            report = {"commits": delivery}
         path = f".tasks/{args.task}/{args.file}.md"
         existing = optional_doc(store, args.task, args.file)
         if existing and existing["content"].encode() == content:
@@ -500,7 +494,7 @@ def repo_summary(record, commit):
     return result
 
 
-def render_task_status(data, docs, drafts, changed):
+def render_task_status(data, docs, drafts):
     report = data.get("report") if isinstance(data.get("report"), dict) else {}
     commits = report.get("commits") if isinstance(report.get("commits"), dict) else {}
     result = {key: data.get(key) for key in ("id", "title", "status", "agent", "workspace")}
@@ -508,8 +502,6 @@ def render_task_status(data, docs, drafts, changed):
     publications = {kind: document["revision"] for kind, document in docs.items() if document}
     if publications:
         result["publications"] = publications
-    if report.get("task_revision"):
-        result["report"] = {"task_revision": report["task_revision"]}
     unarchived = [job_summary(job) for job in data["jobs"] if job.get("status") != "archived"]
     archived_count = sum(job.get("status") == "archived" for job in data["jobs"])
     if unarchived or archived_count:
@@ -521,8 +513,6 @@ def render_task_status(data, docs, drafts, changed):
     changed_drafts = {kind: True for kind, dirty in drafts.items() if dirty}
     if changed_drafts:
         result["drafts"] = changed_drafts
-    if changed:
-        result["requirements_changed"] = True
     archive = archive_summary(data.get("archive"))
     if archive:
         result["archive"] = archive
@@ -533,9 +523,8 @@ def render_task_status(data, docs, drafts, changed):
         fixed = {}
         if review.get("task") is not None:
             fixed["source_task"] = review["task"]
-        for key in ("task_revision", "report_revision", "commits"):
-            if review.get(key) is not None:
-                fixed[key] = review[key]
+        if review.get("commits") is not None:
+            fixed["commits"] = review["commits"]
         if fixed:
             result["review"] = fixed
     return result
@@ -614,12 +603,7 @@ def status(store, args):
     for kind, document in docs.items():
         path = store.doc(args.task, kind)
         drafts[kind] = path.exists() and (document is None or path.read_text() != document["content"])
-    report = data.get("report")
-    changed = None
-    if report and docs["task"]:
-        previous = published(store, args.task, "task", report["task_revision"])
-        changed = previous["blob"] != docs["task"]["blob"]
-    return render_task_status(data, docs, drafts, changed)
+    return render_task_status(data, docs, drafts)
 
 
 def wait_agent(args):
@@ -858,7 +842,6 @@ def print_wait_list(records):
 
 
 def print_published(document):
-    sys.stdout.write(f"revision: {document['revision']}\n\n")
     sys.stdout.write(document["content"])
 
 
@@ -972,7 +955,7 @@ def parser():
     sub = task.add_subparsers(dest="command", required=True)
     p = command(sub, "create", "register a TASK-ID, drafts and empty workspace")
     p.add_argument("--title", required=True, metavar="TITLE", help="short task title")
-    p.add_argument("--review", metavar="TASK-ID", help="source TASK-ID; fix its published task/report and commits")
+    p.add_argument("--review", metavar="TASK-ID", help="source TASK-ID; read its latest published task/report and delivery commits")
     p.set_defaults(func=create)
     p = command(sub, "bind", "bind one execution agent")
     p.add_argument("task", metavar="TASK-ID", help="registered task")
@@ -981,12 +964,11 @@ def parser():
     p = command(sub, "show", "read a published document")
     p.add_argument("task", metavar="TASK-ID", help="registered task")
     p.add_argument("--file", choices=("task", "report"), default="task", metavar="FILE", help="published document: task or report (default: task)")
-    p.add_argument("--revision", metavar="COMMIT", help="published commit to read; defaults to main")
     p.add_argument("--json", action="store_true", help="emit the published document as JSON")
-    p.set_defaults(func=lambda s, a: published(s, a.task, a.file, a.revision), renderer="published")
+    p.set_defaults(func=lambda s, a: published(s, a.task, a.file), renderer="published")
     p = command(sub, "publish", "publish only one draft to main using an isolated index")
     p.add_argument("task", metavar="TASK-ID", help="registered task")
-    p.add_argument("--file", choices=("task", "report"), required=True, metavar="FILE", help="draft to publish: task or report; reports require task_revision on the first line")
+    p.add_argument("--file", choices=("task", "report"), required=True, metavar="FILE", help="draft to publish: task or report")
     p.set_defaults(func=publish)
     p = command(sub, "list", "list registered task records")
     group = p.add_mutually_exclusive_group()
