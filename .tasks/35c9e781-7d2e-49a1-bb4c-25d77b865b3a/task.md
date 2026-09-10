@@ -43,4 +43,7 @@ GPU0预留给本对照，从Manager确认F0 row1结束并移交后生效；当�
 
 ## MAM 查询更新（2026-09-10）
 
-系统 MAM 已更新：`mam task list` 默认单行列表，`mam task show` 默认 Markdown；脚本读取结构化结果时为这两个命令加 `--json`。`mam task status` 仅显示保存的 job 状态与 checked_at，不刷新进程。按既定频率监控时使用 `mam job list --task 35c9e781-7d2e-49a1-bb4c-25d77b865b3a` 获取实时进程状态，再结合已有日志检查进度。训练/评测协议、GPU 分配与检查频率不变。
+系统 MAM 已更新：`mam task list` 和 `mam job list` 为带表头的简表，无 --json；完整task信息使用 `mam task status <id>`，实时job结构化详情使用 `mam job status <job-id>`。`mam task show` 仍默认Markdown，保留 --json。`mam task status` 仅显示保存的 job 状态与 checked_at，不刷新进程。按既定频率监控时使用 `mam job list --task 35c9e781-7d2e-49a1-bb4c-25d77b865b3a` 获取实时进程状态，再结合已有日志检查进度。训练/评测协议、GPU 分配与检查频率不变。
+
+
+16:01接口迁移：不要再将job list输出按JSON解析；用task status里的jobs取ID，再逐个job status获取实时结构化结果。既定监控频率不变。新增mam wait jobs/list/stop可按需使用，自动CODEX_THREAD_ID；停止等待不影响实验。
