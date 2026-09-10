@@ -33,3 +33,8 @@ row30/GPU0已于09:29完成92/100，Manager接受最终协议、视频和退出�
 # 12:55 GPU0后续安排
 
 用户追加同一旧模型BF16转存后的100rollout验证。row1完成、验收并确认所有自有进程退出后，GPU0交接给35c9e781-7d2e-49a1-bb4c-25d77b865b3a（Carver）；e690的新schema技术验证改等下一张释放卡。既定row1/row50原run与三库冻结规则不变，row50仍完成100。Manager已接受row1中点调查为当前配置的性能退化，继续保留所有正常失败。
+
+
+## MAM 查询更新（2026-09-10）
+
+系统 MAM 已更新：`mam task list` 默认单行列表，`mam task show` 默认 Markdown；脚本读取结构化结果时为这两个命令加 `--json`。`mam task status` 仅显示保存的 job 状态与 checked_at，不刷新进程。按既定频率监控时使用 `mam job list --task a15fdd25-5e7d-4eb4-8059-a5bd4d35a691` 获取实时进程状态，再结合已有日志检查进度。训练/评测协议、GPU 分配与检查频率不变。
