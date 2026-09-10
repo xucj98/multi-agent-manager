@@ -74,3 +74,6 @@ F0负责人15:01确认GPU1所有自有进程退出、端口19310/19312释放、j
 Manager接受8eab15f1技术链路与drawer10ep offline交付，GPU1已转交训练。现在在原RMBench worktree的README_memory_schema.zh-CN.md简短记录实际技术PASS的含义、drawer两模型各5ep结果表和真实目录drawer_s2m_v2_regression_5ep_gpu1_20260910，避免读者把旧示例路径当此次实际结果；不把offline MAE写成闭环成功率。保留20k后续命令和每checkpoint自身smoke要求。只改文档，diff-check，不重跑模型。
 
 本任务两份technical_rearrange_*_gpu1_20260910原始smoke已完成技术验收且不能用于正式门禁，可清理；已发布report是技术结论留痕，不另打包全量smoke。正式drawer产物保留。清理自有pycache等临时缓存，不跨清理ad6的step50checkpoint（其owner统一处理）。提交文档并发布report后保留三树，供明日20k评测继续复用。
+
+
+18:22 MAM精简status已安装：task status 的未归档job摘要位于 jobs.unarchived（无jobs时该键可省略），不是旧jobs数组；job status直接提供status/checked_at/error及unknown时last_known信息，不再嵌套probe或identity。实时进程身份仍由工具内部核对。按新JSON读取；保持既定每小时频率，不因接口变更额外复查训练。
