@@ -55,14 +55,32 @@ BF16 checkpoint 只读路径为
 ad6 已发布的 `metadata/export_validation.json` 证明 51 个叶子、3,353,433,872 个元素在
 两条 BF16 restore 路径上的数值与 uint16 位模式差异均为 0；本任务没有重复该全量验证。
 
-### 下一步
+### BF16 smoke 与正式启动
 
-现在在 GPU0 先执行 BF16 自己的两条 smoke（episode 0 有视频、episode 1 无视频），核对
-实际 BF16 加载、row30 trace、视频帧、audit 与 lineage。门禁通过后以同一冻结输入可靠脱离
-启动连续正式 100，并立即登记 MAM job；首条 accepted rollout 后更新本报告。
+GPU0 上的 BF16 自己的两条 smoke 已完成，均为 Success（seeds 100000、100001）；episode 0
+生成 382 帧视频，episode 1 按无视频路径完成。既有 smoke gate 已通过，记录的 config SHA256 为
+`4e5cea45b647a12fa59327fc489174f6b631300a98105081ed7e149aa9e95dc0`。真实 policy path 为
+BF16 checkpoint，params/assets digest 为
+`93188775f326dd9a20615359eb864771330e56b42f8a8ba1d7ca3b1c6af43d54`，metadata digest 为
+`06fda2eb304188c093c80558db2e94bb8180c89d2f5e3ef07dde59215231d52e`。每集执行的 trace 都是
+selector index29 / row30（分别 13、14 个已执行块），且真实输出完整继承了五个 Audit
+config_source 文件和 command_source。
 
-完成与未完成：CPU 环境、输入留痕、基线修正和 CPU 继承检查完成；BF16 smoke、正式 100、
-50 条检查、逐 seed 配对统计和结果 README 尚未开始。
+正式 100 已于 **2026-09-10 13:20:30 +08:00** 在 GPU0 可靠脱离启动，主 runner 为
+`is-dcfi2kjdq7g3k6aa-devmachine-0:2710786`，MAM job 为
+`577e7ab0-eb55-4c65-bed5-3b725e958435`（已登记 running）。正式产物为：
+
+`RMBench/eval_result/memory_chunk_20260910/precision_rearrange_full_row30_bf16_100ep_seed0`
+
+启动后已创建 formal 产物目录并进入服务加载；首条 accepted rollout 尚在执行，随后更新本报告。
+
+### 后续检查
+
+保持同一连续 run、GPU0 与冻结输入。首条完成后核对真实加载/row30/诊断；第 50 条按 92/100
+主基线与 45/50 同 seed 辅助基线检查，完成后做逐 seed 配对统计、失败类别与结果 README。
+
+完成与未完成：CPU 环境、输入留痕、基线修正、CPU/真实输出继承检查与两条 BF16 smoke 已完成；
+正式 100 已启动，首条、50 条检查、100 条收尾、逐 seed 配对统计和结果 README 尚未完成。
 
 workspace、各库交付 commit：RMBench
 `f022badd11228e5763a301339a5d1fe5574962b4`；robot-bridge
