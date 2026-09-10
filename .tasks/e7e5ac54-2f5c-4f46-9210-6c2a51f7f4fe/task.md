@@ -58,3 +58,8 @@ base在/mnt/public/cache/openpi/openpi-assets/checkpoints/pi05_base。新机器�
 完成核对20,000更新、唯一20000 checkpoint、完整参数shape/BF16/无optimizer、assets与metadata、仅checkpoint路径可恢复。base约3.35B参数，裸BF16约6.71GB，不按旧12GB估算硬凑大小。随后向Manager/评测owner提供checkpoint和metadata；每个正式eval仍需自身2rollout video/no-video smoke后100，不在本任务未经安排启动eval。
 
 记录实际结果、清理本任务临时smoke/无用文件后archive已停止job。正式checkpoint保留共享原repo路径；worktree等任务验收且无活跃job后由Manager归档。report包括task_revision、workspace/完整commit、完成/未完成、job及输出路径、下一检查时间。不要修改其他task的task.md/report.md。
+
+
+## MAM 查询更新（2026-09-10）
+
+系统 MAM 已更新：`mam task list` 默认单行列表，`mam task show` 默认 Markdown；脚本读取结构化结果时为这两个命令加 `--json`。`mam task status` 仅显示保存的 job 状态与 checked_at，不刷新进程。按既定频率监控时使用 `mam job list --task e7e5ac54-2f5c-4f46-9210-6c2a51f7f4fe` 获取实时进程状态，再结合已有日志检查进度。训练/评测协议、GPU 分配与检查频率不变。
