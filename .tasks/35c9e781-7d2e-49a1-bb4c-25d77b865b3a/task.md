@@ -37,3 +37,5 @@ GPU0预留给本对照，从Manager确认F0 row1结束并移交后生效；当�
 - 当前派生run.baseline仍引用历史93/100及55.1ep/h，本次主配对参照应是已完成F0 row30的92/100，配置、命令与诊断路径也应明确来自该run；原历史参照可保留为继承背景，但不能在最终报告或中点比较中冒充此次FP32对照。更新这一诊断/来源字段不改变policy协议。近期实际F0吞吐约38–39ep/h，资源预算先约3小时，后续用自己实测更新，不沿旧55.1排2小时。
 - 私有manifest/evidence最终必须随run留下完整文件。当前config_source仍指历史单个config.yaml，不保证新增hash-evidence随现有recorder继承。参考已验收的新schema入口的Audit别名+config_source目录做法，用任务私有输入目录作为来源，并在其中保留本次FP32参照的config/command小型metadata副本。通过既有inherit_metadata做一次CPU实际复制检查，确认新manifest/evidence及基线config/command均进入lineage；不更改公共runner，不仅凭hash摘要就删去唯一输入文件。正式smoke时再次确认真实输出继承。不要把私有目录放到checkpoint内。
 修正后给短报告/差异确认即可，不重复权重全量数值比较。GPU0仍待Manager移交。
+
+13:04 GPU0已正式移交：F0 row1于12:55:46完成100，最终all_owned_processes_absent=true，GPU0/19300/19302释放证据gpu0_handoff_verification.json已由Manager核对（F0 report0e41481b）。你的任务获得本机GPU0使用权；GPU1仍为F0 row50，其余卡仍训练。完成上节CPU来源/继承修正和检查后，可以开始BF16自己的两集smoke；按既定门禁通过后自主启动正式100并登记MAM job，报告实际启动和首条检查。不要等待新的用户许可；遇到实质协议/产物错误先定位报告。正式整个run冻结三库及私有输入。50条/完成时做事件检查，普通监控约小时。
