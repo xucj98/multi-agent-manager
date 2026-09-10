@@ -28,3 +28,10 @@ workspace、各库交付 commit：
 - serial checkpoint：`/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/gpu_smoke_checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/serial_lag30_d10cc01/50`。
 - put-back norm 命令：`CUDA_VISIBLE_DEVICES='' JAX_PLATFORMS=cpu .venv/bin/python -B scripts/compute_norm_stats.py --config-name=pi05_rmbench_put_back_block_full_t_plus_1`；产物：[norm_stats.json](/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/openpi/assets/memory_v1/rmbench_put_back_block_robot/norm_stats.json)。两臂真实 loader 以本 task `.venv`、`num_workers=0` 各取一批并完成上述 shape/weight 断言。
 - R3/R4 定向验证：`2 passed, 11 deselected`；Banach R4 重叠 case 复现：`1 passed, 7 deselected`；`ruff check`、`ruff format --check`、`git diff --check` 通过。
+
+阶段更新（7a62920）：
+
+- `7a629204b4ab6d3cd113443c538837f8fb5f08d4` 固定 checkpoint YAML 边界：`DataConfig.memory_adapter` 与 `memory_model_spec` 为运行时注入字段，不进入 YAML；真实 wash serial metadata roundtrip 验证 resolved `memory_config` 只保存一次。相关 `arx_policy/config/config_memory/memory_data` 回归共 `23 passed`。
+- put-back 在当前 HEAD 以实际共享根 `HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot` 重新取样。t+1/t+30 各一批：asset `rmbench_put_back_block_robot`、robot_dim 14、state `(32,32)`、actions/weights `(32,50,32)`，已用 memory 宽度为 23，尾部 padding 的非零 weight 数均为 0。简短日志：`/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/gpu_smoke_logs/put_back_block_loader_smoke_7a62920.log`。GPU4/5 可据此放行。
+- wash v3 全量 robot-only norm 已启动为 CPU-only MAM job `396366a5-71b0-4185-82ee-a3963b4b004b`（PID 2323375），不占 GPU；日志：`/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/cpu_norm_logs/wash_cup_s2m_robot_norm_7a62920.log`，目标为 `assets/memory_v1/x1pro_wash_cup_s2m_robot/norm_stats.json`。启动后的稳定吞吐约 16 batch/s，4490 batches 预计数分钟完成；完成后将做 full/serial 实际 loader 与 checkpoint roundtrip。
+- 遵照 e6908de7 的短期交接，两个已验收的 50-step checkpoint 与其日志仍留在本 task workspace，仅供新 schema metadata/入口核验，未清理、未复制、未占用 GPU。
