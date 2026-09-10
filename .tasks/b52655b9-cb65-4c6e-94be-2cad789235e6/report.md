@@ -3,12 +3,13 @@
 - task：`b52655b9-cb65-4c6e-94be-2cad789235e6`
 - worktree：`/mnt/public/xcj/Projects/table-1000/workspace/b52655b9-cb65-4c6e-94be-2cad789235e6/table-1000`
 - branch：`task/b52655b9-cb65-4c6e-94be-2cad789235e6`
-- 交付 HEAD：`fda95068bcd856b9947a5c9a9d8001120c8247b4`
+- 交付 HEAD：`f8340d5de7ac5452a6a8d726c1fc11047c0ae6b1`
 
 提交链：`2af4b12`（MAM 入口）、`d30dca0`（持久 symlink package
 store）、`b049801`（可重复 setup/archive clean）、`9fe95e0`（peer
 运行说明）、`b56e55e`（无残留 cleanup 幂等退出码）、`7b3a907`（peer Vulkan
-运行前提与 probe）、`fda9506`（最小 peer EGL 修复说明）。
+运行前提与 probe）、`fda9506`（最小 peer EGL 修复说明）、`f8340d5`（EGL 修复范围
+澄清）。
 
 ## 一键入口与布局
 
@@ -60,8 +61,9 @@ physics、Table-10 0002 `red-then-blue` reference replay（`valid=true`），以
 data/CLI tests 的 `40 passed`。随后连续两次 `cleanup.sh` 都返回 0，worktree 无
 `.table1000-runtime-cache`、`.pytest_cache`、`.ruff_cache` 或源 `__pycache__`。
 
-独立 blank-context 验收也只经 MAM 一键入口创建了新 worktree：约 5 秒、私有 venv 约
-21 MiB，并验证了包 store symlink、source/venv 隔离、重复 repair 和 archive preflight。
+独立 blank-context 验收只经 MAM 一键入口创建新 worktree：约 5 秒、私有 venv 约 21 MiB，
+并完成完整 smoke（40 tests）和 cleanup。重复 repair 由独立 review 验证；archive preflight
+和实际归档由 manager 的验收证据确认。
 
 ## 远端只运行验证和最小 EGL 修复
 
