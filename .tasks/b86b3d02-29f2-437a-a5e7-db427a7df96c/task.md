@@ -26,3 +26,8 @@ wash训练owner ad6bb77e-3892-4730-ae1a-7d9cd99a5728最新task/report：两20k c
 范围收敛：删除当前输入未用的--replay任意选节；保留必要的OpenPI/RMBench root映射及旧格式适配，不为了删行数重写整个launcher。不要增加新的通用配置格式。已有memory指标算法CPU review通过，除具体错误外不改controller/scheduler。
 更正报告计数：5525是逻辑执行行/模型，K30对应各集41/51/24/38/33次infer，共187次/模型；此前报告的5525 query不可当成实际infer次数。正式GPU最终按实际日志验证。
 提交小修并发布report，给出新增失败保护的定向CPU测试及新commit。目标20分钟，若需要扩大范围先说明。仍不占GPU；Manager交原独立reviewer复查后分配wash offline。本任务实现完成后允许继续负责本代码的GPU offline，但必须等Manager明确授权与checkpoint通过。
+
+## 07:36 wash正式offline排期（以独立复查通过为前提）
+训练owner ad6bb77e已发布两20000的CPU完整参数、真实GPU checkpoint-only恢复及进程释放验收，GPU2/3于07:30各1MiB/0%。独立review65a3对fda269c1通过且Manager告知后，授权本任务使用本机GPU2串行执行full/serial两个模型固定5ep；GPU3暂不使用，不跨wuwen-1。启动前核对显存、独立端口，复用已有两库环境和入口，固定干净源码。
+统一正式输出目录RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_20k_offline5ep，launcher内模型子目录wash_full/wash_serial属于同一run的分项产物。先dry-run确认两个真实checkpoint可用。完整执行各5ep[0..4]，不用新smoke模型代替，检查真实action/memory GT/pred/mask、实际infer次数（预计187/模型）与执行行5525/模型、每集退出和资源释放。读取GT仅评分。若失败保留具体首因和已生成产物，不覆盖同目录掩盖失败；恢复方案先报告。
+记录实际命令、源码与解释器、checkpoint/转换/训练metadata完整继承。若预计超1小时按mam登记job；可以按合理估算短任务无需强行登记。完成发布简报提供两模型每集动作误差/phase指标（含有效样本数）及产物路径；offline不是闭环成功率。随后Manager安排结果文档整合与统一台账更新，不把本次接口通过称作scheduler原始架构重构已完成。
