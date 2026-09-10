@@ -63,3 +63,5 @@ Source report:
 重点独立检查：最近env发现/不回退/--root移除、不同项目记录与锁/wait隔离、linked MAM根不误归并、PROJECT_ROOT业务源和工作区、发布精确修改目标分支而main不变、并发发布和旧登记安全。运行完整测试及实际一键创建入口。核对README（main bdccfd0）与设计/install文档无冲突。审计主分支开发/项目分支发布流程，避免旧主分支硬编码和脚本遗留。报告实际问题及严重度，或GO和验证证据。清理临时产物，保留本任务worktree。不要访问GPU或改变训练。
 
 文档核对补充：设计文档开头仍链接README的#等待和#工作区，当前README已是#休眠管理且工作区步骤在#执行与交付；可作为小修复提交到本review分支。其余实际代码问题先报告给Manager裁定。
+
+Manager已在源任务追加移除REPOS五库硬编码：允许PROJECT_ROOT下任意合法单层仓库名，保留路径边界/primary/script校验。作者将交付增量commit；本review需以最终commit复核此项，当前可继续其余独立检查，等增量到达再给最终结论。
