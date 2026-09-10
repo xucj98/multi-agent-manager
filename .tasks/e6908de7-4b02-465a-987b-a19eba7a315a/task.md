@@ -77,3 +77,7 @@ Manager接受8eab15f1技术链路与drawer10ep offline交付，GPU1已转交训�
 
 
 18:22 MAM精简status已安装：task status 的未归档job摘要位于 jobs.unarchived（无jobs时该键可省略），不是旧jobs数组；job status直接提供status/checked_at/error及unknown时last_known信息，不再嵌套probe或identity。实时进程身份仍由工具内部核对。按新JSON读取；保持既定每小时频率，不因接口变更额外复查训练。
+
+
+## GPU 调度更新（2026-09-10 22:17 CST）
+用户要求 2026-09-11 中午12:00前预留6张空闲卡供其他同学使用。Manager 指定本机 GPU2、3、4、5、6、7：当前训练自然结束、保存完成并释放资源后，保持空闲，不得接续训练、smoke、offline test或formal eval，直到用户另行允许。现有训练继续；本机 GPU0/1及wuwen-1可用于后续实验，仍需核对可用性。若保留卡训练ETA越过截止时间，及时报告Manager裁决，不擅自终止训练。最新22:17日志预计保留六卡约07:20–07:40训练结束，余量充足。
