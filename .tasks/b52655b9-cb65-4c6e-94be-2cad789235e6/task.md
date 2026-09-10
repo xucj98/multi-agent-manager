@@ -12,3 +12,6 @@
 
 # 用户追加：outputs 也纳入软链接管理
 用户询问软链接数量并明确 outputs 类目录也应软链接。当前 primary 与 task worktree 各只有 .cache 一条顶层链接。请完善集中成果目录：PROJECT_ROOT/outputs/main 供 primary，PROJECT_ROOT/outputs/TASK-ID 供 task worktree，并在各 repo 创建 outputs 软链接指向对应目录，避免多 agent 覆盖且归档 worktree 后保留成果。已有 worktree outputs 内容要安全迁移，遇冲突不能覆盖；不要把历史研究备份当默认输出目录。对数据流核验是否还有其他真正需要共享/集中留存的 repo 顶层目录，按必要性实现并列清单。更新文档、smoke 与 report，明确每个 worktree 顶层业务软链总数/去向（区分 Python venv 内部软链）。
+
+# 用户最新布局要求（覆盖之前路径约定）
+用户明确：主仓库不要软链接，PROJECT_ROOT 下面只有 workspace、mam 及各个 repo。保留 MAM 必需隐藏 .mam 配置；所有业务实体目录归属 canonical repo。请由本环境任务协调并完成：将项目 assets 实体迁为 canonical/.cache 实体（先安全移除已核验旧软链），canonical/outputs 为实体，worktree/.cache -> canonical/.cache，worktree/outputs -> canonical/outputs/TASK-ID。uv cache 和本机配置收拢 canonical/.local 内；不再保留 PROJECT_ROOT/assets、outputs、cache 等业务目录。迁移任务负责备份目录收拢 canonical/.local/migration-backup，与你直接协调。更新所有路径、文档、已有worktree软链与验收；确保主repo顶层无业务软链，worktree仅链接实际需要资产/成果，清理先前空目录。主repo Python自身venv内部系统解释器软链无需改变。
