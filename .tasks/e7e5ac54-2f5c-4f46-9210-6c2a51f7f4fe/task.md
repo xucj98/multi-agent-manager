@@ -2,7 +2,13 @@
 
 ## 目标、工作区与当前授权
 
-你负责首批已计划的八个单GPU20k训练的执行、监控、checkpoint验收和评测交接。Manager统一判断代码/数据验收，其他owner继续实施；你不修改模型、loader、converter、schema或MAM实现，不重跑整个历史实验，不自行派agent。
+你负责已授权的单GPU20k训练执行、监控、checkpoint验收和评测交接：远端八路继续，新增本机四路见下文。Manager统一判断代码/数据验收，其他owner继续实施；你不修改模型、loader、converter、schema或MAM实现，不重跑整个历史实验，不自行派agent。
+
+### 10:39 本机新增四路授权
+
+Manager于10:37读取本机GPU2–7均为1MiB占用、81038MiB空闲、利用率0；GPU2/3交wash，GPU0/1仍F0。你使用本机GPU4/5分别启动rearrange full_t_plus_1/full_t_plus_30的seed2，GPU6/7分别启动put_back full_t_plus_1/full_t_plus_30的seed1。这四项均在原Q2计划内，不新增实验预算。使用你已有d10冻结worktree/解释器，单卡batch32、20k、同pi05_base与已验收norm；仅seed/exp_name变化，不重新训练smoke或重建环境。
+
+每路启动前复核本机实际显存及RAM，确认独立exp_name和输出不已存在，立即从本机python -u -B启动并登记真实本机host/PID。既有本机full/serial50step与同机环境已验收；这里只做启动所需检查，不重跑全部旧门禁。首次检查实际更新与已落盘有限loss，之后与八路远端一起约每小时检查；此轮新增工作不提前反复检查远端进度。所有运行树保持d10。若OOM按原异常协议报告，不隐式换batch。剩余put-back seed2配对等下一空闲时段另派，不自行超出这四项。
 
 先按MAM AGENTS/README读取发布要求，用mam workspace add在本task创建openpi worktree，base=d10cc01d44c10e5ed0cd8c228d9409dd6cabac50；读取openpi AGENTS。独立环境由既有一键入口创建，复用共享assets/data/checkpoints软链接，不挂别人的PYTHONPATH。你本机管理、通过ssh wuwen-1执行训练；两端共享/mnt/public。所有正式进程使用你自己的固定worktree/解释器，运行期间不修改该树的源码或切换版本。
 
@@ -16,7 +22,7 @@ full证据在ad6任务workspace的gpu_smoke_logs/full_tplus1_d10cc01.log、full_
 
 ## 第一批配置和资源
 
-资源：wuwen-1 GPU0..7每卡一个训练。本机GPU0跑F0、GPU1跑训练smoke，不使用。启动前查实际显存，不能只靠看不到其他人的进程判断空闲；不终止别人的进程。每模型单卡batch32、20,000次optimizer update，H50/K30，save_full_state=False、save_dtype=bfloat16，最终只留20000一个checkpoint及assets/metadata。其余优化器参数沿既定config，不为命令长度手写全部默认参数。若OOM或训练不稳定，保留失败事实及时报告Manager，不能静默改变受控batch/模型/数据或混写重试目录。
+资源：wuwen-1 GPU0..7每卡一个训练；本机GPU4–7按10:39分配，GPU0/1用于F0、GPU2/3用于wash，不占用。启动前查实际显存，不能只靠看不到其他人的进程判断空闲；不终止别人的进程。每模型单卡batch32、20,000次optimizer update，H50/K30，save_full_state=False、save_dtype=bfloat16，最终只留20000一个checkpoint及assets/metadata。其余优化器参数沿既定config，不为命令长度手写全部默认参数。若OOM或训练不稳定，保留失败事实及时报告Manager，不能静默改变受控batch/模型/数据或混写重试目录。
 
 | GPU | training config | seed |
 | --- | --- | --- |
