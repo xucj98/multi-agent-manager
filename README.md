@@ -8,15 +8,27 @@ MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`�
 
 MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 由 codex 生成，标识执行 agent。
 
-`mam` 可从任意目录调用，默认 MAM 根目录 `MAM-ROOT` 为 `/mnt/public/xcj/Projects/multi-agent-manager`；可用 `--root ROOT` 覆盖。MAM 使用共享根目录：Manager 在其中编辑 `task.md`，执行者在其中编辑自己的 `report.md`。`main` 上的提交内容是已发布版本，工作目录中的修改是草稿。
+`mam` 从当前目录向上查找最近的 `.mam/env.json`，找不到或配置无效时报错。配置包含三个值：
 
-MAM 的任务 TASK-ID 和执行者 AGENT-ID 一一绑定。每个执行者有自己独立的 workspace `Projects/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。
+```json
+{
+  "MAM_ROOT": "/mnt/public/xcj/Projects/multi-agent-manager",
+  "PROJECT_ROOT": "/mnt/public/xcj/Projects",
+  "MAM_BRANCH": "project/state-vla"
+}
+```
+
+两个根目录使用绝对路径。`MAM_ROOT` 保存任务、报告及本地管理记录；`PROJECT_ROOT` 存放业务仓库和 `workspace`；`MAM_BRANCH` 保存已发布的任务和报告。Manager、执行者及手动运行管理命令的终端，都从对应项目目录内使用 MAM。
+
+MAM 使用共享根目录：Manager 编辑其中的 `task.md`，执行者编辑自己的 `report.md`。发布分支上的提交是已发布内容，未发布修改是草稿；发布时 MAM checkout 必须处于配置分支。工具源码在 `main` 维护，项目记录在各项目分支维护。
+
+MAM 的任务 TASK-ID 和执行者 AGENT-ID 一一绑定。每个执行者有自己独立的 workspace `PROJECT_ROOT/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。
 
 ```text
-Projects/multi-agent-manager  # MAM 工作目录
+MAM_ROOT/                   # MAM 工作目录
   .tasks/TASK-ID/task.md      # Manager 编辑任务要求
   .tasks/TASK-ID/report.md    # 执行者编辑结果简报
-Projects/workspace/TASK-ID/   # 执行者的独立工作空间
+PROJECT_ROOT/workspace/TASK-ID/   # 执行者的独立工作空间
   REPO/                       # 按需创建的 worktree，分支为 task/TASK-ID
 ```
 
