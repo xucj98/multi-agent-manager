@@ -1,6 +1,6 @@
-# 07:47 首批四模型匹配smoke全部通过，四卡formal100已启动
+# 07:53 四卡formal100继续，新增GPU3 rearrange seed1 smoke
 
-按06:53授权，在owner分别发布GPU4/6/7/5训练保存、CPU验收、进程退出和释放后逐卡接用；每次启动前显存均1MiB/0%，端口空闲，原三树干净。GPU0/1不抢占，GPU2/3留wash，wuwen-1停用。未修改源码/配置，未重跑技术50或旧drawer。
+按06:53授权，在owner分别发布GPU4/6/7/5训练保存、CPU验收、进程退出和释放后逐卡接用；每次启动前显存均1MiB/0%，端口空闲，原三树干净。按最新07:52补充，GPU0/1不抢占，GPU2留wash，GPU3已获授权接用，wuwen-1停用。未修改源码/配置，未重跑技术50或旧drawer。
 
 ## 已完成：四个20k自身smoke
 
@@ -29,6 +29,12 @@ host均is-dcfi2kjdq7g3k6aa-devmachine-0。各run单GPU串行100，sim/policy同�
 实际command/cwd/PID/启动时间保留于本worktree .local/memory_schema_eval/launches/<run>.json；临时启动日志同名.log。正式run沿既有recorder保存实际命令、配置、checkpoint/served metadata和source；smoke验证摘要保存为正式目录smoke_verification.json（新启动项在runner建目录后复制）。不在空run目录提前写入文件。
 
 rearrange两项已完成正式首条并继续推进，put-back两项正在启动/首条阶段。尚未完成100，不宣称正式成绩。保持active turn，通过mam wait jobs --task等待并结合日志检查；第50条正常诊断，新20k尚无真正可比旧基准，不强行引用不同训练/模型/F0成功率。保留正常失败与全部100条，结束核对产物/退出、archive job，保留smoke门禁摘要后清理自有smoke和临时缓存。
+
+## GPU3新增与剩余队列
+
+已读07:52发布补充，GPU3启动前实测1MiB/81038MiB空闲/0%，19430/19432端口空闲、run名未占用、三树干净。已启动rearrange_full_t_plus_1_s1_20k_smoke2，使用已CPU验收的seed1最终20000，实际参数--gpu 3；仍为短smoke，尚未验收或formal。配对rearrange t+30 seed1保留下一空卡最高优先项，不按成绩筛选。
+
+统一EXPERIMENT_LEDGER.zh-CN.md已获知合入主库；当前三树由正式run使用，不merge或改文档。安全结束运行后再整合台账、更新对应模型行和实际结果链接/快照时间。
 
 ## 剩余队列与位置
 
