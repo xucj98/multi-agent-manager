@@ -1,37 +1,57 @@
-task_revision: cd4af5bb686e9e0c54962a07cab81dd597aea4c5
+task_revision: 60d377c49dd6ba3bcf6a55ae2ebf417694164171
 
-完成与结论：**d49c1a1 的 R3、R4 均通过定向 CPU 复核，可以关闭。本阶段完成，无新增阻塞。**
-
-历史 CPU 结论引用本任务 publication 6a328471cd1493e21c3bc617b0f697b445a17a96。按最新 task，Manager 后续已验收 full/serial 实际 GPU50、BF16 保存/恢复及 put-back norm/loader，首批八路固定 d10 的正式训练保持既有放行。本轮未重测、未修改它们；尚未交付的 wash 训练注册另待确切增量。
+完成与结论：**wash full/serial 本轮 CPU 增量通过；7a62920 的 d10 checkpoint metadata 向后兼容未通过（P1，见下）。组合候选尚不能作为加载 d10 checkpoint 的新版交付。** 固定 d10 的八路正式运行保持已放行状态，无需重启、改写旧 metadata 或重跑 GPU50。
 
 workspace、审查版本：
 
 - 复用 /mnt/public/xcj/Projects/workspace/9b73b590-f7bf-4f46-b2e4-4fa5882d9db3/openpi 及原 .venv。
-- 候选 d49c1a1c5cb141283cb10634cfb31903624ed761；真实 review HEAD beb1741ac7f121d8b82f379444860fa8875bb1ee，git diff d49c1a1 HEAD 为空。候选父级含已交付的 42011a3 数据/文档，此次只判断 R3/R4。
-- 未修改交付实现、未用 GPU、未派 agent、未创建环境。已登记的 robot-bridge 树未用于重复跨库验证。
+- 候选 062d12a5effbaf183718c9c208d880983693e64d + 7a629204b4ab6d3cd113443c538837f8fb5f08d4；实际 review HEAD 423fbe3f3d538e5bb7a3f2399bedf8fe635d663e，git diff 7a62920 HEAD 为空，git diff --check 通过。
+- 仅 CPU，未修改实现、未派 agent、未新建环境。已登记 robot-bridge 保持 f84edbd6eea81104a00fd85409046eaaa8712e9b，仅静态读取 metadata 消费代码，未执行重复跨库/live 测试。
+- 历史已通过项引用本任务 report 6a328471cd1493e21c3bc617b0f697b445a17a96、53ca3e2eb1526a08309c0fbd1d9d1894f7b62bc8；GPU50/put-back 沿用 Manager 验收。
 
-R3 证据：
+**P1：init=False 使现有 d10 tagged YAML 无法恢复。**
 
-- 原全 initial 复现通过。新独立检查将字段 initial 特意设为非零 [3,2,1]，覆盖 full/serial 各自的全 initial、部分 initial/其余 cache，以及仅 infer initial、train 保持 reference，共 6 项。
-- 实际 TrainConfig.create_data_config、MemoryDataAdapter.make_row、data_loader.transform_dataset 与推理 input transforms 均执行；使用已有 robot norm 和真实 tokenizer。全 initial 忽略两组合法非initial请求，full tokens相同；部分 initial 仅覆盖声明字段，其余 cache 仍改变 full tokens。serial 消费的 key_state_input_ids 与声明逐字段一致。
-- 真实采样和训练 transforms 保持 train source 独立于 infer source；无 mask 的 initial 可以采样。对构造的81行 episode 在 q31 取样，再把 phase availability 全置 false，机器人50x14 target、归一化结果及全1 robot weights均保留；仅 phase监督被屏蔽。没有重跑原数据窗口/P2数值验收。
+位置：src/openpi/training/config.py:120–121；触发入口 src/openpi/training/checkpoint_metadata.py:102。现有 d10 YAML 的嵌套 DataConfig 含 memory_adapter: null、memory_model_spec: null；tyro from_yaml 仍将它们传入构造器。两个真实 50-step checkpoint 均在全新进程报同一错误，尚未进入权重加载或 inference factory：
 
-R4 证据：
+```text
+TypeError: DataConfig.__init__() got an unexpected keyword argument 'memory_adapter'
+full child exit=1; serial child exit=1
+```
 
-- 原重叠 case 复现现与公共 spec 同得 [0,1,0]。新 batched JIT selector 在同一 batch 覆盖首个匹配、仅第二个匹配、无匹配 otherwise，并让第三字段读取第二字段已选结果；公共 decoder 与 Pi0 逐值同得 [0,1,1] / [0,2,2] / [2,0,0]。默认 argmax 对照仍等于独立 argmax。
-- 复用原 SerialProbe，实际 Pi0.sample_actions_with_key_state、选择、current segment embedding 和 JAX sampling loop接真实 Policy.infer/transforms。上述三种条件均满足：统一 wire IDs = 公共 decoder 结果 = 真正传入 segment1 的动作条件；actions 为50x14且有限。
-- 该 sampler 检查沿原 CPU 小trunk替身替代昂贵 Gemma/SigLIP/投影，并将 module_jit 包装设为 identity；没有冒称新的完整模型/GPU或硬件验证。
+只读复现输入根为 /mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/gpu_smoke_checkpoints，分别使用：
 
-实际定向命令与结果：从上述 openpi 根执行，统一前缀为：
+- pi05_rmbench_rearrange_blocks_full_t_plus_1/full_tplus1_d10cc01/50
+- pi05_rmbench_rearrange_blocks_serial_lag30/serial_lag30_d10cc01/50
 
-    env CUDA_VISIBLE_DEVICES='' JAX_PLATFORMS=cpu PYTHONDONTWRITEBYTECODE=1 OPENPI_DATA_HOME=/mnt/public/cache/openpi HF_HUB_OFFLINE=1 HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot .venv/bin/python -B -m pytest -q -p no:cacheprovider
+复现核心命令（checkpoint_dir 为上述任一完整路径）：
 
-其后参数及实际输出（临时脚本当时均位于本 report 同目录）：
+```bash
+CUDA_VISIBLE_DEVICES='' JAX_PLATFORMS=cpu .venv/bin/python -B -c 'import sys; from openpi.training.checkpoint_metadata import load_train_config; load_train_config(sys.argv[1]).create_data_config(training=False)' "$checkpoint_dir"
+```
 
-| 检查 | pytest 参数 | 输出 |
-| --- | --- | --- |
-| 原独立复现 | combined_review_test.py remaining_review_test.py -k 'aux_initial_ignores_external_cached_ids or explicit_conditional_decoder_agrees_with_public_spec'（脚本传绝对路径） | 2 passed, 14 deselected，14.85s |
-| 新独立边界 | d49_review_test.py（脚本传绝对路径） | 8 passed，21.21s |
-| 作者新增回归 | src/openpi/training/config_memory_test.py src/openpi/training/memory_data_test.py -k 'conditional_decoder_uses_first_matching_schema_case or auxiliary_initial_input_needs_no_mask_and_ignores_inference_cache' | 2 passed, 11 deselected，13.97s |
+独立复现还在 OpenPI import 前安装 source-read audit，并从 /tmp 启动子进程；没有借用父进程 schema cache。影响是新候选不能消费已验收/正在生成的 d10 格式；旧固定树与 checkpoint 权重不因此失效。修复应在新代码兼容旧 runtime null 字段，保留唯一 resolved schema；不修改已有 checkpoint。
 
-收尾：5个本任务临时review脚本已在执行后清理，以上为实际执行记录。未跟随共享软链接，检查两worktree的非tracked源码cache：openpi仅有1个 .ruff_cache，已清理；robot-bridge为0个。共享数据/资产和原环境保留，两库实现工作树干净；环境/分支由Manager后续归档。本阶段可结束，wash候选到达时继续同一任务。
+wash 与新格式已通过的独立证据：
+
+- 两个注册配置均走真实 create_data_loader，num_workers=0、shuffle=False、split=None，各取 batch32；143,698 rows / 172 episodes / fps15，state (32,32)、actions/weights (32,50,32)，三相机 (32,224,224,3)。使用已归档 CPU norm job396366a5 产出的 assets/memory_v1/x1pro_wash_cup_s2m_robot/norm_stats.json，只有 state/actions 且均14维。full 20维之后、serial 14维之后的 actions/weights padding 均为零。
+- 抽查 ep0/4/171 的 q65：adapter actions 与真实 LeRobot/Parquet actions 全50行一致（atol=1e-6），state 原样取当前 follow14；action/state 最大差分别0.686465、0.127485、0.076816，未混成 follow target、SM2SM 或二次移位。真实 Arx 保持14维到 Normalize，独立 quantile 数值断言通过，再接 memory/tokenize/pad。face/left/right 到 base/left_wrist/right_wrist 的实际像素映射逐值一致。
+- 对两配置执行未 stub 的 checkpoint_metadata.save/load，完整继承 info、conversion、source metadata。datasets.json 含 fps15、172ep、state/actions14、相机接口；upstream conversion 固定 offline IDs 为 processed IDs 的前5项，info train=0:172，follow→master、offset0 均保留。bridge backends/openpi.py:333、464–467 有从 checkpoint datasets 读取并发布 policy_hz 的现存路径，未发现此接口的 fps 缺口。
+- 新 YAML 各只有一处 memory_config，不保存 memory_adapter/model_spec，memory_config_path=None；恢复 schema 相等，runtime adapter/spec 重建成功。另起全新进程、cwd=/tmp，在 import 前阻断原 dataset/sidecar/YAML/norm 的 open；两个 checkpoint-only factory 成功，source-read 尝试均为0。norm 从临时 checkpoint assets 读取。
+- factory 的权重/模型 trunk 使用受控 CPU 替身，实际 Policy、Arx、Normalize、memory 和模型 transforms 均执行：非initial input [2] 进入 full one-hot/serial key_state IDs；full [2]→[4] 改变实际 tokens。输出 robot actions (50,14)，full memory IDs (50,1)、serial (1,1)，选中值3经机器人裁剪仍保留。此项仅验证新配置的 transform/wire 接线，不宣称重做真实模型数值或 GPU 验收。
+- dataclasses.replace(installed_data_config) 确实清空两个 init=False runtime 字段；但当前训练 loader、norm、Policy 路径未发现 install 后 replace 调用，现存 replace 均在安装前。实际 TrainConfig replace 后 create_data_config 重建通过，当前调用路径不另列阻塞。
+
+测试命令与输出（均在本 worktree，环境另设 PYTHONDONTWRITEBYTECODE=1、CUDA_VISIBLE_DEVICES=''、JAX_PLATFORMS=cpu、OPENPI_DATA_HOME=/mnt/public/cache/openpi、HF_HUB_OFFLINE=1、HF_LEROBOT_HOME=/mnt/public/xcj/Projects/openpi/data/lerobot）：
+
+```text
+.venv/bin/python -B -m pytest -q -p no:cacheprovider --basetemp=/tmp/review-9b73-wash-author src/openpi/policies/arx_policy_test.py src/openpi/training/config_test.py -k 'wash_cup or defer_padding'
+3 passed, 7 deselected
+
+.venv/bin/python -B -u /tmp/review-9b73-wash.py
+devices: TFRT_CPU_0
+real_loader_PASS x2; real_metadata_PASS x2
+fresh_factory_wire_PASS x2; blocked_source_attempts=[]
+ALL_NEW_WASH_PROBES_PASS
+exit=0
+```
+
+清理：临时独立脚本、pytest basetemp、生成的 metadata/norm 副本与临时日志已删除；两 worktree 非共享、非tracked 源码 cache 扫描为空，未跟随共享软链接。原正式数据、资产、checkpoint、环境和分支保留。剩余仅上述候选兼容性修复及其小增量复验。
