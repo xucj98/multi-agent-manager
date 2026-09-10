@@ -42,9 +42,11 @@ PROJECT_ROOT/workspace/TASK-ID/
 | `mam task create --title TITLE` | Manager | 生成 `TASK-ID`，登记任务，创建 task.md、report.md 草稿和空 workspace；返回 `TASK-ID` 与文件、目录路径，状态为“进行中” |
 | `mam task create --title TITLE --review TASK-ID` | Manager | 创建任务，并在任务草稿中引用源 `TASK-ID` 当前已发布的要求、简报及已登记的交付代码 commit，供执行者 review |
 | `mam task bind TASK-ID --agent AGENT-ID` | Manager | 将已启动的 subagent 绑定到任务；一个未归档任务对应一个执行 agent，一个 agent 同时绑定一个任务 |
-| `mam workspace add TASK-ID --repo REPO --base COMMIT` | 执行者 | 从 `PROJECT_ROOT/REPO` 调用该库的 `.local/create_worktree.sh`，从 base commit 新建 `task/TASK-ID` 分支及对应 `PROJECT_ROOT/workspace` worktree，同时创建环境和共享软链接；登记并返回路径与分支名 |
+| `mam workspace add TASK-ID --repo REPO --base COMMIT` | 执行者 | 从 `PROJECT_ROOT/REPO` 调用该库的 `.local/create_worktree.sh`，从 base commit 新建 `task/TASK-ID` 分支及对应 `PROJECT_ROOT/workspace` worktree，同时创建环境和受控共享软链接；登记并返回路径与分支名 |
 
 `REPO` 不使用固定注册表，而是 `PROJECT_ROOT` 下非空的单层目录名；绝对路径、`.`、`..`、正反斜杠和其他路径逃逸形式都会被拒绝。MAM 仍会确认该目录是 primary Git checkout，并要求其中存在非软链接的 `.local/create_worktree.sh`。涉及哪些库及其 base commit 由任务说明确定，每个库分别调用 workspace add。具体安装和软链接规则由各库脚本负责。同一任务在不同库使用同名 `task/TASK-ID` 分支。
+
+MAM 自身的 `scripts/create_worktree.sh` 在源 MAM 根存在 `.local/README.md` 时，才会在新 worktree 建立指向它的单文件 `.local/README.md` 软链接；不会共享整个 `.local`。源文件缺失或目标已有文件时仍可创建 worktree，且不会覆盖目标。归档只将目录内仅有、且精确指向 primary MAM 根该 README 的链接视为已知忽略内容，其他 `.local` 内容仍会阻止删除。
 
 ## 编辑、发布与查看
 
@@ -98,8 +100,9 @@ job archive 只记录收尾结果，不删除 workspace；任务归档也保留�
 | `mam wait jobs [--task TASK-ID] [--timeout TIMEOUT] [--agent AGENT-ID]` | 所有人 | 默认监控当前所有未归档 job，`--task` 缩小范围。已有确定 stopped job 立即返回 `stopped`；任一运行 job 停止时返回 `stopped`；空集返回 `empty`，超时返回 `timeout`。unknown 探测不视作 stopped。轮询只探测必要 job，不探测 agent，也不持有任务锁睡眠 |
 | `mam wait list` | 所有人 | 即使为空也输出表头；每行是 `AGENT-ID`、绑定任务标题、`TASK-ID`、等待内容、等待开始时间。绑定取等待者自己的未归档任务；没有绑定显示“未绑定”，不使用被监控 job 的负责人代替 |
 | `mam wait stop --agent AGENT-ID` | 所有人 | 仅为该 agent 写取消标记并唤醒等待，返回 `cancelled`；不存在当前等待返回 `not_waiting`。不向 job 进程发信号，不归档 job |
+| `mam wait stop manager` | Manager | 从当前有效等待及未归档任务绑定中找出唯一未绑定任务的等待者并写取消标记。零个、多个或身份无法确认都会报错；等待中的 `--task` 只是监控范围，不是绑定。选中后若原等待已结束或被替换，返回 `not_waiting`，不会取消替换后的等待 |
 
-等待者未指定 `--agent` 时，只读取 `CODEX_THREAD_ID`；不从继承的 `CODEX_SESSION_ID` 推测身份。`AGENT-ID` 缺失、空白或含换行会明确报错。每次 target 探测前检查 deadline，单次远端探测预算不超过 0.5 秒与剩余时限的较小值；允许小幅运行时调度开销。stop 不会被长 SSH 查询无限拖住。
+`mam wait stop` 必须且只能使用 `manager` 或 `--agent AGENT-ID` 之一。等待者未指定 `--agent` 时，只读取 `CODEX_THREAD_ID`；不从继承的 `CODEX_SESSION_ID` 推测身份。`AGENT-ID` 缺失、空白或含换行会明确报错。每次 target 探测前检查 deadline，单次远端探测预算不超过 0.5 秒与剩余时限的较小值；允许小幅运行时调度开销。stop 不会被长 SSH 查询无限拖住。
 
 `job list --attention` 中，即使 job 已确认 stopped，只要 agent 状态未知或查询失败，也明确显示 `unknown/待核实`，与普通待处理项区分。
 

@@ -754,6 +754,75 @@ def active_wait(store, agent):
     return record, observation["status"]
 
 
+def active_wait_records(store):
+    records = []
+    for path in sorted(store.waits.glob("*.json")):
+        if path.is_symlink() or not re.fullmatch(r"[0-9a-f]{64}", path.stem):
+            continue
+        with store.lock(f"wait-{path.stem}"):
+            try:
+                raw = json.loads(path.read_text())
+            except (OSError, ValueError):
+                path.unlink(missing_ok=True)
+                continue
+            agent = raw.get("agent") if isinstance(raw, dict) else None
+            if not isinstance(agent, str) or wait_key(agent) != path.stem:
+                path.unlink(missing_ok=True)
+                continue
+            record, state = active_wait(store, agent)
+            if record:
+                records.append((record, state))
+    return records
+
+
+def bound_wait_agents(store):
+    return {data["agent"] for data in store.all()
+            if data["status"] != "archived" and isinstance(data.get("agent"), str)}
+
+
+def same_wait_record(record, expected):
+    return all(record.get(key) == expected.get(key) for key in ("agent", "pid", "identity", "token"))
+
+
+def cancel_wait(store, agent, expected=None):
+    with store.lock(wait_lock(agent)):
+        record, state = active_wait(store, agent)
+        if not record or (expected is not None and not same_wait_record(record, expected)):
+            return {"status": "not_waiting", "agent": agent}
+        if state != "running":
+            raise Error("waiter identity cannot be verified")
+        record["cancelled"] = now()
+        store.write_wait(record)
+    return {"status": "cancelled", "agent": agent}
+
+
+def manager_wait_target(store):
+    bindings = bound_wait_agents(store)
+    candidates, unverifiable = [], []
+    for record, state in active_wait_records(store):
+        if record["agent"] in bindings:
+            continue
+        if state != "running":
+            unverifiable.append(record["agent"])
+        else:
+            candidates.append(record)
+    if unverifiable:
+        raise Error("cannot verify unbound manager wait identity: " + ", ".join(sorted(unverifiable)))
+    if not candidates:
+        raise Error("no unbound active wait found for manager")
+    if len(candidates) != 1:
+        raise Error("multiple unbound active waits found for manager: "
+                    + ", ".join(sorted(record["agent"] for record in candidates)))
+    return candidates[0]
+
+
+def wait_stop_manager(store):
+    # Keep a task binding from changing while the selected unbound wait is cancelled.
+    with store.lock("bindings"):
+        target = manager_wait_target(store)
+        return cancel_wait(store, target["agent"], expected=target)
+
+
 def begin_wait(store, agent, task, timeout):
     observation = runtime().probe_process("local", os.getpid())
     if observation["status"] != "running" or not isinstance(observation.get("identity"), dict):
@@ -850,23 +919,7 @@ def wait_description(record):
 
 
 def wait_list(store, args):
-    records = []
-    for path in sorted(store.waits.glob("*.json")):
-        if path.is_symlink() or not re.fullmatch(r"[0-9a-f]{64}", path.stem):
-            continue
-        with store.lock(f"wait-{path.stem}"):
-            try:
-                raw = json.loads(path.read_text())
-            except (OSError, ValueError):
-                path.unlink(missing_ok=True)
-                continue
-            agent = raw.get("agent") if isinstance(raw, dict) else None
-            if not isinstance(agent, str) or wait_key(agent) != path.stem:
-                path.unlink(missing_ok=True)
-                continue
-            record, state = active_wait(store, agent)
-            if record and state == "running":
-                records.append(record)
+    records = [record for record, state in active_wait_records(store) if state == "running"]
     bindings = {data["agent"]: data for data in store.all() if data["status"] != "archived" and data["agent"]}
     return [{"agent": record["agent"], "task_title": bindings[record["agent"]]["title"] if record["agent"] in bindings else "未绑定",
              "task": bindings[record["agent"]]["id"] if record["agent"] in bindings else "未绑定",
@@ -874,16 +927,12 @@ def wait_list(store, args):
 
 
 def wait_stop(store, args):
-    agent = wait_agent(args)
-    with store.lock(wait_lock(agent)):
-        record, state = active_wait(store, agent)
-        if not record:
-            return {"status": "not_waiting", "agent": agent}
-        if state != "running":
-            raise Error("waiter identity cannot be verified")
-        record["cancelled"] = now()
-        store.write_wait(record)
-    return {"status": "cancelled", "agent": agent}
+    agent, manager = getattr(args, "agent", None), getattr(args, "manager", None)
+    if (agent is None) == (manager is None):
+        raise Error("choose exactly one wait stop target: manager or --agent AGENT-ID")
+    if manager is not None:
+        return wait_stop_manager(store)
+    return cancel_wait(store, wait_agent(args))
 
 
 def task_list(store, args):
@@ -958,6 +1007,19 @@ def ignored_link(repo, name):
     return False
 
 
+def controlled_local_readme(repo):
+    local = repo / ".local"
+    readme = local / "README.md"
+    if local.is_symlink() or not local.is_dir() or not readme.is_symlink():
+        return False
+    try:
+        entries = list(local.iterdir())
+        expected = primary(repo) / ".local" / "README.md"
+        return entries == [readme] and os.readlink(readme) == str(expected)
+    except OSError:
+        return False
+
+
 def dirty(repo):
     output = git(repo, "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--ignore-submodules=none", "--ignored=matching").stdout
     ignored, problems = [], []
@@ -965,7 +1027,9 @@ def dirty(repo):
         if not item:
             continue
         code, name = item[:2], os.fsdecode(item[3:])
-        if code == b"!!" and (name.rstrip("/").split("/", 1)[0] == ".venv" or ignored_link(repo, name)):
+        if code == b"!!" and (name.rstrip("/").split("/", 1)[0] == ".venv" or ignored_link(repo, name)
+                              or (name.rstrip("/") in (".local", ".local/README.md")
+                                  and controlled_local_readme(repo))):
             ignored.append(name)
         else:
             problems.append(f"{os.fsdecode(code)} {name}")
@@ -1113,7 +1177,8 @@ def parser():
     p = command(waits, "list", "list current waits")
     p.set_defaults(func=wait_list, renderer="wait_list")
     p = command(waits, "stop", "wake one waiter without changing its monitored jobs")
-    p.add_argument("--agent", required=True, metavar="AGENT-ID", help="waiter AGENT-ID")
+    p.add_argument("manager", nargs="?", choices=("manager",), help="stop the unique unbound manager wait")
+    p.add_argument("--agent", metavar="AGENT-ID", help="waiter AGENT-ID")
     p.set_defaults(func=wait_stop)
     w = command(commands, "workspace", "manage repository worktrees and their environments").add_subparsers(required=True)
     p = command(w, "add", "create a repository worktree using its local environment entry")

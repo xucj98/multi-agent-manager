@@ -109,6 +109,12 @@ printf env > "$target/.venv/marker"
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout.splitlines()
 
+    def wait_record(self, agent, pid, token, task=None):
+        return {"agent": agent, "pid": pid,
+                "identity": {"host": "local", "boot_id": "test-boot", "start_ticks": pid},
+                "token": token, "kind": "jobs", "task": task, "timeout": None,
+                "started_at": "test", "cancelled": None}
+
     def test_parallel_publications_preserve_drafts_and_index(self):
         first, second, draft = self.task(), self.task(), self.task()
         (self.root / "code.py").write_text("staged = True\n")
@@ -528,11 +534,39 @@ printf env > "$target/.venv/marker"
         linked = self.projects / "production state"
         self.git(self.root, "worktree", "add", "-b", "project/state-vla", str(linked), "main")
         self.configure(self.projects, linked, "project/state-vla")
+
+        missing = self.task()
+        missing_path = Path(self.add(missing)["path"])
+        self.assertFalse((missing_path / ".local").exists())
+        self.call("archive", missing, "--note", "missing local README is allowed")
+
+        source_readme = self.root / ".local/README.md"
+        source_readme.write_text("Primary local instructions.\n")
         task = self.task()
         path = Path(self.add(task)["path"])
+        local, linked_readme = path / ".local", path / ".local/README.md"
+        self.assertTrue(local.is_dir())
+        self.assertFalse(local.is_symlink())
+        self.assertEqual(list(local.iterdir()), [linked_readme])
+        self.assertTrue(linked_readme.is_symlink())
+        self.assertEqual(linked_readme.readlink(), source_readme)
+        self.assertEqual(linked_readme.read_text(), "Primary local instructions.\n")
         command = [str(path / ".venv/bin/python"), "-B", str(path / ".venv/bin/mam"), "task", "status", task]
         self.assertEqual(json.loads(subprocess.check_output(command, cwd=path))["id"], task)
         self.assertEqual(cli.Store(cli.project_config(path)).root, linked)
+
+        linked_readme.unlink()
+        linked_readme.write_text("Keep this conflicting file.\n")
+        retry = subprocess.run(["bash", str(scripts / "create_worktree.sh"), self.git(self.root, "rev-parse", "main"),
+                                f"task/{task}", str(path.parent), sys.executable], cwd=self.root,
+                               capture_output=True, text=True)
+        self.assertEqual(retry.returncode, 0, retry.stdout + retry.stderr)
+        self.assertEqual(linked_readme.read_text(), "Keep this conflicting file.\n")
+        self.call("archive", task, "--note", "conflicting local README remains protected", ok=False)
+        self.assertTrue(path.exists())
+
+        linked_readme.unlink()
+        linked_readme.symlink_to(source_readme)
         self.call("archive", task, "--note", "stdlib smoke finished")
         self.assertFalse(path.parent.exists())
 
@@ -805,6 +839,123 @@ printf env > "$target/.venv/marker"
             if child.poll() is None:
                 child.terminate()
                 child.wait(timeout=3)
+
+    def test_wait_stop_manager_selects_unbound_waiter_and_keeps_job_running(self):
+        monitored, execution = self.task(), self.task()
+        self.call("bind", monitored, "--agent", "job-owner")
+        self.call("bind", execution, "--agent", "execution-agent")
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
+        waiters = []
+        try:
+            self.call("add", monitored, "--note", "manager stop smoke", "--host", "localhost", "--pid", str(child.pid), command="job")
+            for agent in ("manager-agent", "execution-agent"):
+                waiters.append((agent, subprocess.Popen([str(MAM), "wait", "jobs", "--task", monitored,
+                                                          "--agent", agent, "--timeout", "10"], stdout=subprocess.PIPE,
+                                                         stderr=subprocess.PIPE, text=True, cwd=self.projects)))
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                if {row.split("\t")[0] for row in self.wait_list_lines()[1:]} == {"manager-agent", "execution-agent"}:
+                    break
+                time.sleep(0.05)
+            else:
+                self.fail("manager and execution waits were not registered")
+            self.assertIn("choose exactly one", self.wait_call("stop", ok=False)["error"])
+            self.assertIn("choose exactly one", self.wait_call("stop", "manager", "--agent", "manager-agent", ok=False)["error"])
+
+            started = time.monotonic()
+            stopped = self.wait_call("stop", "manager")
+            self.assertLess(time.monotonic() - started, 2)
+            self.assertEqual(stopped, {"status": "cancelled", "agent": "manager-agent"})
+            manager_waiter = waiters[0][1]
+            stdout, stderr = manager_waiter.communicate(timeout=3)
+            self.assertEqual(manager_waiter.returncode, 0, stderr)
+            self.assertEqual(json.loads(stdout)["status"], "cancelled")
+            self.assertIsNone(waiters[1][1].poll(), "bound execution wait must be excluded")
+            self.assertIsNone(child.poll(), "manager stop must not signal the monitored job")
+            self.assertEqual(self.wait_call("stop", "--agent", "execution-agent")["status"], "cancelled")
+            stdout, stderr = waiters[1][1].communicate(timeout=3)
+            self.assertEqual(waiters[1][1].returncode, 0, stderr)
+            self.assertEqual(json.loads(stdout)["status"], "cancelled")
+        finally:
+            for agent, waiter in waiters:
+                if waiter.poll() is None:
+                    subprocess.run([str(MAM), "wait", "stop", "--agent", agent], capture_output=True, cwd=self.projects)
+                    waiter.terminate()
+                    waiter.wait(timeout=3)
+            if child.poll() is None:
+                child.terminate()
+                child.wait(timeout=3)
+
+    def test_wait_stop_manager_requires_unique_verifiable_unbound_waiter(self):
+        states = {1: "running", 2: "running", 3: "unknown", 4: "running", 5: "running", 6: "running"}
+        fake = types.SimpleNamespace(probe_process=lambda host, pid, identity, timeout=None:
+                                     {"status": states[pid], "identity": identity})
+        args = types.SimpleNamespace(agent=None, manager="manager")
+        with patch.object(cli, "runtime", return_value=fake):
+            with self.assertRaisesRegex(cli.Error, "no unbound active wait"):
+                cli.wait_stop(self.store, args)
+
+            self.store.write_wait(self.wait_record("first-manager", 1, "first"))
+            self.store.write_wait(self.wait_record("second-manager", 2, "second"))
+            with self.assertRaisesRegex(cli.Error, "multiple unbound active waits"):
+                cli.wait_stop(self.store, args)
+            self.store.remove_wait("first-manager")
+            self.store.remove_wait("second-manager")
+
+            bound_task = self.task()
+            self.call("bind", bound_task, "--agent", "bound-executor")
+            self.store.write_wait(self.wait_record("bound-executor", 1, "bound"))
+            self.store.write_wait(self.wait_record("manager-agent", 2, "manager", task=bound_task))
+            self.assertEqual(cli.wait_stop(self.store, args), {"status": "cancelled", "agent": "manager-agent"})
+            self.assertIsNone(self.store.read_wait("bound-executor")["cancelled"])
+            self.store.remove_wait("bound-executor")
+            self.store.remove_wait("manager-agent")
+
+            self.store.write_wait(self.wait_record("unverified-manager", 3, "unknown"))
+            self.store.write_wait(self.wait_record("other-manager", 4, "other"))
+            with self.assertRaisesRegex(cli.Error, "cannot verify unbound manager wait identity"):
+                cli.wait_stop(self.store, args)
+            self.assertIsNone(self.store.read_wait("other-manager")["cancelled"])
+            self.store.remove_wait("unverified-manager")
+            self.store.remove_wait("other-manager")
+
+            selected = self.wait_record("racing-manager", 5, "old")
+            replacement = self.wait_record("racing-manager", 6, "new")
+            self.store.write_wait(selected)
+
+            def replace_selected(_store):
+                self.store.write_wait(replacement)
+                return selected
+
+            with patch.object(cli, "manager_wait_target", side_effect=replace_selected):
+                self.assertEqual(cli.wait_stop_manager(self.store), {"status": "not_waiting", "agent": "racing-manager"})
+            self.assertIsNone(self.store.read_wait("racing-manager")["cancelled"])
+
+            self.store.write_wait(selected)
+
+            def finish_selected(_store):
+                self.store.remove_wait("racing-manager")
+                return selected
+
+            with patch.object(cli, "manager_wait_target", side_effect=finish_selected):
+                self.assertEqual(cli.wait_stop_manager(self.store), {"status": "not_waiting", "agent": "racing-manager"})
+
+    def test_wait_stop_manager_isolated_by_project_configuration(self):
+        other_projects = Path(self.temp.name) / "Other Projects"
+        other_root = self.source("multi-agent-manager", other_projects)
+        other_store = cli.Store(self.configure(other_projects, other_root))
+        observation = cli.runtime().probe_process("local", os.getpid())
+        self.assertEqual(observation["status"], "running")
+        first = self.wait_record("first-manager", os.getpid(), "first")
+        first["identity"] = observation["identity"]
+        second = self.wait_record("second-manager", os.getpid(), "second")
+        second["identity"] = observation["identity"]
+        self.store.write_wait(first)
+        other_store.write_wait(second)
+
+        self.assertEqual(self.wait_call("stop", "manager"), {"status": "cancelled", "agent": "first-manager"})
+        self.assertTrue(self.store.read_wait("first-manager")["cancelled"])
+        self.assertIsNone(other_store.read_wait("second-manager")["cancelled"])
 
     def test_waiters_for_two_agents_are_independent(self):
         task = self.task()
