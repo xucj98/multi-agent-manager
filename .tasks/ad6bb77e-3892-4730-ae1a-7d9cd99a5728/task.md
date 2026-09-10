@@ -40,6 +40,8 @@ Manager于10:37实测本机GPU2–7各1MiB占用、81038MiB空闲、0%利用率�
 report注明最新task_revision、workspace/实际SHA、两配置gate/正式状态、job/PID/输出路径、剩余与下一巡检。详细旧证据以publication/文件指针引用，不重复累积历史段落。
 # 用户追加：验证保存精度与现有推理路径等价（12:25）
 
+12:35新增用户要求：还需要将已训练模型转成BF16做真实rollout。因此本次必须以F0使用的完整旧模型 /mnt/public/xcj/Projects/RMBench/policy/pi05/checkpoints/pi05_full_key_state/shared_memory_full_key_state_seed0/30000 为主比较源。数值一致性通过后的BF16副本需保留为正式评测输入，不能按下文临时副本规则删除它。目标固定为 /mnt/public/xcj/Projects/openpi/user_checkpoints/precision_validation/rearrange_full_key_state_30k_bf16/30000；创建前检查不存在，不覆盖已有内容。只保留params、assets与完整继承metadata，训练来源metadata不改写成另一场训练；在metadata下保存本次导出实际命令、所调用代码commit、原checkpoint位置及本次dtype转换说明，沿用command/config留痕，不另造大套provenance。metadata需足够让下一owner明确这是同一旧30k模型的导出副本，不是新训练。导出验证完成后优先发出可用路径/bytes/逐值比较结果，Manager另派agent做独立GPU100rollout，你继续负责wash训练。其他临时副本/辅助文件仍清理；导出命令须完整留在metadata便于复现。
+
 用户要求：若实际推理依赖FP32，不能为省空间擅自改成BF16保存。Manager已只读确认原RMBench fork与独立openpi的policy_config均在JAX推理restore时显式dtype=jnp.bfloat16；训练主参数/优化器仍FP32，主干计算混合BF16，部分运算FP32。需要验证“FP32保存→按现有入口加载BF16”与“同一FP32参数先按现有导出函数保存BF16→再加载BF16”恢复权重一致。
 
 本轮只做CPU、临时产物验证，不改任何源码、正常训练进程、config或保存参数；不用GPU、不重复wash50训练。复用你的独立环境，显式JAX_PLATFORMS=cpu。选实际存在、metadata证实FP32的旧checkpoint，可优先用 /mnt/public/xcj/Projects/RMBench/policy/pi05/checkpoints/pi05_full_key_state/shared_memory_full_key_state_seed0/30000 或原pi05_base。如需核对新增serial小head，使用已有旧drawer serial checkpoint或小型有明确数值的head参数补充，不伪造真实模型完成情况。
