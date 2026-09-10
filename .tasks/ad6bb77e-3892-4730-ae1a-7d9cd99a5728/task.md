@@ -38,3 +38,12 @@ Manager于10:37实测本机GPU2–7各1MiB占用、81038MiB空闲、0%利用率�
 20k结束核对更新数、唯一20000、完整shape/BF16/model-only、metadata/assets及checkpoint-only恢复，交Manager/评测owner安排固定5ep offline。未安排前不占其他GPU做offline。记录结果、处理临时产物后mam job archive，最终Manager归档workspace/分支。
 
 report注明最新task_revision、workspace/实际SHA、两配置gate/正式状态、job/PID/输出路径、剩余与下一巡检。详细旧证据以publication/文件指针引用，不重复累积历史段落。
+# 用户追加：验证保存精度与现有推理路径等价（12:25）
+
+用户要求：若实际推理依赖FP32，不能为省空间擅自改成BF16保存。Manager已只读确认原RMBench fork与独立openpi的policy_config均在JAX推理restore时显式dtype=jnp.bfloat16；训练主参数/优化器仍FP32，主干计算混合BF16，部分运算FP32。需要验证“FP32保存→按现有入口加载BF16”与“同一FP32参数先按现有导出函数保存BF16→再加载BF16”恢复权重一致。
+
+本轮只做CPU、临时产物验证，不改任何源码、正常训练进程、config或保存参数；不用GPU、不重复wash50训练。复用你的独立环境，显式JAX_PLATFORMS=cpu。选实际存在、metadata证实FP32的旧checkpoint，可优先用 /mnt/public/xcj/Projects/RMBench/policy/pi05/checkpoints/pi05_full_key_state/shared_memory_full_key_state_seed0/30000 或原pi05_base。如需核对新增serial小head，使用已有旧drawer serial checkpoint或小型有明确数值的head参数补充，不伪造真实模型完成情况。
+
+使用当前_model.restore_params、_cast_floating_params及实际Orbax保存/恢复机制比较全部浮点叶子（键、shape、dtype、逐值一致性及不一致计数，不用宽松allclose隐藏差异）。分别报告原文件dtype、推理恢复dtype，以及两条路径是否相等；若存在差异，先报告具体值/张量/转换路径，不假定不会影响性能。范围是验证当前BF16推理是否引入额外权重变化，不能据此声称与真正FP32推理等价，不能声称BF16导出可恢复FP32训练精度。若只完成参数一致性，不冒充已经跑了动作/rollout对比。
+
+原checkpoint只读；临时导出放本任务workspace的明确新建子目录，验收数值结论写report后删除该临时副本和辅助脚本。无需额外持久provenance框架。CPU耗时预计少于一小时，若实际预计超过则登记job。不要重做本小时训练巡检；13:02仍按已约定时间巡检。发布简短report，保留原训练状态与产物定位。
