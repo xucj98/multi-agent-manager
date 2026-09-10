@@ -26,3 +26,12 @@ git diff --check 351c3a3..fbfdedc
 - `/mnt/public/xcj/Projects/table-1000/workspace/b1df7da1-8f3a-453c-97da-a58cec90b93f/multi-agent-manager`
 - 分支：`task/b1df7da1-8f3a-453c-97da-a58cec90b93f`
 - 无实施改动。
+
+## 用户文档拆分增量审查
+
+通过。只读审查了 `fbfdedcebfeb78046ec2b15902dc54ed2b43a52b..fd28c23e72d49951ef508aea7d80361365598ec2`（包含 manager 澄清 commit `798bb012dfe578e45f58f04eb89a1d7889970a2b`），未发现信息丢失、范围混淆或失效链接。
+
+- `docs/install.md` 现在只保留安装、PATH 与项目 `.mam/env.json` 配置；MAM 自身的解释器、editable 安装、构建后端前提、验证和合并流程都已迁入 `docs/development.md`。
+- `docs/development.md` 明确只适用于 MAM 自身，保留从 `main` 建立独立 worktree、Python >=3.10、被忽略的 local 配置、`flit_core` 前提、完整单测和独立 review/合并语义；不会把这些要求错误施加给被管理仓库。
+- `README.md` 的“开发验证”仅保留到开发说明的一句引用；`AGENTS.md` 最后的开发指引已按要求删除。`README -> docs/development.md`、`docs/development.md -> ../README.md` 和 `install.md` 的相对目标均存在，相关标题与锚点一致。
+- 执行了 `git diff --check` 和 Git 对链接目标文件的静态存在性检查；这是纯文档增量，按要求没有运行安装或测试。
