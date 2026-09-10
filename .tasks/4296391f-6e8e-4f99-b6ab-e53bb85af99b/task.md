@@ -15,3 +15,8 @@
 5. 作者launcher新commit到达后独立检查metadata.query_stride缺失与schema execution.rows的真实兼容行为，只把对应含义一致的字段校验，不混淆训练采样与执行K。用真实失败served_metadata反例与旧drawermetadata验证，给出可重试准入结论。
 
 先30分钟内报告关键阻塞和最小方案；能完成则直接提交有用交付。简报写任务完成项、workspace/两库commit、测试和可复制入口、真实部署未验收项，发布report。清理自己的测试缓存/临时文件，保留worktree供验收归档。全程不占GPU，保持与b86写集分离。
+
+## 07:51 现场入口与优先复核
+用户确认现用启动入口scripts/launch/x1pro_takeover.sh，环境由现场WSL的~/.robot_bridge_env.sh加载；当前训练服务器及用户均不在内网。policy为jx-4090-2，robot为jx-x1pro-060，master/scheduler为jx-x1pro-m-060。内网URL在用户消息，文档不硬编码这些地址，也不从此服务器探测连接；跳板机由用户确认，内网同事最终执行。部署说明沿原RB_POLICY_SSH/URL、RB_ROBOT_SSH/URL、RB_MASTER_SSH/URL、RB_SCHEDULER_SSH机制，说明哪些是现场既有值、哪些模型相关值要换。先交付可供同事执行的现有入口，不新建跨网框架，不发送真实动作。
+
+offline修复commit已到124049fb78d29db1d77d13a9fd4a4b698fcfe6e9（作者report已发布）：只改launcher和测试。请优先在自己的分支推进到该commit，对真实缺顶层query_stride的served_metadata/新schema K校验做约5–10分钟定向复核并先报告准入结论，让offline GPU2尽快重试；随后继续live/offline一致性与部署文档。重点确认数据采样stride与执行K不被混同、实际source/clean gate保留、legacy drawer不回归。你尚无业务实现修改时直接ff即可；若有自己修改先妥善保存，不丢代码。后续若改live文件，与作者launcher写集仍分离。
