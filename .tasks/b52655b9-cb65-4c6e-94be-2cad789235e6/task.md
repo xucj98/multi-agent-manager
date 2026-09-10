@@ -21,3 +21,6 @@ wuwen-2只作只读设计参考，与本机并不共享/mnt/public；禁止通�
 
 # 用户明确授权最终缓存布局与manager策略裁决
 统一 ~/.cache -> /mnt/public/xcj/cache，uv store=/mnt/public/xcj/cache/uv。迁移agent负责旧~/.cache及canonical.local/uv-cache整合与校验，环境任务暂停uv写入并协调，再使用稳定新路径。最终采用uv --link-mode symlink复用三方包文件；各worktree.venv实体独立，editable以--no-deps --link-mode copy -e 自己worktree安装，避免共享editable元数据。已由独立实验验证A升级/卸载不影响B、同名editable代码隔离；包store必须持久保留，文档禁止clean/prune/手工改删共享包文件。正式验证新增完整环境实际时间/磁盘占用、symlink去向、隔离和smoke；不把copy/hardlink当最终成功，hardlink因yrfs能力不可用需要明确说明。
+
+# 用户追加：同集群远端只运行已建环境
+worktree仅本地创建，wuwen-4090-2与wuwen-4090-3只运行代码，无须共享uv工具或远端安装。manager已只读确认两机共享项目路径存在，均x86_64/glibc2.39、/usr/bin/python3.12可用。请用最终新symlink环境SSH两机直接激活/运行python（无uv），验证CPU smoke、真实资产加载和最小场景/渲染能力；选择空闲GPU、不启动长任务。若系统Python实际兼容则无需额外shared3.12，否则报告后采用共享持久解释器。文档明确uv仅本地创建工具，运行端依赖Python/包store/资产共享路径和驱动。
