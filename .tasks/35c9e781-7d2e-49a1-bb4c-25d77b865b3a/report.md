@@ -1,4 +1,4 @@
-task_revision: 13c1584029258b758b3215cb3009d4d9c1c37052
+task_revision: 1dc0d33b8783f532702f33e597802d390d943c41
 
 ## CPU 留痕修正完成，GPU0 已移交
 
@@ -68,19 +68,24 @@ config_source 文件和 command_source。
 
 正式 100 已于 **2026-09-10 13:20:30 +08:00** 在 GPU0 可靠脱离启动，主 runner 为
 `is-dcfi2kjdq7g3k6aa-devmachine-0:2710786`，MAM job 为
-`577e7ab0-eb55-4c65-bed5-3b725e958435`（已登记 running）。正式产物为：
+`577e7ab0-eb55-4c65-bed5-3b725e958435`（实时 `mam job list --task` 状态为 running）。正式产物为：
 
 `RMBench/eval_result/memory_chunk_20260910/precision_rearrange_full_row30_bf16_100ep_seed0`
 
-启动后已创建 formal 产物目录并进入服务加载；首条 accepted rollout 尚在执行，随后更新本报告。
+首条 accepted rollout 已完成：episode 0 / seed 100000 / **Success**，391 step，12/12 任务条件为真、
+无 failure reason，视频 391 帧通过。formal config 仍记录 BF16 checkpoint 和私有 manifest
+SHA256 `f03b5c67b521774fe1a2bd9df511a13d7ae583ad7630cedfed0fd50a09df5ca8`；14 个已执行 query
+trace 全部为 selector index29 / row30。runner 已在 formal 中接受同卡 smoke compatibility
+(`4e5cea45b647a12fa59327fc489174f6b631300a98105081ed7e149aa9e95dc0`)。
 
 ### 后续检查
 
-保持同一连续 run、GPU0 与冻结输入。首条完成后核对真实加载/row30/诊断；第 50 条按 92/100
-主基线与 45/50 同 seed 辅助基线检查，完成后做逐 seed 配对统计、失败类别与结果 README。
+保持同一连续 run、GPU0 与冻结输入。按最新 MAM 规则以
+`mam job list --task 35c9e781-7d2e-49a1-bb4c-25d77b865b3a` 刷新实际 job 状态；第 50 条按
+92/100 主基线与 45/50 同 seed 辅助基线检查，完成后做逐 seed 配对统计、失败类别与结果 README。
 
 完成与未完成：CPU 环境、输入留痕、基线修正、CPU/真实输出继承检查与两条 BF16 smoke 已完成；
-正式 100 已启动，首条、50 条检查、100 条收尾、逐 seed 配对统计和结果 README 尚未完成。
+正式 100 运行中，首条检查通过；50 条检查、100 条收尾、逐 seed 配对统计和结果 README 尚未完成。
 
 workspace、各库交付 commit：RMBench
 `f022badd11228e5763a301339a5d1fe5574962b4`；robot-bridge
