@@ -1,3 +1,19 @@
+# 06:53正式仿真安排：八份20k CPU准备完成，等待本机释放
+
+task_revision: 1ecd0431d361e738b25ab5aba43e07aa0b1b729a
+
+复用原三树/干净版本，无新代码提交。训练owner已发布远端八份最终20000保存和CPU全参数门禁通过。本轮对这八份实际checkpoint逐项运行原入口 --prepare-audit、smoke --dry-run、formal --dry-run（共24次），全部exit0。metadata→Context验证H50/K30、schema/字段/反馈和demo_clean_state来源，审计生成物仅在本worktree .local/memory_schema_eval；未改写checkpoint，未加载GPU模型。
+
+已准备：rearrange t+1/t+30 seed0/1、put-back t+1/t+30 seed0、serial/no-memory seed0。每份实际CPU输出保留于 RMBench/.local/memory_schema_eval/cpu_20k_20260911，既有manifest/evidence位于其inputs同级目录，开跑后由config_source继承到结果run。
+
+首批按发布分配：GPU4=rearrange t+1 seed0（19440/19442），GPU6=rearrange t+30 seed0（19460/19462），GPU5=put-back t+1 seed0（19450/19452），GPU7=put-back t+30 seed0（19470/19472）；各卡独立Warp缓存。仍须owner发布各卡保存/退出/释放且启动前显存确认才执行。GPU0/1不抢占，GPU2/3留wash，wuwen-1停用。
+
+目前八份仅CPU准备完成，GPU smoke/formal尚未启动，无本任务GPU job。保持active turn，通过mam wait等待训练结束事件，再读取owner释放报告；不得将事件或ETA本身当作释放授权。正式运行将登记各job、做50条诊断与100条收尾。旧配置/训练步数不一致的F0成绩不作强制可比基准。
+
+下文保留前轮CPU队列与wash接口交付；wash公共修复由Manager协调，本轮专注正式sim。
+
+---
+
 # 9月11日04:32 CPU评测准备交付
 
 已准备：原README新增14个仿真模型的checkpoint绝对路径和28个独立run名，12个Q2按seed0/1/2、每seed rearrange与put-back各t+1→t+30成对排队，最后serial/no-memory基线。补齐put-back seed2；继续复用原prepare-audit/smoke/formal命令、既有runner/recorder，不新增launcher或调度框架。
