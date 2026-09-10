@@ -425,6 +425,49 @@ printf env > "$target/.venv/marker"
         self.assertFalse(self.call("status", other)["repos"])
         self.assertTrue(Path(first["path"]).is_dir())
 
+    def test_workspace_add_accepts_project_repo_names_and_rejects_path_inputs(self):
+        name = "project-specific-repository"
+        source = self.source(name)
+        task = self.task()
+        record = self.add(task, name)
+        self.assertEqual(record["source"], str(source))
+        self.assertEqual(record["path"], str(self.projects / "workspace" / task / name))
+        self.assertEqual(self.call("status", task)["repos"][name]["state"], "ready")
+
+        state = self.store.state / f"{task}.json"
+        before = state.read_bytes()
+        base = self.git(source, "rev-parse", "main")
+        for invalid in ("", ".", "..", "../outside", "/tmp/outside", "nested/repository", "nested\\repository"):
+            with self.subTest(invalid=invalid):
+                rejected = self.call("add", task, "--repo", invalid, "--base", base, command="workspace", ok=False)
+                self.assertIn("repository name must be a non-empty single directory name", rejected["error"])
+                self.assertEqual(state.read_bytes(), before)
+
+        help_result = subprocess.run([str(MAM), "workspace", "add", "--help"], capture_output=True, text=True)
+        self.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
+        self.assertIn("below PROJECT_ROOT", help_result.stdout)
+        self.assertNotIn("robot-bridge", help_result.stdout)
+
+        missing = self.source("no-entry-repository")
+        (missing / ".local" / "create_worktree.sh").unlink()
+        missing_task = self.task()
+        missing_result = self.add(missing_task, "no-entry-repository", ok=False)
+        self.assertIn("has no .local/create_worktree.sh", missing_result["error"])
+        self.assertFalse(self.store.read(missing_task)["repos"])
+
+        linked_entry = self.source("linked-entry-repository")
+        entry = linked_entry / ".local" / "create_worktree.sh"
+        entry.unlink()
+        entry.symlink_to(linked_entry / "code.py")
+        linked_task = self.task()
+        linked_result = self.add(linked_task, "linked-entry-repository", ok=False)
+        self.assertIn("symlinked path is not allowed", linked_result["error"])
+        self.assertFalse(self.store.read(linked_task)["repos"])
+
+        self.call("archive", task, "--note", "custom repository cleanup")
+        self.assertFalse(Path(record["path"]).exists())
+        self.assertFalse(cli.branch_exists(source, f"task/{task}"))
+
     def test_archive_protects_code_and_shared_entities(self):
         self.source("robot-bridge")
         task = self.task()

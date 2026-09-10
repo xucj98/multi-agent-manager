@@ -18,7 +18,6 @@ import tempfile
 import time
 import uuid
 
-REPOS = ("multi-agent-manager", "RMBench", "opendm", "openpi", "robot-bridge")
 ENV_FILE = Path(".mam") / "env.json"
 WAIT_POLL_SECONDS = 0.2
 WAIT_PROBE_TIMEOUT_SECONDS = 0.5
@@ -63,6 +62,19 @@ def safe_path(path):
     if path.resolve() != path or path.is_symlink():
         raise Error(f"symlinked path is not allowed: {path}")
     return path
+
+
+def repository_name(value):
+    if not isinstance(value, str) or not value:
+        raise Error("repository name must be a non-empty single directory name")
+    if value in (".", "..") or "/" in value or "\\" in value or "\0" in value:
+        raise Error("repository name must be a non-empty single directory name")
+    path = Path(value)
+    if path.is_absolute():
+        raise Error("repository name must be a non-empty single directory name")
+    if len(path.parts) != 1 or path.name != value:
+        raise Error("repository name must be a non-empty single directory name")
+    return value
 
 
 def configured_directory(key, raw):
@@ -264,8 +276,7 @@ def optional_doc(store, task, kind):
 
 
 def repo_context(store, data, name, record):
-    if name not in REPOS:
-        raise Error(f"unknown registered repository: {name}")
+    name = repository_name(name)
     source = safe_path(store.project_root / name)
     workspace = safe_path(data["workspace"])
     path = safe_path(workspace / name)
@@ -275,6 +286,13 @@ def repo_context(store, data, name, record):
     if primary(source) != source:
         raise Error(f"source is not a primary checkout: {source}")
     return source, path, branch
+
+
+def workspace_entry(source):
+    entry = safe_path(source / ".local" / "create_worktree.sh")
+    if not entry.is_file():
+        raise Error(f"source repository has no .local/create_worktree.sh: {source}")
+    return entry
 
 
 def live(store, data, name, record):
@@ -338,24 +356,26 @@ def bind(store, args):
 
 
 def workspace_add(store, args):
+    name = repository_name(args.repo)
     with store.lock(args.task):
         data = store.read(args.task, writable=True)
-        source = safe_path(store.project_root / args.repo)
+        source = safe_path(store.project_root / name)
         if primary(source) != source:
             raise Error(f"source is not a primary checkout: {source}")
+        entry = workspace_entry(source)
         base = head(source, args.base)
         branch = f"task/{args.task}"
-        path = safe_path(Path(data["workspace"]) / args.repo)
-        record = data["repos"].get(args.repo)
+        path = safe_path(Path(data["workspace"]) / name)
+        record = data["repos"].get(name)
         if record:
-            repo_context(store, data, args.repo, record)
+            repo_context(store, data, name, record)
             if base != record["base"]:
                 raise Error("retry base differs from registered base")
             if record["state"] == "ready":
-                live(store, data, args.repo, record)
+                live(store, data, name, record)
                 return record
             if path.exists():
-                live(store, data, args.repo, record)
+                live(store, data, name, record)
             elif branch_exists(source, branch):
                 raise Error("partial creation left a branch; archive this task before creating a replacement")
         else:
@@ -363,19 +383,19 @@ def workspace_add(store, args):
                 raise Error("unregistered worktree or branch already exists; refusing to adopt it")
             record = {"source": str(source), "path": str(path), "branch": branch, "base": base,
                       "state": "creating", "removed": False, "branch_removed": False, "error": None}
-            data["repos"][args.repo] = record
+            data["repos"][name] = record
         safe_path(data["workspace"]).mkdir(parents=True, exist_ok=True)
         store.write(data)
         try:
-            result = run(["bash", source / ".local/create_worktree.sh", base, branch, data["workspace"]], check=False)
+            result = run(["bash", entry, base, branch, data["workspace"]], check=False)
             if result.returncode:
                 raise Error((os.fsdecode(result.stderr + result.stdout).strip() or "environment entry failed")[-3000:])
-            live(store, data, args.repo, record)
+            live(store, data, name, record)
             record["state"], record["error"] = "ready", None
         except (OSError, Error) as exc:
             record["state"], record["error"] = "failed", str(exc)
             store.write(data)
-            raise Error(f"workspace add failed; {args.repo} remains registered: {exc}")
+            raise Error(f"workspace add failed; {name} remains registered: {exc}")
         store.write(data)
     return record
 
@@ -1098,7 +1118,7 @@ def parser():
     w = command(commands, "workspace", "manage repository worktrees and their environments").add_subparsers(required=True)
     p = command(w, "add", "create a repository worktree using its local environment entry")
     p.add_argument("task", metavar="TASK-ID", help="registered task")
-    p.add_argument("--repo", choices=REPOS, required=True, metavar="REPO", help="source repository")
+    p.add_argument("--repo", required=True, metavar="REPO", help="single source repository directory below PROJECT_ROOT")
     p.add_argument("--base", required=True, metavar="COMMIT", help="base commit for the task branch")
     p.set_defaults(func=workspace_add)
     return cli
