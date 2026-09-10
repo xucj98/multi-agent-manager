@@ -36,7 +36,7 @@ def identifier(value):
         if str(uuid.UUID(value)) != value:
             raise ValueError()
     except (ValueError, AttributeError):
-        raise Error(f"expected canonical UUID: {value}")
+        raise Error(f"expected canonical TASK-ID: {value}")
     return value
 
 
@@ -105,12 +105,12 @@ class Store:
     def read(self, task, *, writable=False):
         path = safe_path(self.state / f"{identifier(task)}.json")
         if not path.is_file():
-            raise Error(f"task is not registered: {task}")
+            raise Error(f"TASK-ID is not registered: {task}")
         data = json.loads(path.read_text())
         if data["id"] != task or data["workspace"] != str(self.workspaces / task):
-            raise Error(f"registration has inconsistent task/workspace: {path}")
+            raise Error(f"registration has inconsistent TASK-ID/workspace: {path}")
         if writable and data["status"] == "archived":
-            raise Error(f"task is archived: {task}")
+            raise Error(f"TASK-ID is archived: {task}")
         return data
 
     def all(self):
@@ -177,7 +177,7 @@ def published(store, task, kind, revision=None):
         raise Error(f"revision is not published on main: {commit}")
     result = git(store.root, "show", f"{commit}:{path}", check=False)
     if result.returncode:
-        raise Error(f"no published {kind} for task {task} at {commit}")
+        raise Error(f"no published {kind} for TASK-ID {task} at {commit}")
     return {"revision": value(store.root, "log", "-1", "--format=%H", commit, "--", path),
             "content": result.stdout.decode(), "blob": value(store.root, "rev-parse", f"{commit}:{path}")}
 
@@ -238,14 +238,14 @@ def create(store, args):
             draft.parent.mkdir(parents=True)
             content = f"# {args.title}\n"
             if review:
-                content += "\nReview fixed source delivery:\n" + json.dumps(review, indent=2) + "\n"
-                content += "\nSource task:\n\n" + task_doc["content"] + "\nSource report:\n\n" + report_doc["content"]
+                content += f"\nReview fixed source delivery (source TASK-ID: {args.review}):\n" + json.dumps(review, indent=2) + "\n"
+                content += "\nSource task requirements:\n\n" + task_doc["content"] + "\nSource report:\n\n" + report_doc["content"]
             draft.write_text(content)
             store.doc(task, "report").write_text("")
         except OSError as exc:
             data["error"] = str(exc)
             store.write(data)
-            raise Error(f"creation incomplete; task {task} remains registered: {exc}")
+            raise Error(f"creation incomplete; TASK-ID {task} remains registered: {exc}")
     return {**data, "task_file": str(store.doc(task, "task")), "report_file": str(store.doc(task, "report"))}
 
 
@@ -316,7 +316,7 @@ def publish(store, args):
             first = content.decode().splitlines()
             match = re.fullmatch(r"task_revision: ([0-9a-f]{40})", first[0] if first else "")
             if not match:
-                raise Error("report first line must be task_revision: <40-character published commit>")
+                raise Error("report first line must be task_revision: COMMIT (a 40-character published commit)")
             revision = match[1]
             published(store, args.task, "task", revision)
             delivery = {}
@@ -465,6 +465,115 @@ def job_list(store, args):
     return {"jobs": selected, "needs_verification": uncertain}
 
 
+def saved_job_state(job):
+    """Return the saved observation shown by task status without probing."""
+
+    probe = job.get("probe")
+    if job.get("status") != "archived" and isinstance(probe, dict) and probe.get("status") == "unknown":
+        return "unknown", probe.get("checked_at") or job.get("checked_at")
+    return job.get("status", "unknown"), job.get("checked_at")
+
+
+def job_summary(job):
+    status, checked_at = saved_job_state(job)
+    result = {"id": job["id"], "note": job.get("note"), "status": status}
+    if checked_at is not None:
+        result["checked_at"] = checked_at
+    return result
+
+
+def archive_summary(archive):
+    if not isinstance(archive, dict):
+        return None
+    return {key: archive[key] for key in ("note", "at") if archive.get(key) is not None}
+
+
+def repo_summary(record, commit):
+    result = {key: record[key] for key in ("path", "branch", "state", "base") if record.get(key) is not None}
+    if commit is not None:
+        result["commit"] = commit
+    for key in ("removed", "branch_removed"):
+        if record.get(key):
+            result[key] = True
+    if record.get("error"):
+        result["error"] = record["error"]
+    return result
+
+
+def render_task_status(data, docs, drafts, changed):
+    report = data.get("report") if isinstance(data.get("report"), dict) else {}
+    commits = report.get("commits") if isinstance(report.get("commits"), dict) else {}
+    result = {key: data.get(key) for key in ("id", "title", "status", "agent", "workspace")}
+    result["repos"] = {name: repo_summary(record, commits.get(name)) for name, record in data["repos"].items()}
+    publications = {kind: document["revision"] for kind, document in docs.items() if document}
+    if publications:
+        result["publications"] = publications
+    if report.get("task_revision"):
+        result["report"] = {"task_revision": report["task_revision"]}
+    unarchived = [job_summary(job) for job in data["jobs"] if job.get("status") != "archived"]
+    archived_count = sum(job.get("status") == "archived" for job in data["jobs"])
+    if unarchived or archived_count:
+        result["jobs"] = {"cached": True}
+        if unarchived:
+            result["jobs"]["unarchived"] = unarchived
+        if archived_count:
+            result["jobs"]["archived_count"] = archived_count
+    changed_drafts = {kind: True for kind, dirty in drafts.items() if dirty}
+    if changed_drafts:
+        result["drafts"] = changed_drafts
+    if changed:
+        result["requirements_changed"] = True
+    archive = archive_summary(data.get("archive"))
+    if archive:
+        result["archive"] = archive
+    if data.get("error"):
+        result["error"] = data["error"]
+    review = data.get("review")
+    if isinstance(review, dict):
+        fixed = {}
+        if review.get("task") is not None:
+            fixed["source_task"] = review["task"]
+        for key in ("task_revision", "report_revision", "commits"):
+            if review.get(key) is not None:
+                fixed[key] = review[key]
+        if fixed:
+            result["review"] = fixed
+    return result
+
+
+def render_job_status(data, job):
+    stored_status = job.get("status", "unknown")
+    probe = job.get("probe") if isinstance(job.get("probe"), dict) else {}
+    observed_status = probe.get("status")
+    status, checked_at, error = stored_status, job.get("checked_at"), None
+    if stored_status != "archived" and observed_status in ("running", "stopped"):
+        status = observed_status
+        checked_at = probe.get("checked_at") or checked_at
+        error = probe.get("error")
+    elif stored_status != "archived" and observed_status == "unknown":
+        status = "unknown"
+        checked_at = probe.get("checked_at") or checked_at
+        error = probe.get("error")
+    result = {"id": job["id"], "note": job.get("note"), "task": data["id"], "task_title": data["title"],
+              "agent": data.get("agent"), "host": job.get("host"), "pid": job.get("pid"), "status": status}
+    if job.get("started_at") is not None:
+        result["started_at"] = job["started_at"]
+    if checked_at is not None:
+        result["checked_at"] = checked_at
+    if error:
+        result["error"] = error
+    if status == "unknown":
+        if stored_status != "unknown":
+            result["last_known_status"] = stored_status
+        if job.get("checked_at") is not None:
+            result["last_known_checked_at"] = job["checked_at"]
+    if stored_status == "archived":
+        archive = archive_summary(job.get("archive"))
+        if archive:
+            result["archive"] = archive
+    return result
+
+
 def job_status(store, args):
     for item in store.all():
         if not any(job["id"] == args.job for job in item["jobs"]):
@@ -475,9 +584,8 @@ def job_status(store, args):
             if data["status"] != "archived" and job["status"] != "archived":
                 refresh_jobs(data, [job])
                 store.write(data)
-            return {"task": data["id"], "task_title": data["title"], "task_status": data["status"],
-                    "agent": data["agent"], **job}
-    raise Error(f"job is not registered: {args.job}")
+            return render_job_status(data, job)
+    raise Error(f"JOB-ID is not registered: {args.job}")
 
 
 def job_archive(store, args):
@@ -496,7 +604,7 @@ def job_archive(store, args):
                 job["archive"] = {"note": args.note, "at": now()}
                 store.write(data)
             return job
-    raise Error(f"job is not registered: {args.job}")
+    raise Error(f"JOB-ID is not registered: {args.job}")
 
 
 def status(store, args):
@@ -511,8 +619,7 @@ def status(store, args):
     if report and docs["task"]:
         previous = published(store, args.task, "task", report["task_revision"])
         changed = previous["blob"] != docs["task"]["blob"]
-    return {**data, "publications": {kind: doc["revision"] if doc else None for kind, doc in docs.items()},
-            "drafts": drafts, "requirements_changed": changed}
+    return render_task_status(data, docs, drafts, changed)
 
 
 def wait_agent(args):
@@ -520,7 +627,7 @@ def wait_agent(args):
     source = "--agent" if supplied is not None else "CODEX_THREAD_ID"
     agent = supplied if supplied is not None else os.environ.get("CODEX_THREAD_ID")
     if not isinstance(agent, str) or not agent or agent != agent.strip() or any(char in agent for char in "\r\n\t"):
-        raise Error(f"{source} must be a non-empty single-line agent ID")
+        raise Error(f"{source} must be a non-empty single-line AGENT-ID")
     return agent
 
 
@@ -570,7 +677,7 @@ def begin_wait(store, agent, task, timeout):
         if existing:
             if state == "unknown":
                 raise Error("existing wait cannot be verified")
-            raise Error("agent is already waiting")
+            raise Error("AGENT-ID is already waiting")
         store.write_wait(record)
     return record
 
@@ -651,7 +758,7 @@ def wait_jobs(store, args):
 
 
 def wait_description(record):
-    return f"jobs task={record['task']}" if record.get("task") else "jobs (all unarchived)"
+    return f"jobs TASK-ID={record['task']}" if record.get("task") else "jobs (all unarchived)"
 
 
 def wait_list(store, args):
@@ -715,7 +822,7 @@ def print_task_list(tasks):
         state = task["agent_state"]["status"]
         rows.append("\t".join((one_line(task["title"]), one_line(task["status"]), task["id"], one_line(agent),
                               "未绑定" if state == "unbound" else one_line(state))))
-    print_table(("标题", "task状态", "UUID", "agent", "agent状态"), (row.split("\t") for row in rows))
+    print_table(("标题", "任务状态", "TASK-ID", "AGENT-ID", "agent状态"), (row.split("\t") for row in rows))
 
 
 def displayed_job_status(job):
@@ -741,11 +848,11 @@ def print_job_list(result):
         for job in result[group]:
             state = "unknown/待核实" if group == "needs_verification" else displayed_job_status(job)
             rows.append((job["note"], state, job_started_at(job), job["id"], job["task_title"], job["task"]))
-    print_table(("描述", "job状态", "开始时间", "job-id", "任务描述", "task-id"), rows)
+    print_table(("描述", "job状态", "开始时间", "JOB-ID", "任务描述", "TASK-ID"), rows)
 
 
 def print_wait_list(records):
-    print_table(("agent-id", "绑定task标题", "task-id", "等待内容", "等待开始时间"),
+    print_table(("AGENT-ID", "绑定任务标题", "TASK-ID", "等待内容", "等待开始时间"),
                 ((record["agent"], record["task_title"], record["task"], record["waiting"], record["started_at"])
                  for record in records))
 
@@ -859,75 +966,75 @@ def parser():
 
     cli = argparse.ArgumentParser(prog="mam", description="Manage local cluster tasks, workspaces and processes.",
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    cli.add_argument("--root", type=Path, default=DEFAULT_ROOT, help="stable management checkout")
+    cli.add_argument("--root", type=Path, default=DEFAULT_ROOT, metavar="ROOT", help="stable management checkout")
     commands = cli.add_subparsers(required=True)
     task = command(commands, "task", "manage tasks and publications")
     sub = task.add_subparsers(dest="command", required=True)
-    p = command(sub, "create", "register UUID, drafts and empty workspace")
-    p.add_argument("--title", required=True, help="short task title")
-    p.add_argument("--review", help="source task UUID; fix its published task/report and commits")
+    p = command(sub, "create", "register a TASK-ID, drafts and empty workspace")
+    p.add_argument("--title", required=True, metavar="TITLE", help="short task title")
+    p.add_argument("--review", metavar="TASK-ID", help="source TASK-ID; fix its published task/report and commits")
     p.set_defaults(func=create)
     p = command(sub, "bind", "bind one execution agent")
-    p.add_argument("task", help="task UUID")
-    p.add_argument("--agent", required=True, help="execution agent ID; one active task per agent")
+    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("--agent", required=True, metavar="AGENT-ID", help="execution AGENT-ID; one active task per agent")
     p.set_defaults(func=bind)
     p = command(sub, "show", "read a published document")
-    p.add_argument("task", help="task UUID")
-    p.add_argument("--file", choices=("task", "report"), default="task", help="published document (default: task)")
-    p.add_argument("--revision", help="published commit to read; defaults to main")
+    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("--file", choices=("task", "report"), default="task", metavar="FILE", help="published document: task or report (default: task)")
+    p.add_argument("--revision", metavar="COMMIT", help="published commit to read; defaults to main")
     p.add_argument("--json", action="store_true", help="emit the published document as JSON")
     p.set_defaults(func=lambda s, a: published(s, a.task, a.file, a.revision), renderer="published")
     p = command(sub, "publish", "publish only one draft to main using an isolated index")
-    p.add_argument("task", help="task UUID")
-    p.add_argument("--file", choices=("task", "report"), required=True, help="draft to publish; reports require task_revision on the first line")
+    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("--file", choices=("task", "report"), required=True, metavar="FILE", help="draft to publish: task or report; reports require task_revision on the first line")
     p.set_defaults(func=publish)
     p = command(sub, "list", "list registered task records")
     group = p.add_mutually_exclusive_group()
     group.add_argument("--archived", action="store_true", help="show only archived tasks")
     group.add_argument("--all", action="store_true", help="include archived tasks")
     p.set_defaults(func=task_list, renderer="task_list")
-    p = command(sub, "status", "query jobs, versions, drafts and archive progress")
-    p.add_argument("task", help="task UUID")
+    p = command(sub, "status", "show concise task, repo and cached job status")
+    p.add_argument("task", metavar="TASK-ID", help="registered task")
     p.set_defaults(func=status)
     p = command(sub, "archive", "remove owned worktrees and task branches; retain task records")
-    p.add_argument("task", help="task UUID")
-    p.add_argument("--note", required=True, help="purpose, result or reason for this operation")
+    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
     p.set_defaults(func=archive)
     jobs = command(commands, "job", "register, query and archive process records").add_subparsers(required=True)
     p = command(jobs, "add", "register a running process with its startup identity")
-    p.add_argument("task", help="task UUID")
-    p.add_argument("--note", required=True, help="purpose, result or reason for this operation")
-    p.add_argument("--host", required=True, help="host running the process")
-    p.add_argument("--pid", type=int, required=True, help="running process ID")
+    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
+    p.add_argument("--host", required=True, metavar="HOST", help="host running the process")
+    p.add_argument("--pid", type=int, required=True, metavar="PID", help="running process ID")
     p.set_defaults(func=job_add)
     p = command(jobs, "list", "query process and agent states; never wake agents")
-    p.add_argument("--task", help="filter jobs by task UUID")
-    p.add_argument("--status", choices=("running", "stopped", "archived", "all"), help="filter jobs; default excludes archived records")
+    p.add_argument("--task", metavar="TASK-ID", help="filter jobs by TASK-ID")
+    p.add_argument("--status", choices=("running", "stopped", "archived", "all"), metavar="STATUS", help="filter jobs; default excludes archived records")
     p.add_argument("--attention", action="store_true", help="show stopped jobs with inactive agents; list unknowns separately")
     p.set_defaults(func=job_list, renderer="job_list")
-    p = command(jobs, "status", "refresh and show one registered process record as JSON")
-    p.add_argument("job", help="job UUID")
+    p = command(jobs, "status", "refresh and show one registered process summary as JSON")
+    p.add_argument("job", metavar="JOB-ID", help="registered job")
     p.set_defaults(func=job_status)
     p = command(jobs, "archive", "record the handling of a stopped process; retain history")
-    p.add_argument("job", help="job UUID")
-    p.add_argument("--note", required=True, help="purpose, result or reason for this operation")
+    p.add_argument("job", metavar="JOB-ID", help="registered job")
+    p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
     p.set_defaults(func=job_archive)
     waits = command(commands, "wait", "wait for registered jobs and manage wakeups").add_subparsers(required=True)
     p = command(waits, "jobs", "wait until a selected unarchived job stops")
-    p.add_argument("--task", help="limit monitoring to one task UUID")
-    p.add_argument("--timeout", type=float, help="return timeout after this many seconds")
-    p.add_argument("--agent", help="waiter agent ID; defaults to CODEX_THREAD_ID")
+    p.add_argument("--task", metavar="TASK-ID", help="limit monitoring to one TASK-ID")
+    p.add_argument("--timeout", type=float, metavar="TIMEOUT", help="return timeout after this many seconds")
+    p.add_argument("--agent", metavar="AGENT-ID", help="waiter AGENT-ID; defaults to CODEX_THREAD_ID")
     p.set_defaults(func=wait_jobs)
     p = command(waits, "list", "list current waits")
     p.set_defaults(func=wait_list, renderer="wait_list")
     p = command(waits, "stop", "wake one waiter without changing its monitored jobs")
-    p.add_argument("--agent", required=True, help="waiter agent ID")
+    p.add_argument("--agent", required=True, metavar="AGENT-ID", help="waiter AGENT-ID")
     p.set_defaults(func=wait_stop)
     w = command(commands, "workspace", "manage repository worktrees and their environments").add_subparsers(required=True)
     p = command(w, "add", "create a repository worktree using its local environment entry")
-    p.add_argument("task", help="task UUID")
-    p.add_argument("--repo", choices=REPOS, required=True, help="source repository")
-    p.add_argument("--base", required=True, help="base commit for the task branch")
+    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("--repo", choices=REPOS, required=True, metavar="REPO", help="source repository")
+    p.add_argument("--base", required=True, metavar="COMMIT", help="base commit for the task branch")
     p.set_defaults(func=workspace_add)
     return cli
 
