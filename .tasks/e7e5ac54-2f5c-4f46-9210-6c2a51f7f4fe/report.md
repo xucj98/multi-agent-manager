@@ -2,6 +2,8 @@
 
 ## 9月11日04:42 第二份20000 checkpoint收尾
 
+04:47补齐两份seed1 metadata内容核验：每份9个JSON、6个JSONL、6个YAML均解析成功；保存norm与已验收共享资产JSON一致，SHA256=`5d84df27e9fce3c6ec28585319ed293fa59fc1822063ecfa0e95c5bf4478606b`。该检查仍在本机显式禁用GPU，仅检查已结束两项。
+
 wuwen-1 GPU6，rearrange full_t_plus_1 seed1，job `95a88ee3-1a90-4e2e-baa1-50a1cd6f4eb0`，PID4186835，04:41:29.545最终保存并完成Save Finalize，MAM wait 04:41:34返回stopped；随后/proc PID及同session/直接子进程均不存在，GPU6已用4MiB、空闲81046MiB、0%。无自有残留需清理；数值exit code未留存，退出与保存成功分别有证据。
 
 交接checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1/20000`。父目录仅20000；commit_timestamp存在，items仅params/assets/metadata，无optimizer。command记录d10完整SHA/clean/冻结cwd/GPU6/seed1，数据记录demo_clean_state，norm及上游metadata已保存。
