@@ -1,5 +1,10 @@
 task_revision: 51d1634247d93727e97bf27cd4e3ddff6a4c247c
 
+归档前清理：按Manager验收后的要求核对三树 `git status --short --ignored`，删除任务本地源码目录
+24个 `__pycache__`（RMBench 6、robot-bridge 9、openpi 9）；未发现本地ruff/pytest/mypy缓存。
+三树普通git status均干净，剩余忽略项为独立 `.venv` 与共享入口，留待Manager归档环境。
+清理未跟随任何软链接，未触碰共享数据、结果、checkpoint或当前GPU0训练；没有重跑验证。
+
 ## 正式100完成；GPU0可移交Q2
 
 完成与未完成：BF16两条smoke、连续100、50条中点、完整逐seed配对、结果README、smoke/临时输入清理、job归档与GPU0退出检查全部完成。工作区保留待Manager归档。
