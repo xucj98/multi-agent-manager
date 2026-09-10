@@ -1,19 +1,19 @@
 task_revision: d6d15a263554de34c0f46441c4c0b22ae5f6029e
 
-当前结果：完成18:57 wash两路例行巡检，实际快照2026-09-10 18:58:32 CST。两路实时running、更新持续增加，全部可见标量有限，无新增异常；下一检查2026-09-10 19:57 CST。本次仅只读巡检并发布报告，结束本次巡检。
+当前结果：完成19:57 wash两路例行巡检，实际快照2026-09-10 19:58:07 CST。两路实时running、更新持续增加，全部可见标量有限，无新增异常；下一检查2026-09-10 20:57 CST。本次仅只读巡检并发布报告，结束本次巡检。
 
 workspace: /mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/openpi
 实际SHA: 056bcc887637cc6eda565a8ad7d45c88021d4bcd；工作树干净，源码/环境/config/训练进程保持冻结。
 
-| GPU/配置 | progress约数 | 较17:57新增约数 | 可见标量step | loss | grad_norm | param_norm | 秒/更新 | ETA（北京时间） |
+| GPU/配置 | progress约数 | 较18:58新增约数 | 可见标量step | loss | grad_norm | param_norm | 秒/更新 | ETA（北京时间） |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 2 / full | 7820 | 1000 | 7800 | 0.0105 | 0.0577 | 1804.8510 | 3.6905 | 2026-09-11 07:28左右 |
-| 3 / serial | 7830 | 1000 | 7800 | 0.0379 | 1.1051 | 1804.9944 | 3.6915 | 2026-09-11 07:27左右 |
+| 2 / full | 8790 | 970 | 8700 | 0.0097 | 0.0553 | 1805.1044 | 3.6855 | 2026-09-11 07:27左右 |
+| 3 / serial | 8800 | 970 | 8700 | 0.0309 | 0.9980 | 1805.2593 | 3.6871 | 2026-09-11 07:26左右 |
 
-- 两路各78组已落盘loss/grad_norm/param_norm全部有限，较上次各新增10组。标量为每100更新区间均值，不代表逐update原始标量。
-- progress按kit取整；最近精确标量step均7800。吞吐按上次与本次日志时间差及约数增量计算，两路均约975 updates每小时。ETA为估算，受取整、吞吐及最终保存耗时影响。
-- 已按18:22迁移从task status的jobs.unarchived读取ID，逐个job status实时查询扁平status/checked_at，18:57:42均running，未返回error；身份由MAM内部核对。未读取旧probe/identity，也未将缓存当实时证据。原PID、cwd及python -u -B/batch32/seed0/20000更新/仅最终保存命令均匹配。
-- 全日志无所检错误或非有限标量，无新增警告。日志距采样full8.5秒、serial4.0秒。
+- 两路各87组已落盘loss/grad_norm/param_norm全部有限，较上次各新增9组。标量为每100更新区间均值，不代表逐update原始标量。
+- progress按kit取整；serial显示约8800时最近已落盘精确标量仍为8700。吞吐按上次与本次日志时间差及约数增量计算，两路均约977 updates每小时。ETA为估算，受取整、吞吐及最终保存耗时影响。
+- 从task status的jobs.unarchived确认ID，逐个job status实时读取扁平status/checked_at，19:57:33均running，未返回error；身份由MAM内部核对。未将缓存当实时证据。原PID、cwd及python -u -B/batch32/seed0/20000更新/仅最终保存命令均匹配。
+- 全日志无所检错误或非有限标量，无新增警告。日志距采样full9.3秒、serial3.2秒。
 - GPU2/3占用73406/73408MiB、空闲7633/7631MiB，利用率均100%，温度69/56°C；只查询本任务GPU2/3。
 - 未启动GPU程序、重启训练、修改冻结树或重复BF16导出/旧50验证。20k及最终验收尚未完成。
 
@@ -36,7 +36,7 @@ serial:
 - 最终checkpoint目标：/mnt/public/xcj/Projects/openpi/checkpoints/pi05_x1pro_wash_cup_s2m_serial_lag30/memory20k_ad6bb77e_wash_serial_s0/20000
 - 完整command/env/启动记录：/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/wash_gpu_logs/formal_serial_launch.json
 
-本次快照：/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/wash_gpu_logs/formal_hourly_20260910_1857.json
+本次快照：/mnt/public/xcj/Projects/workspace/ad6bb77e-3892-4730-ae1a-7d9cd99a5728/wash_gpu_logs/formal_hourly_20260910_1957.json
 
 已接受产物与保留要求：
 
@@ -44,4 +44,4 @@ serial:
 - F0正式BF16评测输入：/mnt/public/xcj/Projects/openpi/user_checkpoints/precision_validation/rearrange_full_key_state_30k_bf16/30000；params/assets/metadata均原位保留。CPU参数验证及交接已获Manager接受，证据publication 04eee7a5cf20b4011406dbddc99bbbb148d7e1b8；后续Carver负责100 rollout，本owner未宣称rollout结果。
 - 原d10 full/serial两份50在本workspace/gpu_smoke_checkpoints下，params/assets/metadata均原位存在，继续供e690使用；没有清理/重载。当前wash smoke也保留。
 
-剩余：两路20k继续运行；下一巡检2026-09-10 19:57 CST。完成后按task验收唯一20000、完整shape/BF16/model-only、metadata/assets和checkpoint-only恢复，交Manager安排5ep offline，再处理产物与MAM job收尾。
+剩余：两路20k继续运行；下一巡检2026-09-10 20:57 CST。完成后按task验收唯一20000、完整shape/BF16/model-only、metadata/assets和checkpoint-only恢复，交Manager安排5ep offline，再处理产物与MAM job收尾。
