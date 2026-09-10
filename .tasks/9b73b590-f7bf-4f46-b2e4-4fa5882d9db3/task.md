@@ -6,12 +6,14 @@
 
 你此前6a32847报告的d10cc01 CPU GO已被Manager接受。真实tokenizer条件、P2损失/梯度、LeRobot/sidecar窗口、serial条件与wire、更新计数、R1/R2自包含恢复、metadata继承均已通过。Manager后续验收了full/serial各50次实际GPU更新、完整BF16保存和checkpoint-only恢复。put-back专用14维norm及两种full实际归一化loader也已验收。首批八路正式20k已放行，运行树固定d10；这些已通过范围不重测或暂停。
 
-当前候选：d49c1a1c5cb141283cb10634cfb31903624ed761，父级含已合并的42011a3数据/文档。只复核R3/R4修复，交阶段CPU结论。wash full/serial训练注册尚在作者实现，届时另给确切commit和增量范围；未交付的wash不是当前候选缺陷。
+R3/R4的d49c1a1已由你独立通过，Manager已合入主库41fca908。当前增量候选为062d12a5effbaf183718c9c208d880983693e64d与7a629204b4ab6d3cd113443c538837f8fb5f08d4，后者为当前作者HEAD。复核wash full/serial训练配置与运行时字段序列化边界，不重做已接受的核心训练评审。
 
-## 本轮两项
+## 本轮范围
 
-1. R3：合法train source=initial没有mask键，adapter必须正常构造和采样；infer source=initial应遵守字段声明initial，不消费请求中的非initial cache。核对全initial和部分initial/其余cache的实际transform路径；不能只检查helper样本或依赖scheduler恰巧先清零。保持机器人归一化/动作监督与没有递推的aux定义，缺GT不丢机器人sample。
-2. R4：显式conditional decoder重叠case时，Pi0必须与公共schema一样first-match，实际动作condition、统一wire选中值一致。复用你此前remaining_review_test.py的实际Pi0复现，确认没有破坏默认argmax、无匹配fallback或按字段顺序读取selected；无需重审整个parser和昂贵模型计算。
+1. wash两个注册配置pi05_x1pro_wash_cup_s2m_full_current_feedback、pi05_x1pro_wash_cup_s2m_serial_lag30须共用已有多字段机制；当前仅一个phase字段。沿用drawer S2M：当前从臂14维输入、对齐的下一主臂14维目标，不能变成follow到follow或SM2SM；核对真实Arx输入/输出transform及相机映射、defer padding、非initial memory输入和输出memory IDs不会被机器人裁剪丢弃。
+2. 核对数据指向已验收v3 all_172_15hz_s2m_master_v3_source_frame_aligned，fps15和接口信息通过现有metadata可供checkpoint-only部署读取。全172ep参与训练，offline固定0–4；norm为该数据的robot-only 14维，不借用drawer/rearrange norm。norm尚在计算可先审其余项，待完成后各取真实loader一批。
+3. 7a62920将DataConfig.memory_adapter/model_spec改为init=False。独立检查配置保存只有唯一resolved memory_config、恢复后runtime对象重新构造；特别关注install后dataclasses.replace的调用路径是否丢失必要对象。用fresh-process加载现有d10保存的50step metadata，确认兼容当前正在训练的d10配置格式；不要求GPU加载全部权重，也不为清除旧null字段重启或改写正式任务。
+4. 增量回归以真实transform、loader和配置roundtrip为主；报告明确CPU边界。已有R3/R4、full/serial 50step BF16保存与wire结论直接引用，不重复昂贵测试。若部署fps/配置缺口属于其他库，只报告实际缺口，不越界实现。
 
 修复不应改变首批默认cache/argmax训练协议，也不需要给正在跑的八路更新源码。遇到具体回归，报告输入、实际行为和影响范围，别把未用的扩展配置问题捆绑成首批训练阻塞。
 
@@ -25,4 +27,4 @@ P2仅改变phase目标t+j+1对重复t+30；公共mask/机器人目标/归约与l
 
 ## 交付
 
-简短report注明最新task_revision、真实review HEAD/工作区、R3/R4结论和独立测试命令/输出；已通过历史项引用6a32847，不复制完整旧报告。阶段完成后可结束，Manager在wash候选到达时唤醒同一任务。归档前清理本task的临时review脚本以及两worktree源码里的非共享、非tracked .pytest_cache/.ruff_cache/__pycache__，不跟随共享软链接。正式数据/资产保留，环境与分支由Manager归档。
+简短report注明最新task_revision、真实review HEAD/工作区、wash与序列化结论和独立测试命令/输出；已通过历史项引用6a32847、53ca3e2，不复制完整旧报告。归档前清理本task的临时review脚本以及两worktree源码里的非共享、非tracked .pytest_cache/.ruff_cache/__pycache__，不跟随共享软链接。正式数据/资产保留，环境与分支由Manager归档。
