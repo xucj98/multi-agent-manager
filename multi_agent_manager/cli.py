@@ -314,10 +314,28 @@ def runtime():
     return job_runtime
 
 
-def refresh_jobs(data):
+def agent_observations(agent_ids):
+    agent_ids = sorted(set(agent_ids))
+    if not agent_ids:
+        return {}
+    observations = runtime().probe_agents(agent_ids)
+    return observations if isinstance(observations, dict) else {}
+
+
+def agent_state(agent, observations, *, unbound="unknown"):
+    if not agent:
+        error = None if unbound == "unbound" else "no bound agent"
+        return {"status": unbound, "checked_at": None, "error": error}
+    observation = observations.get(agent)
+    if not isinstance(observation, dict) or not isinstance(observation.get("status"), str) or not observation["status"]:
+        return {"status": "unknown", "checked_at": None, "error": "agent state unavailable"}
+    return dict(observation)
+
+
+def refresh_jobs(data, jobs=None):
     if data["status"] == "archived":
         return
-    for job in data["jobs"]:
+    for job in data["jobs"] if jobs is None else jobs:
         if job["status"] == "archived":
             continue
         observation = runtime().probe_process(job["host"], job["pid"], job["identity"])
@@ -343,22 +361,46 @@ def job_add(store, args):
     return {"task": args.task, **job}
 
 
+def static_jobs(data, args):
+    if args.attention:
+        return [job for job in data["jobs"] if job["status"] != "archived"]
+    if args.status == "archived":
+        return [job for job in data["jobs"] if job["status"] == "archived"]
+    if args.status == "all":
+        return list(data["jobs"])
+    return [job for job in data["jobs"] if job["status"] != "archived"]
+
+
 def job_list(store, args):
     tasks = [store.read(args.task)] if args.task else store.all()
-    rows = []
+    entries = []
     for item in tasks:
         with store.lock(item["id"]):
             data = store.read(item["id"])
-            refresh_jobs(data)
-            if data["status"] != "archived":
+            if data["status"] == "archived" and args.attention:
+                continue
+            jobs = static_jobs(data, args)
+            current = [job for job in jobs if job["status"] != "archived"]
+            if current and data["status"] != "archived":
+                refresh_jobs(data, current)
                 store.write(data)
-            rows.extend({"task": data["id"], "agent": data["agent"], **job} for job in data["jobs"])
-    agents = runtime().probe_agents(sorted({row["agent"] for row in rows if row["agent"]})) if rows else {}
+            entries.extend((data["id"], data["agent"], data["status"], job) for job in jobs)
+    if args.status in ("running", "stopped"):
+        entries = [entry for entry in entries if entry[3]["status"] == args.status]
+    if args.attention:
+        agents = agent_observations(
+            agent for _, agent, task_status, job in entries
+            if task_status != "archived" and job["probe"]["status"] == "stopped" and agent
+        )
+    else:
+        agents = agent_observations(
+            agent for _, agent, task_status, job in entries
+            if task_status != "archived" and job["status"] != "archived" and agent
+        )
     selected, uncertain = [], []
-    for row in rows:
-        row["agent_state"] = agents.get(row["agent"], {"status": "unknown", "error": "no bound agent"})
-        if args.status != "all" and row["status"] != args.status and (args.status or row["status"] == "archived"):
-            continue
+    for task, agent, _, job in entries:
+        row = {"task": task, "agent": agent, **job}
+        row["agent_state"] = agent_state(agent, agents)
         if args.attention:
             if row["status"] == "archived":
                 continue
@@ -394,11 +436,7 @@ def job_archive(store, args):
 
 
 def status(store, args):
-    with store.lock(args.task):
-        data = store.read(args.task)
-        refresh_jobs(data)
-        if data["status"] != "archived":
-            store.write(data)
+    data = store.read(args.task)
     docs = {kind: optional_doc(store, args.task, kind) for kind in ("task", "report")}
     drafts = {}
     for kind, document in docs.items():
@@ -411,6 +449,32 @@ def status(store, args):
         changed = previous["blob"] != docs["task"]["blob"]
     return {**data, "publications": {kind: doc["revision"] if doc else None for kind, doc in docs.items()},
             "drafts": drafts, "requirements_changed": changed}
+
+
+def task_list(store, args):
+    tasks = [data for data in store.all() if args.all or (data["status"] == "archived") == args.archived]
+    agents = agent_observations(data["agent"] for data in tasks if data["agent"])
+    return [{**data, "agent_state": agent_state(data["agent"], agents, unbound="unbound")} for data in tasks]
+
+
+def one_line(value):
+    return " ".join(str(value).split())
+
+
+def print_task_list(tasks):
+    rows = []
+    for task in tasks:
+        agent = task["agent"] or "未绑定"
+        state = task["agent_state"]["status"]
+        rows.append("\t".join((one_line(task["title"]), one_line(task["status"]), task["id"], one_line(agent),
+                              "未绑定" if state == "unbound" else one_line(state))))
+    if rows:
+        sys.stdout.write("\n".join(rows) + "\n")
+
+
+def print_published(document):
+    sys.stdout.write(f"revision: {document['revision']}\n\n")
+    sys.stdout.write(document["content"])
 
 
 def ignored_link(repo, name):
@@ -533,6 +597,7 @@ def parser():
     p.add_argument("task", help="task UUID")
     p.add_argument("--file", choices=("task", "report"), default="task", help="published document (default: task)")
     p.add_argument("--revision", help="published commit to read; defaults to main")
+    p.add_argument("--json", action="store_true", help="emit the published document as JSON")
     p.set_defaults(func=lambda s, a: published(s, a.task, a.file, a.revision))
     p = command(sub, "publish", "publish only one draft to main using an isolated index")
     p.add_argument("task", help="task UUID")
@@ -542,7 +607,8 @@ def parser():
     group = p.add_mutually_exclusive_group()
     group.add_argument("--archived", action="store_true", help="show only archived tasks")
     group.add_argument("--all", action="store_true", help="include archived tasks")
-    p.set_defaults(func=lambda s, a: [d for d in s.all() if a.all or (d["status"] == "archived") == a.archived])
+    p.add_argument("--json", action="store_true", help="emit complete task records as JSON")
+    p.set_defaults(func=task_list)
     p = command(sub, "status", "query jobs, versions, drafts and archive progress")
     p.add_argument("task", help="task UUID")
     p.set_defaults(func=status)
@@ -581,7 +647,12 @@ def main(argv=None):
         if getattr(args, "task", None):
             identifier(args.task)
         result = args.func(Store(args.root), args)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if getattr(args, "command", None) == "list" and not args.json:
+            print_task_list(result)
+        elif getattr(args, "command", None) == "show" and not args.json:
+            print_published(result)
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
     except (Error, OSError, ValueError, KeyError, TypeError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
