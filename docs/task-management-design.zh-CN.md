@@ -44,7 +44,7 @@ PROJECT_ROOT/workspace/TASK-ID/
 | `mam task bind TASK-ID --agent AGENT-ID` | Manager | 将已启动的 subagent 绑定到任务；一个未归档任务对应一个执行 agent，一个 agent 同时绑定一个任务 |
 | `mam workspace add TASK-ID --repo REPO --base COMMIT` | 执行者 | 从 `PROJECT_ROOT/REPO` 调用该库的 `.local/create_worktree.sh`，从 base commit 新建 `task/TASK-ID` 分支及对应 `PROJECT_ROOT/workspace` worktree，同时创建环境和共享软链接；登记并返回路径与分支名 |
 
-涉及哪些库及其 base commit 由任务说明确定，每个库分别调用 workspace add。具体安装和软链接规则由各库脚本负责。同一任务在不同库使用同名 `task/TASK-ID` 分支。
+`REPO` 不使用固定注册表，而是 `PROJECT_ROOT` 下非空的单层目录名；绝对路径、`.`、`..`、正反斜杠和其他路径逃逸形式都会被拒绝。MAM 仍会确认该目录是 primary Git checkout，并要求其中存在非软链接的 `.local/create_worktree.sh`。涉及哪些库及其 base commit 由任务说明确定，每个库分别调用 workspace add。具体安装和软链接规则由各库脚本负责。同一任务在不同库使用同名 `task/TASK-ID` 分支。
 
 ## 编辑、发布与查看
 
