@@ -182,7 +182,7 @@ printf env > "$target/.venv/marker"
                 self.assertEqual(self.git(self.root, "diff", "--cached", "--", relative), "")
 
     def test_task_list_text_has_header_and_status_keeps_records(self):
-        header = "标题\ttask状态\tUUID\tagent\tagent状态"
+        header = "标题\t任务状态\tTASK-ID\tAGENT-ID\tagent状态"
         self.assertEqual(self.task_command_output("list").splitlines(), [header])
         rejected = subprocess.run([str(MAM), "--root", str(self.root), "task", "list", "--json"], capture_output=True, text=True)
         self.assertEqual(rejected.returncode, 2)
@@ -218,17 +218,26 @@ printf env > "$target/.venv/marker"
     def test_status_preserves_saved_job_observation_without_probing(self):
         task = self.task()
         data = self.store.read(task)
-        data["jobs"] = [{"id": "saved-job", "note": "saved", "host": "local", "pid": 1,
-                         "identity": {"boot_id": "boot", "start_ticks": 1}, "status": "running",
-                         "checked_at": "saved-at", "probe": {"status": "unknown", "checked_at": "saved-at", "error": "offline"},
-                         "archive": None}]
+        data["jobs"] = [
+            {"id": "saved-job", "note": "saved", "host": "local", "pid": 1,
+             "identity": {"boot_id": "boot", "start_ticks": 1}, "status": "running",
+             "checked_at": "saved-at", "probe": {"status": "unknown", "checked_at": "saved-at", "error": "offline"},
+             "archive": None},
+            {"id": "archived-job", "note": "old", "host": "local", "pid": 2,
+             "identity": {"boot_id": "boot", "start_ticks": 2}, "status": "archived",
+             "checked_at": "old-at", "probe": {"status": "stopped", "checked_at": "old-at", "error": None},
+             "archive": {"note": "done", "at": "old-at"}},
+        ]
         self.store.write(data)
         record = self.store.state / f"{task}.json"
         before = record.read_bytes()
         with patch.object(cli, "runtime", side_effect=AssertionError("status must not probe jobs")):
             result = cli.status(self.store, types.SimpleNamespace(task=task))
-        self.assertEqual(result["jobs"][0]["checked_at"], "saved-at")
-        self.assertEqual(result["jobs"][0]["probe"]["status"], "unknown")
+        self.assertEqual(result["jobs"], {"cached": True, "unarchived": [
+            {"id": "saved-job", "note": "saved", "status": "unknown", "checked_at": "saved-at"}],
+            "archived_count": 1})
+        self.assertNotIn("identity", result["jobs"]["unarchived"][0])
+        self.assertNotIn("probe", result["jobs"]["unarchived"][0])
         self.assertEqual(record.read_bytes(), before)
 
     def test_job_list_filters_before_probes_and_keeps_realtime_status(self):
@@ -285,10 +294,10 @@ printf env > "$target/.venv/marker"
         data["jobs"] = [
             {"id": "first", "note": "first", "host": "local", "pid": 10,
              "identity": {"boot_id": "boot", "start_ticks": 10}, "status": "running", "checked_at": "saved",
-             "probe": {"status": "running", "checked_at": "saved", "error": None}, "archive": None},
+             "started_at": "started-first", "probe": {"status": "running", "checked_at": "saved", "error": None}, "archive": None},
             {"id": "second", "note": "second", "host": "local", "pid": 11,
              "identity": {"boot_id": "boot", "start_ticks": 11}, "status": "running", "checked_at": "saved",
-             "probe": {"status": "running", "checked_at": "saved", "error": None}, "archive": None},
+             "started_at": "started-second", "probe": {"status": "running", "checked_at": "saved", "error": None}, "archive": None},
         ]
         self.store.write(data)
         calls = []
@@ -302,7 +311,24 @@ printf env > "$target/.venv/marker"
         self.assertEqual(calls, [11])
         self.assertEqual(result["task"], task)
         self.assertEqual(result["status"], "stopped")
+        self.assertEqual(result["checked_at"], "checked")
+        self.assertEqual(result["started_at"], "started-second")
+        self.assertNotIn("identity", result)
+        self.assertNotIn("probe", result)
         self.assertEqual(self.store.read(task)["jobs"][0]["status"], "running")
+
+        def unknown_probe(host, pid, identity):
+            calls.append(pid)
+            return {"status": "unknown", "identity": None, "checked_at": "unavailable", "error": "offline"}
+
+        with patch.object(cli, "runtime", return_value=types.SimpleNamespace(probe_process=unknown_probe)):
+            unknown = cli.job_status(self.store, types.SimpleNamespace(job="second"))
+        self.assertEqual(calls, [11, 11])
+        self.assertEqual(unknown["status"], "unknown")
+        self.assertEqual(unknown["checked_at"], "unavailable")
+        self.assertEqual(unknown["last_known_status"], "stopped")
+        self.assertEqual(unknown["last_known_checked_at"], "checked")
+        self.assertEqual(unknown["error"], "offline")
 
     def test_versions_reports_and_review_do_not_drift(self):
         task = self.task()
@@ -314,7 +340,14 @@ printf env > "$target/.venv/marker"
         review = self.call("create", "--title", "review", "--review", task)
         fixed = self.store.doc(review["id"], "task").read_text()
         self.publish(self.task())
-        self.assertFalse(self.call("status", task)["requirements_changed"])
+        initial_status = self.call("status", task)
+        self.assertNotIn("requirements_changed", initial_status)
+        self.assertEqual(initial_status["publications"], {"task": revision, "report": report})
+        self.assertEqual(initial_status["report"], {"task_revision": revision})
+        self.assertEqual(initial_status["repos"]["multi-agent-manager"]["commit"], self.git(worktree, "rev-parse", "HEAD"))
+        self.assertEqual(self.call("status", review["id"])["review"], {
+            "source_task": task, "task_revision": revision, "report_revision": report,
+            "commits": {"multi-agent-manager": self.git(worktree, "rev-parse", "HEAD")}})
         self.store.doc(task, "task").write_text("new requirements\n")
         self.assertTrue(self.call("status", task)["drafts"]["task"])
         self.publish(task)
@@ -433,7 +466,7 @@ printf env > "$target/.venv/marker"
         self.assertIn("remove owned worktrees and task branches", " ".join(archive_help.split()))
         self.assertEqual(cli.DEFAULT_ROOT, Path("/mnt/public/xcj/Projects/multi-agent-manager"))
         rows = subprocess.check_output([command, "--root", str(self.root), "task", "list"], cwd="/tmp", text=True)
-        self.assertEqual(rows.splitlines(), ["标题\ttask状态\tUUID\tagent\tagent状态"])
+        self.assertEqual(rows.splitlines(), ["标题\t任务状态\tTASK-ID\tAGENT-ID\tagent状态"])
         installed = subprocess.check_output([str(python), "-I", "-c",
             "import multi_agent_manager; print(multi_agent_manager.__file__)"], cwd="/tmp", text=True)
         self.assertTrue(Path(installed.strip()).is_relative_to(environment))
@@ -449,7 +482,10 @@ printf env > "$target/.venv/marker"
         self.store.write(data)
         record = self.store.state / f"{task}.json"
         before = (record.read_bytes(), record.stat().st_mtime_ns)
-        self.assertEqual(self.call("status", task)["repos"], data["repos"])
+        archived_status = self.call("status", task)
+        self.assertEqual(archived_status["repos"], {
+            "agent-workflow": {"path": str(Path(data["workspace"]) / "agent-workflow"), "removed": True}})
+        self.assertEqual(archived_status["archive"]["note"], "historical task")
         self.assertEqual(self.task_command_output("list", "--archived").splitlines()[1].split("\t")[2], task)
         self.job_command_output("list", "--task", task)
         self.assertEqual((record.read_bytes(), record.stat().st_mtime_ns), before)
@@ -462,7 +498,7 @@ printf env > "$target/.venv/marker"
             self.assertIn(description, help_result.stdout)
             old = subprocess.run([str(MAM), "--root", str(self.root), "task", command, "--help"], capture_output=True, text=True)
             self.assertEqual(old.returncode, 2, old.stdout + old.stderr)
-        self.assertEqual(self.job_command_output("list").splitlines(), ["描述\tjob状态\t开始时间\tjob-id\t任务描述\ttask-id"])
+        self.assertEqual(self.job_command_output("list").splitlines(), ["描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID"])
 
     def test_tampered_paths_and_symlink_workspace_rejected(self):
         task = self.task()
@@ -492,16 +528,20 @@ printf env > "$target/.venv/marker"
             detail = self.call("status", job["id"], command="job")
             self.assertEqual(detail["task"], task)
             self.assertEqual(detail["agent"], None)
-            self.assertEqual(detail["probe"]["status"], "running")
+            self.assertEqual(detail["status"], "running")
+            self.assertNotIn("probe", detail)
             self.assertTrue(detail["started_at"].endswith("Z"))
             rows = self.job_command_output("list", "--task", task, "--status", "running").splitlines()
-            self.assertEqual(rows[0], "描述\tjob状态\t开始时间\tjob-id\t任务描述\ttask-id")
+            self.assertEqual(rows[0], "描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID")
             self.assertEqual(rows[1].split("\t"), ["owned smoke", "running", detail["started_at"], job["id"], "test task", task])
             child.stdin.close()
             child.wait(timeout=10)
             self.assertEqual(process_runtime.probe_process("localhost", child.pid, job["identity"])["status"], "stopped")
             saved = cli.job_archive(self.store, types.SimpleNamespace(job=job["id"], note="test exited"))
             self.assertEqual(saved["status"], "archived")
+            archived = self.call("status", job["id"], command="job")
+            self.assertEqual(archived["status"], "archived")
+            self.assertEqual(archived["archive"]["note"], "test exited")
             cli.archive(self.store, types.SimpleNamespace(task=task, note="smoke complete"))
         finally:
             if child.poll() is None:
@@ -528,8 +568,8 @@ printf env > "$target/.venv/marker"
                 time.sleep(0.05)
             else:
                 self.fail("waiter was not registered")
-            self.assertEqual(rows[0], "agent-id\t绑定task标题\ttask-id\t等待内容\t等待开始时间")
-            self.assertEqual(rows[1].split("\t")[:4], ["waiter-one", "waiter binding", waiter_task, f"jobs task={monitored}"])
+            self.assertEqual(rows[0], "AGENT-ID\t绑定任务标题\tTASK-ID\t等待内容\t等待开始时间")
+            self.assertEqual(rows[1].split("\t")[:4], ["waiter-one", "waiter binding", waiter_task, f"jobs TASK-ID={monitored}"])
             duplicate = self.wait_call("jobs", "--task", monitored, "--agent", "waiter-one", "--timeout", "1", ok=False)
             self.assertIn("already waiting", duplicate["error"])
             self.assertEqual(self.wait_call("stop", "--agent", "waiter-one")["status"], "cancelled")
@@ -537,7 +577,7 @@ printf env > "$target/.venv/marker"
             self.assertEqual(waiter.returncode, 0, stderr)
             self.assertEqual(json.loads(stdout)["status"], "cancelled")
             self.assertIsNone(child.poll(), "wait stop must not signal the monitored process")
-            self.assertEqual(self.wait_list_lines(), ["agent-id\t绑定task标题\ttask-id\t等待内容\t等待开始时间"])
+            self.assertEqual(self.wait_list_lines(), ["AGENT-ID\t绑定任务标题\tTASK-ID\t等待内容\t等待开始时间"])
             self.assertEqual(self.wait_call("stop", "--agent", "waiter-one")["status"], "not_waiting")
         finally:
             if waiter and waiter.poll() is None:
@@ -620,7 +660,7 @@ printf env > "$target/.venv/marker"
         self.assertEqual(self.wait_call("jobs", "--task", unknown, "--agent", "unknown-agent", "--timeout", "0.05")["status"], "timeout")
         self.store.write_wait({"agent": "stale-agent", "pid": 999999, "identity": {"host": "local", "boot_id": "old", "start_ticks": 1},
                                "token": "stale", "kind": "jobs", "task": unknown, "timeout": None, "started_at": "old", "cancelled": None})
-        self.assertEqual(self.wait_list_lines(), ["agent-id\t绑定task标题\ttask-id\t等待内容\t等待开始时间"])
+        self.assertEqual(self.wait_list_lines(), ["AGENT-ID\t绑定任务标题\tTASK-ID\t等待内容\t等待开始时间"])
         self.assertEqual(self.wait_call("jobs", "--task", unknown, "--agent", "stale-agent", "--timeout", "0.05")["status"], "timeout")
 
     def test_wait_deadline_limits_each_remote_probe(self):
