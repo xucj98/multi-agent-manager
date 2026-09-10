@@ -11,3 +11,5 @@ MAM_ROOT隔离所有task/job/wait/锁/归档登记，PROJECT_ROOT/workspace管�
 
 ## Manager迁移决策补充
 用户已确认本轮由Manager在实现/review完成后重写main历史，仅从main全历史过滤.tasks；project/state-vla保留原始完整历史。MAM开发worktree从main取基线，代码交付回main；生产MAM checkout处于project/state-vla。不要让新代码要求发布分支必须名为main，也不要把项目记录合回main。你无需执行历史迁移；在报告中核对独立发布分支与开发main共存是否受现有workspace add/primary逻辑影响。README已由Manager提交bdccfd0，可只读核对。
+
+接口使用者审计：scripts/create_worktree.sh 当前最后一行使用 --root，删除参数时需同步修正并实际验证一键创建，避免新main无法创建worktree。所有仓库内入口对移除参数的调用需扫描（不改历史.tasks）。安装从main取代码，不依赖生产checkout分支为main。
