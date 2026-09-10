@@ -70,3 +70,6 @@ wuwen-1 的现有训练自然结束、完成 checkpoint 保存并释放资源后
 
 ## MAM 项目配置迁移完成（2026-09-11）
 在/mnt/public/xcj/Projects及其子目录内直接使用mam；已取消--root参数，自动读取项目配置。MAM根目录不变，已发布任务/报告改到project/state-vla，main只用于工具开发。现有task/job/workspace不变；报告仍在原路径编辑，mam task publish正常发布。本轮main已重写历史；后续若开发MAM必须从新的main基线创建worktree，不从旧任务或项目分支合回main。训练与评测业务代码基线不受影响。
+
+## 9月11日07:03 模型目录统一
+用户要求OpenPI模型统一位于checkpoints，不再使用user_checkpoints。Manager交47a91a44-4efa-48d7-b162-93d097763376迁移已完成精度验证的BF16副本到openpi/checkpoints/precision_validation/rearrange_full_key_state_30k_bf16/30000，保留权重和历史原始留痕。此前本任务“原位保留user_checkpoints”改为保留迁移后副本；你不要并发移动或重建旧路径，不改变正在训练的输出。后续简报引用新位置并注明迁移完成状态，以迁移owner报告为准。
