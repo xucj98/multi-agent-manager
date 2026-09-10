@@ -1,5 +1,3 @@
-task_revision: d2f3c9838481e278a8db0e4a3d5ec427a2859ec3
-
 # 9月11日04:32 CPU评测准备交付
 
 已准备：原README新增14个仿真模型的checkpoint绝对路径和28个独立run名，12个Q2按seed0/1/2、每seed rearrange与put-back各t+1→t+30成对排队，最后serial/no-memory基线。补齐put-back seed2；继续复用原prepare-audit/smoke/formal命令、既有runner/recorder，不新增launcher或调度框架。
