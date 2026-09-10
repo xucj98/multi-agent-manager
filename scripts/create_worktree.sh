@@ -32,4 +32,7 @@ git -C "$worktree" check-ignore -q .venv/ || {
 }
 "$python" -m venv "$worktree/.venv"
 "$worktree/.venv/bin/python" -m pip install --no-deps --editable "$worktree"
-"$worktree/.venv/bin/python" -B "$worktree/.venv/bin/mam" --root "$source_root" task list
+(
+  cd "$worktree"
+  "$worktree/.venv/bin/python" -B "$worktree/.venv/bin/mam" task list
+)
