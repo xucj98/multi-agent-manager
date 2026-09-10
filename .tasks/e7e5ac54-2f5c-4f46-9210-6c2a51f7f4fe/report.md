@@ -1,5 +1,28 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日05:32 剩余8路小时巡检
+
+已读最新要求，05:32:48–54逐项job status均running，无error。累计6项training job已完成收尾/归档；剩余8路最新日志均前进、所有已落盘loss/grad_norm/param_norm有限，无Traceback/CUDA/OOM等可见报错。未重复读取任何已验收checkpoint参数。
+
+| host/GPU | updates≈ | 最新实际标量 | 日志剩余ETA |
+| --- | --- | --- | --- |
+| wuwen-1/4 | 19.5kit/20.0kit | Step 19400: grad_norm=0.0315, loss=0.0006, param_norm=1804.4135 | 32:28 |
+| wuwen-1/5 | 20.0kit/20.0kit | Step 19900: grad_norm=0.0318, loss=0.0007, param_norm=1804.2891 | 02:06 |
+| 本机/0 | 13.0kit/20.0kit | Step 13000: grad_norm=0.0368, loss=0.0010, param_norm=1804.0103 | 7:03:24 |
+| 本机/1 | 13.3kit/20.0kit | Step 13200: grad_norm=0.0350, loss=0.0011, param_norm=1804.1437 | 6:56:32 |
+| 本机/4 | 18.2kit/20.0kit | Step 18200: grad_norm=0.0313, loss=0.0007, param_norm=1804.5131 | 1:45:36 |
+| 本机/5 | 18.0kit/20.0kit | Step 17900: grad_norm=0.0353, loss=0.0007, param_norm=1804.4702 | 2:04:33 |
+| 本机/6 | 18.2kit/20.0kit | Step 18200: grad_norm=0.0334, loss=0.0008, param_norm=1804.3468 | 1:49:58 |
+| 本机/7 | 18.0kit/20.0kit | Step 18000: grad_norm=0.0296, loss=0.0006, param_norm=1804.2294 | 2:01:20 |
+
+进度kit为取整值，远端GPU5仍running、Step19900，不把20.0kit当作完成。ETA不含最终保存；远端GPU5预计05:35、GPU4约06:05结束更新。本机GPU4–7约07:18–07:37，GPU0/1约12:29–12:36。冻结worktree仍d10cc01完整SHA、git status为空，未改参数。
+
+05:32:55资源：远端GPU0–3各4MiB/0%，GPU4/5各73489MiB/100%，RAM可用876GiB；本机8卡均约73405–73408MiB/100%，RAM可用836GiB，共享盘可用9.1TiB。
+
+**需Manager知悉的资源变化：** 远端GPU6/7此前在本任务收尾时均4MiB/0%，本轮分别出现14449/14499MiB及85%/86%利用率。本任务没有启动任何新GPU进程；必要只读身份核对中nvidia-smi compute-apps仅列仍在训练的PID12435/12436，未显示GPU6/7对应占用进程，故不能归因为本任务残留（可能其他虚拟机占用）。未尝试终止不明进程；整机空闲状态须在最终释放时据实核对，不承诺外部占用会消失。
+
+MAM继续等待新结束事件，只验收新checkpoint；GPU恢复/wire/评测仍待本机空闲卡和Manager排期，wuwen-1不接续GPU任务。运行项下一小时06:32检查；先到的结束事件立即收尾。
+
 ## 9月11日05:18 GPU3完成收尾
 
 wuwen-1 GPU3，memory20k_e7e5ac54_rearrange_no_memory_s0，job `2774d038-5a23-4184-b16a-92fa1fd88019`，PID4186839。最终20000保存与Save Finalize完成，MAM wait返回stopped；随后PID及同session/直接子进程均不存在，GPU3=4MiB已用/81046MiB空闲/0%。无自有残留需清理；未留存数值exit code，退出及保存分别有证据。
