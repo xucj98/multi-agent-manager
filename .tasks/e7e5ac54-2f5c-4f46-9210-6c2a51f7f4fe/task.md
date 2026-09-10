@@ -88,3 +88,6 @@ wuwen-1 的现有训练自然结束、完成 checkpoint 保存并释放资源后
 
 ## MAM 项目配置迁移完成（2026-09-11）
 在/mnt/public/xcj/Projects及其子目录内直接使用mam；已取消--root参数，自动读取项目配置。MAM根目录不变，已发布任务/报告改到project/state-vla，main只用于工具开发。现有task/job/workspace不变；报告仍在原路径编辑，mam task publish正常发布。本轮main已重写历史；后续若开发MAM必须从新的main基线创建worktree，不从旧任务或项目分支合回main。训练与评测业务代码基线不受影响。
+
+## 9月11日04:32 起收尾执行
+完成本轮正常巡检后，远端首批预计数分钟内结束。保持active turn，使用mam wait jobs --task等待本任务的结束事件，接续按已授权要求处理完成的训练：核验实际20000、最终checkpoint/metadata/参数完整与dtype、退出与自有子进程/显存释放，处理后归档对应training job并简报。不要把运行中或仅写到临时目录的checkpoint判为完成。未完成的训练保持冻结。wuwen-1结束后不做任何GPU恢复或smoke；完整性/可行的CPU恢复在本机进行且显式禁用GPU。本机GPU仍全占用时，把GPU恢复/评测交接列为待办，不能抢占训练卡。每次实际job结束可以检查该job，其他仍运行任务按小时检查，不持续轮询全机。多job待处理时合并收尾，并记录哪些验证完成、哪些等待GPU。Manager仍负责评测排期。
