@@ -64,3 +64,54 @@
 - `git fsck --no-dangling` 在 canonical clone 通过；origin URL、HEAD 与 `origin/main` 一致。
 - environment agent 负责 `.local` 环境入口、独立 venv、canonical `.cache` 实体和 worktree 链接；本任务只在 `.local/migration-backup/` 保存私有迁移证据。PROJECT_ROOT 不保留 `migration-backup` 或 `assets` 业务目录。
 - 当前资产覆盖 ManiSkill reference 路径；未来启用 RoboTwin/Kubric 后需要按其许可、provenance 与运行需求单独迁移/下载未复制缓存。
+
+## 统一用户缓存迁移（最终完成）
+
+用户授权的全局缓存实体为 `/mnt/public/xcj/cache`；最终
+`/root/.cache` 是指向该目录的符号链接，新增的
+`/mnt/public/xcj/cache/shared-python` 已保留。原 `/root/.cache` 是实体目录，
+盘点为 1,867 个目录、3,140 个普通文件、62 个链接，普通文件共
+5,130,120,620 bytes；sorted relative-path aggregate SHA-256 为
+`51b55f04e0a07813d0a574e5874bf138b80f08636e6ae0375da53d7662627039`。
+合并前，既有全局缓存已私有快照到 canonical 的：
+
+`/mnt/public/xcj/Projects/table-1000/table-1000/.local/migration-backup/2783e0c3-4955-4cb0-99d9-24ed65693bbd/cache-conflicts/global-cache-pre-home-merge`
+
+home/global 没有非 root 路径冲突；原 home 树在原子切换前完成两次完整内容校验。
+APC 已退出（记录的 PID 不存在且 8770 无监听）后，再次确认无打开句柄，删除了
+经校验的旧实体 `/root/.cache.pre-migration-2783e0c3`。最终复核确认 home 链接、
+全局 cache 实体、`shared-python` 均仍正确。
+
+canonical 临时 uv 源
+`/mnt/public/xcj/Projects/table-1000/table-1000/.local/uv-cache` 的迁移前盘点为
+32,387 个节点（3,139 目录、29,142 普通文件、106 链接；普通文件
+6,207,456,020 bytes）。它已收拢到实体目录 `/mnt/public/xcj/cache/uv`，未执行
+`uv cache clean/prune`，也未手工删除最终全局缓存中的包。
+
+预检结果为 32,319 个 canonical source-only 节点、2,023 个 global target-only
+节点、30 个相同共享节点和 38 个冲突节点。38 个冲突均为索引/元数据；
+`archive-v0` payload 冲突和 lock 冲突均为 0，且没有依赖冲突的 source-only 相对链接。
+裁决是保留既有 global target，使用 `rsync -aH --ignore-existing` 仅复制
+source-only 节点，绝不覆盖 archive payload。
+
+38 个冲突的两侧均已在私有迁移备份中保全：
+
+| 一侧 | 位置（均位于 canonical migration-backup） | 普通文件 | 链接 | 普通文件 bytes |
+| --- | --- | ---: | ---: | ---: |
+| canonical source | `cache-conflicts/uv-conflicts/canonical-source` | 26 | 12 | 558,825 |
+| 既有 global target | `cache-conflicts/uv-conflicts/global-target` | 26 | 12 | 556,801 |
+
+两个归档根目录及其目录/普通文件权限已核对为 `0700`/`0600`。最终验证包括：两个旧源
+均无打开句柄；uv 的 `--ignore-existing` 元数据检查没有遗漏 source-only 节点；排除
+38 个已归档冲突根的 checksum dry-run 验证非冲突内容；38 个冲突归档根的内容哈希或
+链接目标均分别与 canonical 源和最终 global target 相符。随后仅删除了 canonical
+`.local/uv-cache` 旧实体；`/mnt/public/xcj/cache/uv` 已复核为实体目录。
+
+历史 `outputs/` 私有备份未被本次缓存迁移改变，仍为 56 个普通文件、13,266,644 bytes、
+aggregate SHA-256 `9758b4462046bc86f9f2ef8b7285d723cf791f672a267e10a1687cb1bc0c10b6`，
+并保持 `0700`/`0600` 权限。环境拥有的 `.local/create_worktree.sh` 和
+`.local/worktree-env.conf` 未由本任务修改；环境任务已收到可恢复 uv 安装的通知。
+
+迁移记录未展示缓存内容、包路径、凭据或 token。完整证据见 canonical 的
+`.local/migration-backup/2783e0c3-4955-4cb0-99d9-24ed65693bbd/MANIFEST.md`。
+
