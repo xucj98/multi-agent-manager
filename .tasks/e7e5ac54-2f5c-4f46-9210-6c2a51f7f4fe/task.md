@@ -6,7 +6,9 @@
 
 先按MAM AGENTS/README读取发布要求，用mam workspace add在本task创建openpi worktree，base=d10cc01d44c10e5ed0cd8c228d9409dd6cabac50；读取openpi AGENTS。独立环境由既有一键入口创建，复用共享assets/data/checkpoints软链接，不挂别人的PYTHONPATH。你本机管理、通过ssh wuwen-1执行训练；两端共享/mnt/public。所有正式进程使用你自己的固定worktree/解释器，运行期间不修改该树的源码或切换版本。
 
-当前只授权CPU准备、环境/CLI/数据路径核对、确定八条可复制命令和输出目录。GPU正式开跑待Manager告知相应模型路径已通过独立CPU review及实际50step保存/恢复；不自行抢跑，不向用户再次请求许可。通过一条路径就能分阶段开其对应训练，不捆绑wash/live。
+2026-09-10 08:05 Manager已验收full GPU50：实际50updates、51参数leaf全部BF16、3353433872元素、仅checkpoint恢复得到actions(50,14)与memory_prediction_ids(50,3)。结合CPU独立GO 6a32847，现放行wuwen-1 GPU0/1/3/6/7的五个rearrange full/no-memory正式20k，立即按下表启动并登记；保持d10源码冻结。GPU2等serial自身50step恢复通过；GPU4/5等put-back专用norm和实际归一化loader核验。不要等全部八项就绪才启动已通过的项，不向用户再次请求许可。
+
+full证据在ad6任务workspace的gpu_smoke_logs/full_tplus1_d10cc01.log、full_tplus1_d10cc01_dtype_restore.log、full_tplus1_d10cc01_restore_wire.log；实际checkpoint为gpu_smoke_checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/full_tplus1_d10cc01/50。它们用于本次验收，正式训练仍从同一pi05_base初始化。
 
 ## 第一批配置和资源
 
