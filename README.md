@@ -71,6 +71,8 @@ mam workspace add <uuid> --repo <repo> --base <commit>
 
 具体参数按需查阅 `mam task --help`、`mam workspace --help`、`mam job --help` 及相应子命令的帮助。
 
+`mam task list` 默认每个任务输出一行，以制表符分隔标题、任务状态、完整 UUID、绑定的 agent ID 和 agent 状态；使用 `--json` 可取得完整任务记录，供脚本处理。`mam task show` 默认先输出实际发布 revision，再原样输出 Markdown 正文；使用 `--json` 可取得原有的结构化文档对象。
+
 ## 开发验证
 
 MAM 使用 Python 标准库。在自己的 worktree 中运行 `.venv/bin/python -B -m unittest discover -s tests -v`。修改删除操作时，验证共享软链接目标、未提交文件、未登记目录和运行进程得到保护。
