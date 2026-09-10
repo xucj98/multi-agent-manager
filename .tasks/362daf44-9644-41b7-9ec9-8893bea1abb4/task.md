@@ -68,3 +68,8 @@ workspace、各库交付 commit：
 核心验收：三个list表头/物理单行及空集；job status只探测目标并保持未知状态诚实；task list取消--json且status仍完整；wait的自动agent身份（你的shell CODEX_THREAD_ID与MAM绑定交叉核对）、同agent重复、双agent隔离、stop不终止job、stop/start竞态与异常残留、timeout/empty/已有stopped/远端unknown。真实多进程测试stop响应，不仅mock。关注等待对多个SSH job是否可实际工作，0.5秒远端超时不能使正常本集群wuwen-1永远unknown；可用wuwen-1的自己短sleep做非GPU验证，但不得触碰既有实验或MAM真实job。没有权限/条件则明确未验。
 
 检查实现必要性与简洁性（净增336生产行略超预算，指出具体可删冗余而非为了行数压缩）；中文README/指定设计文档/CLI帮助一致，无歧义。完整单测和diff-check只跑一遍除非发现问题。发布简短GO/NO-GO report，具体问题分阻塞与建议，含复现步骤、task_revision、workspace/commit、验证。清理自己的临时数据/进程/pycache再交付。Manager另检查实际工具轨迹。
+# 增量复验（15:54）
+
+源任务新发布要求6da327722bf9e5834aebbd0475d554de6fdc3479，交付report 7bd9b9f802369bd4f0f6cf96229e648802522787，修复commit e6892fe7d9d29be71f03d69a5c32318706207090。此次以这些固定引用替代下方旧交付作为最终验收对象；旧报告保留历史。复用本任务worktree快进到e6892fe7，不新建环境。
+
+只复验已报告两处问题、受影响wait/renderer行为以及必要标准库回归，正常remote/多等待者先前证据复用。实际复测多remote短timeout及attention agentunknown；不重复全部无关探索。清理临时产物并更新report到最新任务revision，明确GO/NO-GO与最终commit。
