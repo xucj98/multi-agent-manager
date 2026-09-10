@@ -22,3 +22,9 @@ CPU 验证（未加载模型、未启动仿真或 GPU）：
 - openpi：同级 `openpi`，a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4，干净。
 
 没有 MAM job 或 GPU 进程。GPU 授权后仍按既有规则：完成 20k checkpoint 先 prepare-audit、匹配两集 smoke，再用同 checkpoint 的 smoke 启动 formal；超过一小时的正式任务立即登记 MAM job。
+
+最终 CPU 状态（冻结）：
+
+- CPU 交付固定在 RMBench `737890494d38486c6335feed6fe55f550b271234`；三库 worktree 均干净。
+- 没有本任务 MAM job、GPU 进程或 `.local/memory_schema_eval` 残留。
+- GPU 未分配；保持暂停，待独立 review 提出具体问题后在本 task 恢复。
