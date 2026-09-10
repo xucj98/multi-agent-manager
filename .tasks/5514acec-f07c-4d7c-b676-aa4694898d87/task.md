@@ -7,3 +7,7 @@ manager 已 git fetch origin main (351c3a3) 并成功 merge 到 project/table-10
 
 # 裁决与环境修复授权
 已定位该机缺少 scripts/local_create_worktree.sh 指定的真实 Python 3.10.19。优先用 uv python install 3.10.19 --install-dir /mnt/public/xcj/cache/shared-python 安装真实解释器满足既有路径，不修改上游脚本、不伪造版本软链。完成后以 MAM .venv/bin/python -B -m unittest discover -s tests -v 验证全部测试，发布根因、环境修复及结果。若发现其他代价或根因，报告 manager。
+
+# 用户最新要求：分析 MAM 可迁移性，不能为不合理测试迎合旧机配置
+用户质疑为何需要3.10.19，并指出MAM仅在wuwen-2验证过，其他环境考虑可能不足。请继续原任务做针对性分析：区分 pyproject Python>=3.10 的真实要求、本机 .local 配置和被版本化脚本/测试不合理固化的约束；核查硬编码 Python路径、/mnt/public前缀、测试是否依赖网络/主机用户目录、错误输出是否足够。给 manager 一个最小修复方案和真实应保留的测试语义，避免过度跨平台抽象。此前装Python只是复现证明，不应作为可迁移性的修复结论。
+先提交分析/方案给manager，不直接改共享源码。若后续实施需独立MAM worktree，从同步后的main创建，按开发验证合并main再带入project分支。保留之前事实，报告结论需修正为测试通过仅适配了原主机假设。
