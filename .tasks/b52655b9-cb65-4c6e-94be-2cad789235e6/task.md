@@ -18,3 +18,6 @@
 
 # 用户纠正：wuwen-2 是不同集群
 wuwen-2只作只读设计参考，与本机并不共享/mnt/public；禁止通过远端创建环境/hardlink解决本机需求。此前manager基于同路径可能共享的探针/远端方案已撤销。如果已创建本任务临时探针，仅清理这些探针并报告。现有本机copy安装可继续真实smoke及代码review，但不能宣称hardlink验收通过。针对本机yrfs跨目录硬链EPERM给出可行选择，等待manager裁决；不得擅自将环境迁/root或改变用户主repo无软链布局。
+
+# 用户明确授权最终缓存布局与manager策略裁决
+统一 ~/.cache -> /mnt/public/xcj/cache，uv store=/mnt/public/xcj/cache/uv。迁移agent负责旧~/.cache及canonical.local/uv-cache整合与校验，环境任务暂停uv写入并协调，再使用稳定新路径。最终采用uv --link-mode symlink复用三方包文件；各worktree.venv实体独立，editable以--no-deps --link-mode copy -e 自己worktree安装，避免共享editable元数据。已由独立实验验证A升级/卸载不影响B、同名editable代码隔离；包store必须持久保留，文档禁止clean/prune/手工改删共享包文件。正式验证新增完整环境实际时间/磁盘占用、symlink去向、隔离和smoke；不把copy/hardlink当最终成功，hardlink因yrfs能力不可用需要明确说明。
