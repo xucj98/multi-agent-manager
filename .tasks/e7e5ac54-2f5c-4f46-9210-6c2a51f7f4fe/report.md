@@ -1,5 +1,15 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日05:03 GPU0完成收尾
+
+wuwen-1 GPU0，memory20k_e7e5ac54_rearrange_full_t_plus_1_s0，job `89dcc92f-365e-409a-87d3-e6e82b66adba`，PID4186829。最终20000保存与Save Finalize完成，MAM wait返回stopped；随后PID及同session/直接子进程均不存在，GPU0=4MiB已用/81046MiB空闲/0%。无自有残留需清理；未留存数值exit code，退出及保存分别有证据。
+
+checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s0/20000`。
+本机固定解释器显式CUDA_VISIBLE_DEVICES为空/JAX_PLATFORMS=cpu，实际读回51叶/3353433872元素，全BF16、全有限、全部参数路径与注册config shape一致，CPU核验exit0。父目录仅20000，有原子commit，仅params/assets/metadata，无optimizer；metadata JSON/JSONL/YAML解析通过，d10/clean/实际command/config协议一致，demo_clean_state来源和norm与验收资产吻合。200条标量均有限，Step20000：grad_norm=0.0345, loss=0.0007, param_norm=1804.5520，未见训练报错。
+
+逐参数shape及完整CPU审计：`/mnt/public/xcj/Projects/workspace/e7e5ac54-2f5c-4f46-9210-6c2a51f7f4fe/closure/memory20k_e7e5ac54_rearrange_full_t_plus_1_s0.json`。
+对应training job按结果归档；累计4项完成/10项未完成。释放的wuwen-1 GPU保持空闲；完整policy GPU恢复/wire/评测仍待本机空闲卡及Manager安排。继续MAM事件等待，运行项05:32巡检。
+
 ## 9月11日04:59 第三份20000 checkpoint收尾
 
 wuwen-1 GPU1，rearrange full_t_plus_30 seed0，job `db46bdd0-0ec2-41c1-9c98-baca9ffd6f5b`，PID4186841。04:58:03.156完成最终保存，04:58:08 MAM wait返回stopped；随后PID及同session/直接子进程均消失，GPU1=4MiB/81046MiB空闲/0%。数值exit code未留存；退出和保存完成证据分别成立，无自有残留需清理。
