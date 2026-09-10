@@ -6,7 +6,7 @@ MAM 通过文件和 CLI 管理当前集群的任务，顶层命令为 `mam task`
 
 使用者分为 Manager 和执行者。Manager 为 subagent 登记任务，自己的工作无需创建任务。代码实现、review、实验等是不同的任务内容，负责完成任务的 agent 统一称为执行者。
 
-## 文件与版本
+## 文件与发布
 
 任务、workspace 和工作分支使用同一个 `TASK-ID`，由工具生成：
 
@@ -28,7 +28,7 @@ Projects/workspace/TASK-ID/
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
 | `mam task create --title TITLE` | Manager | 生成 `TASK-ID`，登记任务，创建 task.md、report.md 草稿和空 workspace；返回 `TASK-ID` 与文件、目录路径，状态为“进行中” |
-| `mam task create --title TITLE --review TASK-ID` | Manager | 创建任务，并在任务草稿中引用源 `TASK-ID` 已发布的要求、简报及其代码 commit，固定所引用的版本，供执行者 review |
+| `mam task create --title TITLE --review TASK-ID` | Manager | 创建任务，并在任务草稿中引用源 `TASK-ID` 当前已发布的要求、简报及已登记的交付代码 commit，供执行者 review |
 | `mam task bind TASK-ID --agent AGENT-ID` | Manager | 将已启动的 subagent 绑定到任务；一个未归档任务对应一个执行 agent，一个 agent 同时绑定一个任务 |
 | `mam workspace add TASK-ID --repo REPO --base COMMIT` | 执行者 | 调用该库的 `.local/create_worktree.sh`，从 base commit 新建 `task/TASK-ID` 分支及对应 worktree，同时创建环境和共享软链接；登记并返回路径与分支名 |
 
@@ -36,16 +36,16 @@ Projects/workspace/TASK-ID/
 
 ## 编辑、发布与查看
 
-`FILE` 为 `task` 或 `report`；`COMMIT` 是已发布 commit。
+`FILE` 为 `task` 或 `report`。
 
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
-| `mam task show TASK-ID [--file FILE] [--revision COMMIT]` | 所有人 | 返回已发布的文件内容及版本；默认读取 main 上的 task.md，也可读取指定 commit |
-| `mam task publish TASK-ID --file FILE` | 文件负责人 | 加锁，将指定文件的草稿单独提交到 main，返回发布 commit；同步本次文件的暂存内容，保留其他文件的暂存内容及所有草稿；发布 report 时关联简报中注明的任务版本，状态改为“待验收” |
+| `mam task show TASK-ID [--file FILE]` | 所有人 | 直接返回当前已发布的文件内容；默认读取 main 上的 task.md，`--file report` 读取 report.md |
+| `mam task publish TASK-ID --file FILE` | 文件负责人 | 加锁，将指定文件的草稿单独提交到 main，返回发布 commit；同步本次文件的暂存内容，保留其他文件的暂存内容及所有草稿；发布 report 时记录各 ready worktree 的当前 HEAD 为交付代码 commit，状态改为“待验收” |
 | `mam task list [--archived\|--all]` | 所有人 | 即使为空也输出表头；每行固定为标题、任务状态、`TASK-ID`、agent、agent 状态。保留既有筛选，不提供 `--json` |
-| `mam task status TASK-ID` | 所有人 | 返回任务、workspace、各库交付和已保存 job 观测的精简 JSON 展示；不隐式刷新 job，并提示草稿及当前要求与简报所依据要求是否不同 |
+| `mam task status TASK-ID` | 所有人 | 返回任务、workspace、各库交付和已保存 job 观测的精简 JSON 展示；不隐式刷新 job，并提示未发布草稿 |
 
-修改要求和简报使用普通编辑工具，再通过 publish 发布。执行者通过 show 获取任务及版本，在 report.md 中注明实际依据的任务 commit。版本差异以本任务文件内容为准，其他任务的提交不会使本任务失效。
+修改要求和简报使用普通编辑工具，再通过 publish 发布。执行者通过 show 获取当前已发布的任务要求；已发布内容的历史由普通 Git 提交保留，CLI 不维护任务要求与简报的版本绑定。
 
 ## 长任务进程
 
@@ -71,9 +71,9 @@ job archive 只记录收尾结果，不删除 workspace；任务归档也保留�
 
 ## 状态展示
 
-`task status` 是对登记的轻量展示，不改变存储记录，也不探测进程。它保留任务的 `id`、标题、状态、agent 和 workspace；每个仓库保留路径、分支、状态、必要的 base 与交付 commit。`publications` 中的任务和简报 revision 各出现一次；已发布简报另保留其依据的 `task_revision`。
+`task status` 是对登记的轻量展示，不改变存储记录，也不探测进程。它保留任务的 `id`、标题、状态、agent 和 workspace；每个仓库保留路径、分支、状态、必要的 base 与交付 commit。`publications` 中可显示 task.md 和 report.md 各自最后一次发布的 Git commit。
 
-未归档 job 位于 `jobs.unarchived`，每项只含 `id`、`note`、`status` 和 `checked_at`；`jobs.cached` 明确这些是已保存的观测，已归档 job 只给出 `archived_count`。有变化时才显示 drafts 和 `requirements_changed`。任务归档或出错时保留归档结论或失败原因；review 任务保留固定源任务、版本和成果 commit 引用。空值及正常的 false 清理标记可省略。
+未归档 job 位于 `jobs.unarchived`，每项只含 `id`、`note`、`status` 和 `checked_at`；`jobs.cached` 明确这些是已保存的观测，已归档 job 只给出 `archived_count`。有未发布改动时才显示 `drafts`。任务归档或出错时保留归档结论或失败原因；review 任务保留源任务和成果代码 commit 引用。旧登记中不再使用的字段在读取时忽略，无需迁移。空值及正常的 false 清理标记可省略。
 
 `job status` 只刷新所请求的 `JOB-ID` 一次。正常结果保留该 job 的 `id`、`note`、所属任务与标题、agent、主机、PID、启动时间、状态和检查时间，不重复输出 `identity` 或 `probe`。探测为 unknown 时，`status` 为 `unknown`，并返回 `error` 及必要的最后已知状态和时间；进程身份不匹配等诊断以错误文本给出。已归档 job 保持 `archived`，并保留归档结论。
 

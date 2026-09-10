@@ -68,8 +68,8 @@ printf env > "$target/.venv/marker"
     def publish(self, task, kind="task"):
         return self.call("publish", task, "--file", kind)["revision"]
 
-    def report(self, task, revision):
-        self.store.doc(task, "report").write_text(f"task_revision: {revision}\nCompleted the task; tests passed.\n")
+    def report(self, task):
+        self.store.doc(task, "report").write_text("Completed the task; tests passed.\n")
         return self.publish(task, "report")
 
     def task_output(self, *args):
@@ -126,15 +126,15 @@ printf env > "$target/.venv/marker"
 
     def test_publish_unchanged_repairs_only_its_index_entry(self):
         task, other = self.task(), self.task()
-        task_revision = self.publish(task)
-        report_revision = self.report(task, task_revision)
+        task_publication = self.publish(task)
+        report_publication = self.report(task)
         self.git(self.root, "add", "code.py", str(self.store.doc(other, "task")))
         (self.root / "code.py").write_text("staged = True\n")
         self.git(self.root, "add", "code.py")
         (self.root / "code.py").write_text("unstaged = True\n")
         self.store.doc(other, "task").write_text("other task draft\n")
         other_index = self.git(self.root, "ls-files", "--stage", "--", "code.py", f".tasks/{other}/task.md")
-        for kind, revision in (("task", task_revision), ("report", report_revision)):
+        for kind, publication in (("task", task_publication), ("report", report_publication)):
             path = f".tasks/{task}/{kind}.md"
             published_bytes = self.store.doc(task, kind).read_bytes()
             for damage in ("deleted", "stale"):
@@ -147,7 +147,7 @@ printf env > "$target/.venv/marker"
                     before = self.git(self.root, "rev-parse", "main")
                     result = self.call("publish", task, "--file", kind)
                     self.assertTrue(result["unchanged"])
-                    self.assertEqual(result["revision"], revision)
+                    self.assertEqual(result["revision"], publication)
                     self.assertEqual(self.git(self.root, "rev-parse", "main"), before)
                     self.assertEqual(self.git(self.root, "show", f":{path}"), published_bytes.decode().strip())
                     self.assertEqual(self.git(self.root, "status", "--porcelain", "--", path), "")
@@ -156,13 +156,13 @@ printf env > "$target/.venv/marker"
         self.assertEqual((self.root / "code.py").read_text(), "unstaged = True\n")
         self.assertEqual(self.store.doc(other, "task").read_text(), "other task draft\n")
         self.git(self.root, "commit", "-m", "ordinary commit after index repair")
-        self.assertEqual(self.call("show", task, "--json")["revision"], task_revision)
-        self.assertEqual(self.call("show", task, "--file", "report", "--json")["revision"], report_revision)
+        self.assertEqual(self.call("show", task, "--json")["revision"], task_publication)
+        self.assertEqual(self.call("show", task, "--file", "report", "--json")["revision"], report_publication)
 
     def test_publish_keeps_concurrent_edit_as_unstaged_draft(self):
         task = self.task()
-        revision = self.publish(task)
-        self.report(task, revision)
+        self.publish(task)
+        self.report(task)
         for kind in ("task", "report"):
             with self.subTest(kind=kind):
                 path = self.store.doc(task, kind)
@@ -202,18 +202,21 @@ printf env > "$target/.venv/marker"
             self.assertEqual(rows[bound][3:], ["bound-agent", "unknown"])
         self.assertEqual(self.call("status", bound)["agent"], "bound-agent")
 
-    def test_task_show_text_keeps_markdown_and_json_keeps_history(self):
+    def test_task_show_text_is_published_markdown(self):
         task = self.task()
         first = self.publish(task)
         first_document = json.loads(self.task_command_output("show", task, "--json"))
-        self.assertEqual(self.task_command_output("show", task), f"revision: {first}\n\n{first_document['content']}")
+        self.assertEqual(self.task_command_output("show", task), first_document["content"])
+        self.assertNotIn("--revision", self.task_command_output("show", "--help"))
         self.store.doc(task, "task").write_text("# 更新后的要求\n\n正文不应被 JSON 转义。\n")
         second = self.publish(task)
         self.assertNotEqual(first, second)
-        historical = json.loads(self.task_command_output("show", task, "--revision", first, "--json"))
-        self.assertEqual(historical, first_document)
-        self.assertEqual(self.task_command_output("show", task),
-                         "revision: " + second + "\n\n# 更新后的要求\n\n正文不应被 JSON 转义。\n")
+        self.assertEqual(json.loads(self.task_command_output("show", task, "--json"))["content"],
+                         "# 更新后的要求\n\n正文不应被 JSON 转义。\n")
+        self.assertEqual(self.task_command_output("show", task), "# 更新后的要求\n\n正文不应被 JSON 转义。\n")
+        rejected = subprocess.run([str(MAM), "--root", str(self.root), "task", "show", task, "--revision", first],
+                                  capture_output=True, text=True)
+        self.assertEqual(rejected.returncode, 2)
 
     def test_status_preserves_saved_job_observation_without_probing(self):
         task = self.task()
@@ -330,33 +333,59 @@ printf env > "$target/.venv/marker"
         self.assertEqual(unknown["last_known_checked_at"], "checked")
         self.assertEqual(unknown["error"], "offline")
 
-    def test_versions_reports_and_review_do_not_drift(self):
+    def test_reports_track_delivery_and_review_reads_latest_publications(self):
         task = self.task()
         worktree = Path(self.add(task)["path"])
-        revision = self.publish(task)
-        self.call("publish", task, "--file", "report", ok=False)
-        report = self.report(task, revision)
-        self.assertEqual(self.publish(task, "report"), report)
-        review = self.call("create", "--title", "review", "--review", task)
-        fixed = self.store.doc(review["id"], "task").read_text()
-        self.publish(self.task())
-        initial_status = self.call("status", task)
-        self.assertNotIn("requirements_changed", initial_status)
-        self.assertEqual(initial_status["publications"], {"task": revision, "report": report})
-        self.assertEqual(initial_status["report"], {"task_revision": revision})
-        self.assertEqual(initial_status["repos"]["multi-agent-manager"]["commit"], self.git(worktree, "rev-parse", "HEAD"))
-        self.assertEqual(self.call("status", review["id"])["review"], {
-            "source_task": task, "task_revision": revision, "report_revision": report,
-            "commits": {"multi-agent-manager": self.git(worktree, "rev-parse", "HEAD")}})
-        self.store.doc(task, "task").write_text("new requirements\n")
-        self.assertTrue(self.call("status", task)["drafts"]["task"])
         self.publish(task)
-        self.assertTrue(self.call("status", task)["requirements_changed"])
-        self.assertEqual(self.store.doc(review["id"], "task").read_text(), fixed)
-        self.assertEqual(review["review"]["report_revision"], report)
-        self.assertEqual(review["review"]["commits"]["multi-agent-manager"], self.git(worktree, "rev-parse", "HEAD"))
-        self.assertIn("test task", self.call("show", task, "--revision", revision, "--json")["content"])
+        self.store.doc(task, "report").write_text("Completed initial requirements.\n")
+        report_publication = self.publish(task, "report")
+        first_delivery = self.git(worktree, "rev-parse", "HEAD")
+        self.store.doc(task, "task").write_text("latest requirements\n")
+        task_publication = self.publish(task)
+        initial_status = self.call("status", task)
+        self.assertEqual(initial_status["publications"], {"task": task_publication, "report": report_publication})
+        self.assertEqual(initial_status["repos"]["multi-agent-manager"]["commit"], first_delivery)
+        self.assertNotIn("report", initial_status)
+        self.assertNotIn("requirements_changed", initial_status)
+
+        (worktree / "code.py").write_text("delivered = True\n")
+        self.git(worktree, "add", "code.py")
+        self.git(worktree, "commit", "-m", "record delivery")
+        delivery = self.git(worktree, "rev-parse", "HEAD")
+        self.call("publish", task, "--file", "report", ok=False)
+        self.store.doc(task, "report").write_text("Completed latest requirements and recorded delivery.\n")
+        report_publication = self.publish(task, "report")
+        final_status = self.call("status", task)
+        self.assertEqual(final_status["publications"], {"task": task_publication, "report": report_publication})
+        self.assertEqual(final_status["repos"]["multi-agent-manager"]["commit"], delivery)
+
+        review = self.call("create", "--title", "review", "--review", task)
+        review_task = self.store.doc(review["id"], "task").read_text()
+        self.assertIn("latest requirements", review_task)
+        self.assertIn("Completed latest requirements and recorded delivery.", review_task)
+        self.assertIn(delivery, review_task)
+        self.assertEqual(review["review"], {"task": task, "commits": {"multi-agent-manager": delivery}})
+        self.assertEqual(self.call("status", review["id"])["review"], {
+            "source_task": task, "commits": {"multi-agent-manager": delivery}})
         self.call("create", "--title", "bad review", "--review", self.task(), ok=False)
+
+    def test_legacy_revision_metadata_is_ignored_when_querying_records(self):
+        task = self.task()
+        task_publication = self.publish(task)
+        report_publication = self.report(task)
+        legacy_commits = {"multi-agent-manager": "legacy-delivery"}
+        data = self.store.read(task)
+        data["report"] = {"task_revision": task_publication, "commits": legacy_commits,
+                          "revision": report_publication}
+        data["review"] = {"task": task, "task_revision": task_publication,
+                          "report_revision": report_publication, "commits": legacy_commits}
+        self.store.write(data)
+        status = self.call("status", task)
+        self.assertEqual(self.task_command_output("show", task), self.store.doc(task, "task").read_text())
+        self.assertEqual(self.task_command_output("show", task, "--file", "report"), self.store.doc(task, "report").read_text())
+        self.assertEqual(status["review"], {"source_task": task, "commits": legacy_commits})
+        self.assertNotIn("report", status)
+        self.assertNotIn("requirements_changed", status)
 
     def test_bind_and_empty_archive_have_no_accept_gate(self):
         first, second = self.task(), self.task()
