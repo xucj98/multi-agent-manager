@@ -13,3 +13,11 @@
 # 验证与交付
 
 这是文案/metavar小修改，控制增量，不新增框架或冗长测试。实际递归跑所有子命令--help，核对placeholder/header/文档常用命令；现有标准库回归按README运行，若断言旧提示仅做必要调整。CLI身份参数dest不能因metavar修改而变动。diff-check及范围检查；无GPU。清理自有pycache与临时输出，干净commit、发布简短report（task_revision/workspace/commit/改动文件/验证）。用户特别要求审计所有help，不能只改两个示例。预计20分钟内交可review版本。
+# 17:40 用户追加：精简 status
+
+用户要求同时优化各status输出冗余。仅现有task status/job status，不新增命令或--json/--verbose/详情级别，不改存储与进程探测语义。继续JSON，做小型展示投影而非重构内部模型：
+- task status保留id/title/status/agent/workspace、repo路径/分支/状态/交付commit与必要base、发布task/report版本及report依据task版本、drafts/requirements_changed。发布revision每种只出现一次。jobs只列摘要id/note/status/checked_at（这是保存观测，明确cached语义），不嵌套identity/probe/archive长历史。归档job可汇总数量，未归档job摘要用于Manager取ID；task本身归档/出错时保留收尾结论和有用失败原因；review任务保留固定源task/版本/成果引用。空null字段、正常false清理标记、重复source/path等可省略，不丢定位工作区和验收版本的能力。
+- job status保留id/note/task/task_title/agent/host/pid/started_at/status/checked_at，刷新目标job一次。正常不重复identity/probe/status/checked_at，隐藏boot_id/start_ticks。探测unknown时status显示unknown并保留error与必要last_known_status/last_known_checked_at；已归档保持archived并保留archive结论。异常身份不匹配可有针对性提供诊断，不一律dump全部对象。
+- 状态函数内部返回值被其他调用复用时优先增加轻量render投影，不破坏job归档/等待/其他command输出。更新必要测试验证真实状态不冒充缓存，精简后仍可拿到job IDs与工作区/版本。不改变task show行为。README只写怎么查询，不添加输出字段规格；必要规格进入设计文档。
+
+此项与此前文案一起交付，但可单独commit便于review；当前base task文字中“不改行为”指原功能语义，这里明确授权status展示精简。若此前文案已提交，保留并增量实施。任务预计适度延长，不增加环境/agent。
