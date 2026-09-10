@@ -6,3 +6,6 @@
 在 task worktree 实施 .local 脚本/文档、需要的依赖锁定和 AGENTS.md 引导。确保新 worktree 有独立 .venv，通过 uv --link-mode hardlink（cache 同文件系统）节约时间空间；共享资产的软链接完整且安全；脚本幂等、失败清楚、可从新任务一键使用。不要硬链接可被工作修改的源代码；不复制旧 venv。根据实际项目做有意义 smoke，验证 hardlink inode 及 venv 独立性。不要运行正式训练。不要自行派发下级 agent。
 # 交付验收
 提交代码，报告 commit、精确一键命令、依赖来源、cache/资产路径、测试及边界；发布 mam report；后续另有独立 review 和空白上下文验收。
+
+# Manager 验收补充
+默认一键环境须覆盖当前实际 ManiSkill/reference 工作流，不能只安装 CPU/dev 测试依赖而让后续 agent 手动补核心 simulator/torch。按现有 README/pyproject/旧环境核验依赖；至少执行真实资产加载及场景 smoke，GPU 可用时包含渲染/模拟。可以合理分层安装但默认入口需完成当前工作流。参考 wuwen-2 的版本化脚本加 .local wrapper 模式。验证任意 cwd 的底层入口、重复执行与失败恢复、独立 venv 以及真实 cache inode hardlink 证据。
