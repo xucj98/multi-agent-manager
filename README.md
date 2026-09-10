@@ -1,35 +1,41 @@
-# MAM 操作手册
+# Multi-Agent Manager（MAM）
 
-MAM 管理本集群的任务、workspace、长进程和可停止等待。所有 agent 与管理命令在本机运行；GPU 作业可通过 SSH 在 `wuwen-1` 运行，两端共享 `/mnt/public`。安装与更新见[安装说明](docs/install.md)。
+## 核心原则
 
-`mam` 可从任意目录调用，默认管理根目录为 `/mnt/public/xcj/Projects/multi-agent-manager`；需要时用全局 `--root ROOT` 覆盖。
+MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job`、`mam wait`。所有 agent 与管理命令在本机运行；GPU 作业可通过 SSH 在 `wuwen-1` 运行，两端共享 `/mnt/public`。安装与更新见[安装说明](docs/install.md)。
 
-语法中的大写词需要替换为实际值，方括号表示可选参数。下面不含大写词的命令可直接执行。MAM 创建 `TASK-ID`；它同时用于任务文件、workspace 和工作分支。`JOB-ID` 标识登记的进程，`AGENT-ID` 标识执行 agent。
+使用细节可用 `mam --help` 查询，语法中的大写词需要替换为实际值，方括号表示可选参数。
+
+MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 由 codex 生成，标识执行 agent。
+
+`mam` 可从任意目录调用，默认 MAM 根目录 `MAM-ROOT` 为 `/mnt/public/xcj/Projects/multi-agent-manager`；可用 `--root ROOT` 覆盖。MAM 使用共享根目录：Manager 在其中编辑 `task.md`，执行者在其中编辑自己的 `report.md`。`main` 上的提交内容是已发布版本，工作目录中的修改是草稿。
+
+MAM 的任务 TASK-ID 和执行者 AGENT-ID 一一绑定。每个执行者有自己独立的 workspace `Projects/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。
 
 ```text
-.tasks/TASK-ID/task.md
-.tasks/TASK-ID/report.md
-Projects/workspace/TASK-ID/REPO/
+Projects/multi-agent-manager  # MAM 工作目录
+  .tasks/TASK-ID/task.md      # Manager 编辑任务要求
+  .tasks/TASK-ID/report.md    # 执行者编辑结果简报
+Projects/workspace/TASK-ID/   # 执行者的独立工作空间
+  REPO/                       # 按需创建的 worktree，分支为 task/TASK-ID
 ```
 
 ## 任务管理
 
-管理仓库使用共享 checkout：Manager 在其中编辑 `task.md`，执行者在其中编辑自己的 `report.md`。`main` 上的提交内容是已发布版本，工作目录中的修改是草稿，使用 `mam task publish` 发布。途中追加要求时，先更新 `task.md` 并发布，再通知执行者读取新版本。
-
-Manager 创建任务、填写任务要求并发布，再绑定执行 agent：
+Manager 创建任务、填写任务要求并发布，再绑定执行 agent，agent 任务完成后根据情况启动 review 或归档。
 
 ```text
 mam task create --title TITLE
-mam task create --title TITLE --review TASK-ID
+mam task create --title TITLE --review TARGET-TASK-ID
 mam task publish TASK-ID --file task
 mam task bind TASK-ID --agent AGENT-ID
-```
-
-`create` 返回任务草稿路径；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求。Review 的 `--review` 接收源任务的 `TASK-ID`。验收完成后由 Manager 归档：
-
-```text
 mam task archive TASK-ID --note NOTE
 ```
+
+- `create` 返回 `TASK-ID`；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求；然后发布任务。
+- 使用 codex 工具创建 subagent，要求其查看 `AGENTS.md` 并使用 `mam task show TASK-ID` 查看任务；获取 `AGENT-ID`，绑定执行 agent。
+- 途中追加要求时，先更新 `task.md` 并发布，再通知执行者读取新版本。
+- Review 的 `--review` 接收源任务的 `TASK-ID`。
 
 先用这些可执行命令查看已有任务和等待：
 
@@ -50,19 +56,19 @@ mam task show TASK-ID
 
 ## 执行与交付
 
-启动 prompt 会提供 `TASK-ID`。先运行 `mam task status TASK-ID` 和 `mam task show TASK-ID`，再为每个需要修改或独立 review 的仓库创建或复用 worktree：
+启动 prompt 会提供 `TASK-ID`。先运行 `mam task show TASK-ID`，再为每个需要修改或独立 review 的仓库创建 worktree：
 
 ```text
 mam workspace add TASK-ID --repo REPO --base COMMIT
 ```
 
-完成后，在管理仓库的 `.tasks/TASK-ID/report.md` 写结果简报。首行使用 `task_revision: COMMIT`，其中 `COMMIT` 是本次实际依据的已发布任务版本；记录完成项、workspace 与交付 commit、验证结果和成果位置。然后发布简报：
+完成后，在 `MAM-ROOT` 的 `.tasks/TASK-ID/report.md` 写结果简报，记录完成项、workspace 与交付 commit、验证结果和成果位置。然后发布简报：
 
 ```text
 mam task publish TASK-ID --file report
 ```
 
-交付后清理任务要求的临时文件，保留 worktree 供 Manager 验收、归档。
+交付后清理临时文件，保留 worktree 供 Manager 验收、归档。
 
 ## 进程管理
 
@@ -78,7 +84,7 @@ mam job archive JOB-ID --note NOTE
 
 进程结束后，先记录结果并处理任务要求的临时文件，再执行 `mam job archive`。Manager 可用 `mam job list --attention` 查找需要跟进的登记。
 
-## 等待
+## 休眠管理
 
 需要保持 active turn 等待已登记的长任务时使用：
 
@@ -89,10 +95,6 @@ mam wait stop --agent AGENT-ID
 ```
 
 `mam wait stop` 只停止对应 agent 的等待，不会停止或归档 job。
-
-## 工作区
-
-代码修改和独立 review 使用本任务的 worktree；讨论、只读调查和监控无需创建 worktree 或代码环境，`mam task create` 仍会分配空 workspace。每个仓库分别执行一次 `mam workspace add TASK-ID --repo REPO --base COMMIT`，并按任务要求的 base commit 工作。
 
 ## 开发验证
 
