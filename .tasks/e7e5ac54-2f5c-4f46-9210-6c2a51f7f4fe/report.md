@@ -1,5 +1,19 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日04:39 首份20000 checkpoint收尾与交接
+
+wuwen-1 GPU7，rearrange full_t_plus_30 seed1，job `fa1d8437-1fb7-48a5-8d37-2233e8e06767`，PID4186832，已自然结束。04:36:01日志确认最终20000原子提交、Save Finalize done；MAM wait于04:36:05返回stopped（当时zombie），随后/proc PID已不存在，同session/直接子进程为空。GPU7已用4MiB、空闲81046MiB、利用率0%，没有需要清理的自有残留。原detach未留独立exit-code文件，数值退出码不可追溯；实际退出及保存成功分别由进程检查和finalize日志证实，不将stopped直接等同exit0。
+
+首份交接checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s1/20000`。
+
+- 父目录仅20000，无临时checkpoint；_CHECKPOINT_METADATA有commit_timestamp，items仅assets/metadata/params，无train_state或optimizer。
+- metadata/command.txt记录d10cc01完整SHA、clean、冻结cwd、GPU7、seed1和原实际命令；train_config.yaml记录batch32/20000/BF16/save_full_state=false，datasets.json为demo_clean_state、50episodes，norm与上游数据/sidecar metadata均已保存。
+- 本机固定树解释器，显式 `CUDA_VISIBLE_DEVICES='' JAX_PLATFORMS=cpu .venv/bin/python -B`，JAX仅CpuDevice。通过既有restore_params(checkpoint/params, restore_type=np.ndarray)实际读回全部51叶、3353433872元素，全部BF16且数值有限。另用注册config.model.create的jax.eval_shape对比checkpoint metadata，51/51参数路径与shape完全一致。两次CPU核验均exit0，未占GPU，未修改运行源码。
+- 退出后缓冲已落盘：Step100至20000共200条，loss/grad_norm/param_norm全部有限；Step20000为loss=0.0007、grad_norm=0.0345、param_norm=1804.5209。这是区间均值证据。
+- 已完成保存/参数CPU读取/形状/metadata文件/释放检查；完整policy checkpoint-only GPU恢复、wire及正式评测尚待本机空闲卡和Manager排期，未将CPU参数读回称为完整policy推理通过。本机仍全占用，wuwen-1释放卡保持空闲。
+
+对应training job按本记录归档；其余13路保持冻结，继续mam wait jobs --task接续结束事件，运行项按05:32小时频率核查。
+
 ## 9月11日04:32 巡检与接续收尾
 
 已读最新04:32收尾条款。04:33:43–48实时job status确认14路running，无error；04:33–04:34日志及资源快照如下。
