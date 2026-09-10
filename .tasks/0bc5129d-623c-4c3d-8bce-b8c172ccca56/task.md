@@ -1,68 +1,30 @@
-F0当前固定候选：bc842036e3735390f35fe1138aa7b19f5ae2f95b。该小增量已用build_policy_obs=None替换92b365c代理；先完成F0增量复核并发布可否进入GPU smoke的结论。后续live9d2784d与新wire独立继续。
+# Memory runtime 独立 review
 
-## 新memory跨库wire契约：必须联通真实train/infer transforms与scheduler
+## 目标与工作区
 
-Manager发现当前两个实现不匹配：runtime MemoryContext.add_inputs把full编码写入padded state；训练AttachMemoryAfterNormalize只读取memory_input_ids，缺失会回initial。输出MemoryOutputs已把actions裁为robot_dim并给memory_prediction_ids，runtime却仍从actions尾部decode。仅各自CPU mock通过不能批准新模型闭环。
+审查任务9f5a3889-49a6-4f00-af84-096d8042c3bc交付的robot-bridge runtime。复用本任务已登记的robot-bridge/openpi worktree和独立环境，读取各库AGENTS及bridge的docs/design/conventions.md。只读审查生产实现，独立验证，不占GPU、不连接真机、不派agent。
 
-新memory_config路径统一为：
-- policy输入使用机器人原有state/images/prompt，加memory_input_ids，shape(F,)；full和serial都由policy输入transform负责具体编码。scheduler只送当前语义ID，停止自己写dense state offsets。旧无memory_config路径/F0保持原语义。
-- policy输出actions始终为机器人动作；另给memory_prediction_ids，full为(H,F)，serial为(1,F)，已按保存schema的decoder用本query输入memory作previous解码。full继续复用MemoryOutputs现有实现；serial复用实际动作条件化用的key_state_prediction结果，不能在scheduler重新argmax生成另一个当前条件。允许训练owner在src/openpi/policies/policy.py现有diagnostics输出位置为新memory_config加此统一字段；旧diagnostics可保持兼容。schema仍只有TrainConfig.memory_config一份。
-- MemoryContext从统一memory_prediction_ids读取并检查layout/shape/类别范围，然后按既有反馈时刻/row选择维护cache；不再次从已经裁掉memory的机器人actions解码，也不重编码policy输入state。policy无跨query缓存，previous来自请求的memory_input_ids；scheduler拥有反馈时序及context。不新增session/plugin/RPC或第二种wire配置。
-- no-memory字段F=0可用空预测维度或在空field情况下不索取该字段；旧checkpoint不强制需要新字段。
+当前候选为bridge ed2f2f34a1eea74e8449d39b889555fdfcc659fc，父提交c94f508907da6c9a6a786246a3f5968df28af46f；在自己的review分支合入增量。openpi使用已有ffa308d5485a2c8222d3e7735b08723c6e93a237等价树即可。checkpoint模型和loss审查归Banach，真实GPU50由训练owner负责。
 
-训练owner负责输入/输出transform与Policy.infer，runtime owner负责MemoryContext及三个scheduler/UI；backend保持现有字典透传。先固定F0 terminal最小commit，再进行此新schema接口增量，避免旧权重评测被后者阻塞。
+## 已通过范围
 
-验收必须跨边界：用真实policy input/output transforms和真实MemoryContext，非initial cache经scheduler传入后确实改变pi05 tokenized_prompt；模型原始dense输出经过真实输出transform裁为14维robot actions后，memory_prediction_ids仍到达context并按K30选row30反馈。serial预测ID与实际动作条件selected相同；测试单/多字段和no-memory。可以用小模型/构造原始输出做CPU联通，不能用两个各自mock字典替代这条测试。GPU50step保存加载后再复验实际返回的keys/shape。Reviewer均按此明确契约复核。
+你的报告05ba1a0及此前分项结论已被Manager接受：F0/legacy simulation（冻结bc842036）、新memory实际transforms→Context的7项CPU联通、drain后latency处理、原takeover回归，以及c94f508的全新隔离wheel依赖验证。F0已在独立任务跑正式100，不重开这些gate，也不重复整个训练/数据套件。
 
-## terminal修复的结构裁定（替代“不改Base任何代码”的过严限制）
+## 本轮待关闭的两个live问题
 
-92b365c通过每轮替换_policy_client为代理来跳过terminal infer，功能方向正确，但新增临时client身份/包装器没有必要。Manager此前要求“不改Base”过严；应保留已有执行顺序与通信机制，不必禁止最小退出契约。
+1. 同步get_obs必须等待与返回观察时间相符的实际handoff。此前单行chunk的排期已结束而SDK调用尚未完成时，零剩余wait提前返回，Context允许下一infer。使用真实X1 loop/X1Pro worker、真实execute/get_obs和event延迟SDK返回，验证不会提前放行；放行后的completed/queued必须与观察时间相符。保留同一个带wait_condition的get_obs，非零剩余的原异步流水线继续成立。
+2. 实时tick跳过多个目标时，进度必须是成功handoff确认的轨迹前缀/位置。此前3行目标只发送第3行却completed=1，Context误用row1并留下永久pending。复现延迟tick，验证成功发送第3行后Context消费index2、队列可drain；不能为凑计数补发过期动作，也不能只按墙钟声称完成。
 
-请删除_TerminalInferenceSkippingClient和sim的run_iteration包装，采用已有build_policy_obs hook返回None表示这轮不调用policy；Base在该hook后作None检查并返回skip，文档/类型同步。simulation仍先处理terminal observation的真实执行进度/trace，之后返回None；其_loop_step会按_episode_terminal结束。Base不读取仿真字段、不加新RPC、session或调度循环；live/offline正常dict返回行为不变。保留并复核actual run_iteration的infer_count=0、execute=0、terminal actual_k/next_query，以及非terminal/reset/takeover原路径。此小修单独commit，以其作为F0正式候选。
+两项都检查partial prefix、旧图像/新图像快照、重复事件、cut/reset/接管及旧epoch事件，避免旧proposal被新动作消费。进度表示执行器交接的轨迹位置，不是SDK调用次数、硬件物理到位、渲染帧或仿真积分步。核验必要的锁/子进程事件路径；不能只依赖作者mock结论。修复后的回归按影响选择，不扩成硬件验收。
 
-## Eval入口补充
+## 持续成立的接口与结构约束
 
-Eval准备commit RMBench9e8fccbd2fa004f18a3cbcc301e7387b02edaccf发现terminal trace next_query=false仍额外policy infer。Manager已要求作者在simulation scheduler局部跳过terminal infer并单独提交，保留base/live循环；请复核此增量与F0实际调用/trace一致。另正式recorder原完整配置smoke检查保留，四种row各自先2rollout smoke，不写新的白名单兼容机制。
+- 保留SchedulerBase的execute→带wait_condition的get_obs及WS动作chunk/UDP takeover；没有get_progress RPC、session或plugin bus。一个scheduler对应一个robot和一个policy；显式memory context归scheduler，原算法内部cache/reset行为可保留。
+- 新schema输入为机器人原state/images/prompt加memory_input_ids(F,)，编码归policy transforms。输出actions仅机器人动作，memory_prediction_ids为full(H,F)或serial(1,F)。serial IDs必须等于实际动作条件selected；Context校验后按事件/行消费，不二次argmax、不读机器人actions尾部。previous来自本query输入，单/多字段和F=0共用机制。
+- full逐行预测可不同；H50/K30首批在chunk完成后读row30。query/chunk/部分执行、拒绝、中止、reset均有明确pending生命周期。UI从同一schema字段生成，普通部署不读取训练GT。
+- 旧无memory_config checkpoint沿既有路径；F0保留原权重、词表、归一化与解码，rows1/20/30/50为所有字段同一选择行，trace记录actual_k/next_query。terminal通过build_policy_obs返回None跳过infer，Base保留既有顺序。
+- 仿真产物归RMBench recorder。三个scheduler共用Context，不复制三套反馈状态机；轻量openpi-client不依赖训练框架。异常/接管/reset回收旧动作、子进程与视频资源。
 
-## 已提交的完整runtime增量
+## 交付
 
-作者已交付robot-bridge fd38513adb5ba171327358f70f55f88059de49d2（含22a5c6c/bb908c6前置），请在本任务独立分支合入并完成上述全范围review；openpi helper使用主库58d6f2155acc3af03017677bb3f536101e6699f4的等价API。作者报告445 passed/1skipped不是独立验收结论。F0是旧full固定权重评测的直接阻塞：先给selector/legacy/progress部分是否阻塞的明确结论，剩余新schema路径继续检查。报告实现与测试的代码规模，以及必要性/重复逻辑方面的实质问题，不为凑行数删必要验证。
-
-# Memory runtime独立review：执行进度、反馈时刻与takeover
-
-## 范围与工作区
-
-独立审查runtime任务9f5a3889-49a6-4f00-af84-096d8042c3bc的已发布要求与交付代码。先创建本task robot-bridge worktree at22a5c6cc54f46daf0e025fa3f7fdbd1f07a2f6a8，并读AGENTS与docs/design/conventions.md；需要新client API时创建本task openpi at58d6f2155acc3af03017677bb3f536101e6699f4，使用独立editable，不能引用作者临时树。起始commit含bb908c6执行进度及22a5c6c metadata透传，可先审这两项。作者正在补scheduler/MemoryContext/UI集成，Manager随后给增量commit；不要空等，不改交付实现，不占GPU，不派agent。
-
-## 核查要点
-
-- 保留SchedulerBase原execute→带wait_condition的get_obs循环及真机WS action chunk/UDP takeover机制；没有get_progress RPC或session概念。模型可以原有内部cache/reset，scheduler负责显式memory context，单scheduler一robot一policy。
-- execute接受chunk与实际处理多少policy动作行明确区分；新controller计数与相应chunk/观察对应，部分执行、取消、episode中止、接管、异常和reset均不会消费旧proposal。动作行计数不冒充物理到位检测，不把渲染帧/仿真积分substep当policy row。看锁/线程/队列路径，独立构造最小复现，不能只相信作者mock。
-- 新memory单/多字段共用：语义初值、当前selected与prior snapshot、query_selected/chunk_completed反馈、row.first/index/last_executed、actual k与一基/零基索引一致。full逐行预测不是强制每行相同；首批P2在K30完成后读row30。缺GT属于训练数据，不应让普通runtime读GT或训练dataset；one-hot identity新输出与legacy归一化各按真实路径解码。
-- F0旧full30k固定H50/K30，需要rows1/20/30/50（index0/19/29/49）诊断，所有memory字段同一选行规则；原模型/词表/归一化/解码路径保持可比。新selector/trace不能顺手更改旧模型条件；老checkpoint未含memory_config仍可走原已验证路径。每query trace记录请求/实际执行k、消费行、before/after语义；episode已结束不伪造下一query。
-- 真机/offline/sim/takeover共享context处理；UI从相同字段定义显示，无phase/attribute字段数量硬编码。reset/接管清pending，异常收尾不泄漏子进程/端口/视频。仿真结果归RMBench recorder，代码不新建robot-bridge/eval_result。
-- 审实现冗余与概念边界，避免同一逻辑在三scheduler复制三份或新建通用plugin bus；也不要为精简破坏已经验证的真机循环。
-
-## 验证与交付
-
-CPU测试适用于controller进度、并发/中断、MemoryContext时序、legacy分支和UI字段传递。GPU的2rollout video/no-video及正式100由独立eval任务执行，你不启动。起始阶段只报告已审查commit的范围；新scheduler增量到后再给完整结论。报告须有task_revision、审查HEAD/工作区、独立验证及发现的具体输入/路径/后果，区分阻塞首批与扩展事项；记录未能验证的真机硬件部分，不能用mock成功冒称真机通过。发布report后清理自己的临时脚本/cache，保留工作树待Manager归档。
-
-## 2026-09-10 06:57：追加发现的裁定
-
-Manager已读6eb517d报告，认定synchronous末行K-1与drain后仍跳latency是需要修复的live/offline问题，并交原作者处理。新wire runtime半边已通过但跨真实OpenPI transforms仍待CPU训练commit，届时再联合复核。F0 row30 smoke已通过并放行正式100，不因此重开F0 gate。
-
-生产轻量包依赖需要可复制安装路径；接受独立openpi该版本构建的openpi-client wheel及全新隔离环境中import/创建MemoryContext验证，不必安装整套训练框架或改动真机/原sdk_robot环境。SDK硬件可运行性不是纯schema依赖验收的前置条件，真实设备验收另列。收到作者最小方案后据真实安装链路评判。保留每项精确范围，避免将尚未交付的训练增量重复计为实现缺陷。
-
-## 已交付live修复与新训练commit
-
-作者bridge修复78e1b4a49677d7aef50b0915076a465a4523ba5b已固定，接f84edbd后。请复用你的独立双库workspace审该增量，优先关闭或精确报告synchronous末行handoff及drain后latency两项；复核原异步/takeover路径不退化。部署轻量安装作者继续补。
-
-openpi训练CPU交付ffa308d5485a2c8222d3e7735b08723c6e93a237已固定，含所需core/sim配置/checkpoint父链。作者在自己双库树合入做真实transforms→Context，你在自己的openpi树合入正式版本后独立验证。无需重复拿旧58d6 transform报告已知缺接口。验证非initial memory改变真实token输入、full robot-only输出后IDs仍传递且K30反馈row30、serial实际selected对应、单/多字段/no-memory；训练/loss/保存由Banach专审，你不重复其整套范围，也不新建工作区。新scope可分阶段发布。
-
-## 定向补核：控制tick跨过队列端点
-
-Manager读78e1b4a发现tracker仍按mark_processed的精确timestamp逐个加count，而原实时loop按当前time选before/after，调度抖动可能一次跨过多个队列端点。请构造一次tick延迟跨过2个command的真实loop/worker复现，核对：(a)未被选作before的旧pending是否永远残留；(b)completed次数是否被MemoryContext误当连续前缀，导致实际已发第3个端点却反馈第1个位置；(c)synchronous等待是否有终止条件。
-
-这属于现有进度/映射正确性验收，不要求新增框架。先给明确复现与判断，不预设一定需要逐条补发。原实时插值允许跳过中间端点，不能为了记忆计数改成事后补发一串过期动作；进度语义若应表示执行器已推进到的轨迹位置，应以实际成功handoff及其位置为证据，不能仅按墙钟假定完成，也不能把SDK发送次数冒充policy row。此项仅影响live，保持仿真/训练独立推进。
-
-Manager已裁定你的78e复现：两live剩余问题交作者按成功handoff的轨迹前缀/位置及同步wait修正，不补发过期动作。已通过新wire7项与latency不重跑无关范围。部署增量c94f508907da6c9a6a786246a3f5968df28af46f已固定，请审最小wheel安装路径/全新隔离环境验证，勿触碰真机。该项和live修复可分开发布结论。
+发布简明report，包含task_revision、独立工作区及实际HEAD、本轮两P1是否关闭、复现命令和结果、剩余具体问题与影响。已验收项引用前次报告，不再复制全部历史。区分CPU/fake SDK、GPU和硬件证据。生产及测试的新增规模用于判断必要性，不为压数字删必要验证。清理本任务临时脚本/cache；保留独立worktree待Manager归档。
