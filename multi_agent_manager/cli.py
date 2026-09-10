@@ -632,8 +632,14 @@ def wait_jobs(store, args):
             for target in targets:
                 if wait_cancelled(store, record):
                     return wait_result("cancelled", agent, args.task)
+                budget = WAIT_PROBE_TIMEOUT_SECONDS
+                if deadline is not None:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        return wait_result("timeout", agent, args.task)
+                    budget = min(budget, remaining)
                 job = target["job"]
-                observation = runtime().probe_process(job["host"], job["pid"], job["identity"], WAIT_PROBE_TIMEOUT_SECONDS)
+                observation = runtime().probe_process(job["host"], job["pid"], job["identity"], budget)
                 if observation["status"] == "stopped":
                     return wait_result("stopped", agent, args.task, target, observation)
             if deadline is not None and time.monotonic() >= deadline:
@@ -731,8 +737,10 @@ def job_started_at(job):
 
 def print_job_list(result):
     rows = []
-    for job in [*result["jobs"], *result["needs_verification"]]:
-        rows.append((job["note"], displayed_job_status(job), job_started_at(job), job["id"], job["task_title"], job["task"]))
+    for group in ("jobs", "needs_verification"):
+        for job in result[group]:
+            state = "unknown/待核实" if group == "needs_verification" else displayed_job_status(job)
+            rows.append((job["note"], state, job_started_at(job), job["id"], job["task_title"], job["task"]))
     print_table(("描述", "job状态", "开始时间", "job-id", "任务描述", "task-id"), rows)
 
 
