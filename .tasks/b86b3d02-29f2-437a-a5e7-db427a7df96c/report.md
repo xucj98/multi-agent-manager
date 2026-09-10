@@ -1,3 +1,19 @@
+# 07:45 裁定小修交付：待 Manager 复核
+
+新 bridge commit：`124049fb78d29db1d77d13a9fd4a4b698fcfe6e9`，基于固定 `fda269c1`；原 workspace 干净保留，OpenPI 未改。仅修改 launcher 及必要测试/fixture，无架构重构、无 controller/scheduler 修改、无 GPU 重试。
+
+`_validate_served_metadata` 对 Memory v1 从 `memory_config.protocol.execution.rows` 验证实际运行 K，与 scheduler._move_steps 及 manifest execution_rows 一致；保持模型频率/H 校验。顶层采样 query_stride 缺失或 None 时不将其当成 K 缺失；若提供则单独按 manifest 采样 stride 校验，不要求其等于 K。legacy 原 query_stride 门禁保留。schema K 与实际调度/manifest K 冲突仍拒绝。
+
+首次真实 served_metadata 的顶层 query_stride 是缺失字段，先前错误文本的 None 是 metadata.get 的结果。已将真实文件的 policy_hz/action_horizon/memory_config 投影作为 `tests/launcher/fixtures/wash_full_20k_timing.json`（保留缺字段原状），避免合成 fixture 再次漏掉真实情况。
+
+CPU 验证：launcher 定向测试 18 passed；ruff E/F、git diff --check 通过。测试覆盖真实缺字段/None、采样 stride7 与执行K30可共存、已提供采样stride冲突、schema/manifest/scheduler K冲突、频率/H冲突和旧drawer规则。另直接读取首轮完整 served_metadata 与未修改的 wash manifest 调用门禁，CPU PASS；未加载模型。
+
+复测：`CUDA_VISIBLE_DEVICES='' .venv/bin/python -m pytest -q tests/launcher/test_offline_preflight.py`。
+
+等待 Manager/指定验收任务复核与通知后再用 GPU2。重试输出固定为 `/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_20k_offline5ep_retry1`，原失败目录保留首因/命令/metadata，不覆盖。尚无正式offline指标或真机效果验证；今日真机交付需另给明确模型/代码路径及限制。
+
+以下为首轮失败与此前交付历史。
+
 # 正式 offline 首次启动失败（2026-09-11 07:40）
 
 Manager 授权后从固定干净 bridge `fda269c1f333dabdb5628c083a4dba3db0938333`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4` 启动，GPU2 启动前 1MiB/0%，独立端口 19580/19582 空闲。原 launcher 顺序 wash_full/wash_serial，统一目录 `/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_20k_offline5ep`。
