@@ -43,3 +43,7 @@ wash训练owner ad6bb77e-3892-4730-ae1a-7d9cd99a5728最新task/report：两20k c
 
 ## 08:40 RPC 独立验收后准入
 Helmholtz已独立复核dd0914b170fe5d227f24d36b07d90c0e422b7e58，实际RPC full/serial各两集27 passed。Manager准入：固定该bridge commit和OpenPI a869498f，以GPU2执行两模型各5ep offline，输出新目录wash_memory_v1_20k_offline5ep_retry2。仍先检查卡/端口19580/19582、干净源码与握手；同一GPU顺序跑full后serial，完成后核对执行行/推理次数/指标、进程退出及释放。预计超1小时则登记mam job；失败先定位，不反复盲重试。此准入不代表真机验证通过。
+
+## 正式结果收尾
+Manager接受retry2运行与释放证据。请在同task创建RMBench worktree（基于其当前xcj-dev），阅读实验规范，仅更新experiments/memory_chunk_20260910/EXPERIMENT_LEDGER.zh-CN.md和必要README链接：记录wash两20k训练完成、实际训练/成功offline路径、两模型5ep指标及full逐行/serial逐query不可直接比较、训练内回放而非泛化或闭环成功率。不要更新其他正在跑的sim结果或修改其源树。
+失败重试的根因/命令/commit保留为简洁Git实验记录；诊断已完成的前两次失败临时目录可清理，确认不删原数据/正式retry2及共享模型。报告区分成功运行事实和历史失败，不再把已归档workspace当未来部署入口。完成提交、发布report并清理本task各worktree临时缓存，供Manager合并归档。
