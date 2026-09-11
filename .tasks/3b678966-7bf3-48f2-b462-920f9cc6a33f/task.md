@@ -1,0 +1,9 @@
+# wash-cup live S2M 增量独立验收
+
+目标：今天交付wash-cup真机测试，不做统一架构重构。独立审阅4296391f任务要求与报告，以及bridge dd0914b170fe5d227f24d36b07d90c0e422b7e58..0a33dd19ab911ae3808c3ff141e3fd0603c22594，重点功能a5caa5b57e96fd02de7d6df0cd2ffa5bf0030f5f和部署文档。用mam workspace add创建自己的robot-bridge(0a33dd1)、openpi(a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4)环境，阅读目标库AGENTS和bridge docs/design/conventions.md。
+
+仅CPU只读review；不改业务代码、不SSH操作现场、不占GPU、不发真实机器人动作。实际模型metadata位于openpi/checkpoints/pi05_x1pro_wash_cup_s2m_full_current_feedback/memory20k_ad6bb77e_wash_full_s0/20000与serial_lag30/memory20k_ad6bb77e_wash_serial_s0/20000（第二个完整config为pi05_x1pro_wash_cup_s2m_serial_lag30）。
+
+验收重点：native S2M memory 14维输入与动作/插值正确，原SM2SM/projection保持；live/takeover/offline同metadata同观测序列得到一致输入、执行K30动作与memory反馈；full完成后取index29，serial当前query反馈；acceptance与completion不能混淆；reset/manual/homing/takeover清pending；既有wait condition/UDP控制机制保持。检查测试是否经过实际scheduler而非只测MemoryContext，跑必要回归，明确CPU与现场边界。部署文档应复用scripts/launch/x1pro_takeover.sh和既有Policy Manager，命令和跳过policy自动启动行为确实可用，不硬编码机器地址，不误导用户重启已有实例。
+
+提交简报包含PASS或具体阻塞、文件行/证据、测试、两worktree commits和部署准入结论。发现问题先明确最小修复方向，不自行扩实现。完成后清理自己的测试临时缓存，发布report，保留worktree供归档。优先20分钟内给准入结论，若需更多时间说明阻塞。
