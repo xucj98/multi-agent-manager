@@ -1,3 +1,13 @@
+# 09:19 GPU4 rearrange t+1 seed0前50条中检完成
+
+`rearrange_full_t_plus_1_s0_20k_100ep`前50条38 success/12正常任务失败（76%，仅中检，非正式100结果）。seed严格100000–100049，episode0–49顺序一致，无runtime_error，均terminal，50个scheduler exit0。正常失败为button_pressed_multiple_times4、block2_not_moved_to_middle4、button_press_insufficient2、button_not_pressed2；全部保留。
+
+按每集query_id取最后trace检查：810个有实际执行的query，其中760个K30、50个partial；已有2280个字段反馈更新全部匹配last_executed索引，未见row/index错误。实际证据与检查摘要保存在正式目录`midpoint_review.json`。本新20k没有真正同训练/config的旧基准，不强行用F0做10个百分点对比；当前无须改协议/参数，按原固定100继续。
+
+三个公共RPC失败仍待Manager裁定，GPU3/6暂留空；GPU4/5/7继续，三树冻结不merge台账。前述失败结果均保留，未补跑。下一关键检查为put-back t+1 seed0第50条及各run退出事件。
+
+---
+
 # 08:49 更正GPU3状态：与GPU6同时段出现第三次RPC失败
 
 `rearrange_full_t_plus_1_s1_20k_100ep`于08:45:35失败，完成17条正常success后，episode17发生robot_status_transport_error 30秒超时，最终18条记录。与GPU6的08:45:37仅差两秒，发生在不同target变体，不能归因于t+30模型本身。此前08:45快照只读取episode_status.failure_reason，基础设施错误存储在其它诊断/runner字段，导致将18条记录误述为推进且无新增runtime错误；以本次summary及进程退出证据更正。后续监控同时核对benchmark状态/顶层runtime诊断，不只看episode_status。
