@@ -170,3 +170,9 @@
 - renderer 最小候选为 RMBench `envs/_base_task.py` 8 insertions/1 deletion：进程内保留一个 SapienRenderer，scene/physics/camera 设置仍在原 setup_scene 重建。独立本机树 `workspace/2a879870-8dda-4613-a684-0ad48a5e86be/RMBench-renderer`、C 树 `state-vla/workspace/2a879870-8dda-4613-a684-0ad48a5e86be/diagnostic/renderer-reuse/RMBench`，branch `codex/2a879870-renderer-lifecycle`，base `3e69b1e`。
 - C2 GPU2 的原 bounded harness 已实际启动 40 reset，PID 144583，记录 `records/renderer-reuse-20260912/{launch.json,driver.log,result.json,exit}`；使用原 strict Python/bridge，candidate RMBench cwd，system ICD。等待跨越旧失败点；此为诊断，不作为 smoke/formal，未宣称协议等价已实证。
 - 创建优化已在现有 RMBench task worktree及 C .local 提取 installer 边界准备：两处 sorted(rglob) 改为惰性 rglob，保持“至少一个可解析至配置cache内的真实软链”的原判定；不写 venv 链接或覆盖私有文件。CPU-only fresh 创建/空间/清理 PID 130867 已启动，证据 `records/create-lazy-probe-20260912`。
+
+### Renderer 候选可审阅，诊断继续运行
+
+- 本机独立 branch `codex/2a879870-renderer-lifecycle` 已提交候选 `17b55bf`（base `3e69b1e`，仅 `envs/_base_task.py`）。最小 patch 位于本机 `.tasks/2a879870-8dda-4613-a684-0ad48a5e86be/renderer-reuse.patch`；Manager 可据此安排独立源码 review，runtime gate 尚未完成，不提前判定修复成功。
+- 澄清首个启动 `renderer-reuse-20260912` 的 supervisor 出现字符串换行 SyntaxError，未进入 sim，原日志保留。已在新目录 `renderer-reuse-20260912-retry1` 以 PID `144614` 启动原40-reset harness，实际已开始导入sim环境；活跃源码未再改。
+- `close_env()` 未释放 Gym Env 的 scene/robot/viewer 引用是源码观察；本候选验证的是 renderer context 跨场景持有是否有效，并未把 GPU driver 报错当成已解释的完整根因。源码 AST 只在 setup_scene 改动；行为等价仍需实际 smoke 验证。review 重点包括进程级 context 生命周期、串行 worker 范围及 scene 重建参数保持。
