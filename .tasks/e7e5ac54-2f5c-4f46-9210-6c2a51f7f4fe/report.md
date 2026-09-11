@@ -1,5 +1,20 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日11:32 本机最后两路小时巡检
+
+实时job status均running，无error。日志持续前进，已落盘标量全部有限，无可见训练报错；其余12项已收尾归档，未重复checkpoint读取或远端探测。
+
+| 本机GPU | 模型/seed | 最新真实标量 | 剩余ETA | 预计完成更新 |
+| --- | --- | --- | --- | --- |
+| 0 | put-back full t+30 / 2 | Step 18900: grad_norm=0.0300, loss=0.0006, param_norm=1804.2607 | 1:04:09 | 约12:36 |
+| 1 | put-back full t+1 / 2 | Step 19100: grad_norm=0.0301, loss=0.0006, param_norm=1804.4077 | 54:05 | 约12:26 |
+
+两路各189/191条标量为区间均值，ETA不含最终保存。冻结运行树d10完整SHA正确，git status为空，源码/参数未变。
+
+资源快照：0, 73417 MiB, 7622 MiB, 100 %；1, 73405 MiB, 7633 MiB, 100 %；RAM available 886Gi。
+
+继续active turn与mam wait等待完成事件，下一小时12:32；新完成checkpoint按既有收尾要求验收。wuwen-1保持停用，GPU恢复/评测由Manager排期。
+
 ## 9月11日10:32 本机最后两路小时巡检
 
 实时job status均running，无error。日志持续前进，已落盘标量全部有限，无可见训练报错；其余12项已收尾归档，未重复checkpoint读取或远端探测。
