@@ -46,3 +46,6 @@ retry1实际运行在首个execute因memory prediction IDs被通用handle_execut
 
 ## full Policy Manager 实例启动
 GPU1只读确认约24067MiB可用、PM建议8951。Manager允许现在通过已有Policy Manager部署wash full（model_id取实际PM登记值，上节路径），GPU1、端口8951，启动前再核对空闲资源/端口；使用同一已同步bridge041405f/OpenPI a869和现有环境。不替换/停止已有pourtea、不启动机器人或scheduler、不发送机器人动作。验证PM child running、metadata全且匹配14D S2M/15Hz/H50/K30/full schema、模型加载日志无异常，给准确policy URL及PID/GPU/端口。若可用现成policy-only合成观测smoke且不接真机，可以验证一次infer；不要引入新工具框架。若启动失败，保存首因并只清理本次新建实例。服务用于今天真机，需按预计运行时长用mam job add登记进程（host用已确认SSH别名）；这是待现场使用的长服务，不能归档任务时自动停止。回报其状态，保留任务至现场交接。serial尚不启动，先full。
+
+## 现场交接责任确认
+用户确认jx-x1pro-m-060及现场WSL由内网同事更新。我们只完成已授权policy主机部署及验证，交付简短说明：bridge041405f、OpenPI a869（policy侧）、PM模型URL、现场x1pro_takeover.sh --skip-policy、现场同commit/CPU导入及phase/reset/takeover检查。不要尝试连接或更新master/WSL，不直接向同事发消息；由用户转交。真实机器人行为由现场验证，明确与已完成offline/CPU/policy-only测试的边界。
