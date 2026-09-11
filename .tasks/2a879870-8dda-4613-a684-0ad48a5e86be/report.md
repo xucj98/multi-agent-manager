@@ -236,3 +236,5 @@
 - 按条件授权，C2 GPU2在01:40:25启动新leaf `put_back_full_t_plus_1_s0_20k_renderer_100ep_20260912`，supervisor245873，正式MAM job `ac616c59-bcbb-4789-b05b-6ae68abfb800`。原入口mode=formal、smoke-run=renderer_c2_smoke2_20260912、checkpoint原20000、H50/K30、固定100000–100099及前5video不变。launch.json/driver.log在records/<leaf>；真实result leaf已创建，当前处于服务启动/首episode准备，尚不声称完成任何正式terminal。
 - 首50只读snapshot/infra guard PID246776，job `61c9d848-ba43-4b1d-a748-99b4490696a1`：完整JSONL前缀达到50时保存证据并唤醒MAM；发现固定seed拒绝/序列错或明确infra错误时保留failure receipt并仅中断本次formal进程组，不继续扫seed、不自动重试。正常任务失败不触发。未修改活跃source/算法/动作协议。
 - 现有测量/恢复记录已整理到本机任务独立RMBench的 `experiments/cluster_c_eval_acceptance_20260911/README.md` 草稿，不改活跃树。后续以首50或异常为检查点，不逐episode汇报。
+
+- 启动后实证补充：正式seed100000已accepted；config.yaml为test_num100/eval_video_count5/pi0_step30，recorder17b55bf，实际9个相关进程环境均cuda:0映射GPU2/system ICD，证据records/<formal leaf>/live-device-evidence.json。实验测量/恢复/启动说明已本机独立文档提交 `ece7de6`，活跃C树不改。当前通过MAM wait等待首50或异常事件。
