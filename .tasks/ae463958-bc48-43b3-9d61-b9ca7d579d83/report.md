@@ -1,5 +1,3 @@
-task_revision: 9bd54837ebcaa8f37eb33e3bb3890f3f4b7bcf79
-
 # RMBench 慢 `get_obs` 状态查询与时序诊断独立 review：阻塞
 
 ## 准入结论
@@ -25,11 +23,14 @@ formal 的运行时修复。它们可以把“长 worker RPC 堵住额外状态�
    判定；但 `robot_bridge/benchmark/runner.py:461-480` 完全不检查 source，直接在
    `latest["terminal"]` 为真时等待/结束 scheduler。
 
-   可达的跨连接序列是：上一集已缓存 terminal；下一集 `reset` 尚在 worker 内运行；状态
-   probe 返回旧的 cached terminal；runner 把新 episode 提前走进 terminal 分支。现有真实
-   localhost 用例只覆盖慢 `get_obs` 的 cached `ready`，没有覆盖“旧 terminal + 慢 reset”。
-   解除条件是让 runner 只接受 worker-source 的 terminal（或传递并检查等价的
-   authoritative 标记），并新增这个双 WebSocket 回归用例。
+   这里必须与已确认事故严格区分：正常 `BenchmarkRunner` 在 `_loop()` 中同步等到
+   `reset` RPC 返回，才启动 scheduler 并进入 `_wait()`，所以“旧 terminal + 下一集慢 reset”
+   不是正常 runner 的已证实触发链，也不是四个历史首次 `get_obs` 超时的首因。它是通用
+   多连接 API 的可达边界：外部并发 reset/status 调用仍可得到旧 terminal，而 runner 未执行
+   source 检查。现有真实 localhost 用例只覆盖慢 `get_obs` 的 cached `ready`，没有覆盖这个
+   API 语义。解除条件是让 runner 只接受 worker-source 的 terminal（或传递并检查等价的
+   authoritative 标记），并新增 CPU 双 WebSocket 回归用例；该用例只证明防护，不得反推历史
+   故障根因。
 
 2. diagnostic leaf 仍生成常规 `_result.txt` 的成功率，不能由目录隔离单独保证不混入
    formal 结果。
@@ -60,14 +61,14 @@ formal 的运行时修复。它们可以把“长 worker RPC 堵住额外状态�
   “长 `get_obs` 时不探测”和“已死亡 worker”，没有覆盖“仍有效但
   `get_episode_status` 超过 5 秒”。先用 CPU fake worker 固化期望策略；若这类延迟可合法
   存在，不能把它直接判 lost/杀掉。
-- worker JSONL 只在 opt-in 时启用，但没有事件/字节上限；64 条上限只约束 proxy timeline。
-  单集 75 秒 launcher 实际上把本次风险限制住了，且 trace 写入异常不会改变 rollout；不过
-  诊断写入失败仅落 stderr，建议在结果中显式标记 trace unavailable，并为长期启用加上限。
+- worker JSONL 只在 opt-in 时启用；proxy timeline 保持 `deque(maxlen=64)`。本次窄修复
+  不扩 trace 机制或上限：单集 75 秒 launcher 与默认关闭已足够约束其范围，trace 写入异常
+  仍不得改变 rollout。
 - `.local` 在 worktree 中是到共享主 checkout 的软链接。runner 对 manifest 调用了
   `resolve()`，实际输出的 `input_manifest.source_commit` 为 `f2ec2cf`，而诊断脚本/recorder
   的 commit 是 `ed1e00b`。这不否定本次命令实际固定了 bridge `de0e9da` 和 recorder，
-  但 RMBench 总体版本留痕有歧义；后续入口应将启动 worktree 的精确 RMBench HEAD 单列写入
-  config，而不只要求 `6139577` 的干净后继。
+  但 RMBench 总体版本留痕有歧义；窄修复应将启动 worktree 的精确 RMBench HEAD 单列写入
+  config，而不只要求 `6139577` 的干净后继，并由定向复查核对它与实际启动 worktree 一致。
 
 ## GPU3 单次产物核验
 
@@ -88,6 +89,9 @@ formal 重跑。
 - `env CUDA_VISIBLE_DEVICES= JAX_PLATFORMS=cpu .venv/bin/python -m pytest tests/robot/controllers/test_rmbench_simulation.py tests/benchmark/test_runner.py tests/benchmark/test_stage3.py tests/robot/test_server_dispatch.py tests/transport/test_websocket.py -q`（robot-bridge）：`39 passed, 1 skipped`。
 - `env CUDA_VISIBLE_DEVICES= JAX_PLATFORMS=cpu .venv/bin/python -m unittest discover -s tests -p 'test_eval_diagnostics.py' -v`（RMBench）：`3 passed`。
 - RMBench diagnostic launcher `py_compile`、两库候选 diff 的 whitespace 检查通过。
+
+作者将按最新任务只处理 cached-terminal 防护、diagnostic 产物排除、5 秒边界 CPU 用例和
+RMBench 实际 HEAD 留痕；待其提交后再做定向 CPU 复查，不新增 GPU 要求。
 
 未启动 GPU、仿真评测、真机、SSH 或远端命令；也未改动代码。
 
