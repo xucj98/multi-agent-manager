@@ -252,3 +252,15 @@ smoke gate 依既有 `assert_smoke_compatible`：要求两条 accepted rollout �
 100 条 seed100000–100099、相同 checkpoint 自身 smoke 引用，尚无正式结果。C2/C3 各有两个 active
 formal，达到每 host 最多两个 run 的授权上限；下一批待空位后按既定队列接续。50 条截面、完整收尾、
 raw 回传和主 RMBench 台账增量将在结果到达时更新；当前不把 smoke 分数写为正式成绩。
+
+## 2026-09-12 06:04 C formal 运行快照与台账增量
+
+安全 docs tree 的增量提交为 `75a34d6376cc34e2309a81fa5e243e28c463d6ac`，仅更新
+`EXPERIMENT_LEDGER.zh-CN.md`：将已过期的“待 review/未启动”改为 `f962663` 已准入、四个 matching
+smoke 门和对应 raw leaf/MAM job，并保留两个原始 30 秒失败 leaf。没有写入正式分数或修改 C 的冻结
+评测树；`git diff --check` 通过。
+
+该快照中 C3 的 put-back t+30/s0 与 rearrange t+30/s0 分别完成 20/100、17/100；C2 的 put-back
+t+1/s1 与 t+30/s1 分别完成 8/100、7/100。所有已完成 episode 均为正常 terminal 记录，未见
+runtime error。已重新进入新版裸 `mam wait` 等待四个已登记 formal；既有 C3 50 条监控仍保留。到达
+50 条或进程退出后才做下一次处理，不重复 smoke 或启动超过每 host 两项的并发。
