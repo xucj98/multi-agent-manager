@@ -44,23 +44,23 @@
 - serial 正式运行位于 GPU6，日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s0.log`，MAM job `e087cfa2-04d2-460d-8b6e-974fdd7c7b1a`；仅最终 checkpoint `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s0/20000` 将保留 BF16 `params/assets/metadata`，按小时监控并在完成后归档 job。
 - 两条 smoke 的 checkpoint、日志与 gate 证据暂留供验收；正式 no-memory 形成最终 checkpoint 后再按任务要求清理本任务 smoke 临时产物。
 
-## 已授权后续队列（均为 queued，尚未启动）
+## 后续四项命令及路径（原 queued，现已于 23:34 在 wuwen-1 启动）
 
 四项均使用冻结 commit `a7f3e07`、单卡 batch32/20k/H50/K30、相同 put-back 数据/sidecar/14D norm/pi05_base，只变 `--seed` 和独立 `--exp-name`。2026-09-11 16:49 +08:00 已核对四个 checkpoint 根目录和日志文件均不存在。每次仅在本机实际空闲 GPU 上启动，先复核 `nvidia-smi` 与本项目其他 task/job；不使用 wuwen-1、不碰占用进程，也不重复 GPU smoke。
 
-1. **queued — serial_lag30 seed1**
+1. **running on wuwen-1 — serial_lag30 seed1**
    - checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s1/20000`
    - log：`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s1.log`
    - command：`env CUDA_VISIBLE_DEVICES=<FREE_GPU> XLA_PYTHON_CLIENT_MEM_FRACTION=0.90 HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot OPENPI_DATA_HOME=/mnt/public/cache/openpi .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_back_block_serial_lag30 --exp-name=memory20k_695bc51f_put_back_serial_lag30_s1 --seed=1 --no-wandb-enabled`
-2. **queued — no-memory seed1**
+2. **running on wuwen-1 — no-memory seed1**
    - checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s1/20000`
    - log：`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s1.log`
    - command：`env CUDA_VISIBLE_DEVICES=<FREE_GPU> XLA_PYTHON_CLIENT_MEM_FRACTION=0.90 HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot OPENPI_DATA_HOME=/mnt/public/cache/openpi .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_back_block_no_memory --exp-name=memory20k_695bc51f_put_back_no_memory_s1 --seed=1 --no-wandb-enabled`
-3. **queued — serial_lag30 seed2**
+3. **running on wuwen-1 — serial_lag30 seed2**
    - checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s2/20000`
    - log：`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s2.log`
    - command：`env CUDA_VISIBLE_DEVICES=<FREE_GPU> XLA_PYTHON_CLIENT_MEM_FRACTION=0.90 HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot OPENPI_DATA_HOME=/mnt/public/cache/openpi .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_back_block_serial_lag30 --exp-name=memory20k_695bc51f_put_back_serial_lag30_s2 --seed=2 --no-wandb-enabled`
-4. **queued — no-memory seed2**
+4. **running on wuwen-1 — no-memory seed2**
    - checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s2/20000`
    - log：`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s2.log`
    - command：`env CUDA_VISIBLE_DEVICES=<FREE_GPU> XLA_PYTHON_CLIENT_MEM_FRACTION=0.90 HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot OPENPI_DATA_HOME=/mnt/public/cache/openpi .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_back_block_no_memory --exp-name=memory20k_695bc51f_put_back_no_memory_s2 --seed=2 --no-wandb-enabled`
@@ -87,3 +87,19 @@
 - serial_lag30 seed0：MAM job `e087cfa2-04d2-460d-8b6e-974fdd7c7b1a` 为 running；日志已推进至约 step1410，最近完整指标为 step1400：`grad_norm=0.8634, loss=0.0194, param_norm=1802.6012`，均为有限值。
 - 资源复核：GPU0–7 均为实际占用，利用率 `100/71/100/100/100/100/100/100%`，显存 `73405/73159/73407/73407/73405/73405/73407/72903 MiB`；没有可接用的实际空卡。四项授权队列仍依次为 serial_lag30 seed1、no-memory seed1、serial_lag30 seed2、no-memory seed2，均未启动。
 - 冻结 worktree 仍干净；未修改配置或源码，未触碰任何其他作业。下次资源窗口继续按同一顺序判定并启动首项可用队列。
+
+
+## 2026-09-11 23:35 +08:00 wuwen-1 四项正式启动
+
+研究目的：补齐 B 组 put-back serial_lag30/no-memory 三 seed 重复，保持相同骨干、数据与训练预算。最新 task 的 wuwen-1 开放授权覆盖先前禁用规定。启动前已核对 MAM、本机 seed0 日志、四项唯一日志/checkpoint 均不存在及远端训练进程；没有重复 seed。两条 seed0 仍 running：serial step6700 loss=0.0105，no-memory step7000 loss=0.0013。
+
+远端 host `wuwen-1`（hostname `is-ddiwvwflq5htlzyz-devmachine-0`），启动前 GPU0–7 均 4 MiB/0%，无 compute PID。依序在 GPU0–3 启动，复用共享冻结 worktree `a7f3e07346cee7260cdc3a618eedc38c0702da61`，工作树干净。单卡 bs32/20k、原 data/norm/base、仅最终 BF16 params/assets/metadata 协议不变。命令及唯一结果目录见上方四项，将 `<FREE_GPU>` 分别落实为 0/1/2/3，使用 `nohup setsid env ... .venv/bin/python -u -B ... > LOG 2>&1 < /dev/null &` 启动，无覆盖或重复 smoke。
+
+| 模型 | seed | GPU | PID | MAM job |
+|---|---|---|---|---|
+| serial_lag30 | 1 | 0 | 1469044 | 68dde347-ad63-46e6-a35e-08c4ced8eeec |
+| no_memory | 1 | 1 | 1469111 | e26bc150-d705-4f9c-9ae0-d8449e11cd0e |
+| serial_lag30 | 2 | 2 | 1469115 | 88818158-8a76-4e96-a1a5-5641dd0b47cf |
+| no_memory | 2 | 3 | 1469245 | cadcb4ac-ceb3-4a8c-a773-2ee11516f789 |
+
+四条 job 已在本机 MAM 登记 remote host/PID/boot_id/start_ticks，状态 running；当前等待初始化完成后的首批 updates/有限 loss。GPU4–7 启动前空闲，留给 Manager 排期，不扩展实验清单。启动初检后阶段交付，不建立高频模型巡检。
