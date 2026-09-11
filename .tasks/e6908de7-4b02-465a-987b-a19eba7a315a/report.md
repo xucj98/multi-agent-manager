@@ -1,3 +1,11 @@
+# 09:51 第四项基础设施失败：GPU4 rearrange t+1 seed0停止于67条后
+
+09:50:04，`rearrange_full_t_plus_1_s0_20k_100ep`完成67条正常episode（55 success/12正常失败）后，episode67/seed100067首次get_obs在logical_step0超时30秒，scheduler exit1。runner记录scheduler_exited_before_terminal（与先前三项外层失败标签不同，但scheduler栈仍为相同get_obs TimeoutError）。最终68条记录、benchmark failed，不能作为完整100结果；已完成的前50条诊断仍有效但仅作中检。
+
+全部登记子进程退出，policy/robot正常shutdown -15，19440/19442无监听，GPU4=1MiB/81037MiB空闲/0%。failure_review.json、68条原始结果、trace、metadata、视频和smoke均保留，未重跑。公共证据为processes/069-scheduler.stdout.log；现已有4/6已启动formal因该起始RPC超时提前失败，剩余GPU5/7仍运行，GPU3/4/6保持空闲，不继续填充新任务。需公共owner处置及Manager裁定失败项重试规则，不能改timeout绕过门禁。三树源码继续冻结。
+
+---
+
 # 09:30 GPU5 put-back t+1 seed0前50条中检完成
 
 `put_back_full_t_plus_1_s0_20k_100ep`前50条35 success/15正常失败（70%，仅中检，正式100继续）。失败原因button_not_pressed_after_center10、button_press_insufficient5。episode0–49与seed100000–100049严格顺序，无runtime_error，全部terminal、50个scheduler exit0。逐query最终trace记录684个实际执行query（635个K30、49个partial），1270个已记录字段更新均匹配last_executed行，无索引错配。正式目录`midpoint_review.json`保存检查摘要。
