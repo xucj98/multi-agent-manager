@@ -72,3 +72,8 @@ GPU1只读确认约24067MiB可用、PM建议8951。Manager允许现在通过已�
 
 ## 操作指南补全可执行更新步骤
 cf7ffdb方向正确，但目前只有应为某commit，缺如何更新/重启。请补短的现场步骤（不远端执行）：现有GUI停止三项服务确保旧tmux子进程不保留旧代码→两机更新bridge→用现有解释器核对CPU依赖→主臂systemctl --user restart rb-launcher.service→GUI检查并启动。说明restart GUI不会自动重启已存在tmux服务，避免更新后继续跑旧scheduler。代码取得可从已更新policy机的Git仓库fetch精确041405f（参数化SSH目标和repo路径），不假设GitHub已有该commit；无需为此推GitHub。只核对已有本地源码/此前只读证据，.96路径/解释器未知则作为需现场确认变量，不能猜值。明确主臂light openpi_client.memory_config/PyYAML等实际新增依赖应如何通过原环境安装入口满足，机器人不需要安装模型权重/完整GPU openpi环境。若不足以写精确安装命令，明确现场CPU import失败的报告点，不编造。保持指南简洁，不另建部署框架，不再SSH。
+
+## 用户最终明确：TUI 调试操作指南
+用户要TUI版本，使用scripts/launch/x1pro_takeover.sh。GUI launcher是常驻服务，可以保留；GUI/TUI只是启动robot server/master server/scheduler的并列入口，不需停止GUI后台来用TUI。只需处理已存在的同组子服务，避免重复/继续跑旧代码。上一条GUI操作指南方向撤回，改写为TUI，勿再要求停止GUI常驻服务。
+现场操作指南需给：在现场可SSH三机的终端更新所需bridge代码（版本从policy现有Git取得）；主臂scheduler与从臂代码/现有解释器准备；source ~/.robot_bridge_env.sh并设置主臂/从臂/policy/scheduler各SSH和URL变量（角色参数化，实际已知地址放报告）；bash scripts/launch/x1pro_takeover.sh（默认入口），说明本次policy已有PM实例，原run_policy_server端口skip照常，当前远端RB_POLICY_PORT8949已被PM child占用，scheduler另连full8951。不要强制--skip-policy，不将端口不同本身当故障，不改或重启PM。核查实际脚本tmux持久RB_URL传参已正确。
+GUI可以一直常驻，TUI用于调试，不能错误写成GUI和TUI程序不能共存。仅启动的三个子服务应在更新代码后按既有停止/重启流程更新，不触碰原生硬件进程。控制UI/idle与phase检查沿已验证机制；命令不远端执行。交付一个简洁可复制的TUI指南、精确版本及未知现场变量，尽快完成，避免继续堆历史说明。
