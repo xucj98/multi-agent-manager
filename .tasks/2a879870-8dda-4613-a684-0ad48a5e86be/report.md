@@ -46,3 +46,9 @@
 
 - 兼容路径生效后的第一个固定 seed 已验证：retry1 `seed_preflight.jsonl` 记录 `seed=100000, accepted=true`；这是对原 20 条基础设施 rejection 的直接反证。worker stderr 仅见 SAPIEN 的现有警告，没有旧 `FileNotFoundError`，真实 scheduler 已进入 episode 0，`ffmpeg` 正在写 `episode0.mp4`。
 - 此时 `episode_diagnostics.jsonl` / `video_checks.jsonl` 仍为 0，episode 0 尚未结束；不能把 accepted preflight 当作 two-rollout PASS。C1 的 outer/bridge/robot/policy 均保持运行，下一验收点仍是 episode 0 video、episode 1 no-video、两条诊断和服务退出。
+
+## C1 strict two-rollout PASS 与稳定 shim（2026-09-11 17:34 +08:00）
+
+- C1 retry1 已完整结束并通过：preflight 固定为 `(episode0, seed100000, accepted=true)`、`(episode1, seed100001, accepted=true)`；两条 terminal status 均为 `success`。episode 0 写入 `episode0.mp4`（297,342 bytes、333 帧、video check `ok=true`），episode 1 的 no-video check 为 `enabled=false, ok=true`；`_result.txt` 已生成，任务进程与 19410/19412 端口均已退出。
+- 依照 Manager 裁定，等 C1 停止后才处理 shim。`strict/assets` 与稳定 `state-vla/RMBench/assets` 已用递归 regular-file SHA256 与 symlink spelling 全量比对：346 entries、完全相同、manifest `12c45bfc94b606c7c4df515d11999bf2e689e4fd89e5dc09dc2265811e280fd8`；证据 `records/strict-vs-stable-assets-equivalence.json`。随后将 `/mnt/public/xcj/Projects/RMBench` 原子从 task strict tree 改指稳定 `/mnt/public/xcj/Projects/state-vla/RMBench`，记录 `strict-rmbench-legacy-assets-shim-switch.json`；strict tree 仍 clean。
+- C2 GPU2 与 C3 GPU0 已只读确认空闲并能看到共享 strict tree/旧路径入口。下一步从稳定 shim 启动 C2 same fixed seeds 的真实 smoke；C1 retry1 是唯一有效 C1 smoke，先前 `...c1_smoke2` 仍是 20 条基础设施失败 leaf，显式不计入任何对照/正式结果。
