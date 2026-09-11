@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "cache": "/mnt/public/xcj/cache/uv",
+  "links": [
+    {
+      "name": "asciitree",
+      "wheel_link": "wheels-v5/index/33c2ad7ff9bac756/asciitree/0.3.3-py3-none-any",
+      "wheel_rev": "wheels-v5/index/33c2ad7ff9bac756/asciitree/0.3.3-py3-none-any.rev",
+      "simple_record": "simple-v18/pypi/asciitree.rkyv",
+      "archive": "archive-v0/ZetM5wGMRwKr0h1_QCJPC",
+      "source_raw_link_target": "/root/.cache/uv/archive-v0/ZetM5wGMRwKr0h1_QCJPC",
+      "target_link": "/mnt/public/xcj/cache/uv/archive-v0/ZetM5wGMRwKr0h1_QCJPC"
+    },
+    {
+      "name": "ffmpeg",
+      "wheel_link": "wheels-v5/index/33c2ad7ff9bac756/ffmpeg/1.4-py3-none-any",
+      "wheel_rev": "wheels-v5/index/33c2ad7ff9bac756/ffmpeg/1.4-py3-none-any.rev",
+      "simple_record": "simple-v18/pypi/ffmpeg.rkyv",
+      "archive": "archive-v0/b7ZrzWEuXPkDuw2Eru62E",
+      "source_raw_link_target": "/root/.cache/uv/archive-v0/b7ZrzWEuXPkDuw2Eru62E",
+      "target_link": "/mnt/public/xcj/cache/uv/archive-v0/b7ZrzWEuXPkDuw2Eru62E"
+    },
+    {
+      "name": "iopath",
+      "wheel_link": "wheels-v5/index/33c2ad7ff9bac756/iopath/0.1.10-py3-none-any",
+      "wheel_rev": "wheels-v5/index/33c2ad7ff9bac756/iopath/0.1.10-py3-none-any.rev",
+      "simple_record": "simple-v18/pypi/iopath.rkyv",
+      "archive": "archive-v0/2bEs4I-pjp4Eop6Xpsr1a",
+      "source_raw_link_target": "/root/.cache/uv/archive-v0/2bEs4I-pjp4Eop6Xpsr1a",
+      "target_link": "/mnt/public/xcj/cache/uv/archive-v0/2bEs4I-pjp4Eop6Xpsr1a"
+    }
+  ]
+}

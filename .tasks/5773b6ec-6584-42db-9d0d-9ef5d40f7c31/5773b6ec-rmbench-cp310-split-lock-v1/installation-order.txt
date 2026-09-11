@@ -1,0 +1,5 @@
+# Offline install order for the fixed RMBench CPython 3.10 closure.
+# 1. CU121 closure: uv pip install --no-deps --index-url https://download.pytorch.org/whl/cu121 -r rmbench-cp310-cu121-locked-requirements.txt
+# 2. PyPI closure: uv pip install --no-deps -r rmbench-cp310-pypi-locked-requirements.txt
+# 3. torch/vision: uv pip install --no-deps --index-url https://download.pytorch.org/whl/cu121 torch==2.4.1 torchvision==0.19.1
+# 4. local PyTorch3D and cuRobo wheels: uv pip install --no-deps <wheel>

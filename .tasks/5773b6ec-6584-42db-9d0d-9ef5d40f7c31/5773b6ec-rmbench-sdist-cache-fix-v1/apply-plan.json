@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "cache": "/mnt/public/xcj/cache/uv",
+  "copy_archives": [
+    "M3NJ5VggaldpAa2QoL92e",
+    "fdu7pLqSstlN9xOKsW0l8"
+  ],
+  "existing_archives": [
+    "o4uYWJgo2nPxugTlXpsIn"
+  ],
+  "sdist_roots": [
+    "sdists-v9/pypi/asciitree/0.3.3",
+    "sdists-v9/pypi/ffmpeg/1.4",
+    "sdists-v9/pypi/iopath/0.1.10"
+  ],
+  "links": [
+    {
+      "path": "sdists-v9/pypi/asciitree/0.3.3/lzDVYwydMkqDvXVh2184n/asciitree-0.3.3-py3-none-any",
+      "target": "/mnt/public/xcj/cache/uv/archive-v0/o4uYWJgo2nPxugTlXpsIn",
+      "archive_id": "o4uYWJgo2nPxugTlXpsIn"
+    },
+    {
+      "path": "sdists-v9/pypi/ffmpeg/1.4/kOyA9zzu_W6a0PZc0yHsl/ffmpeg-1.4-py3-none-any",
+      "target": "/mnt/public/xcj/cache/uv/archive-v0/fdu7pLqSstlN9xOKsW0l8",
+      "archive_id": "fdu7pLqSstlN9xOKsW0l8"
+    },
+    {
+      "path": "sdists-v9/pypi/iopath/0.1.10/XZ0fwv3DPlDcoqmLKyRu9/iopath-0.1.10-py3-none-any",
+      "target": "/mnt/public/xcj/cache/uv/archive-v0/M3NJ5VggaldpAa2QoL92e",
+      "archive_id": "M3NJ5VggaldpAa2QoL92e"
+    }
+  ]
+}
