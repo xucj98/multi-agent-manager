@@ -228,3 +228,11 @@
 - 原入口真实smoke2启动：C1 GPU1 supervisor142142，leaf `renderer_c1_smoke2_20260912`；C2 GPU2 supervisor239974，leaf `renderer_c2_smoke2_20260912`；C3 GPU0 supervisor7673，leaf `renderer_c3_smoke2_20260912`。各自 records/<leaf> 保存launch.json、driver.log、child.pid、exit和GPU回收记录；result位于稳定RMBench/eval_result/memory_chunk_20260910/<leaf>。设备为各卡映射cuda:0、system ICD，原模型20000/H50/K30/seed不变。
 - 复用原strict环境，活跃candidate/strict源不改。稳定创建优化已就位，默认wrapper bash -n通过，原patch和CPU测量证据保留；未再安装。启动脚本本机编译发现转义错误，修正后编译通过才上传启动，未产生失败sim或改变seed。
 - 下一验收是三机各2真实rollout、video/no-video/完整产物/退出/GPU回收及clean检查，随后C2同GPU2新leaf正式100并登记job、前50截面检查。原failed22及所有诊断原始证据保留。
+
+### 三机candidate smoke验收PASS；新正式100已实际启动（2026-09-12 01:42 +08:00）
+
+- 三机 `renderer_c{1,2,3}_smoke2_20260912` 全部exit0，精确seed100000/100001，2正常terminal、video0解码帧数与video_checks匹配、episode1无video文件、完整产物和服务退出记录齐全、实际服务PID消失、GPU回收、三库tracked clean。每份13项acceptance checks全部true，C records/<leaf>/acceptance.json及本机task同名镜像已保存，原始hash包含视频。live-device-evidence.json记录实际worker继承cuda:0与system ICD。
+- 成绩如实区分：C1/C2均episode0正常step_limit_reached、episode1成功（分别358/325步）；C3两条成功（327/319步）。这些是模型任务终态，不是infra错误，不以成绩挑重跑；smoke门禁PASS不代表100分数已合格。
+- 按条件授权，C2 GPU2在01:40:25启动新leaf `put_back_full_t_plus_1_s0_20k_renderer_100ep_20260912`，supervisor245873，正式MAM job `ac616c59-bcbb-4789-b05b-6ae68abfb800`。原入口mode=formal、smoke-run=renderer_c2_smoke2_20260912、checkpoint原20000、H50/K30、固定100000–100099及前5video不变。launch.json/driver.log在records/<leaf>；真实result leaf已创建，当前处于服务启动/首episode准备，尚不声称完成任何正式terminal。
+- 首50只读snapshot/infra guard PID246776，job `61c9d848-ba43-4b1d-a748-99b4490696a1`：完整JSONL前缀达到50时保存证据并唤醒MAM；发现固定seed拒绝/序列错或明确infra错误时保留failure receipt并仅中断本次formal进程组，不继续扫seed、不自动重试。正常任务失败不触发。未修改活跃source/算法/动作协议。
+- 现有测量/恢复记录已整理到本机任务独立RMBench的 `experiments/cluster_c_eval_acceptance_20260911/README.md` 草稿，不改活跃树。后续以首50或异常为检查点，不逐episode汇报。
