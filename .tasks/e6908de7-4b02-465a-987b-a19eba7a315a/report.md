@@ -1,3 +1,19 @@
+# 08:26 GPU7 put-back t+30 seed0 formal提前失败，原产物保留
+
+08:23:34 runner终止，外层命令报告benchmark退出2。`put_back_full_t_plus_30_s0_20k_100ep`完成16条正常episode（13 success/3正常失败），episode16/seed100016于logical_step0出现基础设施失败，summary共17条、status=failed；不是完整100结果，不能用13/17作为正式100成绩。全部17条、视频、metadata、trace及smoke原位保留，未补跑/覆盖/删除失败条。
+
+首因证据：processes/018-scheduler.stdout.log显示08:23:04首次get_obs等待，最终transport TimeoutError 30.0s；runner同刻get_episode_status超时并报robot_status_transport_error。该episode没有Memory v1 query trace，最后状态ready/step0。未见此前模型推理错误；worker最后只见新实例导入信息，现有日志不足以判断是慢首帧还是底层挂起，不冒称根因已证实。
+
+代码证据（固定bridge 8ea）：robot_bridge/benchmark/runner.py:418写死client timeout=30，430–434状态RPC失败即终止；scheduler/base.py:120–121使用WebSocketClient默认30秒（transport/websocket.py:113）；rmbench_simulation.py:129–131用同一锁串行worker RPC，而本次worker rpc_timeout=600。get_obs等待期间状态查询可等待同一锁，外层预算比内部短。
+
+最小建议交Manager/公共owner：先针对该seed和首帧get_obs确认耗时/阻塞点，区分底层卡死与外层预算不匹配；若证实预算问题，在既有RPC调用边界显式协调有界timeout，不改memory/动作协议、不全局无界等待、不另造runner。本task未改超时或源码。失败项后续重试/补齐规则需Manager裁定，不能在同目录接续冒充原100。
+
+收尾：进程事件全部有退出，失败scheduler exit1、policy/robot正常shutdown -15；08:25核对自有GPU7进程为空、19470/19472已释放、GPU7=1MiB/81037MiB空闲/0%。job1803ad5f-b94a-4b64-bdc1-2c7f8ed9339c已按失败归档。failure_review.json保留核对结果。其他四项formal继续；按07:52授权，下一空卡优先rearrange t+30 seed1，保持原参数和独立smoke/formal，不重跑失败模型。
+
+以下为此前启动与smoke记录；GPU7 put-back的运行状态以上述失败收尾为准。
+
+---
+
 # 08:00 五项formal100运行，GPU3 seed1 smoke已通过
 
 按06:53授权，在owner分别发布GPU4/6/7/5训练保存、CPU验收、进程退出和释放后逐卡接用；每次启动前显存均1MiB/0%，端口空闲，原三树干净。按最新07:52补充，GPU0/1不抢占，GPU2留wash，GPU3已获授权接用，wuwen-1停用。未修改源码/配置，未重跑技术50或旧drawer。
