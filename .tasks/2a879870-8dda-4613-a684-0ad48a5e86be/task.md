@@ -23,3 +23,6 @@ bridge安装改动3ebf9d075e5e64a350ddb35cd8632e3abd04373c（含bdb4182）；Ope
 
 ## 旧绝对路径shim稳定性裁定
 已知C旧cuRobo YAML绝对路径需要兼容。当前retry1运行期间不要改动其路径。待该smoke完整退出后，将本task创建的C /mnt/public/xcj/Projects/RMBench兼容入口改为指向稳定state-vla/RMBench（或稳定同资产根），不能长期指向workspace/本task/formal运行树，避免归档断链及并行eval互相改全局路径。先核对两目标所需assets真实路径/内容一致，路径修正只影响外部资产定位，不修改严格运行源码；后续三机smoke/formal使用稳定映射。记录实际目标及清理归属，只改你本task创建的shim，不覆盖已有未知目录。旧失败leaf保留到根因与门禁摘要写入稳定记录后再按任务清理要求处理。
+
+## C正式结果回传避免覆盖本机基线
+当前C formal leaf与本机69/100 baseline的exp-group/run同名。运行期间不改输出路径、不移动目录。完整退出并验收后，将C本次正式结果整理为独立实验组cluster_c_eval_acceptance_20260911/put_back_full_t_plus_1_s0_20k_100ep，再同布局回传本机RMBench/eval_result；绝不能覆盖本机memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep基线。保留原始command/config内容（不伪称最初就在新目录启动），在验收实验说明写明C实际原路径→最终归档路径映射、原本机基线路径。复制前确认目的不存在，校验内容hash。C当前运行及固定协议不变，结果整理仅在所有进程退出后执行。
