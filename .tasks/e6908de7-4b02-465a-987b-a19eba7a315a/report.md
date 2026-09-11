@@ -1,3 +1,13 @@
+# 10:53 首份正式100完成：GPU5 put-back t+1 seed0 69/100
+
+`put_back_full_t_plus_1_s0_20k_100ep`已完成100，benchmark completed/error null；69 success、31正常失败（button_not_pressed_after_center18、button_press_insufficient13），0 runtime_error。episode0–99/seed100000–100099原顺序完整保留，无补跑或重抽样。前50中检已于09:30完成。
+
+100份episode JSON、100条video检查均通过，5个视频完整解码（500/500/359/444/355帧），no-video95条无MP4；config_source audit/manifest逐字节继承一致，自身smoke摘要已保留。100个scheduler exit0，policy/robot正常shutdown -15，全部登记子进程退出；19450/19452无监听，GPU5=1MiB/81038MiB空闲/0%。正式目录`final_review.json`保存验证与清理证据，`launch.json`保留原外层实际启动参数；完整结果在共享主RMBench/eval_result/memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep。
+
+本项验收后清理了自有put_back_full_t_plus_1_s0_20k_smoke2和GPU5 Warp缓存，门禁摘要、所有正式结果/metadata/中检原位保留；失败四项的smoke与证据均未动。GPU5释放后暂不接续新任务，公共RPC问题仍待Manager裁定。当前仅GPU7 rearrange t+30 seed1继续，已过50中检；三库仍冻结，运行结束前不改台账。无可比旧20k baseline，不作不匹配模型性能结论。
+
+---
+
 # 10:18 GPU7 rearrange t+30 seed1前50条中检完成
 
 `rearrange_full_t_plus_30_s1_20k_100ep`前50条45 success/5正常失败（90%，仅中检，非正式100）。失败为button_not_pressed2、button_press_insufficient3。episode0–49/seed100000–100049严格顺序，无runtime_error，全部terminal，50个scheduler exit0。逐query最终trace中751个实际执行query（701个K30、50个partial），2103个已记录字段更新全部匹配last_executed反馈行，未见索引错误。正式目录`midpoint_review.json`保存检查摘要。不存在同新20k训练/config的旧基准，不强行与F0做10个百分点比较；继续原参数100条，全部失败保留。
