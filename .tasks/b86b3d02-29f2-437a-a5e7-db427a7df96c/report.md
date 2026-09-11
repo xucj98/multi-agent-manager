@@ -1,3 +1,26 @@
+# 08:12 RPC 最小接线修复交付：CPU 集成通过，待 Helmholtz 独立复核
+
+交付 bridge commit：`dd0914b170fe5d227f24d36b07d90c0e422b7e58`，基于 `124049fb78d29db1d77d13a9fd4a4b698fcfe6e9`；原 workspace `/mnt/public/xcj/Projects/workspace/b86b3d02-29f2-437a-a5e7-db427a7df96c/robot-bridge` 已提交且干净。OpenPI 仍为 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，本轮未修改。
+
+仅改 offline controller 和必要测试（2文件，controller +16行）：Memory v1 的局部 handle_execute 保留 prediction IDs、model rows 的整数数组与 query 整数标量，交现有 execute 严格校验；机器人 arms/phase 仍转换 float32。未配置 Memory v1 时委托原 base handler。没有修改通用 base、server、scheduler、launcher 或模型代码，没有浮点截断为整数来接受错误请求。
+
+真实 CPU 集成使用 localhost WebSocket/codec、实际 policy server、RobotServer、scheduler 与 offline handle_execute，fake policy 仅替换模型推理。full/serial 各连续完成两集（共4集），每集8行，H4/K3按3+3+2执行；各模式6次infer、2次policy reset，最终dataset_done/stop且队列idle。断言RPC后的int32 prediction IDs、int64 model rows、Python int query和float32 arms；核对每条实际drain action与canonical GT（MAE=0）、memory prediction/GT/availability mask、有效样本数与phase accuracy、反馈缓存、尾部与下一集reset，确认GT/target未进policy观测。
+
+同一真实RPC链路另发送4种非法输入（两模式均测）：非整数prediction IDs、非整数model rows、浮点query、0维浮点数组query。全部返回对应类型错误、无排队且执行游标仍为0；随后正常整集仍完成。此前绕过handle_execute的测试缺口已补齐，本轮未发现需扩大写集的后续接线问题。
+
+验证：`27 passed in 21.48s`；ruff E/F 和 git diff --check 均通过。可复制命令（在上述bridge workspace）：
+
+```bash
+CUDA_VISIBLE_DEVICES='' PYTHONPATH=../openpi/packages/openpi-client/src .venv/bin/python -m pytest -q tests/robot/controllers/test_memory_v1_offline.py tests/robot/controllers/test_drawer_offline.py tests/robot/controllers/test_x2robot_offline_phase.py tests/scheduler/test_memory_v1_schedulers.py
+.venv/bin/python -m ruff check --select E,F robot_bridge/robot/controllers/x2robot_offline.py tests/robot/controllers/test_memory_v1_offline.py
+```
+
+本轮CPU-only，未加载真实模型、未启动GPU、未改运行中的训练。实现与必要验证已完成，无需Manager裁定新的技术阻塞。请 Helmholtz / 独立任务 `4296391f-6e8e-4f99-b6ab-e53bb85af99b` 复查该增量；当前会话无agent消息工具，不能直接发送通知，交付通过本报告及对Manager的回复通知。
+
+独立复核及Manager准入前不启动GPU2 retry2。后续固定输出 `/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_20k_offline5ep_retry2`，仍须固定干净源码、卡/端口/source握手门禁和真实两模型各5ep指标/退出验收。前两次失败原始证据保留未覆盖。CPU fake-policy集成不代表正式offline通过，不代表真机效果或原始架构重构完整完成。
+
+以下保留历史交付和失败记录。
+
 # retry1 实际执行失败（2026-09-11 08:04）
 
 按 Manager 新授权，从干净固定 bridge `124049fb78d29db1d77d13a9fd4a4b698fcfe6e9` / OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4` 使用 GPU2、端口19580/19582启动原入口。源码/解释器握手、频率/H/K门禁均通过。full 首个推理结果在 execute RPC 被拒绝：`Memory v1 prediction IDs must be integers`。未完成任何 episode，0执行action行，serial未启动，无可报告的完整action/phase指标。
