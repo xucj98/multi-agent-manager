@@ -26,3 +26,9 @@ offline修复commit已到124049fb78d29db1d77d13a9fd4a4b698fcfe6e9（作者report
 Manager已只读确认：远端/home/xucuijie/Projects/openpi HEAD673038f77fe8245a1309d32c4e1701e748915ba3且checkpoint_metadata.py有未提交修改，新openpi_client/memory_config.py不存在。bridge根/home/xucuijie/Projects/robot-bridge HEAD68b70367104045bee1e9f540187fe5d45d920e7b，有多处同事修改（launcher/scheduler等）。Policy Manager PID3646使用openpi/.venv/bin/python，从bridge cwd启动。8950已有pourtea实例；8949/8951/8952也在运行。GPU0约315MiB free、GPU1约7150MiB free，不能擅自停服务或改现场checkout/环境。
 允许你通过该SSH别名只读研究Policy Manager既有部署参数、backend配置是否能为wash选择独立bridge/openpi源码及解释器，并给出最小部署方案/具体兼容缺口，先不要写远端或改共享环境。现用Manager JSON WebSocket ws://127.0.0.1:8100，cmd=status为只读；远端openpi/.venv有websockets.sync.client（连接时proxy=None）。避免输出无关模型完整metadata，筛选wash同步与必要拓扑。远端不是本集群共享文件系统，模型落点由Policy Manager管理。
 此调查与live/offline检查并行顺序自行安排，但先发offline准入让GPU2恢复（Manager已根据你的报告准入）。不占远端GPU、不发robot动作；有用结论写简报供Manager决定安装/部署动作。
+
+## 用户授权更新：现场代码为可丢弃部署副本
+用户明确授权：jx-4090-2-via-nx-aic上的openpi和robot-bridge未提交修改均可丢弃，以本地/GitHub为准；现场代码可随时替换。这替代上一条“不能覆盖现场未提交代码”的限制。请按本地已验收精确commit准备并同步远端代码：OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4；bridge 124049fb78d29db1d77d13a9fd4a4b698fcfe6e9（若live本任务另有必要小修，需提交/Manager验收再更新）。无需为现场未提交代码另外备份或开审批。
+允许清理两库tracked modifications及确认属于代码的untracked文件，删除前核对git status/clean dry-run；保留被ignore的模型/数据/.venv、~/.robot_bridge_env.sh及Policy Manager状态/同步内容。不要git clean -fdx。可用临时git bundle或已有remote取精确commit，验证树与commit一致；勿把本机未提交文件同步进去。使用现场普通部署checkout，不为每个模型引入新架构。
+现有PM四个policy实例仍有使用者，不因代码同步擅自stop/restart服务；检查PM是否需重启才能应用必要变化，并把具体影响与最小操作报告Manager。先验证既有环境对新代码CPU导入/metadata加载是否可用，不升级/重装正在运行的共享.venv。环境确有不兼容时给最小依赖差异和影响方案，Manager裁定。没有授权真机动作；模型同步仍由用户已发起PM任务完成，不另传一份模型。
+把本授权与实际现场commit/操作写入报告。完成同步后继续live/offline memory一致性及现用x1pro_takeover.sh部署交付，今天不做架构重构。
