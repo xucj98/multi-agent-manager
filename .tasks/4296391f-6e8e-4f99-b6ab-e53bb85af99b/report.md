@@ -1,3 +1,62 @@
+# 最新交付：bridge 本地 Memory v1 schema（待独立 review）
+
+## 准入结论
+
+bridge 候选提交为 `3906dd0032637410359be6dd5006b3f793f3191c`
+(`fix(memory): ship bridge-local schema runtime`)，位于
+`/mnt/public/xcj/Projects/workspace/4296391f-6e8e-4f99-b6ab-e53bb85af99b/robot-bridge`
+的 `task/4296391f-6e8e-4f99-b6ab-e53bb85af99b` 分支。可交 reviewer
+Bernoulli 独立复核；**尚未合入、push 或部署**。
+
+OpenPI 保持干净且未修改：
+`a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。bridge 的
+`robot_bridge/memory_config.py` 与该 OpenPI 提交的
+`packages/openpi-client/src/openpi_client/memory_config.py` 均为 SHA-256
+`6287bddad81cd635556ef6b0b75b3abd64248289d74f101e1fa3a07db176aa80`，`cmp` 一致；
+因此本次没有改动 parser、样本构造、编码、mask 或 feedback 算法。
+
+## 变更范围
+
+- bridge 新增本地纯模块 `robot_bridge.memory_config`；scheduler、policy metadata 注释和
+  offline controller/测试改为直接导入它，不再导入 `openpi_client`。
+- 删除仅为 scheduler 安装 `openpi-client` wheel 的脚本及隔离 wheel 测试。
+- 新增本地 schema 行为回归，并以真实 wash full/serial 20k metadata 构建
+  `MemoryContext`；文档收敛为 WSL checkout → 配置 `RB_*` → `push_code.sh auto` →
+  `x1pro_takeover.sh` → `:8088`，不要求手工 wheel。
+
+## CPU 证据
+
+全部使用 `CUDA_VISIBLE_DEVICES=''`，未访问远端、未加载模型、未占 GPU、未发真机动作：
+
+```bash
+env -u PYTHONPATH PYTHONNOUSERSITE=1 CUDA_VISIBLE_DEVICES='' \
+  .venv/bin/python -m pytest -q \
+  tests/test_memory_config.py \
+  tests/scheduler/test_memory_context.py \
+  tests/scheduler/test_memory_v1_schedulers.py \
+  tests/scheduler/test_openpi_takeover.py \
+  tests/robot/controllers/test_memory_v1_offline.py \
+  tests/launcher/test_offline_preflight.py \
+  tests/launcher/test_x1pro_takeover_launch.py \
+  tests/policy/test_openpi_metadata.py
+# 109 passed in 24.53s
+```
+
+同一 bridge venv 中 `importlib.util.find_spec('openpi_client') is None`；在该条件下，真实
+full（action_rows，H50/K30）与 serial（query，H50/K30）metadata 均成功创建
+`MemoryContext`，写入初始 `memory_input_ids=[0]`，且未加载 JAX、Torch、OpenPI 或硬件 SDK。
+`bash -n scripts/utils/push_code.sh scripts/launch/x1pro_takeover.sh` 与
+`git diff --check` 通过。
+
+本机完整 Ruff 会对逐字复制的上游模块和既有 offline 文件报告已有的宽规则风格项；为保持与
+`a869` 的算法副本字节一致，本次没有为消除这些项改写源文件。这不是 CPU 行为准入阻塞，供
+reviewer 按仓库基线确认。
+
+## 后续
+
+独立 review PASS 后再由 Manager 合入并发布同一 bridge commit，现场才可按已有
+`push_code.sh auto`/TUI 流程同步。当前不得据此声称已部署或真机全链路就绪。
+
 # policy 主机代码同步与现场前置状态
 
 ## 已完成：policy 主机精确同步
@@ -590,4 +649,3 @@ hash 不符时自动补齐，第二次运行不重装；随后仍按现有 TUI �
   机器私有环境解析 RB_REPO/RB_PY。已存在 rb_scheduler 服务则不得被 auto kill/restart，
   也不得声称已运行新代码；应以明确的 handoff/preflight 状态阻止把旧服务误当作更新完成。
   该服务交接边界与依赖安装分开实现。
-
