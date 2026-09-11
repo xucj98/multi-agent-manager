@@ -65,6 +65,10 @@ CUDA_VISIBLE_DEVICES='' PYTHONPATH=<openpi-worktree>/packages/openpi-client/src 
 `ruff check --select E,F,I robot_bridge/scheduler/openpi.py tests/scheduler/test_memory_v1_schedulers.py`
 和 `git diff --check dd0914b..HEAD` 均通过。
 
+交付后已清理两个本 task worktree 中的 `__pycache__`、`.pytest_cache`、`.ruff_cache`，
+保留 `.venv` 和共享 ignored 数据/模型；已用 `git worktree remove` 删除独立 RPC detached
+审查树 `/tmp/mam-4296391f-rpc-dd0914b`。两个交付树均干净，`mam job list --task` 无本任务 job。
+
 RPC 增量的独立复核结论已在本报告下一节发布：独立 detached 树以实际
 WebSocket/codec → policy server → RobotServer → `handle_execute` 路径跑 full/serial
 各两集，`27 passed in 19.63s`；`dd0914b` 准入 GPU2 retry2，输出固定为
