@@ -15,3 +15,10 @@
 - 旧 bridge 的本地 `openpi-client` wheel 已由匹配 `ffa308d` package tree 的 strict OpenPI 源、显式 Python 3.11、`UV_OFFLINE=1` 构建，SHA256 `ab85f668f27b648f21d41e98546ebf1b7c2c1ed603e79982fd593872a3dc47d2`。首次 build 未显式指定解释器而失败的原始日志保留为 `strict-openpi-client-build.log`；retry 成功日志为 `strict-openpi-client-build-retry1.log`。
 - **当前真实阻塞（未忽略）**：wheel 已以 local `uv pip --no-deps` 安装到 strict bridge venv，但 `uv pip check` 明确报缺 `dm-tree>=0.1.8` 和 `tree>=0.2.4`；因此 client scheduler smoke 和任一 rollout 均未开始。此为新缺依赖，不是 profile metadata 警告。原文在 `strict-openpi-client-install-retry1.log`。
 - 下一验收点：从严格 OpenPI lock/cache 将这两个 client 闭包依赖以 symlink 安装到 strict bridge venv，`uv pip check` 与 `MemoryContext` smoke 必须通过；随后在 C1/C2/C3 空闲 GPU 依次运行固定 checkpoint 的 smoke mode（严格 runner 自动两条、episode 0 video / episode 1 no-video），检查完整产物、video、子进程退出及三树 clean。通过后才可登记单次 100 rollout。
+
+## 即时状态（2026-09-11 17:12 +08:00）
+
+- 17:06 所报 client 闭包缺口已消除：严格 OpenPI 已安装版本生成的 7 项局部闭包（`absl-py`、`attrs`、`dm-tree`、`setuptools`、`svgwrite`、`tree`、`wrapt`）已用 C1 shared uv cache 的 symlink 模式装入 strict bridge；`uv pip check` exit 0，真实 `openpi_client` + `MemoryContext` smoke exit 0。记录为 `strict-openpi-client-install-retry2.log`。此前 retry1 的失败原文仍保留，未将其标为可忽略。
+- 严格 runner 的 `--prepare-audit` 已完成，固定 checkpoint 的 H50/K30、schema、输入审计与 manifest 均通过；C1 GPU1 的 `--dry-run` 已输出实际 robot/policy/scheduler 命令。记录：`strict-rollout-prepare-audit.log`、`strict-rollout-c1-smoke-dry-run.log`。
+- **正在运行：无。** Manager 17:12 未见本任务安装/eval 进程是准确的：安装与 dry-run 已结束，实际 rollout 尚未启动。最新命令是 C1 的启动前门禁，确认 `GPU1=1 MiB`、无 compute app、目标 run leaf 不存在、strict 三树 clean；记录于本次 task records/终端检查。
+- **当前阻塞：无。** 下一条已授权命令为从 strict RMBench 目录用 strict OpenPI Python 执行 `run_memory_schema_eval.py --variant put_back_full_t_plus_1 --checkpoint .../20000 --run-name put_back_full_t_plus_1_s0_20k_c1_smoke2 --gpu 1 --mode smoke`。该 runner 自动执行两条 accepted rollout：episode 0 video、episode 1 no-video。完成后先验收产物/服务退出/clean，再依次在 C2 GPU2 与 C3 GPU0 跑同协议 smoke；尚未进入正式 100。
