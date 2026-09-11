@@ -1,4 +1,4 @@
-# 08:xx RPC 修复独立复核：GPU2 offline retry2 准入
+# 08:25 RPC 修复独立复核：GPU2 offline retry2 准入
 
 ## 裁定
 
