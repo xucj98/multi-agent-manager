@@ -59,3 +59,6 @@ To avoid short smoke expiring during coordination, use one harmless local sleep9
 
 ## Final review adjudication
 Manager accepts final review finding1: native input arriving after invocation timestamp but during journal discovery/open is currently missed. Fix discovery-to-open boundary by reading the identified journal from an offset guaranteed to include invocation-time rows (timestamp filter remains), using bounded backwards search or another simple correct strategy; avoid scanning all history on every poll. Add reproduced lookup-window regression. Existing real ready smoke PASS remains evidence, no need repeatedly redo same smoke unless changed live behavior warrants it. Publish small fix.
+
+## Final journal identity correction
+Review f18404a reproduces replacement between _lookup_start_offset scan and _open: new inode receives old offset and silently skips message. Preserve same descriptor for scan/tail or verify scanned dev/inode before seek and fail explicitly if changed. Add exact replacement-window regression. This is a narrow identity check, no new abstraction or broader journal policy. Publish fix and targeted results; previous live PASS retained.
