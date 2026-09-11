@@ -28,3 +28,6 @@ Latest main87f02d3 includes0dd2bcd ignoring unrelated lifecycle events. Re-revie
 
 ## Final narrow recheck
 Main now includes86bc968 discovery-window fix (main36df252) andfe108cc installer recovery. Manager accepts exact manual recovery command/artifact plus nonzero on post-TERM failure as sufficient; automatic rollback/supervisor not required. Recheck just your two blockers and changed docs/tests on latest main, no new broad audit or repeat live smoke. Ensure bounded discovery lookback either covers invocation or errors rather than silently skipping, recovery plan mode600/no secrets output, TERM preflight and failure/signal recovery command correct. Earlier real native PASS and102 tests remain prior evidence. Publish final concise decision, workspace clean.
+
+## Final identity patch
+Main0f3bbc7 integrates046dca5: eight-line scan dev/inode check before seek and exact replacement-window regression. Confirm this resolves your sole remaining blocker; previous installer/docs/native real PASS remains accepted. Only this narrow recheck needed, no repeated full audit. Update final report and clean workspace for archive.
