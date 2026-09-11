@@ -112,3 +112,17 @@ MAM 在每条启动后立即按真实 host、PID、boot identity 和 start ticks
 | 5 | no-memory / 2 | 3.96k / 3.7 s/update | step3900：grad_norm=0.0287, loss=0.0015, param_norm=1802.9578 | 16:39:46 | 9月12日 11:27:08 +08:00 |
 
 当前无异常，也未触及完成条件。四路继续按原命令、原配置、原数据和原输出目录训练；不改配置、不重跑门禁。后续保持约小时巡检，若任一路提前停止、异常或完成 20,000，则立即处理并发布。
+
+
+## 恢复核对（2026-09-12 02:58:12 +08:00）
+
+按最新 Manager 待办恢复现有四路训练责任；复用原 OpenPI worktree，未新建任务或 worktree。只读刷新四个 job、PID/session、实际 GPU 归属、训练日志及预期的 20000 输出目录。四个 MAM job 均为 running，原 PID/session 仍在，且各 PID 仍实际对应 GPU2--5；原 worktree 保持干净并固定在 d10cc01d44c10e5ed0cd8c228d9409dd6cabac50。四个预期 20000 checkpoint 目录均尚不存在，因此没有完成项可验收或归档。
+
+| GPU | config / seed | 当前进度 / 吞吐 | 最近有限训练标量 | 剩余 ETA（日志估算） | 预计完成时间 |
+| --- | --- | --- | --- | --- | --- |
+| 2 | serial-lag30 / 1 | 10.6k / 4.2 s/update | step10600：grad_norm=0.4015, loss=0.0141, param_norm=1804.6017 | 10:50:27 | 9月12日 13:48:39 +08:00 |
+| 3 | serial-lag30 / 2 | 10.7k / 4.1 s/update | step10700：grad_norm=0.3384, loss=0.0131, param_norm=1804.8307 | 10:38:13 | 9月12日 13:36:25 +08:00 |
+| 4 | no-memory / 1 | 12.0k / 3.7 s/update | step12000：grad_norm=0.0249, loss=0.0008, param_norm=1803.9204 | 8:08:13 | 9月12日 11:06:25 +08:00 |
+| 5 | no-memory / 2 | 11.8k / 3.7 s/update | step11800：grad_norm=0.0227, loss=0.0008, param_norm=1803.8953 | 8:27:16 | 9月12日 11:25:28 +08:00 |
+
+GPU2--5 分别占用 73,407、73,407、73,405、73,405 MiB，利用率均为 100%；日志仍推进，未匹配 traceback、OOM、未处理 exception、NaN 或非有限训练值。未停止现场 PM 服务、未修改机器人或训练配置，也未重跑旧门禁。后续使用新版 mam wait 保持 active 等待停止事件；任一路结束后再逐项进行 20000、BF16/有限参数、metadata/assets、单独恢复及资源释放验收，并按要求归档对应 job。
