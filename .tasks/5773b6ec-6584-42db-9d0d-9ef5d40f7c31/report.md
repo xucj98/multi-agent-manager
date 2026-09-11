@@ -128,3 +128,27 @@ symlink 到 `/mnt/public/xcj/cache/uv/archive-v0/...`。
 不改 policy、simulator、模型或正式评估协议。请独立 review `76b4c5b8` 定向检查此 commit（此前三个
 已发布 commit 保持不变）。C 当前无运行进程；下一步是将该已提交修复以 task-owned 小 bundle 部署到
 current OpenPI worktree，重新由入口创建并执行 CPU smoke。
+
+## OpenPI 阶段通过（2026-09-11 13:52 +08:00）
+
+独立 review `76b4c5b8` 已对先前三库提交给出代码准入 PASS；其“将 symlink 扫描收窄到
+site-packages”的建议已采纳为非阻塞，不扩大实现，现场保留实际 site-packages → C uv cache 证据。
+新增 `958eeae` 的独立 CPU review 由任务 `c03e0009` 进行，不写 C；环境施工不等待该 review。
+
+OpenPI 的修复补丁和 bundle 已经逐 hash 校验并部署。C 稳定 source root 仍为
+`a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`；入口从该基线提取并应用受审的安装器 patch，成功后
+仅将 task-owned `current/openpi` 分支快进到 `958eeaedc4c841e2f1b31c51572ddecc449ba5cb`，工作树 clean。
+这两个 commit 的差异仅为 worktree 安装/CPU smoke 的 symlink 语义，正式 strict tree 仍会固定
+任务批准的 `a869…`，不混入该分支。
+
+- C 当前 OpenPI 离线入口成功退出：13:49:52–13:50:45，`34 s`，242 packages，`pip check` 通过，
+  `uv link mode: symlink`；日志为 `records/current-openpi-create-after-fix.log`。这是故障恢复验证，
+  不计入最终全新“一键”耗时。
+- CPU smoke 成功：`5 s`，`openpi` 与 `openpi-client` 均从 current worktree editable 源导入；
+  `site-packages/multidict-6.4.4.dist-info/top_level.txt` 实际链接到
+  `/mnt/public/xcj/cache/uv/archive-v0/...`，五个 `transformers` 覆盖文件为 venv 内非 symlink 私有文件；
+  记录为 `records/current-openpi-cpu-smoke.log`。
+- 当前没有 uv、create-worktree 或 eval 进程。尚未进行 GPU renderer、RMBench、三机 smoke2 或正式 100。
+
+下一验收点是 RMBench 的离线 wheel/curobo 预检和 current 入口成功；三库 cache 完整后会在新的可清理
+目录重新实际运行三个 `.local/create_worktree.sh`，作为唯一正式的一键时间与磁盘数据。
