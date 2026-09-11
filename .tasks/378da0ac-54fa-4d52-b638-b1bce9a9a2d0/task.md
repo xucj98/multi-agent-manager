@@ -16,3 +16,6 @@
 
 ## Manager对ed2f470的阶段裁定
 已读报告：状态探测被锁阻塞的问题有证据，ed2f470改善状态诊断/清理，但scheduler首次get_obs自身30秒超时仍未解决，不能把它称作四formal的完整修复或以一次smoke通过就恢复四项正式100。请继续最小阶段时序取证：worker get_obs进入/渲染/返回或失联、请求及锁等待边界，保留有界时间和异常，CPU测试诊断不改算法。提出GPU3短诊断run的精确launcher pin调整、命令、总时限、失败seed优先选择；Manager保留GPU3供此项，收到具体方案后再准入启动。不改C严格对照运行版本，不盲调大timeout。新增RMBench诊断launcher改动须在本task本地独立worktree提交，实验目录仍RMBench/eval_result/<exp-group>/<run>。最终根因如果仍未知如实说明，禁止归因于memory目标。
+
+## GPU3短诊断准入
+Manager已核对GPU3空闲，允许按已发布报告的两条命令执行一次诊断：bridge de0e9dac89601b792e0eb56e56d88175cbe643e7 / RMBench ed1e00b403c4f49cf2ad4f4fa7afd35609c55d6a / OpenPI a869，rearrange t+1 seed1原episode17/seed100017，端口19430/19432，新run first_obs_timeline_rearrange_tplus1_s1_ep17_gpu3。启动前再检查资源/端口，先prepare-audit，后一次实际运行；get_obs预算30s不变，单集75s/总1500s。此为诊断，不是正式评估，不要求任务成功；若因75s诊断时限结束，与原30s首帧超时分开记录。结束清理自己GPU进程/端口并保留阶段证据、首因和退出，禁止自动重复启动或在未裁定前formal100。已有诊断实现不再扩功能，只基于本次结果给下一步最小建议。
