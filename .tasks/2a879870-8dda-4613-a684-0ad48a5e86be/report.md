@@ -176,3 +176,10 @@
 - 本机独立 branch `codex/2a879870-renderer-lifecycle` 已提交候选 `17b55bf`（base `3e69b1e`，仅 `envs/_base_task.py`）。最小 patch 位于本机 `.tasks/2a879870-8dda-4613-a684-0ad48a5e86be/renderer-reuse.patch`；Manager 可据此安排独立源码 review，runtime gate 尚未完成，不提前判定修复成功。
 - 澄清首个启动 `renderer-reuse-20260912` 的 supervisor 出现字符串换行 SyntaxError，未进入 sim，原日志保留。已在新目录 `renderer-reuse-20260912-retry1` 以 PID `144614` 启动原40-reset harness，实际已开始导入sim环境；活跃源码未再改。
 - `close_env()` 未释放 Gym Env 的 scene/robot/viewer 引用是源码观察；本候选验证的是 renderer context 跨场景持有是否有效，并未把 GPU driver 报错当成已解释的完整根因。源码 AST 只在 setup_scene 改动；行为等价仍需实际 smoke 验证。review 重点包括进程级 context 生命周期、串行 worker 范围及 scene 重建参数保持。
+
+### 创建优化完成（CPU-only，2026-09-12）
+
+- 本机 RMBench task branch 提交 `9c71a3e`：存在性probe改为惰性 rglob。C .local wrapper及提取后installer同步最小patch，备份/diff在 `records/create-lazy-probe-20260912`。原本两处保证仅为“至少存在一个strict resolve后属于指定cache的链接”，不是全量闭包审计；现在同一判定在首个成功项停止。私有 overrides、link-mode、包版本不变。单元测试覆盖私有普通文件、外部/悬空链接、成功后不再消费遍历器；bash -n与diff检查通过。
+- 一次同base `6139577`、复用UV artifact cache、CPU-only fresh实测 **52.926856684s / exit0**；两probe为 **0.203525066 / 0.102121115s**，前次未优化trace为151.783s/双probe100.834s。不同窗口共享FS测量，不宣称固定速度保证。
+- worktree apparent **23,100,627 B**（含venv），venv apparent **13,870,506 B**；allocated分别 **51,438,080 / 41,802,240 B**。均du不跟随链接，禁止拿allocated与之前apparent混比。cache allocated窗口差 **+2,560 B**。GPU前后相同，无本任务GPU工作。
+- profile源码clean；worktree/branch与profile parent均清理，清理 **47.305s** 单列、不混入creation。完整metrics/raw trace/安装日志/patch保留在C上述目录。本机可读summary及wrapper.patch镜像在本MAM `.tasks/2a879870-8dda-4613-a684-0ad48a5e86be/create-lazy-probe-20260912/`。
