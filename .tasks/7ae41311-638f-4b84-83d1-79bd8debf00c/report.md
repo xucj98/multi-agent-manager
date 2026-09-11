@@ -71,3 +71,16 @@ MAM 在每条启动后立即按真实 host、PID、boot identity 和 start ticks
 | 5 | no-memory / 2 | 1.96k / 3.7 s/update | step1900：`grad_norm=0.0356, loss=0.0024, param_norm=1802.6219` | 18:46:18 |
 
 四路无异常，按原训练继续；下一个约小时巡检窗口再刷新进度，任一路停止、异常或完成 20,000 会立即处理并发布更新。
+
+## 第三个小时巡检（2026-09-11 17:44:05 +08:00）
+
+本轮仍只读刷新 MAM job、PID/session、GPU 与现有日志；训练配置、命令、数据和输出树均保持冻结，未重跑任何门禁。四个 job 实时状态均为 `running`，GPU2--5 各保持约 73.4 GiB 显存与 100% 利用率，日志未出现 traceback、OOM、exception 或非有限数值。
+
+| GPU | config / seed | 当前进度 / 稳定吞吐 | 最近有限训练标量 | 剩余 ETA |
+| --- | --- | --- | --- | --- |
+| 2 | serial-lag30 / 1 | 2.67k / 4.2 s/update | step2600：`grad_norm=1.7851, loss=0.0226, param_norm=1802.9341` | 20:02:45 |
+| 3 | serial-lag30 / 2 | 2.68k / 4.1 s/update | step2600：`grad_norm=3.8949, loss=0.0313, param_norm=1802.9760` | 19:53:34 |
+| 4 | no-memory / 1 | 3.01k / 3.6 s/update | step3000：`grad_norm=0.0335, loss=0.0018, param_norm=1802.8184` | 17:12:45 |
+| 5 | no-memory / 2 | 2.95k / 3.7 s/update | step2900：`grad_norm=0.0322, loss=0.0018, param_norm=1802.7966` | 17:41:54 |
+
+四路继续原训练，不作配置或门禁变更；后续约小时巡检，提前停止、异常或完成 20,000 时立即处理并发布结果。
