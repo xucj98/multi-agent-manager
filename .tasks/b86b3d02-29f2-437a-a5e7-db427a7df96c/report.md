@@ -1,3 +1,15 @@
+# retry1 实际执行失败（2026-09-11 08:04）
+
+按 Manager 新授权，从干净固定 bridge `124049fb78d29db1d77d13a9fd4a4b698fcfe6e9` / OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4` 使用 GPU2、端口19580/19582启动原入口。源码/解释器握手、频率/H/K门禁均通过。full 首个推理结果在 execute RPC 被拒绝：`Memory v1 prediction IDs must be integers`。未完成任何 episode，0执行action行，serial未启动，无可报告的完整action/phase指标。
+
+首因已用无GPU CPU探针确认：`robot_bridge/robot/controllers/base.py:205` 的 handle_execute 对 actions 所有值统一 np.asarray(dtype=float32)，将 scheduler 原有 int32 memory_prediction_ids、int64 memory_model_rows 和整数 query index 全部转为 float32（query变为0维数组），随后 offline controller 的整数契约拒绝。此前直接调用 execute 的CPU测试绕过了该handle入口；实际RPC暴露了该测试缺口。证据 execute_dtype_probe.json 保留字段dtype/shape。
+
+产物目录：`/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_20k_offline5ep_retry1`，保留 launcher.log/launcher_exit.json、provenance、served_metadata、checkpoint metadata、config及exit。full/0/exit.json=1，policy_exit.json=-15且shutdown_requested=true（退出清理）；GPU2已恢复1MiB/0%，19580/19582无监听，两库源码未改。
+
+停止后未重试、未覆盖产物。建议 Manager 裁定最小接线修复：在既有execute marshalling入口保持语义ID/行索引整数与query标量契约，同时保持机器人浮点action行为；补通过 handle_execute/真实传输入口的CPU回归，而非只调用execute。该项涉及此前限定之外的controller/base，故本轮仅定位并报告，不擅自修改。正式双模型5ep验收仍未通过，更不代表真机效果或架构重构完成。
+
+以下为此前修复和首轮失败历史。
+
 # 07:45 裁定小修交付：待 Manager 复核
 
 新 bridge commit：`124049fb78d29db1d77d13a9fd4a4b698fcfe6e9`，基于固定 `fda269c1`；原 workspace 干净保留，OpenPI 未改。仅修改 launcher 及必要测试/fixture，无架构重构、无 controller/scheduler 修改、无 GPU 重试。
