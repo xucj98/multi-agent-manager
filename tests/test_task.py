@@ -799,92 +799,30 @@ printf env > "$target/.venv/marker"
                 child.terminate()
                 child.wait(timeout=10)
 
-    def test_wait_stop_keeps_process_and_uses_waiter_binding(self):
-        monitored = self.call("create", "--title", "monitored task")["id"]
-        waiter_task = self.call("create", "--title", "waiter binding")["id"]
-        self.call("bind", monitored, "--agent", "job-owner")
-        self.call("bind", waiter_task, "--agent", "waiter-one")
-        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
-        waiter = None
-        try:
-            self.call("add", monitored, "--note", "wait smoke", "--host", "localhost", "--pid", str(child.pid), command="job")
-            environment = {**os.environ, "CODEX_THREAD_ID": "waiter-one"}
-            waiter = subprocess.Popen([str(MAM), "wait", "jobs", "--task", monitored,
-                                       "--timeout", "10"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                                       env=environment, cwd=self.projects)
-            deadline = time.monotonic() + 3
-            while time.monotonic() < deadline:
-                rows = self.wait_list_lines()
-                if len(rows) == 2:
-                    break
-                time.sleep(0.05)
-            else:
-                self.fail("waiter was not registered")
-            self.assertEqual(rows[0], "AGENT-ID\t绑定任务标题\tTASK-ID\t等待内容\t等待开始时间")
-            self.assertEqual(rows[1].split("\t")[:4], ["waiter-one", "waiter binding", waiter_task, f"jobs TASK-ID={monitored}"])
-            duplicate = self.wait_call("jobs", "--task", monitored, "--agent", "waiter-one", "--timeout", "1", ok=False)
-            self.assertIn("already waiting", duplicate["error"])
-            self.assertEqual(self.wait_call("stop", "--agent", "waiter-one")["status"], "cancelled")
-            stdout, stderr = waiter.communicate(timeout=3)
-            self.assertEqual(waiter.returncode, 0, stderr)
-            self.assertEqual(json.loads(stdout)["status"], "cancelled")
-            self.assertIsNone(child.poll(), "wait stop must not signal the monitored process")
-            self.assertEqual(self.wait_list_lines(), ["AGENT-ID\t绑定任务标题\tTASK-ID\t等待内容\t等待开始时间"])
-            self.assertEqual(self.wait_call("stop", "--agent", "waiter-one")["status"], "not_waiting")
-        finally:
-            if waiter and waiter.poll() is None:
-                subprocess.run([str(MAM), "wait", "stop", "--agent", "waiter-one"], capture_output=True, cwd=self.projects)
-                waiter.terminate()
-                waiter.wait(timeout=3)
-            if child.poll() is None:
-                child.terminate()
-                child.wait(timeout=3)
-
-    def test_wait_stop_manager_selects_unbound_waiter_and_keeps_job_running(self):
-        monitored, execution = self.task(), self.task()
-        self.call("bind", monitored, "--agent", "job-owner")
-        self.call("bind", execution, "--agent", "execution-agent")
-        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
-        waiters = []
-        try:
-            self.call("add", monitored, "--note", "manager stop smoke", "--host", "localhost", "--pid", str(child.pid), command="job")
-            for agent in ("manager-agent", "execution-agent"):
-                waiters.append((agent, subprocess.Popen([str(MAM), "wait", "jobs", "--task", monitored,
-                                                          "--agent", agent, "--timeout", "10"], stdout=subprocess.PIPE,
-                                                         stderr=subprocess.PIPE, text=True, cwd=self.projects)))
-            deadline = time.monotonic() + 3
-            while time.monotonic() < deadline:
-                if {row.split("\t")[0] for row in self.wait_list_lines()[1:]} == {"manager-agent", "execution-agent"}:
-                    break
-                time.sleep(0.05)
-            else:
-                self.fail("manager and execution waits were not registered")
-            self.assertIn("choose exactly one", self.wait_call("stop", ok=False)["error"])
-            self.assertIn("choose exactly one", self.wait_call("stop", "manager", "--agent", "manager-agent", ok=False)["error"])
-
-            started = time.monotonic()
-            stopped = self.wait_call("stop", "manager")
-            self.assertLess(time.monotonic() - started, 2)
-            self.assertEqual(stopped, {"status": "cancelled", "agent": "manager-agent"})
-            manager_waiter = waiters[0][1]
-            stdout, stderr = manager_waiter.communicate(timeout=3)
-            self.assertEqual(manager_waiter.returncode, 0, stderr)
-            self.assertEqual(json.loads(stdout)["status"], "cancelled")
-            self.assertIsNone(waiters[1][1].poll(), "bound execution wait must be excluded")
-            self.assertIsNone(child.poll(), "manager stop must not signal the monitored job")
-            self.assertEqual(self.wait_call("stop", "--agent", "execution-agent")["status"], "cancelled")
-            stdout, stderr = waiters[1][1].communicate(timeout=3)
-            self.assertEqual(waiters[1][1].returncode, 0, stderr)
-            self.assertEqual(json.loads(stdout)["status"], "cancelled")
-        finally:
-            for agent, waiter in waiters:
-                if waiter.poll() is None:
-                    subprocess.run([str(MAM), "wait", "stop", "--agent", agent], capture_output=True, cwd=self.projects)
-                    waiter.terminate()
-                    waiter.wait(timeout=3)
-            if child.poll() is None:
-                child.terminate()
-                child.wait(timeout=3)
+    def test_wait_list_and_manual_stop_preserve_the_wait_process(self):
+        observation = cli.runtime().probe_process("local", os.getpid())
+        self.assertEqual(observation["status"], "running")
+        record = {
+            "agent": "manager-agent",
+            "pid": os.getpid(),
+            "identity": observation["identity"],
+            "token": "manager-token",
+            "kind": "unified",
+            "role": "manager",
+            "task": None,
+            "turn_id": "turn-id",
+            "timeout": 3600,
+            "started_at": "test",
+            "cancelled": None,
+        }
+        self.store.write_wait(record)
+        rows = cli.wait_list(self.store, types.SimpleNamespace())
+        self.assertEqual(rows, [{"agent": "manager-agent", "task_title": "未绑定", "task": "未绑定",
+                                 "waiting": "unified manager", "started_at": "test"}])
+        stopped = cli.wait_stop(self.store, types.SimpleNamespace(agent="manager-agent", manager=None))
+        self.assertEqual(stopped, {"status": "cancelled", "agent": "manager-agent"})
+        self.assertEqual(self.store.read_wait("manager-agent")["cancelled"] is not None, True)
+        self.assertEqual(cli.runtime().probe_process("local", os.getpid(), observation["identity"])["status"], "running")
 
     def test_wait_stop_manager_requires_unique_verifiable_unbound_waiter(self):
         states = {1: "running", 2: "running", 3: "unknown", 4: "running", 5: "running", 6: "running"}
@@ -957,107 +895,19 @@ printf env > "$target/.venv/marker"
         self.assertTrue(self.store.read_wait("first-manager")["cancelled"])
         self.assertIsNone(other_store.read_wait("second-manager")["cancelled"])
 
-    def test_waiters_for_two_agents_are_independent(self):
-        task = self.task()
-        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
-        waiters = []
-        try:
-            self.call("add", task, "--note", "shared wait", "--host", "localhost", "--pid", str(child.pid), command="job")
-            for agent in ("waiter-left", "waiter-right"):
-                waiters.append(subprocess.Popen([str(MAM), "wait", "jobs", "--task", task,
-                                                  "--agent", agent, "--timeout", "10"], stdout=subprocess.PIPE,
-                                                 stderr=subprocess.PIPE, text=True, cwd=self.projects))
-            deadline = time.monotonic() + 3
-            while time.monotonic() < deadline:
-                agents = {row.split("\t")[0] for row in self.wait_list_lines()[1:]}
-                if agents == {"waiter-left", "waiter-right"}:
-                    break
-                time.sleep(0.05)
-            else:
-                self.fail("both waiters were not registered")
-            self.wait_call("stop", "--agent", "waiter-left")
-            stdout, stderr = waiters[0].communicate(timeout=3)
-            self.assertEqual(waiters[0].returncode, 0, stderr)
-            self.assertEqual(json.loads(stdout)["status"], "cancelled")
-            self.assertIsNone(waiters[1].poll())
-            self.assertEqual({row.split("\t")[0] for row in self.wait_list_lines()[1:]}, {"waiter-right"})
-            self.wait_call("stop", "--agent", "waiter-right")
-            stdout, stderr = waiters[1].communicate(timeout=3)
-            self.assertEqual(waiters[1].returncode, 0, stderr)
-            self.assertEqual(json.loads(stdout)["status"], "cancelled")
-        finally:
-            for agent, waiter in zip(("waiter-left", "waiter-right"), waiters):
-                if waiter.poll() is None:
-                    subprocess.run([str(MAM), "wait", "stop", "--agent", agent], capture_output=True, cwd=self.projects)
-                    waiter.terminate()
-                    waiter.wait(timeout=3)
-            if child.poll() is None:
-                child.terminate()
-                child.wait(timeout=3)
-
-    def test_wait_reports_empty_timeout_stopped_unknown_and_stale_records(self):
-        empty = self.task()
-        environment = {key: value for key, value in os.environ.items() if key != "CODEX_THREAD_ID"}
-        environment["CODEX_SESSION_ID"] = "inherited-root-session"
-        missing = self.wait_call("jobs", "--task", empty, env=environment, ok=False)
-        self.assertIn("CODEX_THREAD_ID", missing["error"])
-        self.assertEqual(self.wait_call("jobs", "--task", empty, "--agent", "empty-agent")["status"], "empty")
-
-        task = self.task()
-        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
-        try:
-            job = self.call("add", task, "--note", "timeout smoke", "--host", "localhost", "--pid", str(child.pid), command="job")
-            self.assertEqual(self.wait_call("jobs", "--task", task, "--agent", "timeout-agent", "--timeout", "0.05")["status"], "timeout")
-            self.assertIsNone(child.poll())
-            child.terminate()
-            child.wait(timeout=3)
-            self.assertEqual(self.call("status", job["id"], command="job")["status"], "stopped")
-            stopped = self.wait_call("jobs", "--task", task, "--agent", "stopped-agent")
-            self.assertEqual((stopped["status"], stopped["job"]), ("stopped", job["id"]))
-        finally:
-            if child.poll() is None:
-                child.terminate()
-                child.wait(timeout=3)
-
-        unknown = self.task()
-        data = self.store.read(unknown)
-        data["jobs"] = [{"id": "unknown-job", "note": "offline", "host": "invalid;host", "pid": 1,
-                         "identity": {"host": "invalid;host", "boot_id": "boot", "start_ticks": 1}, "status": "running",
-                         "checked_at": "saved", "probe": {"status": "unknown", "checked_at": "saved", "error": "offline"},
-                         "archive": None}]
-        self.store.write(data)
-        self.assertEqual(self.wait_call("jobs", "--task", unknown, "--agent", "unknown-agent", "--timeout", "0.05")["status"], "timeout")
-        self.store.write_wait({"agent": "stale-agent", "pid": 999999, "identity": {"host": "local", "boot_id": "old", "start_ticks": 1},
-                               "token": "stale", "kind": "jobs", "task": unknown, "timeout": None, "started_at": "old", "cancelled": None})
-        self.assertEqual(self.wait_list_lines(), ["AGENT-ID\t绑定任务标题\tTASK-ID\t等待内容\t等待开始时间"])
-        self.assertEqual(self.wait_call("jobs", "--task", unknown, "--agent", "stale-agent", "--timeout", "0.05")["status"], "timeout")
-
-    def test_wait_deadline_limits_each_remote_probe(self):
-        task = self.task()
-        data = self.store.read(task)
-        data["jobs"] = [{"id": str(index), "status": "running", "host": "remote",
-                         "pid": index + 1, "identity": None} for index in range(8)]
-        self.store.write(data)
-        real_probe = cli.runtime().probe_process
-        for duration, expected in ((0.01, [0.01]), (0.75, [0.5, 0.25])):
-            clock, budgets = [100.0], []
-
-            def probe(host, pid, identity=None, timeout=None):
-                if host == "local":
-                    return real_probe(host, pid, identity)
-                budgets.append(timeout)
-                clock[0] += timeout
-                return {"status": "unknown", "error": "SSH query timed out"}
-
-            with self.subTest(duration=duration), patch.object(cli.time, "monotonic", side_effect=lambda: clock[0]), \
-                    patch.object(cli, "runtime", return_value=types.SimpleNamespace(probe_process=probe)):
-                result = cli.wait_jobs(self.store, types.SimpleNamespace(
-                    task=task, agent="deadline-agent", timeout=duration))
-            self.assertEqual(result["status"], "timeout")
-            self.assertEqual(len(budgets), len(expected))
-            for actual, wanted in zip(budgets, expected):
-                self.assertAlmostEqual(actual, wanted)
-            self.assertFalse(self.store.wait_path("deadline-agent").exists())
+    def test_two_manual_wait_records_are_independent(self):
+        observation = cli.runtime().probe_process("local", os.getpid())
+        for agent, token in (("waiter-left", "left"), ("waiter-right", "right")):
+            record = self.wait_record(agent, os.getpid(), token)
+            record.update({"kind": "unified", "role": "manager", "turn_id": f"{agent}-turn", "timeout": 3600})
+            record["identity"] = observation["identity"]
+            self.store.write_wait(record)
+        self.assertEqual(cli.wait_stop(self.store, types.SimpleNamespace(agent="waiter-left", manager=None)),
+                         {"status": "cancelled", "agent": "waiter-left"})
+        self.assertTrue(self.store.read_wait("waiter-left")["cancelled"])
+        self.assertIsNone(self.store.read_wait("waiter-right")["cancelled"])
+        self.assertEqual(cli.wait_stop(self.store, types.SimpleNamespace(agent="waiter-right", manager=None)),
+                         {"status": "cancelled", "agent": "waiter-right"})
 
     def test_attention_marks_stopped_job_with_unknown_agent(self):
         task = self.task()

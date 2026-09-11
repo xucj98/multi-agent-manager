@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from collections import deque
 import hashlib
 import json
 import math
@@ -11,6 +12,7 @@ import re
 import shlex
 import socket
 import subprocess
+import time
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -340,6 +342,117 @@ class _WebSocket:
 
     def close(self) -> None:
         self.connection.close()
+
+
+class AppServerEventError(RuntimeError):
+    """A failure while subscribing to App Server thread notifications."""
+
+
+class AppServerEventStream:
+    """One App Server connection that preserves notifications during requests.
+
+    ``thread/resume`` both returns a snapshot and subscribes this connection to
+    future thread events.  A normal request/response helper would discard
+    notifications received before its response; waiters must retain them to
+    avoid a completion race during subscription.
+    """
+
+    def __init__(self, websocket: _WebSocket) -> None:
+        self.websocket = websocket
+        self._next_request_id = 1
+        self._events: deque[dict[str, Any]] = deque()
+
+    @classmethod
+    def connect(cls, socket_path: str | None = None) -> "AppServerEventStream":
+        websocket: _WebSocket | None = None
+        try:
+            websocket = _WebSocket.connect(socket_path or DEFAULT_SOCKET_PATH)
+            stream = cls(websocket)
+            stream.request(
+                "initialize",
+                {"clientInfo": {"name": "multi-agent-manager", "title": "Multi-agent manager", "version": "1.0"}},
+            )
+            stream.notify("initialized", {})
+            return stream
+        except (OSError, TimeoutError, _ProbeError, AppServerEventError) as exc:
+            if websocket is not None:
+                websocket.close()
+            raise AppServerEventError(f"App Server event subscription failed: {exc}") from exc
+
+    def notify(self, method: str, params: dict[str, Any]) -> None:
+        try:
+            self.websocket.send_text(json.dumps({"method": method, "params": params}, separators=(",", ":")))
+        except (OSError, TimeoutError, _ProbeError) as exc:
+            raise AppServerEventError(f"App Server notification failed: {exc}") from exc
+
+    def _read(self, timeout: float | None) -> dict[str, Any] | None:
+        if timeout is not None and timeout <= 0:
+            return None
+        connection = self.websocket.connection
+        previous_timeout = connection.gettimeout()
+        try:
+            connection.settimeout(timeout)
+            raw = self.websocket.receive_text()
+        except socket.timeout:
+            return None
+        except (OSError, TimeoutError, UnicodeDecodeError, _ProbeError) as exc:
+            raise AppServerEventError(f"App Server event connection failed: {exc}") from exc
+        finally:
+            connection.settimeout(previous_timeout)
+        try:
+            message = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise AppServerEventError("App Server event stream returned invalid JSON") from exc
+        if not isinstance(message, dict):
+            raise AppServerEventError("App Server event stream returned a non-object message")
+        return message
+
+    def _queue(self, message: dict[str, Any]) -> None:
+        if isinstance(message.get("method"), str):
+            self._events.append(message)
+            return
+        raise AppServerEventError("App Server event stream returned an unexpected response")
+
+    def request(self, method: str, params: dict[str, Any]) -> Any:
+        request_id = self._next_request_id
+        self._next_request_id += 1
+        try:
+            self.websocket.send_text(json.dumps({"method": method, "id": request_id, "params": params}, separators=(",", ":")))
+        except (OSError, TimeoutError, _ProbeError) as exc:
+            raise AppServerEventError(f"App Server request {method} failed: {exc}") from exc
+        deadline = time.monotonic() + APP_SERVER_TIMEOUT_SECONDS
+        while True:
+            message = self._read(max(0.0, deadline - time.monotonic()))
+            if message is None:
+                raise AppServerEventError(f"App Server request {method} timed out")
+            if message.get("id") != request_id:
+                self._queue(message)
+                continue
+            if "error" in message:
+                error = message["error"]
+                detail = error.get("message") if isinstance(error, Mapping) else str(error)
+                raise AppServerEventError(f"App Server request {method} failed: {detail or 'unspecified server error'}")
+            if "result" not in message:
+                raise AppServerEventError(f"App Server request {method} has no result")
+            return message["result"]
+
+    def resume(self, thread_id: str) -> Any:
+        """Subscribe without applying model, sandbox, or other overrides."""
+
+        return self.request("thread/resume", {"threadId": thread_id})
+
+    def poll(self, timeout: float | None) -> dict[str, Any] | None:
+        if self._events:
+            return self._events.popleft()
+        message = self._read(timeout)
+        if message is None:
+            return None
+        if not isinstance(message.get("method"), str):
+            raise AppServerEventError("App Server event stream returned an unexpected response")
+        return message
+
+    def close(self) -> None:
+        self.websocket.close()
 
 
 def _rpc(websocket: _WebSocket, request_id: int, method: str, params: dict[str, Any]) -> Any:
