@@ -108,3 +108,23 @@ uv cache 的相对目录层级，因此尚未重试安装、也未将其计为�
 下一验收点：OpenPI `.local/create_worktree.sh` 在离线 symlink cache 下成功退出、完成其 CPU 环境
 smoke；之后才开始 RMBench 的离线 cache 预检与创建。三库 cache 完整后会新建一次可清理验证树，重新
 实际运行所有入口作为正式“一键”时间和磁盘测量，当前失败后的人工 cache 补齐过程不混入该结果。
+
+## 新增 OpenPI 修复提交（2026-09-11 13:43 +08:00）
+
+C 的真实离线重试已证明 242 个 OpenPI 包可从共享 symlink cache 安装（安装阶段 `21.13 s`）；随后原有
+`transformers` 覆盖逻辑对模块 origin 调用 `resolve()`，将 venv 内的文件 symlink 解析到 uv cache，
+因而在尚未写 cache 的断言处退出。实际布局已保留在
+`records/current-openpi-create-retry.log`：`site-packages/transformers` 目录在 venv 内，但其文件各自
+symlink 到 `/mnt/public/xcj/cache/uv/archive-v0/...`。
+
+为保持 cache 不可变且继续支持默认 hardlink，我在本机受管 OpenPI worktree 新增了提交
+`958eeaedc4c841e2f1b31c51572ddecc449ba5cb`（`Fix symlink-mode transformer overrides`）：
+
+- `scripts/worktree_env/create_worktree_env.sh` 保留未解析的 venv `transformers` 路径，再以原子替换创建
+  私有覆盖文件；
+- `scripts/worktree_env_smoke.py` 用同一 venv 路径验证，并明确要求这些覆盖文件不是 symlink。
+
+已运行 `bash -n`、Python syntax compile 和 `git diff --check`。该提交仅修复 worktree 安装/验证语义；
+不改 policy、simulator、模型或正式评估协议。请独立 review `76b4c5b8` 定向检查此 commit（此前三个
+已发布 commit 保持不变）。C 当前无运行进程；下一步是将该已提交修复以 task-owned 小 bundle 部署到
+current OpenPI worktree，重新由入口创建并执行 CPU smoke。
