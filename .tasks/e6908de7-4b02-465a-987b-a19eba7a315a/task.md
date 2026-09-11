@@ -103,3 +103,6 @@ wash训练owner已验收并释放GPU2/3、归档任务。正式wash offline只�
 ## 集群C迁移排期与对照交接
 用户要求C评估环境验收通过后，后续新eval优先放C；当前已启动本机run继续收尾，不中途移动。环境task5773b6ec负责人Banach正在三库环境/三机smoke/一个100对照验收，暂不扩MAM。请交一个已完整收尾、可直接复现的本机100基线，给成功数、真实失败类型是否影响可比、三库冻结commit、ckpt及数据/seed/命令和必要资源清单；Manager将裁定C正式对照。不要为迁移修改active worktree。C未准入前不自行在C启动正式run；准入后会为后续任务发布C根README与手工workspace/TASK-ID要求。
 同时本轮已完成的100run及时更新稳定实验记录，按原协议记录50检查/最终成功率与模型seed，不仅留在MAM报告。给Manager当前已完成结果、还在运行/排队清单和异常裁定需求，避免准备迁移时漏掉结果收尾。
+
+## 9月11日第二批训练并行与台账
+Manager已安排7ae41311训练rearrange serial/no-memory各seed1/2（GPU2–5）；695bc51f准备put-back serial/no-memory seed0（GPU6/7，配置门禁后正式）。补齐既定B组，不依赖C或Q2结果；不要占本机GPU或wuwen-1。请复用/安全创建本task文档worktree更新EXPERIMENT_LEDGER，区分已派发/准备/实际训练中，只有读到job及updates才能写运行中，后续正式目录由owner提供后链接。加入各项目的（B组训练seed重复及put-back同骨干能力基线）、预期检验而非预设成功率、checkpoint/eval待办。引用两个新task报告核对，交文档commit由Manager集成；不改冻结eval代码树。4个旧abort继续保留证据，8未启动仍待C验收，2完整结果保留。
