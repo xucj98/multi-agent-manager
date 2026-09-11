@@ -49,9 +49,10 @@ MAM job `9f91cf1c-8505-48e3-bd6e-cc7e8093a914` 保持**未归档**，用于现�
   `/home/xucuijie/Projects/robot-bridge`，policy_dir 为已登记的 wash full 20k checkpoint。
 - `ss` 显示 `0.0.0.0:8951` 正由 PID `2264677` 监听。
 
-本轮没有 stop、restart、deploy 或修改 PM；也没有连接或修改机器人。服务仍由 Policy
-Manager 管理，现场需要保留它直至用户明确结束测试。若后续进程停止，Manager 应先记录实际
-观测后再 archive job，不能据 unknown 直接判定停止。
+本轮没有 stop、restart、deploy 或修改 PM；也没有连接或修改机器人。部署交付已完成，现场
+常驻服务仍由 Policy Manager 管理，本 task 当前不承担持续监控。真实 job 登记保持未归档：不
+停止或重启服务、不将 unknown 判为 stopped，也不自行归档仍在运行的 job；后续登记与归档由
+Manager 处理。
 
 `2026-09-11T19:00:36Z`，为保持 active 运行的 `mam wait` 对该 job 的 SSH 状态查询超时，
 返回 `cannot determine state ... SSH query timed out`。这不是 PID 已停的证据，也不覆盖上面的
@@ -67,7 +68,8 @@ Manager 做一次只读 PID/监听核验；只有确认 PID 已不存在后才 a
 - 可部署提交不等同于已完成现场部署或真机动作验证。现场人员应沿现有 TUI/runbook 同步后，
   在 idle 状态核对 metadata、14D、15Hz、H50/K30、phase 与 `memory_diagnostics`，再按其
   安全流程决定受控动作。
-- 本 task 与 full job 均暂不 archive，等待用户现场反馈；无需重复 CPU、offline 或远端部署工作。
+- 本 task 不再对 full job 做常驻等待；保留真实 job 记录，后续登记与归档由 Manager 处理。无需
+  重复 CPU、offline 或远端部署工作。
 
 ## 本地 SSH 复用：等待稳定性修正
 
@@ -90,8 +92,9 @@ socket 目录 `~/.ssh/mam-control` 的权限为 `0700`。原 `User xucuijie`、`
 修改远端。恢复时，在不再需要本地复用连接后，以该备份覆盖 `~/.ssh/config`，并在 socket
 目录清空后删除 `~/.ssh/mam-control`；这只影响本地 SSH，不影响 PM child。
 
-## 等待状态
+## 收尾状态
 
-已使用新版 `mam wait` 保持 active 一个完整固定窗口（3600 秒）。它于窗口到期正常返回
-`status=timeout`，期间没有 job 停止、SSH 错误或现场交接事件；这不是服务状态变化。job 与
-task 继续保留，随后重新进入等待。
+部署交付已完成。现场常驻服务仍由 Policy Manager 管理，本 task 当前不承担持续监控，且不再
+运行 `mam wait` 或 SSH 核验。真实 job `9f91cf1c-8505-48e3-bd6e-cc7e8093a914` 保留原有登记
+状态；没有停止或重启服务，不伪报 stopped，也不自行归档仍在运行的 job。后续登记与归档由
+Manager 处理。
