@@ -338,3 +338,53 @@ Manager 可在 GPU2 使用候选 commit，按既定新输出目录
 infer / 执行行和指标产物。未触发 GPU、内网、跳板或真机操作。
 
 live S2M scheduler 路径与真机部署说明为独立后续项，未并入本准入结论。
+
+## 09:41 8951 EOF 来源定位与最小处置
+
+### 已证实的来源与周期
+
+本 task **没有**使用 `nc`、`telnet`、`curl` 或其他裸 TCP 探活，也没有保留任何
+8951 的循环/后台探测。为 policy-only 验证而执行的访问均是在 policy 主机上由
+`websockets.sync.client.connect(..., proxy=None)` 发起的有限次完整 WebSocket 请求：一次
+metadata + 合成 infer + log 读取，一次 metadata/log 读取；二者均已退出。有效 infer 返回
+`actions=(50,14)` `float32`、有限值，以及 `memory_prediction_ids=(50,1)` `int32`、范围
+`[1,5]`。任务早期还有一次使用现有 `WebSocketClient` wrapper 的短暂 WebSocket smoke；它
+未显式禁用 shell proxy，已停止，且不是裸 TCP 或持续进程。
+
+用户报告的 `2026-09-11 01:33:19.121 UTC` 不是上述一次性验证：8951 的本地 child log 显示它
+处于持续模式，01:32–01:34 期间约每 5.4 秒出现一对 EOF，两个 EOF 相隔约 1 秒。该序列在本任务
+停止主动 8951 请求后仍在 01:39–01:41 持续出现。
+
+在 policy 主机上以只读 `/proc/net/tcp` 每 50 ms 采样 48 秒（01:40:42–01:41:30 UTC）时，唯一
+观测到的非监听 8951 对端为：
+
+- `10.10.2.82 -> 10.10.4.22:8951`；01:40:44 见 `TIME_WAIT`（源端口 42514），01:40:53 见
+  短暂 `CLOSE_WAIT`（48770），01:41:10 见 `ESTABLISHED`（34582；server PID 2264677）。
+- 同一窗口 child log 继续报 `opening handshake failed` / `EOF before HTTP request line`，并从
+  01:41:16 起记录多次实际推理的 `state` 形状 `(1,32)` 与 wash 模型 14 维归一化参数不匹配。
+
+因此已确认观测到的持续连接源为 **10.10.2.82**，目标为 policy 主机 **10.10.4.22:8951**；它不是本 task
+或 policy 主机本地 PM readiness probe。由于按授权没有探测该对端，不能从这台机器断言 10.10.2.82
+是否为 master、WSL 或其他现场主机。policy 主机也无法从远端 TCP 连接反查该对端上的具体进程；本 task
+没有连接、停止或修改该机器。尝试的 24 秒 `tcpdump` 因当前账户没有抓包权限而被内核拒绝
+（`Operation not permitted`）；`/proc` 采样提供了上述源/目的与状态证据。
+
+### 已排除的旧 PM health check
+
+长期运行的 Policy Manager 为 PID 3646，8951 child 为 PID 2264677。实际 PM log 记录 child 于
+01:25:30 UTC `Policy server ready on port 8951`，当前 PM status 仍为 `running`、`error=null`。
+其运行代码的 `PolicyInstance._monitor` 只在 `state == "starting"` 时每 2 秒经
+`127.0.0.1:8951` 发一次 `get_metadata` readiness probe；转为 `running` 后只轮询 child 是否退出，
+不再连接 child。因此它不能产生 01:33 之后的持续 EOF。没有重启 PM、8951 或任何其他实例。
+
+### 最小处置与现场影响
+
+无需改动或重启 policy server。10.10.2.82 的负责人应先找到指向 `10.10.4.22:8951` 的旧客户端/
+探活任务并停用或改正：健康检查必须完成真实 WebSocket 握手，推理客户端必须使用 wash native
+s2m 的 14 维 state 与 Memory v1 输入，不能发送 32 维旧格式请求。该来源未清除前，不应把 8951
+交给现场 scheduler，以免无效请求持续占用 child、淹没日志或与现场请求竞争。
+
+8951 本身仍在 `0.0.0.0:8951` 监听，PM full child 的 PID/GPU/模型/metadata 与本报告先前部署记录
+一致；本 task 的正确格式 policy-only smoke 已通过。待 10.10.2.82 的无效来源处理完，由现场同事按
+既有 `RB_POLICY_URL=ws://10.10.4.22:8951` 和
+`bash scripts/launch/x1pro_takeover.sh --skip-policy` 继续，不由本 task 探测或操作 master/WSL/机器人。
