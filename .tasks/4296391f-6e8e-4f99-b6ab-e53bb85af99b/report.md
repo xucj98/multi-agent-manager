@@ -512,3 +512,82 @@ GUI 与 TUI 是并列启动入口：GUI daemon 可以共存，但同一时刻只
   健康检查；该 job 和本 task 均保留供现场交接，不 archive、不 stop。
 - 已清理本 task 的 `/tmp/mam-4296391f-*` SSH 临时 known-host 文件。两个 task worktree
   除 `.venv` 外未发现可清理的 pytest/ruff/Python 测试缓存；`.venv`、模型和环境均保留。
+
+# 依赖随 push_code auto 自动交付的最小方案（待 Manager 裁定）
+
+## 推荐结论
+
+采用随 robot-bridge 精确版本交付的、审核过的 openpi-client wheel artifact，并让
+scripts/utils/push_code.sh auto 在正常 rsync 完成后，只对 RB_SCHEDULER_SSH 的既有
+scheduler RB_PY 做幂等安装与 CPU import 检查。
+
+artifact 从固定 OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4 的
+packages/openpi-client tree 243a6c6fd7fe840aea9a922f7309026d8aba9bb8 构建，连同
+JSON manifest（OpenPI commit/tree、wheel SHA-256、memory_config.py SHA-256）提交到
+bridge 的受控 artifact 目录。它是同一份 OpenPI schema 实现的不可变发布物，不在 bridge
+复制或维护第二份 memory_config.py。
+
+这满足现场固定链路：
+
+    WSL bridge checkout → 配置 RB_* → push_code.sh auto
+      (rsync bridge + scheduler 自动 ensure) → x1pro_takeover.sh → :8088
+
+WSL 不需要相邻 OpenPI checkout，现场不需要手工构建、传输或执行 wheel 安装，也不从
+公共索引按同名 openpi-client 解析。
+
+## 为什么选此方案
+
+- 当前 push_code.sh auto 只去重四个 RB_*_SSH 后 rsync bridge，明确排除 .venv；因此仅在
+  pyproject.toml 声明依赖、或保留现有手工 install_openpi_client.sh，都不能进入日常交付链。
+- MemoryContext 仅在 checkpoint 有 memory_config 时导入 openpi_client.memory_config。该模块
+  直接只需要 NumPy/PyYAML，现有 scheduler runtime 应提供它们；不需要 OpenPI 训练树、JAX、Torch 或模型。
+- 公共索引已有同名旧包，且当前 package version 都是 0.1.0，名称/版本不能证明 schema 来源。
+  manifest 的 artifact 和模块内容 hash 才能拒绝错误同名包。
+- 现有 scripts/deployment/install_openpi_client.sh 已有正确的 --no-deps、路径安装和
+  MemoryContext smoke，可复用为 mismatch 时的实际 installer，而无需新建通用环境管理框架。
+- 已有 scripts/tests/local/test_openpi_client_wheel.sh 可作为 artifact 发布门禁：它从审核
+  OpenPI tree 构建 wheel，在干净 venv 实际创建 MemoryContext，并证明没有 OpenPI/JAX/Torch。
+
+## 最小实现边界
+
+1. 在受控发布机（不是现场）从 clean 的 OpenPI a869 package tree 生成 wheel 和 manifest；
+   发布前运行既有 wheel 隔离测试。只有 packages/openpi-client tree 改变时才重新发布 artifact。
+2. push_code.sh auto 保持现有 rsync host 集合和排除规则。scheduler host rsync 成功后，
+   以远端 login shell 中的 RB_REPO/RB_PY 调用一个窄 ensure_openpi_client.sh：
+   - 先检查 wheel manifest、RB_PY、pip、NumPy/PyYAML，以及已安装
+     openpi_client.memory_config 的来源/内容 hash；
+   - 已匹配则不运行 pip；
+   - 缺失或错误同名包才从刚 rsync 的本地 artifact 用
+     pip install --no-index --no-deps --upgrade --force-reinstall <wheel> 安装，
+     再复用现有 MemoryContext smoke；
+   - scheduler target 不可达、RB_PY/pip/基线 NumPy/PyYAML 缺失、或安装后仍不匹配时，
+     push_code auto 非零退出，不进入 TUI。
+3. policy、从臂、仅 master-server 的机器只得到原有 bridge rsync；不对它们 pip install，
+   不触碰 PM、模型、GPU、服务或 robot SDK。若 master 与 scheduler 同机，仅执行一次。
+4. 不在 pyproject.toml 裸写 openpi-client 名称依赖：这会重新引入公共同名包风险，
+   且 rsync 后也不会自动执行 pip。artifact manifest/ensure hook 是本部署路径的明确、
+   固定来源声明。
+
+## 一次性前置与每次开发循环
+
+一次性前置仅是发布审核 wheel+manifest，并确保 scheduler 的既有 SDK venv 有 pip、
+NumPy、PyYAML；缺少这些时应修正其标准环境 provisioning，而不是让现场临时找 wheel。
+当前本地 bridge .venv 本身没有 pip，不能据此推断现场 RB_PY 状态，需在实现的
+fake/现场受控验收中确认。
+
+日常循环不增加人工依赖步骤：WSL checkout 自带 artifact；push_code auto 在缺失/
+hash 不符时自动补齐，第二次运行不重装；随后仍按现有 TUI 与 :8088 入口启动。
+
+## 必要验收
+
+- 只有 bridge checkout、没有相邻 OpenPI checkout 时，artifact install + scheduler
+  MemoryContext CPU smoke 通过。
+- scheduler RB_PY 缺 client、或装有同名旧包/相同 0.1.0 但 hash 不符时，自动替换；
+  不访问 package index，也不出现 OpenPI/JAX/Torch。
+- policy/robot/master-only targets 不执行 pip；scheduler 与 master 同机时仍只一次。
+- 第二次 push_code auto 不执行 pip。
+- 已有 tmux server 的全局旧 RB_* 不影响 ensure：远端 helper 以 fresh login shell 的
+  机器私有环境解析 RB_REPO/RB_PY。已存在 rb_scheduler 服务则不得被 auto kill/restart，
+  也不得声称已运行新代码；应以明确的 handoff/preflight 状态阻止把旧服务误当作更新完成。
+  该服务交接边界与依赖安装分开实现。
+
