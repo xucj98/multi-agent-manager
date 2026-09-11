@@ -20,3 +20,6 @@ bridge安装改动3ebf9d075e5e64a350ddb35cd8632e3abd04373c（含bdb4182）；Ope
 5. 稳定state-vla/README.md给后续eval执行者读取：三机共享与安装/运行、手动workspace/TASK-ID+worktree三参数实际命令、GPU检查、smoke2→commit→100/50核对、结果回传/实验记录、任务结束清理自己的远端worktree/branch/临时smoke且不跟随共享软链。简洁操作手册，不扩MAM。
 
 本task全部交付验收后才迁移后续eval。继承模型/数据/cache保持稳定，旧与新task远端临时目录清理清单交Manager一并裁定；不自行删旧owner本机worktree。报告精确completed/pending、commit、路径及测量结果，不声称根因已修复或C已准入，直到验收完成。
+
+## 旧绝对路径shim稳定性裁定
+已知C旧cuRobo YAML绝对路径需要兼容。当前retry1运行期间不要改动其路径。待该smoke完整退出后，将本task创建的C /mnt/public/xcj/Projects/RMBench兼容入口改为指向稳定state-vla/RMBench（或稳定同资产根），不能长期指向workspace/本task/formal运行树，避免归档断链及并行eval互相改全局路径。先核对两目标所需assets真实路径/内容一致，路径修正只影响外部资产定位，不修改严格运行源码；后续三机smoke/formal使用稳定映射。记录实际目标及清理归属，只改你本task创建的shim，不覆盖已有未知目录。旧失败leaf保留到根因与门禁摘要写入稳定记录后再按任务清理要求处理。
