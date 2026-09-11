@@ -91,20 +91,33 @@ job archive 只记录收尾结果，不删除 workspace；任务归档也保留�
 
 `job status` 只刷新所请求的 `JOB-ID` 一次。正常结果保留该 job 的 `id`、`note`、所属任务与标题、agent、主机、PID、启动时间、状态和检查时间，不重复输出 `identity` 或 `probe`。探测为 unknown 时，`status` 为 `unknown`，并返回 `error` 及必要的最后已知状态和时间；进程身份不匹配等诊断以错误文本给出。已归档 job 保持 `archived`，并保留归档结论。
 
-## 可停止等待
+## 等待与待处理事项
 
-等待只读取已登记的 job，不启动 daemon、数据库或调度器。临时登记保存在本机共享 `.local/waits/`；每个 agent 一条活跃等待，记录本地 PID、启动身份和 token。start、stop、退出清理使用同一 agent 锁和 token，因此陈旧等待不能取消后来者；异常退出后 PID 身份已停止的登记会被清理，不会显示为仍在等待或阻止重开。
+`mam wait` 表示调用者已处理完当前工作，可以等待。它先根据当前 task、agent、job 状态检查待处理事项；有事项就立即返回，没有才阻塞。无需消息已读、补报或确认队列，事项未处理时再次调用仍会返回。
 
-| 接口 | 使用者 | 具体操作 |
-| --- | --- | --- |
-| `mam wait jobs [--task TASK-ID] [--timeout TIMEOUT] [--agent AGENT-ID]` | 所有人 | 默认监控当前所有未归档 job，`--task` 缩小范围。已有确定 stopped job 立即返回 `stopped`；任一运行 job 停止时返回 `stopped`；空集返回 `empty`，超时返回 `timeout`。unknown 探测不视作 stopped。轮询只探测必要 job，不探测 agent，也不持有任务锁睡眠 |
-| `mam wait list` | 所有人 | 即使为空也输出表头；每行是 `AGENT-ID`、绑定任务标题、`TASK-ID`、等待内容、等待开始时间。绑定取等待者自己的未归档任务；没有绑定显示“未绑定”，不使用被监控 job 的负责人代替 |
-| `mam wait stop --agent AGENT-ID` | 所有人 | 仅为该 agent 写取消标记并唤醒等待，返回 `cancelled`；不存在当前等待返回 `not_waiting`。不向 job 进程发信号，不归档 job |
-| `mam wait stop manager` | Manager | 从当前有效等待及未归档任务绑定中找出唯一未绑定任务的等待者并写取消标记。零个、多个或身份无法确认都会报错；等待中的 `--task` 只是监控范围，不是绑定。选中后若原等待已结束或被替换，返回 `not_waiting`，不会取消替换后的等待 |
+| 接口 | 具体操作 |
+| --- | --- |
+| `mam wait` | 从 `CODEX_THREAD_ID` 识别调用者，自动选择对象，最多等待 3600 秒；不接受 task、agent 或 timeout 参数 |
+| `mam wait list` | 显示当前等待者、绑定任务、等待内容和开始时间，首行有表头 |
+| `mam wait stop --agent AGENT-ID` | 解除该 agent 的当前等待；不停止 job，不归档任务 |
+| `mam wait stop manager` | 解除当前项目唯一未绑定任务的 Manager 等待；不存在或无法唯一确定时明确反馈 |
 
-`mam wait stop` 必须且只能使用 `manager` 或 `--agent AGENT-ID` 之一。等待者未指定 `--agent` 时，只读取 `CODEX_THREAD_ID`；不从继承的 `CODEX_SESSION_ID` 推测身份。`AGENT-ID` 缺失、空白或含换行会明确报错。每次 target 探测前检查 deadline，单次远端探测预算不超过 0.5 秒与剩余时限的较小值；允许小幅运行时调度开销。stop 不会被长 SSH 查询无限拖住。
+执行者等待其绑定任务的未归档 jobs。Manager 的范围限于当前 MAM 项目：active 执行者负责自己的 jobs，Manager 等待执行者；非 active 执行者的未归档任务及 jobs 交由 Manager 处理。已停止、未归档且由当前调用者负责的 job 立即返回；非 active、任务未归档且需 Manager 处理的执行者也立即返回。执行者被唤醒恢复 active 后，Manager 不必等它归档 job 即可继续等待。
 
-`job list --attention` 中，即使 job 已确认 stopped，只要 agent 状态未知或查询失败，也明确显示 `unknown/待核实`，与普通待处理项区分。
+源任务存在未归档的 review 任务时，源执行者非 active 不单独触发返回，Manager 转而检查 reviewer。reviewer 非 active 且 review 未归档时，返回 review 任务；review 归档后，源任务恢复通常判断。review 关联不隐藏源任务中无人负责的 stopped jobs。
+
+| 返回原因 | 附带信息 |
+| --- | --- |
+| 等待超时 | 已达到一小时上限 |
+| job 结束 | JOB-ID、note；进程停止不代表实验成功 |
+| 执行者结束或已有待处理任务 | AGENT-ID、TASK-ID、task-title |
+| `message`：`received new message` | 收到消息的 AGENT-ID |
+| `cancelled` | 手动调用 wait stop |
+| 空集或错误 | 明确说明没有等待对象或失败原因 |
+
+用户 steer 与 Manager 给执行者的消息只解除接收者当前的等待；用户 queue 不解除等待。普通程序处理进程检查和 App Server 事件，不通过模型轮询。订阅与状态检查必须覆盖交接间隙；服务端断线、身份或必要能力无法确认时明确返回错误，不静默等待一小时。
+
+临时等待登记按 agent 隔离，退出和取消核对进程身份及本次等待 token，陈旧事件不能取消后续等待。不通过返回结果自动归档任何 job 或任务。兼容性按行为测试结果判断，版本信息仅用于诊断。
 
 ## 归档
 
