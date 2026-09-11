@@ -1,3 +1,54 @@
+# `--skip-policy` 启动修复：待 3b678966-7bf3-48f2-b462-920f9cc6a33f 定向复核
+
+## 提交与准入范围
+
+robot-bridge 新提交：`041405f0b35b2a173ac3461d297a43141d028026`
+(`fix(launch): skip policy manager deployment`)，基于此前已审阅的
+`0a33dd19ab911ae3808c3ff141e3fd0603c22594`。本 task worktree 为
+`/mnt/public/xcj/Projects/workspace/4296391f-6e8e-4f99-b6ab-e53bb85af99b/robot-bridge`，
+提交后已清理本 task 的 pytest/ruff/Python 缓存，工作树干净。
+
+该提交只改三处：`scripts/launch/x1pro_takeover.sh`、wash runbook 和一个 CPU fake
+tmux/ssh 测试。它增加显式 `--skip-policy`：
+
+- 仅在该选项下要求非空的 `ws://` / `wss://` `RB_POLICY_URL`，不要求
+  `RB_OPENPI_POLICY_DIR` 或 `RB_POLICY_SSH`；`--help` 正常退出，未知参数退出 2。
+- policy pane 只打印外部 Policy Manager child 已就绪的说明；不发送
+  `run_policy_server.sh`，因此不执行其端口探测、启动或重启逻辑。
+- scheduler pane 把所选 URL 以 `printf %q` 的内联环境赋值传给
+  `run_scheduler.sh`，避免已有 tmux server 的持久旧环境覆盖新 child URL。
+- 不带选项的手工 policy 路径仍会发送原有 `run_policy_server.sh`，并仍要求
+  `RB_POLICY_SSH`。
+
+runbook 现在要求先在 PM 确认 wash child 为“运行中”，复制其 URL 后执行
+`bash scripts/launch/x1pro_takeover.sh --skip-policy`；明确该路径不会触碰 policy
+进程，且 URL 无效或 child 未就绪时应先修正 PM 状态。
+
+## CPU 验证与 reviewer 请求
+
+全程 CPU-only，未连接现场、未发真机动作、未更新远端 checkout，也没有停止或重启任何
+Policy Manager 实例。复跑命令：
+
+```bash
+CUDA_VISIBLE_DEVICES='' .venv/bin/python -m pytest -q \
+  tests/launcher/test_x1pro_takeover_launch.py \
+  tests/launcher/test_tmux_run.py \
+  tests/scripts/test_run_scheduler.py
+# 19 passed in 0.98s
+
+.venv/bin/ruff check tests/launcher/test_x1pro_takeover_launch.py
+bash -n scripts/launch/x1pro_takeover.sh
+git diff --check
+```
+
+新测试用 fake tmux pane 显式注入旧 `ws://…:8949`，而调用端选中
+`ws://…:8953`；断言 scheduler 的 SSH 命令只收到 `:8953`、skip 路径恰好三次 SSH
+且没有 policy command，默认路径仍四次 SSH 并启动手工 policy。也覆盖缺失/非法 URL、
+help 和未知参数。
+
+请 reviewer `3b678966-7bf3-48f2-b462-920f9cc6a33f` 定向复核 skip/default 两条 shell
+路径、tmux URL 转发和 runbook 入口。review PASS 前不得把 `041405f` 同步到现场。
+
 # 08:36 live Memory v1 一致性、部署说明与现场只读复查交付
 
 ## 交付结论
@@ -9,7 +60,7 @@
 
 本 task workspace：
 
-- robot-bridge：`/mnt/public/xcj/Projects/workspace/4296391f-6e8e-4f99-b6ab-e53bb85af99b/robot-bridge`，干净，HEAD `0a33dd19ab911ae3808c3ff141e3fd0603c22594`。
+- robot-bridge：`/mnt/public/xcj/Projects/workspace/4296391f-6e8e-4f99-b6ab-e53bb85af99b/robot-bridge`，干净，当前 HEAD `041405f0b35b2a173ac3461d297a43141d028026`（本节原交付基线为 `0a33dd19ab911ae3808c3ff141e3fd0603c22594`）。
   - 功能提交 `a5caa5b57e96fd02de7d6df0cd2ffa5bf0030f5f`：native Memory v1 S2M live/takeover 支持与真实 metadata 回归。
   - 文档提交 `0a33dd19ab911ae3808c3ff141e3fd0603c22594`：wash-cup 现场 runbook。
   - 基线包含已准入的 launcher `124049fb78d29db1d77d13a9fd4a4b698fcfe6e9` 和 RPC 修复
