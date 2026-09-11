@@ -207,3 +207,10 @@
 
 - `renderer-reuse-20260912-retry1` 已连续24个accepted reset：episode0–23 / seed100000–100023；原formal/system-ICD失败的100022现已accepted。40次尚未完成，不提前PASS；job `1ee98405` 保持运行，下一验收为40连续accepted、exit0、stderr与GPU回收。
 - 两seed动作/图像对照已PASS且可审阅；源码候选17b55bf、创建优化9c71a3e及本机原始证据镜像已提供。formal100仍待review后真实smoke门禁，不拼旧22条。
+
+### 真实 smoke 准备完成（2026-09-12 01:28 +08:00）
+
+- 已重读最新 task；C2 GPU2 PID144614 的40-reset gate继续健康运行，最近实际截面33次accepted，未启动新formal。使用MAM wait等待终态，不逐分钟扫描seed。
+- C独立运行布局 `formal/renderer-reviewed/RMBench` 已从17b55bf创建干净worktree，branch `codex/2a879870-renderer-eval`；目录名仅为预留用途，**不代表review已通过**。兄弟bridge/openpi链接原strict树，RMBench `.venv`复用原strict环境，assets/data/eval_result链接稳定根；新 `.local`独立，仅复制已有checkpoint audit，不共享新Warp写入位置。没有安装/改动活跃diagnostic或旧strict源码。
+- CPU-only原入口 `--variant put_back_full_t_plus_1 --run-name renderer_c2_smoke2_20260912 --gpu 2 --mode smoke --dry-run` exit0；checkpoint原20000、H50/K30与chunk_completed/last_executed反馈检查通过。完整命令保存在C `records/renderer-smoke-dryrun.stdout`，准备清单为 `records/renderer-eval-preparation.json`。这仅是启动准备，不计实际policy/video验收。
+- 下一验收：40/40连续固定seed reset及退出/GPU回收证据 → Manager review17b55bf → 三机真实smoke2 → 新leaf完整100。原failed22不变。
