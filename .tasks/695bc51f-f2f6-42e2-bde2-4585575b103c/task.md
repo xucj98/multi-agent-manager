@@ -12,3 +12,6 @@ report记录研究目的、实际命令/commit、数据/norm和结果路径、�
 
 ## Manager放行：put-back no-memory seed0
 独立review15254a5f配置/真实CPU样本PASS，作者GPU7已完成50updates、有限loss、BF16完整保存与checkpoint-only恢复actions[50,14]。Manager已核对报告及实际保存日志，现正式放行GPU7 no-memory seed0的20k训练。沿a7f3e07冻结树、单卡bs32/20k/相同base及data/norm、最终BF16模型及metadata，独立exp_name不覆盖。立即重新确认GPU7空闲后启动、登记job并验证有效updates/有限loss，不等C或serial。先保留门禁简报到正式run artifacts再清理自身smoke临时checkpoint。serial配置review也PASS，但其GPU smoke尚未完成，仍等GPU6空闲，不碰其他占用。
+
+## 15:46资源更新：按实际空闲卡启动
+GPU0/1/6/7当前均有外部占用，2–5为本项目四路训练。此前指定6/7改为本机0/1/6/7中任一实际空闲卡（启动前显存/利用率确认，不因为本VM看不到PID就判为空闲）。不触碰他人作业，不使用wuwen-1。下一张空闲卡优先已放行no-memory正式20k；serial在另一张空闲卡做自身50step/保存恢复后交证据放行。约30分钟核对一次可用性即可，不持续快速轮询、不创建无用长等待job。资源未空闲时阶段报告即可，Manager按时间唤醒。
