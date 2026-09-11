@@ -1,3 +1,13 @@
+# 08:37 GPU7 rearrange t+30 seed1 smoke PASS，formal100已启动
+
+GPU7已按07:52下一空卡优先条款运行配对seed1。自身20k smoke2 CLI exit0，两集success（392/405步），video392帧完整可读、no-video通过既有validate_smoke_run；config_source内audit/manifest逐字节一致，所有登记子进程退出（scheduler0，服务正常shutdown -15）。config SHA256为89ede174d421fa17aec278dbb116c38c18641612ab5e842ed42c86c3019f0659。
+
+08:36:37正式启动前复核GPU7=1MiB/81037MiB空闲/0%，19470/19472可绑定，原三树干净且SHA不变。run `rearrange_full_t_plus_30_s1_20k_100ep`，PID3521314，job48930d29-9e3c-430c-8f8a-e93671f08333；实际command保存在既有.local/memory_schema_eval/launches。对应smoke_verification.json随正式目录保留。
+
+当前五个formal为GPU3/4/5/6/7，GPU0/1/2不使用，远端停用。此前put-back t+30 seed0基础设施失败仍完整保留待Manager裁定，未重跑。其他四项继续推进，尚未到50条中检。不修改正在使用的源码/文档，不合入台账，保持active turn。
+
+---
+
 # 08:26 GPU7 put-back t+30 seed0 formal提前失败，原产物保留
 
 08:23:34 runner终止，外层命令报告benchmark退出2。`put_back_full_t_plus_30_s0_20k_100ep`完成16条正常episode（13 success/3正常失败），episode16/seed100016于logical_step0出现基础设施失败，summary共17条、status=failed；不是完整100结果，不能用13/17作为正式100成绩。全部17条、视频、metadata、trace及smoke原位保留，未补跑/覆盖/删除失败条。
