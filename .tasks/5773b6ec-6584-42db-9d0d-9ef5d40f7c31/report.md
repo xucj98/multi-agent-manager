@@ -164,3 +164,16 @@ C 的 uv cache 仅见 CPython 3.11 torch 2.7.1、CPython 3.12 的其他版本，
 `torch==2.4.1`/`torchvision==0.19.1`，也未见所需 SAPIEN/Open3D 的匹配缓存记录。因此尚未创建 RMBench
 venv，也没有允许任何网络 fallback。下一步从本集群同一 RMBench 安装闭包生成精确离线 cache 清单，再以单流
 `wuwen-nx-aic → wuwen-4090-aic` 同步并校验，随后才实际运行 C `.local/create_worktree.sh`。
+
+## RMBench 精确 cache 传输计划（2026-09-11 14:05 +08:00）
+
+基于本任务本机完整 RMBench CPython 3.10 venv 的实际 inode→uv archive 映射，闭包包含 269 个 archive
+根、63,174 个 archive 文件、791 个 wheel 元数据路径、467 个 simple-index 记录和 265 个待改写 cache
+symlink；所有 venv hardlink inode 均有 cache archive 匹配，未出现未映射发行包。初始目录型 rsync dry-run
+只会创建目录、不递归数据，因此已在未传输前改为 69,613 条逐文件清单。
+
+修正后的 C 差量 dry-run 为 `7,908,996,576 bytes`、61,515 regular files、238 symlink（总闭包
+8,216,341,732 bytes，已复用约 307 MB）。按此前实测 8.78 MB/s 和本次 44 s 文件列表生成时间，预计
+单流 `--bwlimit=10240` 约 16 分钟；小于 1 小时，不需登记 MAM job。传输保持一条
+`wuwen-nx-aic → wuwen-4090-aic` 流，完成后将仅把这 265 个选择出的 uv internal link 改写为 C cache
+路径，再离线创建 RMBench；不允许公网 fallback。
