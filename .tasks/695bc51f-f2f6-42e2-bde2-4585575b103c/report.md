@@ -4,7 +4,7 @@
 
 ## 当前单模型放行状态
 
-- **no-memory / GPU7：可单独放行正式 20k。** 本模型的 50-step 训练、BF16 model-only 保存和 checkpoint-only 恢复均已完成；恢复证据及可复核路径见下文。正式训练尚未启动，等待 Manager 对此模型单独放行。
+- **no-memory / GPU7：已获 Manager 单独放行，但当前等待 GPU7 释放。** 本模型的 50-step 训练、BF16 model-only 保存和 checkpoint-only 恢复均已完成；恢复证据及可复核路径见下文。2026-09-11 15:44 +08:00 启动前复核显示 GPU7 为 `16223 MiB / 87%`，且本 VM 没有可见 PID，属于外部 VM 作业；依任务的空闲启动条件，未并发启动、未登记 job。GPU7 空闲后将立即以已核对的冻结树启动正式 20k。
 - **serial_lag30 / GPU6：尚不可放行。** GPU6 为他人占用，按最新安排未探测性使用、未启动 smoke；待资源由 Manager 另行安排后才做本模型自身的训练和恢复 gate。
 
 ## 已交付，待快速验收
