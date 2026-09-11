@@ -61,3 +61,6 @@ GPU1只读确认约24067MiB可用、PM建议8951。Manager允许现在通过已�
 
 ## 用户明确采用更新并重启 launcher
 用户判断不必单独处理旧探活，要求更新最新代码并重启launcher。按此执行：在实际.82/.96机器完成当前已验收版本更新，重启本次既有launcher及其需要更新的关联服务，保留配置并指向full PM实例，使用--skip-policy避免额外启动policy。无需另做旧探活修补，也不再为这一已授权launcher重启重复确认。不要重启PM或无关实例，不发homing/execute或进入autonomous；重启前后核对默认待机/接管状态。之后确认8951 EOF周期错误消失、实际scheduler采用14D Memory v1且H50/K30、服务连通和资源归属。若实际运行的launcher并非x1pro_takeover.sh，先读实际入口，沿同一部署机制应用已验收代码，不猜测用错入口。
+
+## 用户指出既有端口skip机制：先核对实际配置
+用户指出原run_policy_server已有端口占用则跳过。Manager承认原机制有效，只在远端RB_POLICY_PORT与scheduler RB_POLICY_URL不一致时可能错误。暂不将新增--skip-policy视为现场必需，不为此另改代码或强行改启动方式。请报告当前实际launcher入口、远端RB_POLICY_PORT、scheduler RB_POLICY_URL及相应端口的读取/传递路径，确认是否确有不一致。继续已授权代码更新与原launcher重启，沿现场原有PM共存机制；若已使用新选项如实说明，不为撤销选项立即再重启。先核对事实供Manager与用户讨论是否保留新增选项。
