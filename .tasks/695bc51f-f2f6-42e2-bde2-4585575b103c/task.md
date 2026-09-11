@@ -15,3 +15,6 @@ report记录研究目的、实际命令/commit、数据/norm和结果路径、�
 
 ## 15:46资源更新：按实际空闲卡启动
 GPU0/1/6/7当前均有外部占用，2–5为本项目四路训练。此前指定6/7改为本机0/1/6/7中任一实际空闲卡（启动前显存/利用率确认，不因为本VM看不到PID就判为空闲）。不触碰他人作业，不使用wuwen-1。下一张空闲卡优先已放行no-memory正式20k；serial在另一张空闲卡做自身50step/保存恢复后交证据放行。约30分钟核对一次可用性即可，不持续快速轮询、不创建无用长等待job。资源未空闲时阶段报告即可，Manager按时间唤醒。
+
+## Manager放行：put-back serial seed0
+独立配置/CPU review15254a5f PASS；现GPU6实际50updates、完整BF16保存、checkpoint-only gate恢复56leaf并返回actions[50,14]/memory_prediction_ids[1,2]均通过。Manager已核对报告及gate日志，正式放行serial seed0的20k：沿a7f3e07冻结版本、已定base/data/norm/bs32/20k、独立exp_name、不覆盖。在本机0/1/6/7任一实际空闲卡启动（优先刚释放的6），立即登记job并确认有效updates/loss，不等C。报告简述gate初次失败与retry1差异，保留门禁必要证据，勿把初次失败隐去。两个正式run按小时监控；不修改活跃源码。
