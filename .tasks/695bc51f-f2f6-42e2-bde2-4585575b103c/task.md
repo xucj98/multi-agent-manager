@@ -27,3 +27,6 @@ GPU0/1/6/7当前均有外部占用，2–5为本项目四路训练。此前指�
 用户刚确认 wuwen-1 空闲，可继续安排训练。本节覆盖此前所有“不得使用wuwen-1”的资源限制。先核对现有本机seed0及任何后来已启动的seed1/2，避免重复；然后ssh wuwen-1检查真实GPU显存/利用率，优先把仍queued的 put-back serial_lag30 seed1、no_memory seed1、serial_lag30 seed2、no_memory seed2四组已授权20k实验放到空闲GPU，每卡一个。与本机共享/mnt/public，复用本task已冻结a7f3e07 worktree/环境/data/norm。bs32/20k、仅最终BF1620000、demo_clean_state、唯一目录、相同base协议不变。无需重复已验收的seed-only smoke，不覆盖已有run。
 启动后在本机MAM登记remote host/PID/身份，核实真实updates与有限loss，更新本任务报告及准确训练路径/研究目的。不得修改任何活跃运行源码/杀他人GPU。四项全已启动则不擅自扩展新的实验清单，汇报可用资源等Manager排期。
 不要按小时/分钟让模型反复巡检；当前MAM新版仍在验收，暂时用普通进程检查及阶段报告，完成启动/检查后结束本轮供Manager接手，不能把繁忙监控转成大量模型请求。此为实质恢复训练安排，不等待MAM或C环境验收。
+
+## Manager待办清理与恢复责任
+恢复运行期责任。先只读核对现有本机与wuwen-1六路训练，已停止则验收20k产物/更新台账/归档job，尚运行则调用已安装新版mam wait保持active直到停止事件。不要小时级模型轮询，不新开重复训练；此前四项已开齐。使用原worktree，勿重建。
