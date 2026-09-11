@@ -221,3 +221,10 @@
 - 原始launch/log/result/exit SHA256及逐项门禁保存在C `records/renderer-reuse-20260912-retry1/gate-receipt.json`，本机镜像 `.tasks/2a879870-8dda-4613-a684-0ad48a5e86be/renderer-40-reset-receipt.json`。该门禁不含policy/video，不计正式成绩，也不证明driver内部机制已完整解释。
 - **请Manager独立review最小源码17b55bf及证据**：renderer-reuse.patch、renderer-source-audit.json、renderer-protocol-comparison.json、renderer-40-reset-receipt.json均在本机task目录。两seed synthetic hold动作、前后qpos/三相机逐元素对照通过；新运行布局和原模型CPU dry-run准备完成。创建优化9c71a3e另含回归测试和52.927s fresh测量/已清理证据，可并行review。
 - 当前本任务GPU诊断已结束，无新smoke/formal运行。实际剩余门禁是最新Resume明确要求的Manager review，然后三机各policy+video/no-video smoke2，最终新leaf从原固定100000开始完整100；不复用旧22条分母。未改模型、seed、动作或memory时序，未重建环境。诊断records保留供review。
+
+### Review准入后，三机真实候选smoke已启动（2026-09-12）
+
+- 已读取最新条件授权：三机验收全部PASS后直接新leaf正式100，无需再次请求许可。C候选RMBench17b55bf、bridge8ea6078、openpia869498启动前tracked clean。
+- 原入口真实smoke2启动：C1 GPU1 supervisor142142，leaf `renderer_c1_smoke2_20260912`；C2 GPU2 supervisor239974，leaf `renderer_c2_smoke2_20260912`；C3 GPU0 supervisor7673，leaf `renderer_c3_smoke2_20260912`。各自 records/<leaf> 保存launch.json、driver.log、child.pid、exit和GPU回收记录；result位于稳定RMBench/eval_result/memory_chunk_20260910/<leaf>。设备为各卡映射cuda:0、system ICD，原模型20000/H50/K30/seed不变。
+- 复用原strict环境，活跃candidate/strict源不改。稳定创建优化已就位，默认wrapper bash -n通过，原patch和CPU测量证据保留；未再安装。启动脚本本机编译发现转义错误，修正后编译通过才上传启动，未产生失败sim或改变seed。
+- 下一验收是三机各2真实rollout、video/no-video/完整产物/退出/GPU回收及clean检查，随后C2同GPU2新leaf正式100并登记job、前50截面检查。原failed22及所有诊断原始证据保留。
