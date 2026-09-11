@@ -68,3 +68,24 @@ Manager 做一次只读 PID/监听核验；只有确认 PID 已不存在后才 a
   在 idle 状态核对 metadata、14D、15Hz、H50/K30、phase 与 `memory_diagnostics`，再按其
   安全流程决定受控动作。
 - 本 task 与 full job 均暂不 archive，等待用户现场反馈；无需重复 CPU、offline 或远端部署工作。
+
+## 本地 SSH 复用：等待稳定性修正
+
+为避免 `mam wait` 对既有 policy-host alias 的重复建连触发跳板超时，按最新授权只修改了本机
+`jx-4090-2-via-nx-aic` 的 SSH 配置。原 `~/.ssh/config` 已备份为
+`~/.ssh/config.mam-4296391f-20260912T0304Z.bak`；新增且仅新增：
+
+```sshconfig
+Host jx-4090-2-via-nx-aic
+    ControlMaster auto
+    ControlPersist 15m
+    ControlPath ~/.ssh/mam-control/%C
+```
+
+socket 目录 `~/.ssh/mam-control` 的权限为 `0700`。原 `User xucuijie`、`HostName 127.0.0.1`、
+`Port 22022`、`ProxyJump wuwen-nx-aic`、认证和全部其他 host 配置均未改动。
+
+本机 master PID `141501` 已建立。经同一 alias 的三次只读 `id -un; hostname` 探测分别为
+486ms、284ms、264ms，均返回 `xucuijie` / `jxlrtc-dual-gpu-002`；没有查询模型、发送动作或
+修改远端。恢复时，在不再需要本地复用连接后，以该备份覆盖 `~/.ssh/config`，并在 socket
+目录清空后删除 `~/.ssh/mam-control`；这只影响本地 SSH，不影响 PM child。
