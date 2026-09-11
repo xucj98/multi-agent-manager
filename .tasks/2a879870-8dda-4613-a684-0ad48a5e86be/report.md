@@ -135,3 +135,11 @@
 - Manager 已明确：40 reset 只验证 renderer/worker 生命周期，绝不替代新环境下的 policy smoke2。gate 通过后依次执行 C2 系统 ICD 环境的完整 video/no-video smoke2，再从新 leaf 固定 `100000–100099` formal；任一再次基础设施异常保留首因并停止，不循环 100。
 - retry1 当前已完成 11/40 个连续 accepted reset，尚无 `ErrorIncompatibleDriver`、Vulkan、RPC EOF、traceback 或路径错误；继续运行。它不写 evaluator result leaf，也不改变 strict 三树。
 - 按最新指令，稳定 `C:/mnt/public/xcj/Projects/state-vla/README.md` 已先行定向修订为 90 行通用手册：task 参数替代旧固定 commits、明确 MAM 本机与 SSH C1 创建/C2-C3 运行、说明旧 client 不由三条建树命令自动复现、把当前验收细节留给实验说明，并将 50 中检改为前 N 个已完成 diagnostics 的切片。前/后 SHA256 为 `c7d45eec...dede5f` → `1bafbae2...74276`；任务 records 的 `state-vla-README-targeted-revision.json` 六项检查均通过。
+
+## C2 renderer 生命周期门禁失败：停止新 rollout（2026-09-11 18:46 +08:00）
+
+- **当前运行：无。** C2 GPU2 已回到 4 MiB、无本任务 compute app；没有启动新的 system-ICD smoke2 或 formal，也没有改动 strict 三树、稳定 shim、原 formal leaf。
+- retry1 在严格 worker 的真实 `cwd=RMBench`、`CUDA_VISIBLE_DEVICES=2`、`SAPIEN_RENDER_DEVICE=cuda:0`、显式系统 `VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json` 下，连续完成 episode/seed `0–21` / `100000–100021` 的 22 次 accepted reset。随后的 episode 22 / seed `100022` 在 worker 返回前再次写出 svulkan2 `Your GPU driver does not support Vulkan` / `ErrorIncompatibleDriver`，`timeout` 报 core dump；这与旧 formal 的 22 条完成后 episode22 reset RPC EOF 是同一生命周期边界。
+- 因此“C2 自动选择 bundled ICD”不是充分修复；已证实的近因是同一 strict worker 进程的反复 RMBench/SAPIEN renderer 生命周期在第 23 次 reset 崩溃。尚不能把 C++/driver 内部机制断言为已修复。该 test 无 policy、video 或 evaluator result leaf，22 条 reset-only 既不计分，也不与旧 formal 的 22 terminal 结果拼接。
+- 失败门禁已固化为 `C:workspace/2a879870-8dda-4613-a684-0ad48a5e86be/records/strict-c2-renderer-gate-retry1-infrastructure-gate.json`，SHA256 `6366eec49d0707f65ca4a542d6f01a9ec65c23205c8502bd2fe661186af0aea3`；原始 log SHA256 `a341ea81afac56a23b4e9d60d63574d52c3d44296f35bf8e67afe5ec9f391b4c`。C2 当前 dmesg 读取被拒、`coredumpctl` 不存在、core 由 apport 接管；这些可用性限制也已写入门禁。
+- 按 Manager 边界，**不循环 100**。后续需先对该 renderer 生命周期崩溃作环境/运行时级首因裁定；在此之前 `smoke_eligible=false`、`formal_eligible=false`，50 条中检不存在。
