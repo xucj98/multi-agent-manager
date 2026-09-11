@@ -1,3 +1,11 @@
+# 08:49 更正GPU3状态：与GPU6同时段出现第三次RPC失败
+
+`rearrange_full_t_plus_1_s1_20k_100ep`于08:45:35失败，完成17条正常success后，episode17发生robot_status_transport_error 30秒超时，最终18条记录。与GPU6的08:45:37仅差两秒，发生在不同target变体，不能归因于t+30模型本身。此前08:45快照只读取episode_status.failure_reason，基础设施错误存储在其它诊断/runner字段，导致将18条记录误述为推进且无新增runtime错误；以本次summary及进程退出证据更正。后续监控同时核对benchmark状态/顶层runtime诊断，不只看episode_status。
+
+全部登记子进程已退出，GPU3=1MiB/0%，19430/19432无监听。failure_review.json已保留，18条原记录与smoke不删除不重跑。GPU3和GPU6先留空，公共owner需结合同时段故障诊断；不改变现有源码/timeout。剩余GPU4 rearrange t+1 seed0、GPU5 put-back t+1 seed0、GPU7 rearrange t+30 seed1继续。三项失败均非完整100正式成绩。
+
+---
+
 # 08:47 第二次相同RPC失败：GPU6 rearrange t+30 seed0提前结束
 
 08:45:37，`rearrange_full_t_plus_30_s0_20k_100ep`在完成32条正常episode（27 success、5正常失败）后，episode32/seed100032首个get_obs遇到30秒TimeoutError；runner同时报robot_status_transport_error，最终33条记录、benchmark failed。不是完整100，不能作为正式成功率。`processes/034-scheduler.stdout.log`、summary、33条原始记录和smoke均保留；`failure_review.json`已保存退出核对。scheduler exit1，policy/robot正常shutdown -15；全部登记子进程已退出，GPU6=1MiB/81037MiB空闲/0%，ss确认19460/19462无监听（初次bind受残留socket影响，未启动新任务）。
