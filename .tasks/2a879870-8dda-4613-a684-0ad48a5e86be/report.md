@@ -93,3 +93,17 @@
 - 已从**正式** leaf 的原始 `video_checks.jsonl` 实读校正：episode 0–4 均为 `enabled=true, ok=true`（frames `333,381,357,500,500`）；episode 5–9 均为 `enabled=false, ok=true`。`config.yaml` 的实际 `eval_video_count=5`，与此一致。17:50 中把 C2 smoke 的 episode 1 no-video 结果误写到 formal 的表述已原位更正；formal episode 1 实际为 video `ok=true, frames=381`，不存在 smoke/formal 混计。
 - 当前 active formal 仍在原 leaf `eval_result/memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep`，不移动、不改名、不改路径。完成且通过连续 100、诊断/视频/退出/clean 验收后，才归档到 C 的独立布局 `eval_result/cluster_c_eval_acceptance_20260911/put_back_full_t_plus_1_s0_20k_100ep`，再按相同 `eval_result/<exp-group>/<run>` 布局回传本机；绝不写入或覆盖本机既有 `memory_chunk_20260910` 的 69/100 baseline。
 - 后续状态只在固定 50 条核对点、基础设施门禁变化或正式结束时发布，不逐集刷报。
+
+## 三库 fresh 测量与 C 操作手册（2026-09-11 18:03 +08:00）
+
+下表只计三条从全新路径运行 `*.local/create_worktree.sh BASE_COMMIT NEW_BRANCH WORKSPACE_ROOT` 的 exit-0 安装；目录大小按原始 `.metrics` 的不跟随软链统计，未使用 `du -L` 重计共享 cache。`filesystem delta` 是同一共享文件系统窗口差值，仅作占用观测。
+
+| 库 / fresh base | 实耗 | worktree | `.venv` | filesystem delta | shared uv cache 增量 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| RMBench `6139577` | 149 s | 23,100,804 B | 13,870,683 B | 21,032,960 B | 2,308 B |
+| robot-bridge `f0f585a` | 14 s | 5,714,735 B | 3,045,755 B | 5,554,176 B | 7,548 B |
+| OpenPI `a869498` | 36 s | 11,628,322 B | 9,360,481 B | 9,650,176 B | 86,175 B |
+
+- 原始测量：C `workspace/2a879870-8dda-4613-a684-0ad48a5e86be/records/current-{rmbench,robot-bridge,openpi}-fresh-create.{log,metrics}`；三条均记录 `uv_symlink=PASS`。RMBench 的历史离线解析/闭包和 bridge client 缺包恢复日志仍单列在同一 records，未计入上表。
+- 稳定手册已实际写入 `C:/mnt/public/xcj/Projects/state-vla/README.md`（SHA256 `c7d45eec90b52bc0ed0cb972f21d46b84f3697b150a1429e919e0a5156dede5f`），内容含三机共享、三参数 worktree 命令、GPU 检查、smoke2→commit→formal、50/100 gate、独立 exp-group 回传和清理边界。写入前已从三份 `.metrics` 逐项校验表中五项数字；不触碰 active strict tree。
+- 正式结果说明将在独立 worktree `C:workspace/2a879870-8dda-4613-a684-0ad48a5e86be/docs/rmbench-formal-record`、branch `task/2a879870-8dda-4613-a684-0ad48a5e86be-c-formal-record`（base `3e69b1e`）完成，避免修改活跃 strict worktree。
