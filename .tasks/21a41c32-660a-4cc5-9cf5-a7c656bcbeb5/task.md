@@ -22,3 +22,6 @@ Another task owns multi_agent_manager/wait_compat.py, scripts/install_and_test.s
 
 ## Acceptance
 Meaningful tests: role/ownership matrix, unrelated projects, no jobs, unknown identity/status, dynamic handoff, existing completion/subscribe race, notification disconnect, targeted steer, native message path, stale/dedup log, one-hour expiry, concurrent wait cleanup/manual stop. No GPU needed. Manager will run real end-to-end test with registered subagent; provide exact short scenario. Run full unit suite. Keep live main untouched, publish task report and commit, clean own temporary files before delivery. Never minute-poll Manager; finish turn when deliverable or blocked.
+
+## User correction (latest, authoritative)
+Compatibility failure means tests/capabilities failed, NOT that app-server/proxy version changed. A new version passing checks must work. No version allowlist or fingerprint mismatch rejection. wait_compat contract should gate on tested behavior, with versions only diagnostic.
