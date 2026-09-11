@@ -94,3 +94,6 @@ GUI可以一直常驻，TUI用于调试，不能错误写成GUI和TUI程序不�
 用户明确现在先两边各自一份memory_config.py，robot-bridge不依赖openpi，openpi也不依赖robot-bridge。覆盖此前单一实现源和OpenPI改为引用bridge的要求。立即停止跨库安装/依赖声明/环境脚本调整；如本task已做相关OpenPI未提交修改，恢复本task自己引入的改动至原a869，不碰其他人的内容和活跃环境。
 最小交付：从原a869纯memory_config.py复制到bridge合理位置，bridge scheduler/offline/相关测试改用本库模块。OpenPI保持原实现和原训练/推理行为，不改包引用。两份暂时一致即可，不引入自动同步/共享包/抽象。删除bridge为memory_config增加的openpi-client安装要求/专用wheel流程，保留与本任务无关的policy服务依赖。
 用户问是否可部署，因此优先给当前实际进度、最小阻塞和预计交付；尽快提交bridge修复，CPU最小环境明确没有openpi_client时用真实full/serial metadata建context并完成scheduler/offline必要回归，复制前后算法一致。文档只保留WSL checkout→配置RB→push_code.sh auto→TUI→8088。无需训练重跑、远端部署或新增环境框架。交Manager独立review后合入并push同一分支，给用户精确可部署commit。
+
+## 最小文档回归修正
+3906重写短指南误删dfc9的已有tmux set-environment刷新步骤，而默认TUI没有URL内联。请仅恢复该文档片段，避免本次schema迁移引入既有使用步骤回退；不扩TUI代码改造。独立review已通知。
