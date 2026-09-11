@@ -90,7 +90,7 @@ mam job archive JOB-ID --note NOTE
 - HOST 可以使用 ssh 别名或 username@hostname。
 - list 不提供 TASK-ID 时显示所有任务中未归档的 job。
 
-job 状态包括 `running`、`stopped`、`archived`。进程停止后，先记录结果并处理任务要求的临时文件，再执行 `mam job archive`。Manager 可用 `mam job list --attention` 查找负责人 inactive 且 job 状态为 `stopped` 的 job。
+job 状态包括 `running`、`stopped`、`archived`。`mam job archive` 可归档任意已登记 job，只停止 MAM 对它的跟踪并保留身份、最后观测和归档原因；它不探测或停止进程。已归档 job 不再进入 `mam wait`，`mam task archive` 要求其所有 job 已归档。Manager 可用 `mam job list --attention` 查找负责人 inactive 且 job 状态为 `stopped` 的 job。
 
 ## 休眠管理
 

@@ -62,7 +62,7 @@ MAM 自身的 `scripts/create_worktree.sh` 在源 MAM 根存在 `.local/README.m
 
 job 指执行者登记的一个长时间运行的进程。预计运行超过 1 小时的程序（如正式数据生成、训练、评估）通过 `mam job add` 登记，通常的短 smoke 无需登记。同一执行者可为自己的任务登记多个进程，每条登记记录生成一个 `JOB-ID`，并关联所属任务，以便 Manager 找到对应执行者。
 
-job 状态为“进行中／已停止／已归档”：查询确认进程结束后变为“已停止”，表示尚待执行者处理；执行者完成结果记录、文件清理等任务要求后，通过 job archive 标记“已归档”。
+job 状态为“进行中／已停止／已归档”：查询确认进程结束后变为“已停止”，表示尚待执行者处理；job archive 可在 running、stopped 或 unknown/待核实观测下标记“已归档”，只结束 MAM 跟踪，不停止进程。
 
 `STATUS` 可为 `running`、`stopped`、`archived` 或 `all`。
 
@@ -72,13 +72,13 @@ job 状态为“进行中／已停止／已归档”：查询确认进程结束�
 | `mam job list [--task TASK-ID] [--status STATUS]` | 所有人 | 默认有表头，每行固定为描述、job 状态、开始时间、`JOB-ID`、任务描述、`TASK-ID`；保留筛选，不提供 `--json`。unknown 探测显示 `unknown/待核实`，不冒充 running 或 stopped |
 | `mam job list --attention` | Manager | 查询进程和 agent 状态，筛选已停止、未归档且执行者已不在运行的 job；不确定项仍在同一表中显示 `unknown/待核实` |
 | `mam job status JOB-ID` | 所有人 | 只刷新该 job，不扫描其他进程；返回该次探测的精简 JSON 展示及所属任务和 agent |
-| `mam job archive JOB-ID --note NOTE` | 执行者 | 记录简短的处理结论或成果位置，将该 job 标记为“已归档”，保留历史记录 |
+| `mam job archive JOB-ID --note NOTE` | 执行者 | 记录简短的处理结论或成果位置，将该 job 标记为“已归档”，保留身份、最后观测和历史记录；不探测或停止进程 |
 
-进程查询在其所属主机执行，远端通过 SSH 查询，核对 PID 和启动时间；查询失败时保留上次状态与时间，并标注“本次查询失败”，不据此判定进程停止。agent 状态由 CLI 连接承载这些线程的现有 Codex App Server，通过 `thread/read` 查询；`active` 对应执行者仍在运行，查询失败显示“待核实”。本机现有 Unix socket 的只读查询已验证可用，接口见 [App Server 文档](https://learn.chatgpt.com/docs/app-server)。
+进程查询在其所属主机执行，远端通过 SSH 查询，核对 PID 和启动时间；查询失败时保留上次状态与时间，并标注“本次查询失败”，不据此判定进程停止。job archive 不触发进程查询。agent 状态由 CLI 连接承载这些线程的现有 Codex App Server，通过 `thread/read` 查询；`active` 对应执行者仍在运行，查询失败显示“待核实”。本机现有 Unix socket 的只读查询已验证可用，接口见 [App Server 文档](https://learn.chatgpt.com/docs/app-server)。
 
-“需要 Manager 处理”是 job 与 agent 状态的组合筛选，不增加 job 状态。已停止但执行者仍为 running 的 job 由执行者继续处理；进程仍在运行或 job 已归档时，不进入该筛选。已归档 job 保持已归档状态。
+“需要 Manager 处理”是 job 与 agent 状态的组合筛选，不增加 job 状态。已停止但执行者仍为 running 的 job 由执行者继续处理；进程仍在运行或 job 已归档时，不进入该筛选。已归档 job 保持已归档状态，不再周期探测或触发 wait 待办。
 
-job archive 只记录收尾结果，不删除 workspace；任务归档也保留各 job 的独立状态与历史。
+job archive 只记录归档结论，不删除 workspace，也不要求进程已停止；任务归档也保留各 job 的独立状态与历史。
 
 ## 状态展示
 
@@ -99,7 +99,7 @@ job archive 只记录收尾结果，不删除 workspace；任务归档也保留�
 | `mam wait stop --agent AGENT-ID` | 解除该 agent 的当前等待；不停止 job，不归档任务 |
 | `mam wait stop manager` | 解除当前项目唯一未绑定任务的 Manager 等待；不存在或无法唯一确定时明确反馈 |
 
-执行者等待其绑定任务的未归档 jobs。Manager 的范围限于当前 MAM 项目：active 执行者负责自己的 jobs，Manager 等待执行者；非 active 执行者的未归档任务及 jobs 交由 Manager 处理。已停止、未归档且由当前调用者负责的 job 立即返回；非 active、任务未归档且需 Manager 处理的执行者也立即返回。执行者被唤醒恢复 active 后，Manager 不必等它归档 job 即可继续等待。
+执行者等待其绑定任务的未归档 jobs。Manager 的范围限于当前 MAM 项目：active 执行者负责自己的 jobs，Manager 等待执行者；非 active 执行者的未归档任务及 jobs 交由 Manager 处理。已归档 job 始终排除，不触发周期探测。已停止、未归档且由当前调用者负责的 job 立即返回；非 active、任务未归档且需 Manager 处理的执行者也立即返回。执行者被唤醒恢复 active 后，Manager 不必等它归档 job 即可继续等待。
 
 源任务存在未归档的 review 任务时，源执行者非 active 不单独触发返回，Manager 转而检查 reviewer。reviewer 非 active 且 review 未归档时，返回 review 任务；review 归档后，源任务恢复通常判断。review 关联不隐藏源任务中无人负责的 stopped jobs。
 
@@ -120,6 +120,6 @@ job archive 只记录收尾结果，不删除 workspace；任务归档也保留�
 
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
-| `mam task archive TASK-ID --note NOTE` | Manager | 记录结束结论，移除已登记的各库 worktree 及独立环境，删除对应的本地任务分支，移除 workspace；保留任务说明、简报和历史登记，状态改为“已归档” |
+| `mam task archive TASK-ID --note NOTE` | Manager | 要求所有 job 已归档，不检查已归档 job 的实际存活；记录结束结论，移除已登记的各库 worktree 及独立环境，删除对应的本地任务分支，移除 workspace；保留任务说明、简报和历史登记，状态改为“已归档” |
 
 分支删除使用创建时登记的“仓库＋分支名”。移除软链接时保留其指向的共享数据。归档返回各项清理结果；未全部完成则保留未归档状态，再次调用继续清理。是否归档由 Manager 根据任务要求决定。

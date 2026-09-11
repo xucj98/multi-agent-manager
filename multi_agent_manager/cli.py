@@ -684,10 +684,6 @@ def job_archive(store, args):
             data = store.read(item["id"])
             job = next(job for job in data["jobs"] if job["id"] == args.job)
             if job["status"] != "archived":
-                refresh_jobs(data)
-                store.write(data)
-                if job["probe"]["status"] != "stopped":
-                    raise Error("process must be confirmed stopped before job archive")
                 job["status"] = "archived"
                 job["archive"] = {"note": args.note, "at": now()}
                 store.write(data)
@@ -1089,11 +1085,9 @@ def archive(store, args):
         data = store.read(args.task)
         if data["status"] == "archived":
             return data["archive"]
-        refresh_jobs(data)
-        store.write(data)
-        blocked = [job["id"] for job in data["jobs"] if job["status"] != "archived" and job["probe"]["status"] != "stopped"]
+        blocked = [job["id"] for job in data["jobs"] if job["status"] != "archived"]
         if blocked:
-            raise Error("archive refused; running or unknown registered processes: " + ", ".join(blocked))
+            raise Error("archive refused; unarchived registered jobs: " + ", ".join(blocked))
         workspace = safe_path(data["workspace"])
         outer_check(workspace, data["repos"])
         for name, record in data["repos"].items():  # preflight every repo before removing any
@@ -1182,7 +1176,7 @@ def parser():
     p = command(sub, "status", "show concise task, repo and cached job status")
     p.add_argument("task", metavar="TASK-ID", help="registered task")
     p.set_defaults(func=status)
-    p = command(sub, "archive", "remove owned worktrees and task branches; retain task records")
+    p = command(sub, "archive", "remove owned worktrees and task branches after all jobs are archived; retain task records")
     p.add_argument("task", metavar="TASK-ID", help="registered task")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
     p.set_defaults(func=archive)
@@ -1201,7 +1195,7 @@ def parser():
     p = command(jobs, "status", "refresh and show one registered process summary as JSON")
     p.add_argument("job", metavar="JOB-ID", help="registered job")
     p.set_defaults(func=job_status)
-    p = command(jobs, "archive", "record the handling of a stopped process; retain history")
+    p = command(jobs, "archive", "archive one registered job; retain history without probing or stopping its process")
     p.add_argument("job", metavar="JOB-ID", help="registered job")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
     p.set_defaults(func=job_archive)
