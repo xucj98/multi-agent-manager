@@ -31,8 +31,8 @@
   两组均为 action `[1,50,32]`、loss weights `[1,50,32]`、state `[1,32]`，且同一行的完整 action
   （含 memory target）、loss weights 与 robot-state 前 14 维逐元素一致且有限。
 - OpenPI adapter 12 项、U pipeline/metadata/binding 3 项、Pi0 加权 loss 1 项、checkpoint
-  metadata 4 项均通过；bridge `MemoryContext` 15 项、跨库真实 policy-transform 6 项均通过。
-  三个 worktree 的 CPU 环境 smoke 也通过。
+  metadata 4 项、memory-config CLI 3 项的同序汇总复跑为 **23 passed**；bridge `MemoryContext`
+  15 项、跨库真实 policy-transform 6 项均通过。三个 worktree 的 CPU 环境 smoke 也通过。
 - 对两份真实 U schema 的 lifecycle 做了独立 CPU probe：prediction feedback 确实更新 cache，
   但 feedback 后、手动/takeover 覆盖后和 reset 后的下一次输入仍分别为 initial IDs。live
   scheduler、offline scheduler 和 RMBench simulation 都通过同一个 `MemoryContext.add_inputs()`
