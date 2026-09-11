@@ -13,3 +13,6 @@ Review focus:
 - Do not broaden unrelated API. Review against user latest task, not abandoned designs. Findings concise with file/line, trigger, practical effect, tests.
 
 Run meaningful independent tests and full suite where dependencies available. Installer module may be separate commit; use e20da6d52525267e035549c3447fbd6d3409df27 if needed in own review branch (this contains older installer script but current baseline wait_compat), disclose exact tested commits. Do not cherry-pick ongoing unstaged author changes. Publish report and end turn when useful findings ready. Manager later supplies final docs/installer for final pass. No minute polling.
+
+## Integration review update
+Final installer commit e23d693e5f8af5c9234da0c60148af3dc72b2fcd now available on top of e20da6d. Manager provisional integration in .local/wait-integration on local main includes runtime+installer, and README/AGENTS/design edits; use current local main as final integrated review base after preserving own tests. Review actual final docs for brevity/clarity/no conflicts, and installer bashrc+yes+precise restart+failed-tests behavior. Don't trust unit tests as real native-message evidence; that smoke is in progress. No live restart permitted in reviewer. Report findings promptly, especially any work-blocking runtime path. User requested no high-frequency model polling.
