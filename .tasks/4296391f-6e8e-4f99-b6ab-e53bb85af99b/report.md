@@ -89,3 +89,9 @@ socket 目录 `~/.ssh/mam-control` 的权限为 `0700`。原 `User xucuijie`、`
 486ms、284ms、264ms，均返回 `xucuijie` / `jxlrtc-dual-gpu-002`；没有查询模型、发送动作或
 修改远端。恢复时，在不再需要本地复用连接后，以该备份覆盖 `~/.ssh/config`，并在 socket
 目录清空后删除 `~/.ssh/mam-control`；这只影响本地 SSH，不影响 PM child。
+
+## 等待状态
+
+已使用新版 `mam wait` 保持 active 一个完整固定窗口（3600 秒）。它于窗口到期正常返回
+`status=timeout`，期间没有 job 停止、SSH 错误或现场交接事件；这不是服务状态变化。job 与
+task 继续保留，随后重新进入等待。
