@@ -1,53 +1,36 @@
 # 安装与更新
 
-在运行 agent 的本机安装。以下命令安装 GitHub 仓库 `main` 上的工具代码；更新时重新执行 `pipx install`：
+在新的 `PROJECT_ROOT` 中先创建项目配置，再 clone MAM。将示例中的绝对路径替换为实际路径；`MAM_BRANCH` 必须是 clone 中已有的本地分支。
 
 ```bash
-apt install -y pipx
-pipx install --force 'multi-agent-manager @ git+ssh://git@github.com/xucj98/multi-agent-manager.git@main'
-```
-
-首次安装后，将命令目录加入 PATH：
-
-```bash
-pipx ensurepath --force
-export PATH="$PATH:$HOME/.local/bin"
-mam --help
-```
-
-`ensurepath` 为后续终端保存 PATH，`export` 让当前终端立即生效。默认命令入口为 `~/.local/bin/mam`，可以从任意目录调用；`mam --help` 不需要项目配置。pipx 使用独立 Python 环境，安装内容固定于安装时的 Git 提交。
-
-运行任务、job、wait 或 workspace 命令前，在项目目录或其祖先目录放置 `.mam/env.json`：
-
-```json
+project=/absolute/path/to/PROJECT_ROOT
+mkdir -p "$project/.mam"
+cat > "$project/.mam/env.json" <<JSON
 {
-  "MAM_ROOT": "/absolute/path/to/mam-worktree",
-  "PROJECT_ROOT": "/absolute/path/to/projects",
-  "MAM_BRANCH": "project/state-vla"
+  "MAM_ROOT": "$project/multi-agent-manager",
+  "PROJECT_ROOT": "$project",
+  "MAM_BRANCH": "main"
 }
+JSON
+git clone git@github.com:xucj98/multi-agent-manager.git "$project/multi-agent-manager"
+cd "$project/multi-agent-manager"
+sudo apt install pipx
+bash scripts/install.sh
 ```
 
-`MAM_ROOT` 可以是普通 checkout 或 linked worktree，必须已有配置中的本地分支。`PROJECT_ROOT` 下保留业务仓库与 `workspace` 的既有布局。安装来源的 `main` 只承载工具代码；项目任务和报告发布到 `MAM_BRANCH`，发布前该 MAM worktree 必须 checkout 在此分支。
+`bash scripts/install.sh` 是唯一的安装入口。它从当前 checkout 用 `pipx install --force` 安装 MAM，把 `~/.local/bin` 加入当前 shell 的 `PATH`，并在 `~/.bashrc` 的非交互 return 之前维护一个带标记的 trace 配置块。更新同一 checkout 后再次运行这一条命令即可。脚本为每次 `.bashrc` 更新创建保留权限的备份，并打印可直接执行的 rollback 命令；它只删除完全匹配的旧 MAM trace export，不改其他内容。
 
-## 从明确 checkout 安装并验证等待兼容性
-
-在合并后的本地 checkout 上运行下面一条命令。它用 `pipx` 强制重装该 checkout、检查安装后的 `mam` 入口、运行完整单元测试，并执行 App Server 的行为探测：
-
-```bash
-/absolute/path/to/multi-agent-manager/scripts/install_and_test.sh /absolute/path/to/multi-agent-manager
-```
-
-运行前需要 `pipx`、可执行的 `codex`，以及已由用户启动的 Codex App。探测绝不会重启、停止或配置用户的 App。它只读连接现有 control socket，并在临时 cwd 中启动一个独立 stdio App Server；该服务器只创建 ephemeral thread，并用必定失败的空 `turn/steer` 请求检查通知送达和 `turn.id` trace 映射，不会启动模型或修改现有 thread。
-
-真实 App 必须把 JSON trace 写到 `~/.codex/app-server-control/app-server.log`。当前所需配置是：
+当前 Codex App Server 需要以下环境才会写入行为探测需要的 JSON trace：
 
 ```text
 RUST_LOG=off,codex_app_server::message_processor=trace,codex_app_server::app_server_tracing=info
 LOG_FORMAT=json
 ```
 
-失败会以非零状态退出，并说明不能安全启动或继续 MAM wait。按提示由用户手动打开或重启 Codex App、修复 trace 配置后再次运行该命令；脚本不会替用户重启 App。
+环境修改不会改变已经运行的 App Server。安装器先从 control socket 确认唯一的 app-managed npm listener，再检查该 listener 的实际环境。若需要重启，它会显示准确的 PID、可执行文件和 socket，并且只有在交互终端输入**完全匹配的** `yes` 后才会向这个单一 PID 发送 `TERM`。请从单独的终端运行安装器，因为重启可能断开 Codex App 的连接。默认输入、`no`、EOF 或非交互运行都会保留所有进程、以非零状态报告安装/验证未完成。安装器重新核对 PID、启动时间、可执行文件、socket 和 npm 父进程后才会终止 listener；它不会停止 proxy、UI、GPU 作业或其他 Codex 进程。
 
-`require_compatible()` 会在每次 wait 前重新执行这些检查，且会在 trace 中归因本次只读 control-socket 握手，返回 socket 路径、trace 日志路径和本次验证的 fingerprint。它不保存证书、不维护版本白名单，也不比较 App Server 与 CLI 的版本：版本信息仅用于诊断，版本变化本身不会阻塞通过行为测试的运行时。
+重启后，安装器只等待 App 自己重新拉起同一种 listener。若不能确认替换 listener，它会以非零状态结束并明确说明没有启动 standalone fallback。随后它在 pipx 安装的 Python 环境中运行完整单元测试与 `multi_agent_manager.wait_compat` 的实时行为检查。
 
-该探测验证 control socket、一般服务器通知和 trace 关联。它不声称已经验证用户消息或 native manager-send 从 Codex App 到 MAM wait 的端到端唤醒；这项试验仍需要 Manager 协调的真实线程测试。
+`require_compatible()` 每次 wait 前都重新检查 control socket、只读 initialize trace、隔离 stdio App Server 的通知送达和 `turn.id` trace 映射。它返回本次验证的 socket、trace 日志和 fingerprint。版本信息只用于排障；版本变化从不阻止通过行为测试的运行时。探测不会创建真实模型 turn 或修改现有 thread。
+
+该探测尚未认证从真实用户消息或 native manager-send 到 MAM wait 的端到端唤醒；需要 Manager 协调真实线程测试后才能将该能力标为已验证。

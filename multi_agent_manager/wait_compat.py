@@ -373,8 +373,14 @@ def _fingerprint(
     log: Mapping[str, Any],
     live: Mapping[str, Any],
     behavior: Mapping[str, Any],
-    cli_version: str | None,
 ) -> str:
+    """Identify the behavior that was just checked, without pinning a version.
+
+    The CLI version deliberately stays out of this value.  It is useful in the
+    returned diagnostics, but a version change is never a compatibility
+    failure and should not look like one to a caller comparing results.
+    """
+
     return "sha256:" + _digest(
         {
             "socket_path": str(socket_path),
@@ -383,7 +389,6 @@ def _fingerprint(
             "log": dict(log),
             "live": dict(live),
             "behavior": dict(behavior),
-            "cli_version": cli_version,
         }
     )
 
@@ -410,13 +415,13 @@ def require_compatible() -> dict[str, Any]:
         raise RuntimeError(
             f"MAM wait compatibility check failed: {exc}. "
             "Do not start or continue a MAM wait. Open or restart the Codex App yourself, "
-            "then rerun scripts/install_and_test.sh with the checkout path."
+            "then rerun bash scripts/install.sh from the MAM checkout."
         ) from None
 
     return {
         "socket_path": str(socket_path),
         "log_path": str(log_path),
-        "fingerprint": _fingerprint(socket_path, log_path, socket, log, live, behavior, cli_version),
+        "fingerprint": _fingerprint(socket_path, log_path, socket, log, live, behavior),
         "capabilities": {
             "live_control_socket": "validated",
             "event_delivery": "validated",
