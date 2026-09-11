@@ -1,3 +1,11 @@
+# 08:47 第二次相同RPC失败：GPU6 rearrange t+30 seed0提前结束
+
+08:45:37，`rearrange_full_t_plus_30_s0_20k_100ep`在完成32条正常episode（27 success、5正常失败）后，episode32/seed100032首个get_obs遇到30秒TimeoutError；runner同时报robot_status_transport_error，最终33条记录、benchmark failed。不是完整100，不能作为正式成功率。`processes/034-scheduler.stdout.log`、summary、33条原始记录和smoke均保留；`failure_review.json`已保存退出核对。scheduler exit1，policy/robot正常shutdown -15；全部登记子进程已退出，GPU6=1MiB/81037MiB空闲/0%，ss确认19460/19462无监听（初次bind受残留socket影响，未启动新任务）。
+
+与08:23 GPU7 put-back故障同为episode首次get_obs、logical_step0、30秒外层超时；发生在不同任务/seed/卡，已不是单一seed证据。公共边界缺口及最小建议见下文，仍未证实底层慢首帧或卡死的根因，未改timeout/源码/参数。请Manager协调公共owner诊断并裁定失败模型重试规则。GPU6本轮先保持空闲，不继续投入第三项来掩盖重复公共故障；其余GPU3/4/5/7四项继续按原配置推进，GPU7 seed1已完成首条，第二条在08:45仍有query14/step402进展。失败两项均未补跑/覆盖。
+
+---
+
 # 08:37 GPU7 rearrange t+30 seed1 smoke PASS，formal100已启动
 
 GPU7已按07:52下一空卡优先条款运行配对seed1。自身20k smoke2 CLI exit0，两集success（392/405步），video392帧完整可读、no-video通过既有validate_smoke_run；config_source内audit/manifest逐字节一致，所有登记子进程退出（scheduler0，服务正常shutdown -15）。config SHA256为89ede174d421fa17aec278dbb116c38c18641612ab5e842ed42c86c3019f0659。
