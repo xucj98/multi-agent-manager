@@ -4,8 +4,8 @@
 
 ## 当前单模型放行状态
 
-- **no-memory：已获 Manager 单独放行，等待本机 0/1/6/7 中下一张实际空闲卡。** 本模型的 50-step 训练、BF16 model-only 保存和 checkpoint-only 恢复均已完成；恢复证据及可复核路径见下文。2026-09-11 15:47 +08:00 资源复核：GPU0 `61725 MiB / 64%`、GPU1 `25397 MiB / 100%`、GPU6 `14897 MiB / 50%`、GPU7 `16223 MiB / 88%`，均为外部占用；未并发启动、未登记 job。GPU 2–5 为本项目其他四路训练且不使用。本任务将按约 30 分钟一次的频率复核，或由 Manager 提前唤醒。
-- **serial_lag30：尚不可放行。** 独立 review 已 PASS，但自身 50-step/保存/恢复 gate 尚未开始；等待 no-memory 启动后另一张实际空闲的获准卡完成该 smoke，再单独提交恢复证据。
+- **no-memory：正式 20k 已启动。** 本模型的 50-step 训练、BF16 model-only 保存和 checkpoint-only 恢复已完成。2026-09-11 16:16 +08:00 GPU0 空闲后，以冻结 commit `a7f3e07` 启动 `memory20k_695bc51f_put_back_no_memory_s0`；MAM job `14bad7c3-59cb-45d5-8173-8eb92cb9b90a`、PID `3996599` 已登记为 running。16:21:40 已完成首个有效 update（`1/20000`）；等待首个聚合 loss 后补充。
+- **serial_lag30：自身 smoke 运行中。** 独立 review 已 PASS。2026-09-11 16:17 +08:00 使用另一张空闲的 GPU6 启动 `smoke50_695bc51f_put_back_serial_lag30_s0`（PID `3996877`，短 smoke 未登记 job）；正在首次编译，后续完成 50-step/BF16 保存/checkpoint-only 恢复后单独提交证据。
 
 ## 已交付，待快速验收
 
