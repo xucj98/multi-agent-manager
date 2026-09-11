@@ -53,6 +53,11 @@ MAM job `9f91cf1c-8505-48e3-bd6e-cc7e8093a914` 保持**未归档**，用于现�
 Manager 管理，现场需要保留它直至用户明确结束测试。若后续进程停止，Manager 应先记录实际
 观测后再 archive job，不能据 unknown 直接判定停止。
 
+`2026-09-11T19:00:36Z`，为保持 active 运行的 `mam wait` 对该 job 的 SSH 状态查询超时，
+返回 `cannot determine state ... SSH query timed out`。这不是 PID 已停的证据，也不覆盖上面的
+成功观测；本 task 未重试、未修改网络或服务。收尾方案是保留 job 与 task，待 SSH 恢复后由
+Manager 做一次只读 PID/监听核验；只有确认 PID 已不存在后才 archive。
+
 ## 本地收尾与现场剩余事项
 
 - 原 workspace 保留：
