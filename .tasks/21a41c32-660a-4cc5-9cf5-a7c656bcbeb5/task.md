@@ -25,3 +25,11 @@ Meaningful tests: role/ownership matrix, unrelated projects, no jobs, unknown id
 
 ## User correction (latest, authoritative)
 Compatibility failure means tests/capabilities failed, NOT that app-server/proxy version changed. A new version passing checks must work. No version allowlist or fingerprint mismatch rejection. wait_compat contract should gate on tested behavior, with versions only diagnostic.
+
+## User acceptance addition: explicit exit reason and identifying fields
+Every mam wait return must explain why it ended. Required outcomes:
+- timeout: fixed one-hour wait elapsed (3600 seconds).
+- job stopped/completed: include job-id and its registered note. Process exit detection alone does not prove experimental success; retain truthful status.
+- subagent completed its turn: include agent-id, task-id and task-title.
+- cancelled: manual `mam wait stop` ended this wait.
+Do not collapse automatic user steer/native manager-message wake into manual cancelled; give a concise distinct message/input reason and affected agent ID. Preserve compact actionable error and empty-target reasons already required. No full metadata dump. Add assertions for output reason and ALL required fields, including manual cancellation and timeout. Ensure CLI output (not just internal return dict) retains these fields.
