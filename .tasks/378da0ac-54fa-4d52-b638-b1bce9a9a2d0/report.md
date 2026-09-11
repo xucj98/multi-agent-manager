@@ -2,7 +2,7 @@
 
 ## 结论
 
-已证实的公共运行故障是**状态探测与长 `get_obs` 共用 RMBench controller 的串行 worker RPC 锁**：scheduler 的首次 `get_obs` 已在 controller 内等待时，benchmark runner 另一个 WebSocket 连接发出的 `get_episode_status` 仍会排在同一锁后面。两端 client 都是 30 秒预算，故三次被 runner 错标为 `robot_status_transport_error`，另一次先观察到 scheduler 的非零退出。
+已证实的公共运行问题是**状态探测与长 `get_obs` 共用 RMBench controller 的串行 worker RPC 锁**：scheduler 的首次 `get_obs` 已在 controller 内等待时，benchmark runner 另一个 WebSocket 连接发出的 `get_episode_status` 会排在同一锁后面。两端 client 都是 30 秒预算，故三次失败被 runner 错标为 `robot_status_transport_error`，另一次先观察到 scheduler 的非零退出。这是故障分类/诊断路径的公共问题，**不是四项 scheduler 首次 `get_obs` 自身超时的已证实首因**。
 
 四份源结果的 scheduler trace 都显示首个 `get_obs` 在 loop 启动后约 30 秒由 scheduler 自己抛出 `TimeoutError`；controller 内 worker RPC 在实际启动命令中设为 600 秒。首次 `get_obs` 为什么没有在 30 秒内返回（冷渲染、GPU/driver 争用、worker 卡死等）不能从现有产物区分：worker 在 runner 清理后才被中断，未留下响应完成时间或原始渲染异常。没有把该未证实部分归因给模型、memory、seed 或任务算法。
 
@@ -129,3 +129,45 @@ worker 单调时钟给出本次冷路径的可复核时序：
 收尾已核对：worker 写入 `worker_stopped`；scheduler 正常 exit 0，policy/robot 均由 runner
 shutdown 以 `-15` 退出；GPU3 回到 1 MiB / 0%，19430/19432 无监听。保留上述 result、worker JSONL、
 scheduler 日志、输入审计和 manifest；没有自动重跑，也没有新增实现。
+## 阶段三：review 采纳的窄修复与定向复核请求（2026-09-11）
+
+本阶段只落实 Manager 采纳的四项边界修复，没有启动 GPU、formal、smoke、真机或训练，也没有修改 C 严格对照、scheduler 的 30 秒 `get_obs` 预算、模型/memory/动作/成功判定或 trace 框架上限。
+
+| 仓库 | worktree | 提交 | 内容 |
+| --- | --- | --- | --- |
+| robot-bridge | `/mnt/public/xcj/Projects/workspace/378da0ac-54fa-4d52-b638-b1bce9a9a2d0/robot-bridge` | `d49f6165cf5f1b5a7111c0826e52bde2d0b9e479` | cached terminal 权威性、5 秒 probe 边界测试、实际 RMBench execution-tree HEAD 留痕。 |
+| RMBench | `/mnt/public/xcj/Projects/workspace/378da0ac-54fa-4d52-b638-b1bce9a9a2d0/RMBench` | `ad8b5c7cab1af696c303339d11cf0f82f8a066ac` | diagnostic 结果与常规成功率入口隔离。 |
+
+### 已实现的边界
+
+- runner 仍保存 cached status 及 diagnostics，但只有 `episode_status_source != "cached"` 的 terminal 才进入 scheduler 收尾；没有该字段的旧 controller 保持原行为。真实 localhost 双 WebSocket 测试先写入 terminal，再由另一连接持锁慢 reset，证实 runner 不会以 cached terminal 结束，而是在短测试 deadline 正确报 `episode_timeout`。
+- 这不是四项 formal 的已证实首因：正常 `BenchmarkRunner._loop()` 同步等自己的 reset 返回后才启动 scheduler 和 `_wait()`，所以“旧 terminal + 下一次慢 reset”不在其正常单 runner 链中。它是多连接 controller API 的可达防御边界，不能反推为历史首次 `get_obs` timeout 的触发序列。
+- 固定 5 秒空闲 `get_episode_status` probe 的既有策略已明确并补 CPU 用例：fake worker 在收到 status 请求后仍存活但延迟超过缩短后的 test bound，proxy 记录 `worker_rpc_failed/TimeoutError`、reap worker，并返回 `worker_state=lost`。这确认它按 worker 异常处理，不是 scheduler timeout 调整或新配置项。
+- 后续 launcher 的 `usr_args._runtime.rmbench_execution_tree` 单列 `--source-root RMBench` 实际 root 与精确 HEAD；`input_manifest.source_commit` 保持为 manifest 父目录的独立身份。CPU 测试初始化不同 Git root 并验证两字段不会混淆。
+- `RMBenchResultRecorder.finish()` 在 `mode=diagnostic` 只写 `diagnostic_result.txt`（status、target episodes、证据指针），不再写常规 `_result.txt` 或 `Success Rate`；smoke/formal 的原 `_result.txt` 格式保持。实际 recorder 产物测试同时覆盖 diagnostic 与 smoke。
+
+### 已完成 GPU3 诊断 leaf 的透明后处理
+
+已完成 leaf 在新代码之前运行，因此没有改写其 `config.yaml` 或宣称它原本带有新字段。为防止旧单集成功被常规入口索引，已删除：
+
+```text
+/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/first_obs_timeline_rearrange_tplus1_s1_ep17_gpu3/_result.txt
+```
+
+并新增同目录下不含成功率的 `diagnostic_result.txt` 与
+`diagnostic_result_postprocess.json`。sidecar 记录被移除旧文件的 SHA-256、替换理由、后处理提交、以及未改动的 `config.yaml`、`command.txt`、`episode17.json`、`episode_diagnostics.jsonl`、`diagnostics_summary.json`、`processes.jsonl` 和 worker trace 哈希。
+
+sidecar 同时明确这是事后核实，而非原 launcher 写入：实际 RMBench execution tree 为 `ed1e00b403c4f49cf2ad4f4fa7afd35609c55d6a`，bridge 为 `de0e9dac89601b792e0eb56e56d88175cbe643e7`，OpenPI 为 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`；原 `input_manifest.source_commit` 是共享 `.local` manifest 父目录的 `f2ec2cfe14d4a721a12d19ae9971af5c0e1777ff`。原始 episode、scheduler、worker trace、config 与 timing evidence 未改。
+
+### CPU 验证
+
+- `env CUDA_VISIBLE_DEVICES= JAX_PLATFORMS=cpu PYTHONDONTWRITEBYTECODE=1 robot-bridge/.venv/bin/python -m pytest tests/robot/controllers/test_rmbench_simulation.py tests/benchmark tests/robot/test_server_dispatch.py tests/transport/test_websocket.py -q`：`54 passed, 1 skipped`。
+- `PYTHONDONTWRITEBYTECODE=1 robot-bridge/.venv/bin/python -m ruff check robot_bridge/benchmark/runner.py robot_bridge/robot/controllers/rmbench_simulation.py tests/robot/controllers/test_rmbench_simulation.py tests/benchmark/test_runner.py`：通过。
+- `env CUDA_VISIBLE_DEVICES= JAX_PLATFORMS=cpu PYTHONDONTWRITEBYTECODE=1 RMBench/.venv/bin/python -m unittest discover -s tests -p 'test_eval_diagnostics.py' -v`：`4 tests passed`；fixture import 输出既有 SAPIEN/Open3D/资源告警，无失败。
+- 两个 worktree 均 clean，`git diff --check` 通过。
+
+### 仍未证实与准入结论
+
+四个 historical formal 的 scheduler 首次 `get_obs` 自身 30 秒超时的首因仍未知。上述 cached-status、cached-terminal 和 5 秒 probe 修复改善故障分类、API 终态语义与取证边界，但没有证明或消除 scheduler 首帧超时；GPU3 单次正常返回同样不能放行 formal。四个 partial leaf 继续只作原始证据，不能合并为任何新的成功率或分母。
+
+请 `ae463958-bc48-43b3-9d61-b9ca7d579d83` 对 `d49f6165cf5f1b5a7111c0826e52bde2d0b9e479` 与 `ad8b5c7cab1af696c303339d11cf0f82f8a066ac` 定向复核：cached terminal 权威性、diagnostic result 隔离、5 秒 probe 的 worker 异常策略、实际 RMBench execution-tree provenance，以及上述“慢 reset”仅为防御边界而非四项 formal 首因的表述。
