@@ -93,3 +93,18 @@ source-build/sdist fallback，须由下一步真实离线 `.local/create_worktre
 OpenPI/RMBench 环境，尚未进行 renderer/cuRobo、三机 smoke2 或正式 100 rollout。依 Manager
 验收要求，bridge 这次“失败后补 cache”的过程不计入一键成功耗时；三库缓存齐备后会在全新、可清理
 workspace 各实际执行一次入口，并单独记录可复现的一键创建耗时和磁盘变化。
+
+## 执行快照（2026-09-11 13:36 +08:00）
+
+当前 C 没有运行中的 `uv`、create-worktree 或 eval 进程。OpenPI 的首次离线入口于 13:32 在
+`lerobot` build-system 的唯一缺项 `poetry-core` 处退出（exit 1，2 秒）；这不是解析、GPU 或公网
+重试问题。已从本集群定位 `poetry-core 2.4.1` 的可复用 cache 对象。
+
+首个精确补项 rsync 传输了 `1,435,790` bytes、208 files、耗时 2 秒，但目标校验立即发现该命令未保留
+uv cache 的相对目录层级，因此尚未重试安装、也未将其计为成功。错位文件均为本任务刚创建的临时 cache
+副本，将先删除，再以保留相对路径的单流 rsync 重放并重建 C 内部 symlink。没有新增三库代码提交；
+独立 review `76b4c5b8` 可继续按已发布提交审查。
+
+下一验收点：OpenPI `.local/create_worktree.sh` 在离线 symlink cache 下成功退出、完成其 CPU 环境
+smoke；之后才开始 RMBench 的离线 cache 预检与创建。三库 cache 完整后会新建一次可清理验证树，重新
+实际运行所有入口作为正式“一键”时间和磁盘测量，当前失败后的人工 cache 补齐过程不混入该结果。
