@@ -68,3 +68,10 @@
 - 三台有效 smoke 已全部验收：C1 GPU1 steps `333/381`、C2 GPU2 `333/381`、C3 GPU0 `330/322`；每机 `seed100000/100001` 均 accepted、2/2 terminal success、episode0 video check 与 episode1 no-video check 均 `ok=true`、`_result.txt=Success Rate 1.0`、对应服务/端口退出且 strict 三树 clean。逐机 SHA256 acceptance records：`strict-c1-smoke2-retry1-acceptance.json`、`strict-c2-smoke2-acceptance.json`、`strict-c3-smoke2-acceptance.json`。
 - 已从本机原始 `put_back_full_t_plus_1_s0_20k_100ep/launch.json` 对照正式命令；C strict manifest 进一步实读为 `test_num=100`、`seed=0`、`eval_video_count=5`、`demo_clean_eval`、H50/K30。唯一正式 run 以原始名称 `put_back_full_t_plus_1_s0_20k_100ep` 于 C2 GPU2 在 17:44:55 启动，outer PID `9732`，smoke gate 为 C2 valid leaf。
 - 长进程已登记 MAM job `c4dad7ca-84fc-4f6b-8a57-312178b35282`，host 使用可探测 SSH alias `wuwen-4090-2`（而非仅 C 内可解析的 hostname），状态 `running`。launch/prelaunch 记录：`strict-formal-100-{launch.txt,prelaunch-gpu.csv,driver.log,outer.pid}`。将首先检查 `seed100000`，到 50 条按固定顺序核对趋势/异常；任一 rejected preflight 均按基础设施门禁处理，绝不计入或静默跳过。
+
+## 正式 100 即时现场（2026-09-11 17:48 +08:00）
+
+- **正在运行**：C2 `wuwen-4090-2` GPU2 的唯一 strict formal run `put_back_full_t_plus_1_s0_20k_100ep`，outer PID `9732`、MAM job `c4dad7ca-84fc-4f6b-8a57-312178b35282` 均仍存活；robot/policy/worker 与 19420/19422 端口存活。稳定 shim 保持指向 `state-vla/RMBench`，未改活跃 strict tree。
+- 已实读正式 leaf 原始 JSON：仅 `episode_id=0, seed=100000, accepted=true`；其 terminal diagnostics 为 `success`、333 steps，`episode0.mp4` video check 为 `ok=true`（333 frames）。worker stderr 未见旧绝对路径异常或 traceback，只有既有 SAPIEN warning。
+- 当前尚未看到 episode 1 的 preflight/diagnostics/video record，100 条绝未完成；episode 0 scheduler 已以 `episode_terminal` returncode 0 退出，而 outer/服务仍在运行。我正在只读核查其是否处于下一集切换或存在活跃停滞，不做重启、跳 seed 或修改运行路径。
+- 下一验收点是固定 `seed100001` 的 accepted preflight 与连续 diagnostics；任何 rejected preflight、非连续 seed 或 worker/基础设施 traceback 都将保留为 formal gate failure，不能计入结果。现场原始路径：`C:/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep/{seed_preflight,episode_diagnostics,video_checks}.jsonl`，driver：`workspace/2a879870-8dda-4613-a684-0ad48a5e86be/records/strict-formal-100-driver.log`。
