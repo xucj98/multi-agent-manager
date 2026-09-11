@@ -72,3 +72,21 @@ Integrated checkout, using this task worktree interpreter:
 ~~~
 
 All smoke jobs for this task are archived. No server restart, production job change, or GPU operation occurred.
+
+## Final review: journal discovery-to-open race repair
+
+Delivered commit 86bc9688cf1945d49aef19fc18a64d399b701509 fixes the accepted final-review finding without changing live smoke behavior.
+
+The invocation timestamp is captured before journal discovery. After identifying the unique journal, the watcher performs one bounded 32 MiB backwards lookup for the latest complete row older than that timestamp and opens from the following offset. Rows written after invocation, including rows written between discovery and the actual open, are therefore still read and passed through the existing timestamp filter. If the bounded tail has no safe older boundary, it opens from offset zero once rather than risk skipping a native input. Ordinary polls retain their forward-only incremental read behavior and do not rescan history.
+
+The regression test test_session_lookup_window_captures_input_written_between_discovery_and_open simulates a valid current-turn user.text row appended after identity discovery but before file open. It verifies that the watcher returns the matching SessionMessage. This test failed with the previous EOF-open behavior.
+
+Validation after this commit:
+
+~~~text
+.venv/bin/python -B -m unittest discover -s tests -v
+76 tests passed
+~~~
+
+The previously recorded coordinated 900-second native smoke PASS remains the live evidence. Per the published requirement, no unrelated smoke was repeated for this lookup-window-only repair.
+
