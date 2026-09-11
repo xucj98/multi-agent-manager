@@ -129,3 +129,9 @@
 
 - 上一 gate 的 PID `63260` 已自行退出，原因是我在直调 worker 时漏设 controller 原有的 `cwd=RMBench`，导致相对 `assets/objects/objaverse/list.json` 不存在；这是 **gate harness 配置错误**，不是 formal、模型或 Vulkan 结论，原 log/JSON 完整保留。
 - 已以 controller 的真实 cwd、同一 strict roots 和同一 C2 GPU2 重启 retry1，outer PID `63504`；仍为 40 次 reset、系统 ICD、独立 cache/无 result leaf。此 retry 才是当前运行中的门禁。
+
+## 运行边界更新与稳定手册修订（2026-09-11 18:45 +08:00）
+
+- Manager 已明确：40 reset 只验证 renderer/worker 生命周期，绝不替代新环境下的 policy smoke2。gate 通过后依次执行 C2 系统 ICD 环境的完整 video/no-video smoke2，再从新 leaf 固定 `100000–100099` formal；任一再次基础设施异常保留首因并停止，不循环 100。
+- retry1 当前已完成 11/40 个连续 accepted reset，尚无 `ErrorIncompatibleDriver`、Vulkan、RPC EOF、traceback 或路径错误；继续运行。它不写 evaluator result leaf，也不改变 strict 三树。
+- 按最新指令，稳定 `C:/mnt/public/xcj/Projects/state-vla/README.md` 已先行定向修订为 90 行通用手册：task 参数替代旧固定 commits、明确 MAM 本机与 SSH C1 创建/C2-C3 运行、说明旧 client 不由三条建树命令自动复现、把当前验收细节留给实验说明，并将 50 中检改为前 N 个已完成 diagnostics 的切片。前/后 SHA256 为 `c7d45eec...dede5f` → `1bafbae2...74276`；任务 records 的 `state-vla-README-targeted-revision.json` 六项检查均通过。
