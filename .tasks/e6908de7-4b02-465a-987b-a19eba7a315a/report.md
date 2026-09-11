@@ -221,3 +221,34 @@ RMBench docs tree 更新；没有把训练中的路径写成 eval-ready。
 未修改 C 冻结 eval tree、未启动 GPU、未停止服务或机器人。该 docs commit 待 Manager 集成；bridge
 `f962663` 仍待独立 review，review 通过前队列保持停止而非重试。
 
+
+
+## 2026-09-12 C 首次 infer 90 秒准入后的执行阶段
+
+独立 review `03d538a0` 已准入 bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5` 的
+`policy_first_infer_timeout=90.0`。本机运行配置提交
+`3775d4a`（C 部署等价提交 `7933426`）：固定 bridge SHA，使用实验组内
+`openpi_simulation_first_infer_90s.yaml`，并要求运行清单与 scheduler 的实际值一致。
+它仅为每个 scheduler process 的首个 policy infer 给 90 秒有界预算，后续 RPC 保持 30 秒；模型、
+schema、seed、H50/K30 和成功判定均未改动。
+
+本机验证：`git diff --check`、入口 py_compile、两个 checkpoint CPU prepare-audit/dry-run 通过；
+bridge scheduler/transport 测试为 **101 passed, 1 skipped**。C worktree 三库冻结为 RMBench
+`79334268e28ccd91c59049224aad8d0d799d11a7`、bridge `f9626636`、OpenPI `a869498`；C3/C2 真实
+scheduler 均记录了 `First policy inference uses 90.0s RPC budget.`。
+
+四份新的 matching smoke2 均完成 2 条、video/no-video、metadata、scheduler/服务退出与 90 秒
+scheduler 配置检查；旧 30 秒失败 leaf 保留不覆盖。
+
+| C host/GPU | train checkpoint | smoke 结果 | 接续 formal100 MAM job |
+| --- | --- | --- | --- |
+| C3 GPU0 | put-back full t+30 / s0 | 2/2，0 runtime error | `a5f7560b-3667-4aeb-ba37-9491f104225f` |
+| C3 GPU1 | rearrange full t+30 / s0 | 2/2，0 runtime error | `589ae4a2-749a-4542-9421-e137a6959812` |
+| C2 GPU2 | put-back full t+1 / s1 | 1/2；另 1 条为正常 `button_not_pressed_after_center`，0 runtime error | `03bcccbb-89e4-4d4e-b69e-9aa0f6dee37a` |
+| C2 GPU3 | put-back full t+30 / s1 | 0/2；均为正常 `button_not_pressed_after_center`，0 runtime error | `1ad3f257-3ebe-48a1-be64-5029672fcfb2` |
+
+smoke gate 依既有 `assert_smoke_compatible`：要求两条 accepted rollout 无 runtime error、video ON/OFF
+证据、所有子进程退出和 completed status，不按两条任务成功率筛选或改参数。四项 formal 都是固定
+100 条 seed100000–100099、相同 checkpoint 自身 smoke 引用，尚无正式结果。C2/C3 各有两个 active
+formal，达到每 host 最多两个 run 的授权上限；下一批待空位后按既定队列接续。50 条截面、完整收尾、
+raw 回传和主 RMBench 台账增量将在结果到达时更新；当前不把 smoke 分数写为正式成绩。
