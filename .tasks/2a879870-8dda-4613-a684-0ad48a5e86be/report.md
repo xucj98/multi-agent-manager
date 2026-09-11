@@ -183,3 +183,9 @@
 - 一次同base `6139577`、复用UV artifact cache、CPU-only fresh实测 **52.926856684s / exit0**；两probe为 **0.203525066 / 0.102121115s**，前次未优化trace为151.783s/双probe100.834s。不同窗口共享FS测量，不宣称固定速度保证。
 - worktree apparent **23,100,627 B**（含venv），venv apparent **13,870,506 B**；allocated分别 **51,438,080 / 41,802,240 B**。均du不跟随链接，禁止拿allocated与之前apparent混比。cache allocated窗口差 **+2,560 B**。GPU前后相同，无本任务GPU工作。
 - profile源码clean；worktree/branch与profile parent均清理，清理 **47.305s** 单列、不混入creation。完整metrics/raw trace/安装日志/patch保留在C上述目录。本机可读summary及wrapper.patch镜像在本MAM `.tasks/2a879870-8dda-4613-a684-0ad48a5e86be/create-lazy-probe-20260912/`。
+
+### 协议对照及登记
+
+- C2 40-reset candidate gate 已登记 MAM job `1ee98405-a6e7-4936-8d78-96aef1d82232`，PID144614，便于外部观察终态；该job是诊断，不是正式100。
+- C1 GPU1已确认空闲后启动同环境 base/candidate 顺序对照（PID132690），`records/renderer-protocol-20260912`。各2个固定seed100000/100001；基线保存50条保持初始qpos的诊断动作，candidate原样重放，双方均按原worker队列剩20的条件执行30条，保存前后qpos、三相机图像及状态。此synthetic诊断用于验证reset/动作队列/观察接口，没有替代模型policy smoke或正式结果。
+- 下一阶段只在生命周期跨越旧故障点/终态、协议对照完成或异常时汇报；已准备源码与创建优化review材料，formal仍须Manager review与真实smoke门禁。
