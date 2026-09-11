@@ -43,3 +43,6 @@ retry1实际运行在首个execute因memory prediction IDs被通用handle_execut
 
 ## 部署代码准入（独立review完成后）
 独立review 3b678966确认041405f PASS（launcher全组164passed，live此前PASS），Manager已ff合入本机bridge。允许通过既有SSH将现场bridge同步至精确041405f0b35b2a173ac3461d297a43141d028026，OpenPI保持a869；沿用户授权可丢弃现场代码，保留模型/环境/机器配置及现有PM实例，不重启PM、不发真机动作。CPU导入验证与git identity/clean核对后回报。只读刷新PM实例和GPU资源，给full优先的具体可用GPU/端口及现有PM部署命令/请求（供Manager决定启动），不要擅自停止其他实例。确认是否需在实际scheduler主机同步同一bridge版本，明确仅policy主机更新尚不等于真机scheduler已更新。报告现场剩余步骤和简洁可用入口，完成后清理本task临时产物供归档。
+
+## full Policy Manager 实例启动
+GPU1只读确认约24067MiB可用、PM建议8951。Manager允许现在通过已有Policy Manager部署wash full（model_id取实际PM登记值，上节路径），GPU1、端口8951，启动前再核对空闲资源/端口；使用同一已同步bridge041405f/OpenPI a869和现有环境。不替换/停止已有pourtea、不启动机器人或scheduler、不发送机器人动作。验证PM child running、metadata全且匹配14D S2M/15Hz/H50/K30/full schema、模型加载日志无异常，给准确policy URL及PID/GPU/端口。若可用现成policy-only合成观测smoke且不接真机，可以验证一次infer；不要引入新工具框架。若启动失败，保存首因并只清理本次新建实例。服务用于今天真机，需按预计运行时长用mam job add登记进程（host用已确认SSH别名）；这是待现场使用的长服务，不能归档任务时自动停止。回报其状态，保留任务至现场交接。serial尚不启动，先full。
