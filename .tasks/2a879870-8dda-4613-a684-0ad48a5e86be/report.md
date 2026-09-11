@@ -62,3 +62,9 @@
 
 - C2 GPU2 与 C3 GPU0 均已通过 startup：各自 `seed=100000` 的 preflight 均为 `accepted=true`，真实 scheduler 正在执行 episode 0 并写各自 `episode0.mp4`。两端 worker 无 `FileNotFoundError`、`AttributeError`、`ConnectionResetError` 或 traceback；这在稳定 shim 下实际验证了 renderer/cuRobo/sim/policy 链路。
 - 当前两端 `episode_diagnostics` 和 `video_checks` 仍未落盘，因此没有提前宣布 PASS。下一验收点仍是每机 episode 0 terminal+video check、episode 1 (`seed100001`) accepted+no-video check、`_result.txt`、所有服务退出及 strict 三树 clean。
+
+## 三机 smoke PASS，strict 100 已登记启动（2026-09-11 17:45 +08:00）
+
+- 三台有效 smoke 已全部验收：C1 GPU1 steps `333/381`、C2 GPU2 `333/381`、C3 GPU0 `330/322`；每机 `seed100000/100001` 均 accepted、2/2 terminal success、episode0 video check 与 episode1 no-video check 均 `ok=true`、`_result.txt=Success Rate 1.0`、对应服务/端口退出且 strict 三树 clean。逐机 SHA256 acceptance records：`strict-c1-smoke2-retry1-acceptance.json`、`strict-c2-smoke2-acceptance.json`、`strict-c3-smoke2-acceptance.json`。
+- 已从本机原始 `put_back_full_t_plus_1_s0_20k_100ep/launch.json` 对照正式命令；C strict manifest 进一步实读为 `test_num=100`、`seed=0`、`eval_video_count=5`、`demo_clean_eval`、H50/K30。唯一正式 run 以原始名称 `put_back_full_t_plus_1_s0_20k_100ep` 于 C2 GPU2 在 17:44:55 启动，outer PID `9732`，smoke gate 为 C2 valid leaf。
+- 长进程已登记 MAM job `c4dad7ca-84fc-4f6b-8a57-312178b35282`，host 使用可探测 SSH alias `wuwen-4090-2`（而非仅 C 内可解析的 hostname），状态 `running`。launch/prelaunch 记录：`strict-formal-100-{launch.txt,prelaunch-gpu.csv,driver.log,outer.pid}`。将首先检查 `seed100000`，到 50 条按固定顺序核对趋势/异常；任一 rejected preflight 均按基础设施门禁处理，绝不计入或静默跳过。
