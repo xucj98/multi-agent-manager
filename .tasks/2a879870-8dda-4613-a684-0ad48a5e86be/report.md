@@ -81,3 +81,9 @@
 - 前一快照后已实证正常切换：`seed_preflight.jsonl` 连续两条且仅两条，`(episode0, seed100000, accepted=true)`、`(episode1, seed100001, accepted=true)`；两条 terminal diagnostics 均为 `success`，无 rejected preflight。
 - episode 0 为 333 steps、video `ok=true`/333 frames；episode 1 为 terminal success、no-video check `enabled=false, ok=true`。两次 scheduler 均以 `episode_terminal` returncode 0 收尾，outer/robot/policy/worker 继续存活以执行后续固定序列。这一切换不是基础设施停滞。
 - 目前只计已落盘的 2/100；继续按原顺序观察，不重启、不挑选或跳过 seed。第 50 条将固定截面核对 accepted 连续性、success 趋势、failure categories、前五视频及 worker 状态。
+
+## 正式 100 前五条视频门禁（2026-09-11 17:54 +08:00）
+
+- 固定序列 `seed100000–100004` 已全部 preflight accepted，严格连续且 `rejected=[]`；五条 diagnostics 已落盘，结果为 3 `Success` / 2 `Fail`。
+- 两个 `Fail` 分别为 episode 3/4（seed 100003/100004），均是模型任务终态 `button_not_pressed_after_center`、500 steps；它们不是 worker、renderer、cuRobo、RPC 或路径异常，已按正常表现失败保留在正式序列中。
+- 前五条视频均存在且 `ok=true`（frames `333,381,357,500,500`），满足 formal 的前五视频要求；worker stderr 对 `Traceback|FileNotFoundError|ConnectionResetError|AttributeError` 匹配数为 0。正式 job/服务保持运行，继续固定顺序 100000–100099。
