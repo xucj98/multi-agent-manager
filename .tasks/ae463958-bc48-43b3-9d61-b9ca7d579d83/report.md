@@ -87,3 +87,5 @@
 | RMBench | `ed1e00b403c4f49cf2ad4f4fa7afd35609c55d6a` | `ad8b5c7cab1af696c303339d11cf0f82f8a066ac` | `/mnt/public/xcj/Projects/workspace/ae463958-bc48-43b3-9d61-b9ca7d579d83/RMBench` |
 
 本任务为独立只读 review，无交付代码 commit；worktree 保留供 Manager 验收和归档。
+
+发布时，两个审阅分支均已 fast-forward 到表中的定向复查 commit，使 MAM 的交付版本元数据与本报告一致。
