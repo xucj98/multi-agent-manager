@@ -7,3 +7,6 @@
 验收重点：native S2M memory 14维输入与动作/插值正确，原SM2SM/projection保持；live/takeover/offline同metadata同观测序列得到一致输入、执行K30动作与memory反馈；full完成后取index29，serial当前query反馈；acceptance与completion不能混淆；reset/manual/homing/takeover清pending；既有wait condition/UDP控制机制保持。检查测试是否经过实际scheduler而非只测MemoryContext，跑必要回归，明确CPU与现场边界。部署文档应复用scripts/launch/x1pro_takeover.sh和既有Policy Manager，命令和跳过policy自动启动行为确实可用，不硬编码机器地址，不误导用户重启已有实例。
 
 提交简报包含PASS或具体阻塞、文件行/证据、测试、两worktree commits和部署准入结论。发现问题先明确最小修复方向，不自行扩实现。完成后清理自己的测试临时缓存，发布report，保留worktree供归档。优先20分钟内给准入结论，若需更多时间说明阻塞。
+
+## 复查准则更新
+Manager认可端口skip问题，作者将以x1pro_takeover.sh明确--skip-policy修复，不根据TCP监听猜测PM身份。选项要求RB_POLICY_URL，policy pane不执行任何policy启动脚本；默认无选项保持原启动；文档沿PM先部署再选URL。作者交commit后定向复核两条CPU shell路径及环境转发，不重跑无变动的live逻辑。报告准入和清理结果供归档。
