@@ -214,6 +214,19 @@ class WaitRuntimeTests(unittest.TestCase):
         self.assertEqual(record, {})
         self.assertEqual(finished, [])
 
+    def test_executor_excludes_archived_job_without_probing(self):
+        probes = []
+        result, stream, _, record, finished, _ = self.run_wait(
+            [task(agent=CALLER, jobs=[job("archived-job", status="archived", probe={"status": "running"})])],
+            {CALLER: snapshot(CALLER, turn="caller-turn")},
+            probe=lambda *args: probes.append(args) or {"status": "running"},
+        )
+        self.assert_exit(result, "empty", "no active subagents or unarchived jobs")
+        self.assertEqual(stream.resumed, [CALLER])
+        self.assertEqual(probes, [])
+        self.assertEqual(record, {})
+        self.assertEqual(finished, [])
+
     def test_manager_scope_never_subscribes_unregistered_threads(self):
         result, stream, _, record, finished, _ = self.run_wait(
             [],

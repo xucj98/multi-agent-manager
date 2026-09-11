@@ -793,13 +793,13 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.call("archive", task, "--note", "unsafe", ok=False)
         self.assertTrue((self.root / "code.py").exists())
 
-    def test_real_process_runtime_contract(self):
+    def test_running_process_archive_stops_tracking_without_stopping_process(self):
         try:
             process_runtime = cli.runtime()
         except cli.Error:
             self.skipTest("parallel job_runtime module has not been integrated")
         task = self.task()
-        child = subprocess.Popen([sys.executable, "-c", "import sys; sys.stdin.read()"], stdin=subprocess.PIPE)
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         try:
             args = types.SimpleNamespace(task=task, note="owned smoke", host="localhost", pid=child.pid)
             job = cli.job_add(self.store, args)
@@ -813,19 +813,69 @@ base=$(git rev-parse --verify "$1^{commit}")
             rows = self.job_command_output("list", "--task", task, "--status", "running").splitlines()
             self.assertEqual(rows[0], "描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID")
             self.assertEqual(rows[1].split("\t"), ["owned smoke", "running", detail["started_at"], job["id"], "test task", task])
-            child.stdin.close()
-            child.wait(timeout=10)
-            self.assertEqual(process_runtime.probe_process("localhost", child.pid, job["identity"])["status"], "stopped")
-            saved = cli.job_archive(self.store, types.SimpleNamespace(job=job["id"], note="test exited"))
+            before = self.store.read(task)["jobs"][0]
+            saved = cli.job_archive(self.store, types.SimpleNamespace(job=job["id"], note="tracking complete"))
             self.assertEqual(saved["status"], "archived")
+            self.assertEqual(saved["identity"], before["identity"])
+            self.assertEqual(saved["probe"], before["probe"])
+            self.assertEqual(saved["checked_at"], before["checked_at"])
+            self.assertEqual(saved["probe"]["status"], "running")
+            self.assertIsNone(child.poll())
+            self.assertEqual(process_runtime.probe_process("localhost", child.pid, job["identity"])["status"], "running")
+            repeated = cli.job_archive(self.store, types.SimpleNamespace(job=job["id"], note="ignored retry note"))
+            self.assertEqual(repeated["archive"], saved["archive"])
             archived = self.call("status", job["id"], command="job")
             self.assertEqual(archived["status"], "archived")
-            self.assertEqual(archived["archive"]["note"], "test exited")
+            self.assertEqual(archived["archive"]["note"], "tracking complete")
             cli.archive(self.store, types.SimpleNamespace(task=task, note="smoke complete"))
+            self.assertEqual(self.store.read(task)["status"], "archived")
+            self.assertIsNone(child.poll())
+            self.assertEqual(process_runtime.probe_process("localhost", child.pid, job["identity"])["status"], "running")
         finally:
             if child.poll() is None:
                 child.terminate()
                 child.wait(timeout=10)
+
+    def test_job_archive_skips_unknown_remote_probe_and_preserves_history(self):
+        task = self.task()
+        data = self.store.read(task)
+        data["jobs"] = [{
+            "id": "unreachable-job", "note": "remote results", "host": "unreachable.example", "pid": 42,
+            "identity": {"host": "unreachable.example", "boot_id": "boot", "start_ticks": 42},
+            "status": "running", "checked_at": "last-running",
+            "probe": {"status": "unknown", "checked_at": "offline", "error": "SSH query timed out"},
+            "archive": None,
+        }]
+        self.store.write(data)
+        before = json.loads(json.dumps(data["jobs"][0]))
+        with patch.object(cli, "runtime", side_effect=AssertionError("job archive must not probe processes")):
+            archived = cli.job_archive(self.store, types.SimpleNamespace(job="unreachable-job", note="results copied"))
+            repeated = cli.job_archive(self.store, types.SimpleNamespace(job="unreachable-job", note="ignored retry note"))
+        self.assertEqual(archived["status"], "archived")
+        self.assertEqual(archived["identity"], before["identity"])
+        self.assertEqual(archived["probe"], before["probe"])
+        self.assertEqual(archived["checked_at"], before["checked_at"])
+        self.assertEqual(archived["archive"]["note"], "results copied")
+        self.assertEqual(repeated["archive"], archived["archive"])
+
+    def test_task_archive_requires_all_jobs_archived_without_probing(self):
+        task = self.task()
+        data = self.store.read(task)
+        data["jobs"] = [{
+            "id": "unarchived-job", "note": "remote results", "host": "unreachable.example", "pid": 42,
+            "identity": {"host": "unreachable.example", "boot_id": "boot", "start_ticks": 42},
+            "status": "running", "checked_at": "last-running",
+            "probe": {"status": "unknown", "checked_at": "offline", "error": "SSH query timed out"},
+            "archive": None,
+        }]
+        self.store.write(data)
+        with patch.object(cli, "runtime", side_effect=AssertionError("archive must not probe processes")):
+            with self.assertRaisesRegex(cli.Error, "unarchived registered jobs: unarchived-job"):
+                cli.archive(self.store, types.SimpleNamespace(task=task, note="blocked"))
+            self.assertEqual(self.store.read(task)["status"], "working")
+            cli.job_archive(self.store, types.SimpleNamespace(job="unarchived-job", note="results copied"))
+            cli.archive(self.store, types.SimpleNamespace(task=task, note="complete"))
+        self.assertEqual(self.store.read(task)["status"], "archived")
 
     def test_wait_list_and_manual_stop_preserve_the_wait_process(self):
         observation = cli.runtime().probe_process("local", os.getpid())
@@ -984,12 +1034,13 @@ base=$(git rev-parse --verify "$1^{commit}")
             agent["status"] = "active"
             self.assertFalse(cli.job_list(self.store, query)["jobs"])
             cli.job_archive(self.store, types.SimpleNamespace(job=one["id"], note="results saved"))
-            cli.archive(self.store, types.SimpleNamespace(task=task, note="done"))
+            with self.assertRaisesRegex(cli.Error, "unarchived registered jobs"):
+                cli.archive(self.store, types.SimpleNamespace(task=task, note="done"))
             process["status"] = "running"
             saved = self.store.read(task)
             cli.refresh_jobs(saved)
             self.assertEqual(saved["jobs"][0]["status"], "archived")
-            self.assertEqual(saved["jobs"][1]["status"], "stopped")
+            self.assertEqual(saved["jobs"][1]["status"], "running")
 
 
 if __name__ == "__main__":
