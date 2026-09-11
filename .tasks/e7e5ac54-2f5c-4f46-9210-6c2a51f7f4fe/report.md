@@ -1,5 +1,9 @@
 # Memory 20k：远端八路与本机六路
 
+## 归档前closure临时目录清理
+
+已重新核对14项稳定run artifacts全部manifest文件SHA256及逐run manifest一致；12份原始closure JSON与稳定closure-audit.json逐字节一致，最早两项原报告审计证据亦已留存。随后删除自有workspace/closure的12份临时JSON及空目录。workspace现在仅含MAM已登记openpi运行树，14个job均已归档，无未归档job。稳定artifacts与所有checkpoints保留，等待Manager执行task/workspace归档。历史记录中的workspace/closure路径已由稳定manifest对应artifacts路径替代。
+
 ## 9月11日12:39 全部14项完成，稳定交接资料已留存
 
 14/14正式训练均完成实际20000、最终BF16保存、CPU完整参数恢复/shape/有限性、metadata/norm以及自有进程/子进程和逐卡显存释放验收；全部training job已归档。最后GPU1于12:26:55保存完成、GPU0于12:36:16保存完成，最终loss均0.0006，释放时各1MiB/0%。训练数值exit code原detach未留存，不将stopped当作exit0；CPU审计命令exit0。
