@@ -99,3 +99,7 @@ wuwen-1 的现有训练自然结束、完成 checkpoint 保存并释放资源后
 ## 07:52 资源与实验台账补充
 wash训练owner已验收并释放GPU2/3、归档任务。正式wash offline只使用GPU2串行两模型，因此GPU3现授权本任务接用（先核对实际显存/端口），按既定队列启动rearrange t+1 seed1自身smoke→formal；与其配对t+30 seed1保留优先队列，下一张释放卡执行，不按成绩挑选。GPU0/1仍训练，本任务不使用GPU2。4–7原分配不变，wuwen-1停用。
 用户今天暂停统一架构重构，所有实验继续冻结源码。后续文档结果应更新本组EXPERIMENT_LEDGER.zh-CN.md对应模型行：已合入RMBench主xcj-dev（bc43568及整合commit），包含研究动机/假设和固定模型路径。勿在正在被formal使用的源码树中merge/修改文档；先完成这轮运行，后续安全整合文档并更新结果/实际eval链接，保持快照时间准确。重点继续50条诊断与完整100结果，不把training loss或smoke当正式成绩。
+
+## 集群C迁移排期与对照交接
+用户要求C评估环境验收通过后，后续新eval优先放C；当前已启动本机run继续收尾，不中途移动。环境task5773b6ec负责人Banach正在三库环境/三机smoke/一个100对照验收，暂不扩MAM。请交一个已完整收尾、可直接复现的本机100基线，给成功数、真实失败类型是否影响可比、三库冻结commit、ckpt及数据/seed/命令和必要资源清单；Manager将裁定C正式对照。不要为迁移修改active worktree。C未准入前不自行在C启动正式run；准入后会为后续任务发布C根README与手工workspace/TASK-ID要求。
+同时本轮已完成的100run及时更新稳定实验记录，按原协议记录50检查/最终成功率与模型seed，不仅留在MAM报告。给Manager当前已完成结果、还在运行/排队清单和异常裁定需求，避免准备迁移时漏掉结果收尾。
