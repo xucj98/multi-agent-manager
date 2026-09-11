@@ -106,3 +106,6 @@ wash训练owner已验收并释放GPU2/3、归档任务。正式wash offline只�
 
 ## 9月11日第二批训练并行与台账
 Manager已安排7ae41311训练rearrange serial/no-memory各seed1/2（GPU2–5）；695bc51f准备put-back serial/no-memory seed0（GPU6/7，配置门禁后正式）。补齐既定B组，不依赖C或Q2结果；不要占本机GPU或wuwen-1。请复用/安全创建本task文档worktree更新EXPERIMENT_LEDGER，区分已派发/准备/实际训练中，只有读到job及updates才能写运行中，后续正式目录由owner提供后链接。加入各项目的（B组训练seed重复及put-back同骨干能力基线）、预期检验而非预设成功率、checkpoint/eval待办。引用两个新task报告核对，交文档commit由Manager集成；不改冻结eval代码树。4个旧abort继续保留证据，8未启动仍待C验收，2完整结果保留。
+
+## Manager待办清理与恢复责任
+恢复后续评测准备。C任务2a879870已三机smoke通过，renderer修复17b55bf/创建优化9c71a3e已独立review；正式100正在运行，首50为34/50对本机35/50，尚未完成5pp验收。先在现有任务整理剩余14模型清单、已完成/不完整/待跑状态和准确模型目录，确定迁移C的最小批次，不重复跑成功项。C最终验收之前不启动新GPU评估，准备完给Manager阶段report；不要为了active伪造job。原先get_obs修复已有378da0ac/ae463958后续报告，应先核对已修状态，不重开已解决问题。
