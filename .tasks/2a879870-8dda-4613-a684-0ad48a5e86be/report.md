@@ -57,3 +57,8 @@
 
 - C1 已 PASS 并结束；C2/C3 现已实际启动（均用稳定 shim、同一 strict commits、固定从 seed100000 开始）：C2 host `is-ddj72hiexddjfwo6-devmachine-0` / GPU2 / outer PID `3635` / run `put_back_full_t_plus_1_s0_20k_c2_smoke2`，17:35 启动；C3 host `is-ddj72jhhjdy7hiyj-devmachine-0` / GPU0 / outer PID `3631` / run `put_back_full_t_plus_1_s0_20k_c3_smoke2`，17:36 启动。
 - 各自 prelaunch 记录（GPU idle、端口、leaf 不存在、三树 clean、stable shim target 和完整命令）分别为 `strict-c2-smoke2-{prelaunch-gpu.csv,launch.txt}`、`strict-c3-smoke2-{prelaunch-gpu.csv,launch.txt}`。两个结果 leaf、端口和 WARP cache GPU 子目录互不重叠；当前仅处于 model/service startup，尚未将 C2/C3 称为通过。
+
+## C2/C3 已进入真实 rollout（2026-09-11 17:39 +08:00）
+
+- C2 GPU2 与 C3 GPU0 均已通过 startup：各自 `seed=100000` 的 preflight 均为 `accepted=true`，真实 scheduler 正在执行 episode 0 并写各自 `episode0.mp4`。两端 worker 无 `FileNotFoundError`、`AttributeError`、`ConnectionResetError` 或 traceback；这在稳定 shim 下实际验证了 renderer/cuRobo/sim/policy 链路。
+- 当前两端 `episode_diagnostics` 和 `video_checks` 仍未落盘，因此没有提前宣布 PASS。下一验收点仍是每机 episode 0 terminal+video check、episode 1 (`seed100001`) accepted+no-video check、`_result.txt`、所有服务退出及 strict 三树 clean。
