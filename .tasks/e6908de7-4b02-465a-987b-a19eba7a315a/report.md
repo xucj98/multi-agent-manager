@@ -1,3 +1,11 @@
+# 10:18 GPU7 rearrange t+30 seed1前50条中检完成
+
+`rearrange_full_t_plus_30_s1_20k_100ep`前50条45 success/5正常失败（90%，仅中检，非正式100）。失败为button_not_pressed2、button_press_insufficient3。episode0–49/seed100000–100049严格顺序，无runtime_error，全部terminal，50个scheduler exit0。逐query最终trace中751个实际执行query（701个K30、50个partial），2103个已记录字段更新全部匹配last_executed反馈行，未见索引错误。正式目录`midpoint_review.json`保存检查摘要。不存在同新20k训练/config的旧基准，不强行与F0做10个百分点比较；继续原参数100条，全部失败保留。
+
+目前仅GPU5 put-back t+1 seed0与GPU7本项两个formal运行，原三库仍干净且固定SHA未变；按恢复要求核对过现有job，未重复启动run。四项RPC基础设施失败已退出归档并保留所有证据，GPU3/4/6先留空，仍待Manager公共修复/重试裁定。运行期间不merge或修改源码/台账。
+
+---
+
 # 09:51 第四项基础设施失败：GPU4 rearrange t+1 seed0停止于67条后
 
 09:50:04，`rearrange_full_t_plus_1_s0_20k_100ep`完成67条正常episode（55 success/12正常失败）后，episode67/seed100067首次get_obs在logical_step0超时30秒，scheduler exit1。runner记录scheduler_exited_before_terminal（与先前三项外层失败标签不同，但scheduler栈仍为相同get_obs TimeoutError）。最终68条记录、benchmark failed，不能作为完整100结果；已完成的前50条诊断仍有效但仅作中检。
