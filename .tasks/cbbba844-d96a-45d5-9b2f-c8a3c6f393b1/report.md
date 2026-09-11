@@ -52,3 +52,31 @@ source memory YAML 和 worktree assets 读取。二者都核对干净 `6266bd8bb
 请按上述提交、initial-input 不变量、checkpoint-only restore 与任务边界做独立 review。review
 PASS 前不会启动六条 20k；通过后按既定映射启动本机 GPU1/7 的 rearrange seed0/1，wuwen-1
 GPU4 的 rearrange seed2，GPU5/6/7 的 put-back seed0/1/2，并逐条登记 MAM job。
+
+
+## Manager 准入后的六条正式训练启动状态（2026-09-12 06:35 +0800）
+
+独立 review `f6293543` 通过且 Manager 正式准入后，六条均以冻结 OpenPI
+`6266bd8bbfa5f3e451f7253c476d1108e1ff5e1e` 启动：batch32、20,000 updates、H50/K30、
+BF16 model-only、`--save-interval=20000`，没有覆盖既有路径。所有 run 通过 step100 有限
+loss；这只证明启动健康，不是训练完成或评测结果。
+
+| run | host / GPU / PID | MAM job | step100 loss | 最终 checkpoint 路径 |
+| --- | --- | --- | --- | --- |
+| rearrange s0 | localhost GPU1 / `238898` | `d87b16e1-77a5-483b-acda-461fa32c1137` | `0.1568` | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_initial/memory20k_cbbba844_rearrange_full_initial_s0/20000` |
+| rearrange s1 | localhost GPU7 / `238890` | `a1137b5b-dbe8-4a6b-9aa0-125bec11fa65` | `0.1543` | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_initial/memory20k_cbbba844_rearrange_full_initial_s1/20000` |
+| rearrange s2 | wuwen-1 GPU4 / `1605770` | `6ab90156-3094-46fa-ba3c-39e4e3d4e03f` | `0.1562` | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_initial/memory20k_cbbba844_rearrange_full_initial_s2/20000` |
+| put-back s0 | wuwen-1 GPU5 / `1605750` | `2520a158-85e3-4a4a-afe8-24f01aa13bd2` | `0.1582` | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_initial/memory20k_cbbba844_put_back_full_initial_s0/20000` |
+| put-back s1 | wuwen-1 GPU6 / `1605774` | `b669c403-a702-4383-811d-06aa400cf46d` | `0.1547` | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_initial/memory20k_cbbba844_put_back_full_initial_s1/20000` |
+| put-back s2 | wuwen-1 GPU7 / `1605766` | `315d9224-0562-472d-b1c3-0cd678e2abe6` | `0.1557` | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_initial/memory20k_cbbba844_put_back_full_initial_s2/20000` |
+
+实际 GPU UUID/PID 复核通过：local GPU1 `GPU-b72526e2-ac45-3452-8e77-1de83963ae85`→`238898`，
+GPU7 `GPU-d005e95a-93d5-94b7-30ca-02f49f5af15a`→`238890`；wuwen-1 GPU4/5/6/7 分别对应
+`1605770/1605750/1605774/1605766`。当前速度约 3.7–3.9 s/step，若稳定，预计在
+2026-09-13 03:00–04:00 +0800 左右完成。
+
+本机最初两个 `nohup` wrapper 在进入 Python 前被本地执行器回收，留下空日志、没有 checkpoint，
+且未登记 job；改为独立 `setsid` 会话后才启动并登记上表 local GPU1/7 正式 run。该事件未改变
+模型、seed、动作协议或训练路径。六条当前均为 running；未启动 C eval。运行日志在
+`/mnt/public/xcj/Projects/workspace/cbbba844-d96a-45d5-9b2f-c8a3c6f393b1/training_logs/`，台账更新为
+RMBench `a7e851b`。
