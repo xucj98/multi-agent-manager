@@ -464,3 +464,28 @@ policy 侧 full child 的 policy-only smoke、14D / 15 Hz / H50 / K30 metadata �
   `run_policy_server.sh`，并显式把环境文件中的 `RB_POLICY_URL` 传给 scheduler。
 
 本次仅修改本地文档和 MAM report；远端停止指令后没有再执行 SSH 命令、代码同步、服务重启或配置写入。
+
+## 当前现场手册改为 TUI（取代上一版 GUI 手册）
+
+最新用户明确调试入口为 `scripts/launch/x1pro_takeover.sh`。因此当前有效文档提交为
+`63bbd809b8261475f8ed2096f5dce7d1442bdf07`
+（`docs(wash): provide TUI field update procedure`），取代此前仅描述 GUI 的 `cf7ffdb`。
+
+手册现在给出可复制的现场步骤：
+
+1. 保留 `rb-launcher.service` 常驻，但先通过 GUI 的正常“停止全部”或现场既有正常停止路径
+   释放已知 `rb_master`、`rb_robot`、`rb_scheduler`，避免 TUI 重用旧代码的会话；不停止未知
+   tmux、硬件 SDK 或 Policy Manager。
+2. 主臂和从臂以现场变量指定路径与解释器，从已更新 policy 主机 Git 的 `HEAD` 先校验精确为
+   `041405f` 再 fetch/reset；不假设 GitHub 有该 commit，也不执行 `git clean`。`.96` 的 repo/
+   interpreter 仍明确留给现场填写。
+3. 主臂 CPU-only 导入 scheduler、PyYAML 和 `openpi_client.memory_config`；仅在该轻量包缺失时，
+   从 policy 主机的固定 OpenPI `a869` 构建审核 wheel，并以已有
+   `scripts/deployment/install_openpi_client.sh --no-deps` 安装。PyYAML/NumPy 缺失是阻塞报告点，
+   不从公共索引安装同名包，也不安装完整 OpenPI/模型。
+4. TUI shell 校验既有 `RB_*` 拓扑后运行默认
+   `bash scripts/launch/x1pro_takeover.sh`。原 policy pane 按 policy 主机的 `RB_POLICY_PORT`
+   进行已有端口 skip；scheduler 独立采用 `RB_POLICY_URL`。`--skip-policy` 非必需且本流程不使用。
+
+GUI 与 TUI 是并列启动入口：GUI daemon 可以共存，但同一时刻只有一个入口启动那组三项服务。
+本次仅修改本地文档与报告；没有恢复或新增远端 SSH、代码同步、服务重启或配置写入。
