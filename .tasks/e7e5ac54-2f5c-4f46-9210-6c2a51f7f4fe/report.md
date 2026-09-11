@@ -1,5 +1,20 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日09:32 本机最后两路小时巡检
+
+已读最新task；09:32:42–43逐项job status均running，无error。两路日志均继续前进，全部已落盘loss/grad_norm/param_norm有限，无可见训练报错。其余12项已收尾归档，本轮未重复checkpoint读取或远端探测。
+
+| 本机GPU | 模型/seed | updates≈ | 最新实际标量 | 剩余ETA |
+| --- | --- | --- | --- | --- |
+| 0 | put-back t+30 / 2 | 17.0k | Step16900 loss=0.0007, grad_norm=0.0304, param_norm=1804.2034 | 3:03:23 |
+| 1 | put-back t+1 / 2 | 17.2k | Step17100 loss=0.0008, grad_norm=0.0331, param_norm=1804.3474 | 2:56:11 |
+
+两路各169/171条有限标量为区间均值；kit为取整进度，ETA不含保存。GPU1预计12:29、GPU0约12:36完成更新。固定运行树仍d10完整SHA、git status为空，未改源码/参数。
+
+资源：GPU0已用73438MiB/空闲7600MiB/100%，GPU1为73406/7633MiB/100%，RAM可用867GiB。本机其他卡已有使用/释放变化，仅记录资源快照，不检查其他task；本任务未启动新GPU工作，eval由Manager安排。
+
+继续active turn和mam wait等待两项结束事件；下一小时10:32巡检。远端全部本任务训练已完成，自有进程退出；既有不可见外部占用边界不变，本轮未重新探测整机。
+
 ## 9月11日08:32 本机最后两路小时巡检
 
 已读最新task；08:32:18–19逐项job status均running，无error。两路日志继续前进，所有已落盘loss/grad_norm/param_norm有限，无可见训练报错。其余12项已收尾归档，未重复checkpoint读取或远端探测。
