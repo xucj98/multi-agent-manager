@@ -32,3 +32,16 @@
 | 5 | no-memory / 2 | 2026-09-11 14:31:04 +08:00 | `3957417` / `3957417` | `b13b2fbd-ce10-4fac-87d0-62761879e057` |
 
 MAM 在每条启动后立即按真实 host、PID、boot identity 和 start ticks 登记，四个 job 当前均为 `running`。首轮日志已分别在 14:30:51、14:31:17、14:31:45、14:32:10 记录 `local_batch_size: 32`，并确认实际加载 `rearrange_blocks_demo_clean_state_shared_memory` 与 `rmbench_rearrange_blocks_robot`。随后快照中 GPU2--5 各占用 73,363 MiB；仍在初始加载/编译，尚未把该阶段误报为 optimizer update。首个有限标量落盘后补充。
+
+## 首批有效 updates / loss 启动简报
+
+`2026-09-11 14:51:32 +08:00` 同一轮快照中，四路均已跨过 step100，且首个 `loss`、`grad_norm`、`param_norm` 全为有限数值；四个 MAM job 和对应 PID 仍为 `running`。当前 GPU2--5 分别占用 73,407、73,407、73,405、73,405 MiB，利用率均为 100%。未见 traceback 或训练异常。
+
+| GPU | config / seed | PID / MAM job | 首个有效标量（step100） | 当前 step / 稳定吞吐 | 剩余 ETA（该时刻外推） |
+| --- | --- | --- | --- | --- | --- |
+| 2 | serial-lag30 / 1 | `3955954` / `aa6d7690-dbb1-4b6d-8eb2-46ca63059400` | `grad_norm=53.3776, loss=0.4064, param_norm=1802.3915` | 189 / 4.2 s/update | 22:55:40，约 9月12日 13:47 +08:00 |
+| 3 | serial-lag30 / 2 | `3956200` / `68ecba3b-e570-4dd4-8cd1-4a82249a515d` | `grad_norm=32.8460, loss=0.5293, param_norm=1802.3915` | 176 / 4.1 s/update | 22:48:16，约 9月12日 13:40 +08:00 |
+| 4 | no-memory / 1 | `3956476` / `d4ccc2ca-d37a-4d13-89eb-cb4c3ea1598a` | `grad_norm=0.5585, loss=0.0510, param_norm=1802.3865` | 198 / 3.7 s/update | 20:18:46，约 9月12日 11:10 +08:00 |
+| 5 | no-memory / 2 | `3957417` / `b13b2fbd-ce10-4fac-87d0-62761879e057` | `grad_norm=0.5735, loss=0.0517, param_norm=1802.3865` | 179 / 3.7 s/update | 20:35:28，约 9月12日 11:27 +08:00 |
+
+这些 ETA 仅按当前稳定进度行的吞吐估算，最终以 20,000 保存完成为准。后续改为约每小时巡检；任一路停止、报错或完成会立即处理并更新本文。
