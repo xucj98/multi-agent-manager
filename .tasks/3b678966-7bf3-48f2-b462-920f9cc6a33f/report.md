@@ -1,75 +1,61 @@
-# 独立验收：live S2M 小修通过，现场部署入口阻塞
+# 独立验收：live S2M 与 Policy Manager 部署入口 PASS
 
 ## 准入意见
 
-- **`a5caa5b` live S2M 代码：CPU 准入 PASS。** 14 维 native S2M、K30、full/serial
-  的反馈时机，以及 live / takeover / offline 一致性都有实证。
-- **`0a33dd1` 部署说明与其现有启动命令：现场准入 BLOCK。** 在修正 policy-pane 的
-  跳过条件并补回归前，不应按 `wash-cup-memory.md` 同步或执行现场启动；它可能另起一个
-  手工 policy server 并占用 GPU，违背文档承诺的 Policy Manager 共存行为。
+**准入 PASS。** 候选提交
+`041405f0b35b2a173ac3461d297a43141d028026` 已满足复查准则，可以作为
+wash-cup 的 Policy Manager 部署入口合入并按更新后的 runbook 使用。
 
-## 关键阻塞（最小修复方向）
+此前对 `a5caa5b57e96fd02de7d6df0cd2ffa5bf0030f5f` 的 live S2M CPU PASS
+保持有效；按本次任务要求，没有重跑未变的 live / scheduler 逻辑。
 
-`docs/tutorials/wash-cup-memory.md:41-58` 要求从 Policy Manager 卡片复制一个新的
-`RB_POLICY_URL`，并断言 policy pane 会输出 `[skip]`。但
-`scripts/launch/x1pro_takeover.sh:58` 始终启动该 pane，而
-`scripts/remote_server/run_policy_server.sh:30-35` 在 **远端** 只探测
-`${RB_POLICY_PORT:-8000}`；命令既不读取也不转发本次选择的 `RB_POLICY_URL` 端口。
+现场执行前仍应先在 Policy Manager 部署目标 child、确认卡片“运行中”，复制该
+child 的 WebSocket URL，并以 `--skip-policy` 启动。该结论不代替现场的网络、
+UI、homing 和受控动作检查。
 
-这不是同一个对象。Policy Manager 的实例端口由 `RB_POLICY_PORT` 基准向上动态分配
-（`docs/design/policy-manager.md:250-260`）；源任务已发布报告记录的在运行实例也位于
-8949/8950。若选中的 wash child 是另一空闲端口而基准端口未监听，policy pane 不会
-skip，会按旧 `RB_OPENPI_POLICY_DIR` / `RB_POLICY_GPU` 启动手工 server。反之，基准端口
-上碰巧有其他 manager child 时又会 skip，无法证明它对应本次 `RB_POLICY_URL`。
+## 定向复核结果
 
-建议只做窄修补：让 x1pro takeover 的 policy pane 明确按本次 scheduler 所用的 policy
-URL/端口识别已由 Manager 托管的实例（或在该入口显式不启动 policy pane），并为“目标
-实例端口与基准端口不同”的 skip 和“无托管实例时仍能手工启动”各加一条无 SSH/GPU 的
-shell 回归；随后把 runbook 的命令与实际行为对齐。无需改 scheduler、controller 或
-MemoryContext。
-
-## 功能复核证据
-
-- 两个真实 20k checkpoint 的 `metadata/train_config.yaml` 经 OpenPI
-  `checkpoint_metadata.load_train_config`、`_runtime_metadata` 和 bridge
-  `OpenPiBackend.get_metadata()` 重建出的 scheduler metadata，与新增 full/serial fixture
-  逐字段相等：均为 native `s2m`、14D、15 Hz、H50、K30；full 是
-  `chunk_completed`，serial 是 `query_selected`。
-- `robot_bridge/scheduler/openpi.py:291-296, 376-387` 将新路径限制在
-  non-projection Memory v1 native S2M，且要求 `robot_dim == slave_state_dim == 14` 和单个
-  当前观测。`openpi.py:821-853, 943, 1032-1041` 不请求 master、输入 14D state、从
-  `[0:14]` 取动作并以当前 slave 作为插值锚点；其余 SM2SM/projection 分支保持原条件。
-- 新增真实 metadata scheduler 回归通过实际 `OpenPiScheduler`、
-  `OpenPiTakeoverScheduler`、`OpenPiOfflineScheduler` 的 build/execute lifecycle，而非仅
-  `MemoryContext`：三者输入、K30 动作和反馈一致。full 在 robot 接受后仍保持旧值，
-  `completed=30` 后反馈 model index 29 / row 30；serial 在当前 query selected 后反馈。
-  手工 memory、homing 和 takeover 都会丢弃 full 的 pending completion，既有 UDP takeover
-  组也通过。
+- `scripts/launch/x1pro_takeover.sh:58-93` 显式解析
+  `--skip-policy`；该分支要求无空白、以 `ws://` 或 `wss://` 开头的
+  `RB_POLICY_URL`，且不要求 `RB_POLICY_SSH` 或 checkpoint 环境。
+- `x1pro_takeover.sh:106-120` 的 skip policy pane 仅输出明确提示，不调用
+  `run_policy_server.sh`，因此不会触发其中的 SSH、端口探测或 policy/GPU
+  进程。默认无选项分支仍在第 110 行调用手工
+  `run_policy_server.sh`，保留原有手工启动行为。
+- skip 分支以 `printf %q` 把本次所选 URL 内联传入 scheduler pane。
+  `run_scheduler.sh:42-46` 随后将该环境值展开为远端
+  `--policy-url`。测试刻意在 tmux pane 注入过期 URL，确认选定 URL 覆盖它，
+  且 `RB_POLICY_PORT=8949` 未被用作判断或转发。
+- `docs/tutorials/wash-cup-memory.md:29-63` 已按“先在 PM 部署并复制卡片 URL，
+  再执行 `x1pro_takeover.sh --skip-policy`”写明步骤，并明确说明 skip 路径不
+  探测或启动 policy 进程。
 
 ## CPU 验证
 
-所有命令使用 `CUDA_VISIBLE_DEVICES=''`（metadata 重建另设 `JAX_PLATFORMS=cpu`），未加载
-权重、未占 GPU、未连接现场或发送机器人动作。
+所有测试以 `CUDA_VISIBLE_DEVICES=''` 运行；tmux、sleep 和 SSH 在启动器测试中
+均替换为本地假实现，未连接现场、未加载模型权重、未占 GPU，也未发送机器人动作。
 
 ```text
-robot-bridge/openpi worktree_env_smoke.py                         PASS
-pytest memory/live/takeover/transform groups                      51 passed, 1 skipped
-pytest offline controller + launcher preflight                    35 passed
-真实 full/serial metadata -> backend metadata -> fixture 比较      PASS
-ruff --select E,F,I（变更 scheduler/test）及 git diff --check     PASS
-bash -n x1pro_takeover/run_policy_server/run_scheduler             PASS
+bash -n scripts/launch/x1pro_takeover.sh                              PASS
+pytest -q tests/launcher/test_x1pro_takeover_launch.py                6 passed
+pytest -q tests/launcher                                               164 passed
+ruff check tests/launcher/test_x1pro_takeover_launch.py               PASS
+git diff --check 0a33dd1..041405f                                    PASS
 ```
 
-最后一项只验证 shell 语法；部署 blocker 来自对实际启动路径和 Policy Manager 端口语义的
-静态交叉审阅，未连接任何现场 SSH 目标或进行现场试运行。
+新测试文件有一处仅格式化差异：`ruff format --check tests/launcher/test_x1pro_takeover_launch.py` 建议重排第 141 行的 `assert any`。
+`ruff check` 通过；仓库没有发现将 formatter 设为本次准入门槛的规则，因此这不是
+部署准入阻塞，建议作者在后续整理时执行 `ruff format`。
 
 ## 工作区与收尾
 
-- robot-bridge：`/mnt/public/xcj/Projects/workspace/3b678966-7bf3-48f2-b462-920f9cc6a33f/robot-bridge`，
-  `task/3b678966-7bf3-48f2-b462-920f9cc6a33f`，干净，HEAD
-  `0a33dd19ab911ae3808c3ff141e3fd0603c22594`（审阅功能提交
-  `a5caa5b57e96fd02de7d6df0cd2ffa5bf0030f5f`）。
-- openpi：`/mnt/public/xcj/Projects/workspace/3b678966-7bf3-48f2-b462-920f9cc6a33f/openpi`，
-  `task/3b678966-7bf3-48f2-b462-920f9cc6a33f`，干净，HEAD
-  `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。
-- 已清理本次 `/tmp/mam-3b678966-*` pytest / ruff 缓存；无登记 job。
+- 保留 robot-bridge worktree：
+  `/mnt/public/xcj/Projects/workspace/3b678966-7bf3-48f2-b462-920f9cc6a33f/robot-bridge`，
+  branch `task/3b678966-7bf3-48f2-b462-920f9cc6a33f`，HEAD
+  `0a33dd19ab911ae3808c3ff141e3fd0603c22594`，干净。
+- 保留 openpi worktree：
+  `/mnt/public/xcj/Projects/workspace/3b678966-7bf3-48f2-b462-920f9cc6a33f/openpi`，
+  branch `task/3b678966-7bf3-48f2-b462-920f9cc6a33f`，HEAD
+  `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，干净。
+- 已删除仅用于候选提交的 detached review worktree 和
+  `/tmp/mam-3b678966-recheck-041405f` CPU 测试缓存；无登记 job。
