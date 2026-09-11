@@ -19,18 +19,38 @@
 
 删除前以 `lsof` 检查五个普通文件、以 `lsof +D` 检查两个目录，均无打开文件描述符（退出码 1）。删除后逐一路径复核为不存在，`git status` 不再列出这些项。
 
-## 保留的证据与明确阻塞
+## 后续：按 successor 当前状态整理 5773 证据
 
-5773 任务仍为 `pending`，其已发布报告明确写明 RMBench 离线闭包/入口、CPU/GPU smoke 和 C 端正式 100 rollout 尚未完成。因此保留：
+已读取 successor `2a879870-8dda-4613-a684-0ad48a5e86be` 的最新已发布报告（revision `e324362dd2349d6beba20fe7619834d0ef0f94c3`）。它确认 C 的稳定 `.local` 已保存精确离线锁和 patch、RMBench fresh 离线创建已成功；旧 owner 的 cache/资产/records 已在 C 端只读复用。当前 C 的 renderer 生命周期根因门禁与本机 MAM 根目录的旧传输文件无关，successor task/report 也没有引用下列 MAM 本地路径。
 
-- `5773b6ec-rmbench-cp310-split-lock-v1/`、`5773b6ec-rmbench-sdist-cache-fix-v1/`、`rmbench-cache-plan/`、`rmbench-resolver-cache-fix-v1/` 和其余非重复 lockfile；它们仍是未完成 RMBench 离线 resolver/缓存闭包的本地复现材料。
-- `assets.sha256`、`checkpoint-20000.sha256`，以及 OpenPI bundle、两份 patch、`transfer.8H0TPy/`；它们对应已报告的 C 端传输校验和仍待完成的环境重建/验收证据。
-- 根目录异常文件 `=============================算力牛=============================`；这是唯一找到的本地 C `create_worktree` 入口副本，内容对应 5773 报告中已部署的稳定目标 `C:/mnt/public/xcj/Projects/state-vla/.local/create_worktree.sh`。5773 尚未完成，且本地没有可验证的同哈希稳定副本，故不删除。该任务完成时应由其 owner 核对该稳定目标后删除这个误名副本，或将必要副本明确归属到 5773 的受管交付位置。
+### 本轮删除（删除前目标合计 `du -sk` 为 15,925 KiB）
 
-未触及活跃任务报告、本任务 report、`.codex/hooks.json`、`.local/hook-probe`、用户提供的 `docs/wash-cup-shared-memory-token-usage-audit.zh-CN.md`，或任何未列入本任务范围的未跟踪项。
+- 删除顶层 OpenPI bundle、两份 patch 和 `transfer.8H0TPy/`。bundle 所指 `a869498`、`958eeae`、`5f6ca06` 和 RMBench `6139577` 都仍由本机命名 refs 持有，其中 successor 分支直接持有相关 OpenPI/RMBench 提交。`openpi-uv-symlink-5f6ca06.patch` 与 `a869498..5f6ca06` 的完整 diff 同一 patch-id；installer-only patch 分别与该范围和 `a869498..958eeae` 的 installer diff 一致，且 transfer 中 `create_worktree_env.sh` 与 `958eeae` 的源码逐字节相同。
+- 删除两个 cache-fix 目录中的 archive/sdist/simple/wheel payload，只保留 `apply-plan.json` 和 `manifest.sha256`。这些 payload 是完成 C cache 回填前的本机传输副本；successor 已实际用 C cache 和稳定离线锁完成 fresh 安装。
+- 删除 `rmbench-cache-plan/{paths.txt,transfer.log,transfer-paths.txt}`，只保留 cache selection、wheel-link 映射和摘要。前者是 7.9 GiB 传输的原始路径/日志副本；后者保留可复核的闭包计数与链接选择。
+- 删除根目录异常文件 `=============================算力牛=============================`。它没有重命名：与 `.tasks/5773b6ec-6584-42db-9d0d-9ef5d40f7c31/remote-staging/.local/create_worktree.sh` 逐字节相同（SHA256 `544662…`），因此不是唯一脚本。保留副本位于已有任务 staging 路径；该 `.local` 路径受既有 ignore 规则保护，未作为 Manager commit 候选。
 
-## 验证
+删除前对所有文件运行 `lsof`、对所有目录运行 `lsof +D`，均无打开文件描述符；目录删除均使用 `find -P -depth -delete`，未跟随符号链接。删除后每个目标均已复核不存在。
 
-- 归档状态已确认：35c9 和 ad6 任务均 archived，相关 jobs/worktree 已移除或归档。
-- 5773 当前没有未归档 MAM job，但任务及其 C 环境交付仍 pending；这正是保留上述闭包/传输证据的原因。
-- 删除后已检查所有七个目标均不存在，保留项仍存在；主根状态只剩已明确保留的 5773 证据、活跃/排除项和本报告草稿。
+### 建议 Manager 提交的精简证据
+
+以下路径都在既有 `.tasks/5773b6ec-6584-42db-9d0d-9ef5d40f7c31/` 下、未 staged，总计约 300 KiB（含目录元数据），可直接作为一次小型历史证据提交：
+
+```text
+assets.sha256
+checkpoint-20000.sha256
+5773b6ec-rmbench-cp310-split-lock-v1/
+rmbench-cp310-known-good-freeze.txt
+rmbench-cp310-offline-locked-requirements.txt
+5773b6ec-rmbench-sdist-cache-fix-v1/apply-plan.json
+5773b6ec-rmbench-sdist-cache-fix-v1/manifest.sha256
+rmbench-resolver-cache-fix-v1/apply-plan.json
+rmbench-resolver-cache-fix-v1/manifest.sha256
+rmbench-cache-plan/selection.json
+rmbench-cache-plan/wheel-links.json
+rmbench-cache-plan/summary.txt
+```
+
+关键完整哈希已重新记录：资产 manifest `22353e70420a0e474173413b3c18df6dc015506faf8352f31e06107f16bfcd4c`，checkpoint manifest `cb4032ce56b471eabb2f5138925af5cbce800cfbea8630aab85d44d9c665ab79`；split-lock 内保留两份 SHA256 校验和与安装顺序文件。5773 的已跟踪 `task.md`、`report.md` 不在上述新增候选中，旧报告仍描述其历史传输而不依赖已删除的本机副本。
+
+未触及活跃任务报告、本任务 report、`.codex/hooks.json`、`.local/hook-probe`、用户提供的 `docs/wash-cup-shared-memory-token-usage-audit.zh-CN.md`，或任何源仓、其他 workspace、GPU、远端主机和进程。`git diff --cached --name-only` 为空，本任务 worktree 仍 clean。
