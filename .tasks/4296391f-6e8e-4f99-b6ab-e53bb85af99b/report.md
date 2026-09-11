@@ -388,3 +388,79 @@ s2m 的 14 维 state 与 Memory v1 输入，不能发送 32 维旧格式请求�
 一致；本 task 的正确格式 policy-only smoke 已通过。待 10.10.2.82 的无效来源处理完，由现场同事按
 既有 `RB_POLICY_URL=ws://10.10.4.22:8951` 和
 `bash scripts/launch/x1pro_takeover.sh --skip-policy` 继续，不由本 task 探测或操作 master/WSL/机器人。
+
+# 现场操作移交：远端操作已停止（最新用户指令）
+
+> 本节覆盖此前“继续远端同步/重启”的执行计划。收到撤回后没有再发起任何远端
+> 写入、重启或配置修改；两条 SSH 会话已退出。以下服务状态均为撤回前最后一次
+> 只读观测，不应被当作现在的实时探测结果。
+
+## 已实际完成的改动与最后状态
+
+| 机器 | 已实际完成 | 最后确认的 commit / 服务状态 |
+| --- | --- | --- |
+| policy 主机 `10.10.4.22`（`jx-4090-2-via-nx-aic`） | bridge 已精确同步到 `041405f0b35b2a173ac3461d297a43141d028026`；OpenPI 保持 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`；已部署的 wash full PM child 未被重启 | PM PID `3646`；wash full PID `2264677`，GPU 1、`:8951`；既有 child PID `1249503`（`:8949`）和 `2140250`（`:8950`）仍监听。MAM 长服务登记为 `9f91cf1c-8505-48e3-bd6e-cc7e8093a914`。 |
+| 主臂 / scheduler `10.10.2.82` | **没有**同步代码、重启服务、修改 `~/.robot_bridge_env.sh` 或启动 scheduler；只读检查后已断开 SSH | repo `/home/xr/Projects/robot-bridge` 当时为干净的 `b2faa820e49138b839455ba7469245414914ce40`，且尚无 `041405f` git object。`rb-launcher.service` 为 active/running，PID `1995`，监听 `:8200`；未见 `rb_master`、`rb_robot`、`rb_scheduler` tmux session 或 `:8088/:9946/:9948` listener。硬件原生进程未碰：此前观测为 x2robot realtime PID `3452`、`robot_log` PID `3468`。 |
+| 从臂 `10.10.2.96` | **没有**执行远端命令、代码同步、重启或配置修改；只成功完成 SSH 登录并立即退出 | hostname 为 `xr-msi-ex001-65`；repo、commit、服务 PID 与环境尚未读取，不能据此声称从臂已就绪。 |
+
+没有在任何现场机器使用 `x1pro_takeover.sh --skip-policy`；没有因撤回而重启任何服务。
+
+## launcher 与 policy 端口事实
+
+实际 `.82` 入口是 systemd user unit `rb-launcher.service`：
+
+```text
+/home/xr/Projects/sdk_robot/.venv/bin/python scripts/run_launcher.py --config configs/launcher.yaml
+```
+
+它是 GUI launcher，管理 `rb_master`、`rb_robot`、`rb_scheduler` 三个 tmux 服务；**不**管理
+policy pane，也不调用 `run_policy_server.sh`。`x1pro_takeover.sh` 是并列的 shell 入口，现场只应选择
+其中一个，不能与 GUI launcher 同时使用。
+
+最后只读得到的相关设置如下：
+
+| 位置 | 值 | 实际用途 |
+| --- | --- | --- |
+| policy 主机 `~/.robot_bridge_env.sh` | `RB_POLICY_PORT=8949` | Policy Manager 的端口基准；legacy `run_policy_server.sh` 的本地端口占用预检读取它。 |
+| `.82` `~/.robot_bridge_env.sh` | `RB_POLICY_URL=ws://10.10.4.22:8951` | wash full PM child 的 scheduler 目标。该文件没有 `RB_POLICY_PORT`。 |
+| GUI launcher 传参 | `Settings.read(~/.robot_bridge_env.sh)` → `launch_env_from_settings()` → `RB_POLICY_URL` | launcher 的 `_base_env()` 会剥离启动器继承的 `RB_*`，只把设置文件读出的 URL 显式传给 `run_scheduler.sh`；后者以 `--policy-url "$RB_POLICY_URL"` 启动 scheduler。 |
+
+因此 `8949` 与 `8951` 的数值**确实不同**，但在当前 GUI launcher 的实际执行路径中不存在
+`RB_POLICY_PORT` → policy 启动 / 跳过这一环，也没有把 `8949` 传给 scheduler；scheduler 的已配置目标
+是 `8951`。这不是 GUI 路径中的功能性端口不一致。若现场改选 shell 入口，才会触发 legacy
+`run_policy_server.sh`：它仅预检 policy 主机的 `8949`，而 scheduler 仍使用 `8951`；现场应把这两项
+分别视为“既有 PM 占用保护”和“wash full 实际目标”，不要把前者当作后者的健康判定。
+
+## 留给现场同事的未完成步骤
+
+1. 先选定一个入口：保持 GUI launcher，或在完全停止其同一套服务后改用
+   `x1pro_takeover.sh`；不得并行使用两者。
+2. 若选择 GUI launcher，先在 `.82` 与 `.96` 各自核对 repo、私有环境、现有控制进程和 git 状态；
+   再按现场流程同步 bridge 至 `041405f0b35b2a173ac3461d297a43141d028026`，保留 ignored 的 SDK、venv、模型和私有环境。OpenPI 的固定目标为 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。
+3. 每台机器用其既有 `RB_PY` 做 CPU-only import；确认 `.82` 的
+   `RB_POLICY_URL` 仍为 wash full `ws://10.10.4.22:8951`。GUI 路径无需新增 `.82`
+   `RB_POLICY_PORT`，也没有证据表明必须使用 `--skip-policy`。
+4. 仅在现场明确决定更新 GUI 进程时，重启其既有 `rb-launcher.service`；该 unit 的注释说明
+   restart 不会停止它已创建的 tmux 子服务。不要由此自动启动 scheduler、homing、execute、UDP action
+   或 autonomous；先确认各服务 idle / takeover 状态。
+5. 在 scheduler 真正启动后，以其日志和 metadata 核对 14D native S2M、15 Hz、H50、K30 与
+   `ws://10.10.4.22:8951`；这一步和真实机械臂动作验收仍由现场人员完成。
+
+policy 侧 full child 的 policy-only smoke、14D / 15 Hz / H50 / K30 metadata 已通过，但不能替代
+`.82/.96` 同 commit、CPU import、scheduler 连通或真机安全验收。
+
+## 当前现场手册（替换旧 runbook）
+
+现场操作手册已在独立 bridge 交付树提交为
+`cf7ffdb714232ad8555b85325e79b705eb18cbd6`
+（`docs(wash): make GUI launcher the current field guide`）：
+
+- [wash-cup-memory.md](../../workspace/4296391f-6e8e-4f99-b6ab-e53bb85af99b/robot-bridge/docs/tutorials/wash-cup-memory.md)
+  现在只描述实际 `rb-launcher.service` GUI 流程、full `:8951`、GUI `:8200`、control UI `:8088`
+  与 serial 的后续独立切换。
+- 已删除旧 `a5caa5b` / `124049f` 版本叙述、“两个模型都未部署”、强制 `--skip-policy` 和
+  shell/TUI 作为当前入口的描述。
+- 文档明确 GUI launcher 与 `x1pro_takeover.sh` 是并列入口，不能同时使用；GUI 不调用
+  `run_policy_server.sh`，并显式把环境文件中的 `RB_POLICY_URL` 传给 scheduler。
+
+本次仅修改本地文档和 MAM report；远端停止指令后没有再执行 SSH 命令、代码同步、服务重启或配置写入。
