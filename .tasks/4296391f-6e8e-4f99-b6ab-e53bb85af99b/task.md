@@ -77,3 +77,6 @@ cf7ffdb方向正确，但目前只有应为某commit，缺如何更新/重启。
 用户要TUI版本，使用scripts/launch/x1pro_takeover.sh。GUI launcher是常驻服务，可以保留；GUI/TUI只是启动robot server/master server/scheduler的并列入口，不需停止GUI后台来用TUI。只需处理已存在的同组子服务，避免重复/继续跑旧代码。上一条GUI操作指南方向撤回，改写为TUI，勿再要求停止GUI常驻服务。
 现场操作指南需给：在现场可SSH三机的终端更新所需bridge代码（版本从policy现有Git取得）；主臂scheduler与从臂代码/现有解释器准备；source ~/.robot_bridge_env.sh并设置主臂/从臂/policy/scheduler各SSH和URL变量（角色参数化，实际已知地址放报告）；bash scripts/launch/x1pro_takeover.sh（默认入口），说明本次policy已有PM实例，原run_policy_server端口skip照常，当前远端RB_POLICY_PORT8949已被PM child占用，scheduler另连full8951。不要强制--skip-policy，不将端口不同本身当故障，不改或重启PM。核查实际脚本tmux持久RB_URL传参已正确。
 GUI可以一直常驻，TUI用于调试，不能错误写成GUI和TUI程序不能共存。仅启动的三个子服务应在更新代码后按既有停止/重启流程更新，不触碰原生硬件进程。控制UI/idle与phase检查沿已验证机制；命令不远端执行。交付一个简洁可复制的TUI指南、精确版本及未知现场变量，尽快完成，避免继续堆历史说明。
+
+## TUI文档最终核对
+默认041405f TUI路径没有--skip-policy分支的URL内联赋值。启动前文档需export实际填写的RB_*；已有tmux server时用tmux set-environment -g刷新所需拓扑变量，避免旧URL继续进入新pane；无tmux server时新进程继承export即可。不修改代码。删除RB_PY自赋值，用git -C rev-parse校验仓库代替要求.git为目录，以兼容worktree。其余仅必要文档修正，不扩范围。
