@@ -214,3 +214,10 @@
 - C独立运行布局 `formal/renderer-reviewed/RMBench` 已从17b55bf创建干净worktree，branch `codex/2a879870-renderer-eval`；目录名仅为预留用途，**不代表review已通过**。兄弟bridge/openpi链接原strict树，RMBench `.venv`复用原strict环境，assets/data/eval_result链接稳定根；新 `.local`独立，仅复制已有checkpoint audit，不共享新Warp写入位置。没有安装/改动活跃diagnostic或旧strict源码。
 - CPU-only原入口 `--variant put_back_full_t_plus_1 --run-name renderer_c2_smoke2_20260912 --gpu 2 --mode smoke --dry-run` exit0；checkpoint原20000、H50/K30与chunk_completed/last_executed反馈检查通过。完整命令保存在C `records/renderer-smoke-dryrun.stdout`，准备清单为 `records/renderer-eval-preparation.json`。这仅是启动准备，不计实际policy/video验收。
 - 下一验收：40/40连续固定seed reset及退出/GPU回收证据 → Manager review17b55bf → 三机真实smoke2 → 新leaf完整100。原failed22不变。
+
+### Renderer 40-reset 门禁终态 PASS，提交 Manager review（2026-09-12 01:31 +08:00）
+
+- C2 GPU2 `renderer-reuse-20260912-retry1` 在01:29:41正常退出0；40/40 accepted，episode0–39与seed100000–100039逐项连续一致，无跳seed，无ErrorIncompatibleDriver/Vulkan driver/Traceback/RPC EOF/segfault标记。GPU2回收至4MiB，原strict三库tracked clean。
+- 原始launch/log/result/exit SHA256及逐项门禁保存在C `records/renderer-reuse-20260912-retry1/gate-receipt.json`，本机镜像 `.tasks/2a879870-8dda-4613-a684-0ad48a5e86be/renderer-40-reset-receipt.json`。该门禁不含policy/video，不计正式成绩，也不证明driver内部机制已完整解释。
+- **请Manager独立review最小源码17b55bf及证据**：renderer-reuse.patch、renderer-source-audit.json、renderer-protocol-comparison.json、renderer-40-reset-receipt.json均在本机task目录。两seed synthetic hold动作、前后qpos/三相机逐元素对照通过；新运行布局和原模型CPU dry-run准备完成。创建优化9c71a3e另含回归测试和52.927s fresh测量/已清理证据，可并行review。
+- 当前本任务GPU诊断已结束，无新smoke/formal运行。实际剩余门禁是最新Resume明确要求的Manager review，然后三机各policy+video/no-video smoke2，最终新leaf从原固定100000开始完整100；不复用旧22条分母。未改模型、seed、动作或memory时序，未重建环境。诊断records保留供review。
