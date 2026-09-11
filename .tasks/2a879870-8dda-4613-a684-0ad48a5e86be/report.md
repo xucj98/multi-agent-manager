@@ -189,3 +189,10 @@
 - C2 40-reset candidate gate 已登记 MAM job `1ee98405-a6e7-4936-8d78-96aef1d82232`，PID144614，便于外部观察终态；该job是诊断，不是正式100。
 - C1 GPU1已确认空闲后启动同环境 base/candidate 顺序对照（PID132690），`records/renderer-protocol-20260912`。各2个固定seed100000/100001；基线保存50条保持初始qpos的诊断动作，candidate原样重放，双方均按原worker队列剩20的条件执行30条，保存前后qpos、三相机图像及状态。此synthetic诊断用于验证reset/动作队列/观察接口，没有替代模型policy smoke或正式结果。
 - 下一阶段只在生命周期跨越旧故障点/终态、协议对照完成或异常时汇报；已准备源码与创建优化review材料，formal仍须Manager review与真实smoke门禁。
+
+### C1 对照 harness 修正（不影响 C2 lifecycle）
+
+- C1 最初 launcher 路径替换误改环境变量名，未进入仿真；retry1 进入baseline后，probe缺少main guard导致multiprocessing spawn重执行顶层mkdir，planner child FileExistsError，向上包装成ConnectionResetError/seed_preflight_failed。均为自建harness错误，不是模型拒绝或候选差异；原目录保留，未跳seed、未执行candidate对照。
+- 已增加main guard且编译检查，在新 `records/renderer-protocol-20260912-retry2` 从原seed100000启动（driver133678，比较器133679）。比较器仅在双方exit0后生成comparison.json；失败会停止且保留日志。
+- C2原40-reset harness有main guard，独立健康运行；最后阶段检查已连续13个accepted（0–12），未到旧故障点。源码/配置始终未改。
+- 新静态证据 `renderer-source-audit.json`（本机task目录）确认remote candidate与17b55bf字节一致，setup_scene扣除renderer持有改动后AST完全相同；该静态检查不替代运行时结果。
