@@ -124,3 +124,8 @@
 - C2 的系统 NVIDIA ICD 实际位于 `/etc/vulkan/icd.d/nvidia_icd.json`（API `1.3.277`），而 SAPIEN 3.0.0b1 只自动检查 `/usr/share/vulkan/icd.d`，于是此前 worker 落到内置 ICD（API `1.2.140`）；前者已在同 GPU 的独立 renderer+scene 初始化中通过。该差异是当前假设，尚不声称已修复根因。
 - 已在空闲 C2 GPU2 启动独立 gate，outer PID `63260`：严格 RMBench/bridge 原树、正式 `demo_clean_eval` config、连续 seed `100000+` 的 **40 次**真实 worker reset 生命周期，显式 `VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json`，专用 WARP cache、无 policy、无 result leaf。源树及失败 leaf 均不改；原始命令、GPU preflight、逐 reset JSON 和 stderr 分别保存在 `C:workspace/2a879870-8dda-4613-a684-0ad48a5e86be/records/strict-c2-renderer-gate-*`。
 - 下一验收点是超过旧 episode-22 故障点的 40/40 accepted、无 svulkan2 incompatible-driver/RPC EOF、进程退出与 GPU 回收。仅该门禁通过后，才会以**新 leaf**从 seed `100000–100099` 启动新的严格 formal，并在前 50 个已完成 episode 取切片检查（不要求文件实时恰为 50 行）。
+
+### Renderer gate retry1（18:32 +08:00）
+
+- 上一 gate 的 PID `63260` 已自行退出，原因是我在直调 worker 时漏设 controller 原有的 `cwd=RMBench`，导致相对 `assets/objects/objaverse/list.json` 不存在；这是 **gate harness 配置错误**，不是 formal、模型或 Vulkan 结论，原 log/JSON 完整保留。
+- 已以 controller 的真实 cwd、同一 strict roots 和同一 C2 GPU2 重启 retry1，outer PID `63504`；仍为 40 次 reset、系统 ICD、独立 cache/无 result leaf。此 retry 才是当前运行中的门禁。
