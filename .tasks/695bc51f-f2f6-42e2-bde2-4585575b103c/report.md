@@ -4,8 +4,8 @@
 
 ## 当前单模型放行状态
 
-- **no-memory：正式 20k 运行中。** 本模型的 50-step 训练、BF16 model-only 保存和 checkpoint-only 恢复已完成。2026-09-11 16:16 +08:00 GPU0 空闲后，以冻结 commit `a7f3e07` 启动 `memory20k_695bc51f_put_back_no_memory_s0`；MAM job `14bad7c3-59cb-45d5-8173-8eb92cb9b90a`、PID `3996599` 已登记为 running。已验证首个 update（16:21:40）以及 step100 有限 `grad_norm=0.7297, loss=0.0618, param_norm=1802.3864`；稳定约 3.7 s/update。
-- **serial_lag30：正式 20k 运行中。** 独立 review、GPU6 的 50-step smoke、BF16 保存和 checkpoint-only policy gate 均已 PASS。2026-09-11 16:40 +08:00 以冻结 commit `a7f3e07` 在 GPU6 启动 `memory20k_695bc51f_put_back_serial_lag30_s0`；MAM job `e087cfa2-04d2-460d-8b6e-974fdd7c7b1a`、PID `4009203` 已登记为 running，等待首个聚合 loss 后补充。
+- **no-memory：正式 20k 运行中。** 本模型的 50-step 训练、BF16 model-only 保存和 checkpoint-only 恢复已完成。2026-09-11 16:16 +08:00 GPU0 空闲后，以冻结 commit `a7f3e07` 启动 `memory20k_695bc51f_put_back_no_memory_s0`；MAM job `14bad7c3-59cb-45d5-8173-8eb92cb9b90a`、PID `3996599` 已登记为 running。已验证首个 update（16:21:40）、step100 有限 `grad_norm=0.7297, loss=0.0618, param_norm=1802.3864`，以及 step400 有限 `0.1034, 0.0065, 1802.3904`；稳定约 3.7 s/update。
+- **serial_lag30：正式 20k 运行中。** 独立 review、GPU6 的 50-step smoke、BF16 保存和 checkpoint-only policy gate 均已 PASS。2026-09-11 16:40 +08:00 以冻结 commit `a7f3e07` 在 GPU6 启动 `memory20k_695bc51f_put_back_serial_lag30_s0`；MAM job `e087cfa2-04d2-460d-8b6e-974fdd7c7b1a`、PID `4009203` 已登记为 running。已验证首个 update（16:45:07）和 step100 有限 `grad_norm=40.5274, loss=0.5226, param_norm=1802.3909`；稳定约 3.6 s/update。
 
 ## 已交付，待快速验收
 
