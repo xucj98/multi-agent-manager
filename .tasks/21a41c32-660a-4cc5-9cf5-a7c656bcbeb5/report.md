@@ -29,3 +29,19 @@ Manager native-input smoke scenario after integration:
 2. Send normal Manager `send_input` to that executor.
 3. Confirm its CLI JSON returns `reason: "message"`, `message: "received new message"`, and the executor `agent`; confirm the registered job is still running.
 4. Separately use `mam wait stop --agent AGENT-ID` and confirm the waiter returns `reason: "cancelled"` with `manual mam wait stop`.
+
+## Native smoke precondition finding
+
+The first real-smoke launcher did **not** arm. The integrated checkout accepted
+`python -m multi_agent_manager.cli job add …` as a no-op because
+`multi_agent_manager/cli.py` had no `__main__` invocation. It therefore returned
+no job JSON, wrote no wait registration or readiness file, and the transient
+unregistered local sleep was stopped immediately. The Manager input sent before
+readiness is explicitly not evidence of a native-message wake.
+
+Follow-up commit `89d094b289285d288be4f887e3a00c0278cd9c0c` adds the module
+entry point and a subprocess test for it, and fixes the compatibility mock so it
+does not invoke the real compatibility probe when that module is integrated.
+The task-branch suite passes 66 tests. The real smoke must be rerun from the
+integration checkout after that follow-up commit is included; no PASS or FAIL
+for native Manager input is claimed yet.
