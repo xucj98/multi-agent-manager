@@ -152,3 +152,15 @@ OpenPI 的修复补丁和 bundle 已经逐 hash 校验并部署。C 稳定 sourc
 
 下一验收点是 RMBench 的离线 wheel/curobo 预检和 current 入口成功；三库 cache 完整后会在新的可清理
 目录重新实际运行三个 `.local/create_worktree.sh`，作为唯一正式的一键时间与磁盘数据。
+
+## RMBench 缓存预检（2026-09-11 13:55 +08:00）
+
+RMBench current worktree 目标尚不存在。C 的专用 wheel 和评估输入已可用并校验：
+`pytorch3d-0.7.8-cp310-cp310-linux_x86_64.whl` SHA256 为
+`10b96025…c78b51`（54,377,993 bytes），`nvidia_curobo-0.7.8-cp310-cp310-linux_x86_64.whl` SHA256 为
+`780a878…4f988`（67,284,731 bytes）；`RMBench/assets` 为 1,352,988,672 bytes、`data` 为 614,400 bytes，均非空。
+
+C 的 uv cache 仅见 CPython 3.11 torch 2.7.1、CPython 3.12 的其他版本，未见安装器所需的 CPython 3.10
+`torch==2.4.1`/`torchvision==0.19.1`，也未见所需 SAPIEN/Open3D 的匹配缓存记录。因此尚未创建 RMBench
+venv，也没有允许任何网络 fallback。下一步从本集群同一 RMBench 安装闭包生成精确离线 cache 清单，再以单流
+`wuwen-nx-aic → wuwen-4090-aic` 同步并校验，随后才实际运行 C `.local/create_worktree.sh`。
