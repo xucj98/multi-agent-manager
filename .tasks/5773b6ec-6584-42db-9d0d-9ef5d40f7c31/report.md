@@ -177,3 +177,16 @@ symlink；所有 venv hardlink inode 均有 cache archive 匹配，未出现未�
 单流 `--bwlimit=10240` 约 16 分钟；小于 1 小时，不需登记 MAM job。传输保持一条
 `wuwen-nx-aic → wuwen-4090-aic` 流，完成后将仅把这 265 个选择出的 uv internal link 改写为 C cache
 路径，再离线创建 RMBench；不允许公网 fallback。
+
+## RMBench cache transfer progress（2026-09-11 14:14 +08:00）
+
+精确闭包单流仍在持续传输：14:14 采样为 3,946,698,361 bytes（48%）、
+7.81 MB/s、rsync/SSH 子进程正常，动态估算约余 8 分钟。它使用
+wuwen-nx-aic → wuwen-4090-aic 的一条 --bwlimit=10240 流；C 共享盘可用空间约
+5.10 TB，没有公网 fallback、重试循环或 C 上运行中的 uv/eval 进程。
+
+传输结束后只会重写这份闭包中列出的 uv 内部 wheel links，先核验每个 archive target，
+再以 UV_OFFLINE=1 运行 RMBench current 的本地入口。随后重新在全新、可清理的
+workspace 实测三库一键创建时间和磁盘，当前恢复性安装不作为该验收数据。
+
+958eeae 的独立 CPU review 已由 c03e0009 承担；该 review 不写 C，环境施工不等待它。
