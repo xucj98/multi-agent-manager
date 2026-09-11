@@ -1,4 +1,4 @@
-# 07:53 四卡formal100继续，新增GPU3 rearrange seed1 smoke
+# 08:00 五项formal100运行，GPU3 seed1 smoke已通过
 
 按06:53授权，在owner分别发布GPU4/6/7/5训练保存、CPU验收、进程退出和释放后逐卡接用；每次启动前显存均1MiB/0%，端口空闲，原三树干净。按最新07:52补充，GPU0/1不抢占，GPU2留wash，GPU3已获授权接用，wuwen-1停用。未修改源码/配置，未重跑技术50或旧drawer。
 
@@ -15,10 +15,11 @@ smoke run名均 `<variant>_s0_20k_smoke2`。四次CLI均exit0，既有validate_s
 
 put-back t+1第二条为正常step_limit_reached（500步），不改参数或重抽样。这里的成功数仅为smoke结果，不替代正式100成绩。真实20000权重恢复与新wire由匹配smoke覆盖，不再另跑技术验证。
 
-## 正在运行：四个formal100
+## 正在运行：五个formal100
 
 | GPU | run | 实际启动CST | PID | MAM job |
 | --- | --- | --- | ---: | --- |
+| 3 | rearrange_full_t_plus_1_s1_20k_100ep | 2026-09-11T07:59:47.951854+08:00 | 3388704 | 7a618537-3350-45cc-bb45-d3d8fe62f722 |
 | 4 | rearrange_full_t_plus_1_s0_20k_100ep | 2026-09-11T07:32:29.513716+08:00 | 3319712 | af7dd7c9-682c-4a78-9e6e-946cbf47672f |
 | 6 | rearrange_full_t_plus_30_s0_20k_100ep | 2026-09-11T07:33:30.188818+08:00 | 3321184 | 1e72397f-0602-4018-bc7c-4e112ad7501a |
 | 5 | put_back_full_t_plus_1_s0_20k_100ep | 2026-09-11T07:46:46.988207+08:00 | 3352946 | a58e56cc-2281-4d88-89af-53bdee13a768 |
@@ -32,13 +33,13 @@ rearrange两项已完成正式首条并继续推进，put-back两项正在启动
 
 ## GPU3新增与剩余队列
 
-已读07:52发布补充，GPU3启动前实测1MiB/81038MiB空闲/0%，19430/19432端口空闲、run名未占用、三树干净。已启动rearrange_full_t_plus_1_s1_20k_smoke2，使用已CPU验收的seed1最终20000，实际参数--gpu 3；仍为短smoke，尚未验收或formal。配对rearrange t+30 seed1保留下一空卡最高优先项，不按成绩筛选。
+已读07:52发布补充，GPU3启动前实测1MiB/81038MiB空闲/0%，19430/19432端口空闲、run名未占用、三树干净。rearrange_full_t_plus_1_s1_20k_smoke2于07:51:45启动，已完成2/2 success，logical steps392/406，视频392帧可读、no-video正确，既有门禁PASS，config_source逐字节一致；两scheduler exit0、policy/robot正常shutdown -15，全部自有子进程退出，CLI exit0。config SHA256 c37f27fd98cd41904d67c2907cc2b0cd850cf0a295d47ba4984aa4692a845e77。07:59:47已在GPU3启动对应formal100并登记job7a618537-3350-45cc-bb45-d3d8fe62f722（PID3388704）；正式前再次检查1MiB/0%和端口空闲。配对rearrange t+30 seed1保留下一空卡最高优先项，不按成绩筛选。
 
 统一EXPERIMENT_LEDGER.zh-CN.md已获知合入主库；当前三树由正式run使用，不merge或改文档。安全结束运行后再整合台账、更新对应模型行和实际结果链接/快照时间。
 
 ## 剩余队列与位置
 
-14项按README既定训练seed配对队列推进，不按中途表现筛选。目前12份已完成owner保存/CPU门禁交接及本入口audit/smoke dry/formal dry（各exit0）；只剩本机训练中的put-back seed2两项待交接。未开始的10个formal仍在队列，不因首批开跑宣称任务完成。
+14项按README既定训练seed配对队列推进，不按中途表现筛选。目前12份已完成owner保存/CPU门禁交接及本入口audit/smoke dry/formal dry（各exit0）；只剩本机训练中的put-back seed2两项待交接。未开始的9个formal仍在队列，不因首批开跑宣称任务完成。
 
 workspace: /mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a
 - RMBench: 3e69b1e665a8eac0104d261b233f1b3339007e00
