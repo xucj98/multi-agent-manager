@@ -52,3 +52,9 @@ GPU1只读确认约24067MiB可用、PM建议8951。Manager允许现在通过已�
 
 ## 用户报告8951握手错误：优先定位来源
 用户在PM看到8951持续报opening handshake failed / EOF before HTTP request line，示例UTC01:33:19。请优先停止本任务自行添加的任何裸TCP重复探活（如果有，先记录命令/来源），只读追查来源机器/IP/进程：核查本次部署检查命令、仍在运行的PM健康检查实现与旧进程加载版本，并用可用ss/短时抓包证明来源，避免再制造裸TCP探测。不要仅凭EOF堆栈断言来自launcher。区分你的一次性探测与持续周期性探测，给时间间隔和源/目的证据；不重启PM或其他policy实例。先快速回报已知是否本次工具产生，后给确证及最小修复方案。
+
+## 用户更新实际机器人并授权部署
+用户确认握手源10.10.2.82是本次主臂，实际从臂10.10.2.96。覆盖旧jx-x1pro-m-060/060拓扑：通过jx-4090-2-via-nx-aic应能SSH这两台，用户明确要求直接安排部署，替代上一条主从设备仅由同事更新的分工；WSL没有新增访问授权。
+请先报告已确认握手源证据；随后通过policy主机跳转核查两机hostname/用户/代码路径/现有环境/服务和~/.robot_bridge_env.sh，不猜账号或端口，尽量复用已有SSH配置。允许更新两机部署代码至已验收bridge041405f，保留硬件SDK/.venv/模型/设备配置。现场代码按用户既定原则可丢弃，以本地/GitHub为准；不对ignored目录做clean。不修改正在进行的遥操/机器人控制状态：若有active控制进程或动作必须先报告实际状态和最小替换步骤，Manager裁定。
+定位.82的旧探活所属进程/命令，若是本次准备的旧launcher探活，停用该探活而非屏蔽日志。先确认归属，不杀未知控制进程。核查scheduler执行机器为主臂.82，policy使用当前已部署wash full实例（从PM确认URL端口，内网policy地址沿现有配置）。机器人和master server端口沿各机实际配置，更新本次机器私有RB_*环境的拓扑，不提交IP到Git。保留wait-condition/UDP/takeover；只启动不会自动运动的服务和idle scheduler，启动前明确默认模式，不发homing/execute/UDP action或切autonomous。真实运动由现场人员执行。
+优先完成SSH/CPU导入/metadata/观测与idle连通，必要依赖差异先报告，不盲升级共享环境。服务预计>1小时用mam job add登记，多个进程分别记录。交付准确两机commit、端口、服务PID/状态、policy URL、待机模式与现场接管/启动步骤，不能将服务器ready等同真机运动验证。
