@@ -80,3 +80,10 @@
 - serial_lag30 seed0：MAM job `e087cfa2-04d2-460d-8b6e-974fdd7c7b1a` 仍为 running；日志已推进至 step467。最近完整指标为 step400：`grad_norm=4.1750, loss=0.0507, param_norm=1802.3975`，均为有限值；当前速率约 3.6 s/update。
 - 资源复核：GPU0–7 全部实际占用，利用率 98–100%，显存分别为 `73405/70515/73407/73407/73405/73405/73407/80063 MiB`；没有可接用的实际空卡。四项后续训练维持 queued，未触碰其他作业。
 - 按既定约小时巡检；若 Manager 提前唤醒或任一实际空卡出现，直接按顺序启动 serial_lag30 seed1、no-memory seed1、serial_lag30 seed2、no-memory seed2，并逐项登记与确认首个有限 update。
+
+## 2026-09-11 18:12 +08:00 资源/训练巡检
+
+- no-memory seed0：MAM job `14bad7c3-59cb-45d5-8173-8eb92cb9b90a` 为 running；日志已推进至约 step1770，最近完整指标为 step1700：`grad_norm=0.0464, loss=0.0030, param_norm=1802.6096`，均为有限值。
+- serial_lag30 seed0：MAM job `e087cfa2-04d2-460d-8b6e-974fdd7c7b1a` 为 running；日志已推进至约 step1410，最近完整指标为 step1400：`grad_norm=0.8634, loss=0.0194, param_norm=1802.6012`，均为有限值。
+- 资源复核：GPU0–7 均为实际占用，利用率 `100/71/100/100/100/100/100/100%`，显存 `73405/73159/73407/73407/73405/73405/73407/72903 MiB`；没有可接用的实际空卡。四项授权队列仍依次为 serial_lag30 seed1、no-memory seed1、serial_lag30 seed2、no-memory seed2，均未启动。
+- 冻结 worktree 仍干净；未修改配置或源码，未触碰任何其他作业。下次资源窗口继续按同一顺序判定并启动首项可用队列。
