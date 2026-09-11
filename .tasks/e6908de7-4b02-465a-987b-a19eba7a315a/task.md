@@ -115,3 +115,12 @@ Manager接受14行队列状态(2完整保留、12待评)。现在提前传输12�
 
 ## 集群C最终准入，放行既定12项评估
 Manager核对2a879870最终证据：C100/100固定seed、70成功，本机69，19checks通过，255文件回传hash一致。现放行已整理12待评项，不重复2完整项。按C README在C workspace/本TASK-ID建自有三库worktree/环境，运行版本沿已验收RMBench17b55bf、bridge8ea6078、openpia869498，固定GPU映射和ICD；如某variant缺能力/入口需要修复先交Manager，不随意换算法。每模型完成自身2rollout有/无video smoke+产物检查，再固定源码同GPU串行100。模型到达即启动，不必等12个全传完；首批优先已指定两s0，先一机一run(C1/2/3实际空卡任选)，首批健康后可每机最多两run但每GPU仅一run，端口/cache独立，先报告实际资源不抢他人。每run前50比较可比历史/查基础设施，完整结果独立exp-group/run记录，不拼旧partial。真实job登记、本机MAM运行，等待使用mam wait。后续回传到本机RMBench同exp-group，保留旧两完整baseline。不要依赖2a879870或5773远端临时worktree/venv，它们将收尾清理；需shared stable cache/assets/model可继续用。你13192bb文档已合本机f58ac38，文档树可自行清理。
+
+## 后续评估与台账、首次infer超时裁定
+继续负责现有已完成模型队列和新增完成训练的接入。用户明确：已跑完训练要安排eval，eval后整理实验台账。核对695bc51f与7ae41311的最新report，只有最终20k产物完整且训练成功退出后接入；未完成的不要当作可评。现有有效100结果不重复。
+
+针对已报告两个smoke在首次infer 30秒超时：授权在自己独立bridge worktree调查并做最小基础设施修复。先用失败日志/单模型串行有界诊断验证是否JAX首次编译超过预算，不预设首因。若证实首次编译，可只为首次infer提供合理有界预算或明确warmup；后续infer预算保持，不能修改算法/seed/horizon/memory或把超时当成功。代码需CPU有意义验证并提交，先报告commit与证据供Manager独立review，准入后再同模型smoke2→正式100。不在失败原因未明时重复并发smoke。传输继续按既定两路上限与间隔。
+
+实验台账统一RMBench/experiments/<exp-group>，结果RMBench/eval_result/<exp-group>/<run>。逐run记录研究问题、设计变量/控制变量、预期结论、train commit/config/schema/seed、训练及checkpoint路径、eval commit/config/路径、实际成功率和失败分类、与基线差异及限制。现在先建立完整待评清单与状态，正式结果到达后更新，不等全部完成才记账。前50与已有可比结果差超过10个百分点先排查；固定100同GPU串行，单个smoke含2rollout(1video/1无video)，产物检查通过才formal。实验代码与台账交付提交，清理短smoke等临时产物但保留必要故障证据。
+
+不用无变化等待进度写report或commentary；mam wait挂起时不做几十秒一次轮询。完成实际可执行工作后再等待事件。
