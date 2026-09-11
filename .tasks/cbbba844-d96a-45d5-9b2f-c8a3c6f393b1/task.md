@@ -17,3 +17,6 @@
 ## Manager正式训练准入
 独立review f6293543通过，Manager验收。现在立即按既定GPU映射和唯一exp_name启动6条20k：本机1/7为rearrange seed0/1，wuwen-1 GPU4为rearrange seed2、5/6/7为put-back seed0/1/2。启动前复查卡空闲；冻结OpenPI6266bd8bbfa5f3e451f7253c476d1108e1ff5e1e，bs32/20k/BF16 final only，源schema与review一致。无需再重复smoke/CPU或等待其他评估结果。
 逐条mam job add登记真实进程，初始有限loss和实际设备映射验收后报告6个job/路径与预计完成；更新U台账运行状态。若某卡被外部占用，只阻塞该条，其余独立开跑。持续以mam wait完成事件监控，结束后验收产物交e690评估；不得把启动成功写成训练完成。
+
+## 启动验收后的等待交接确认
+Manager已验收6条实际启动/step100/设备映射，当前无需新检查或重复报告。仍由你负责这6条训练停止后的产物验证和eval交接；保持mam wait实际await，等待工具返回事件后处理，不是在后台启动wait后直接结束turn。无变化不汇报、不刷新报告，固定超时后直接重新wait。只有任务真实完成或Manager明确交接时才结束turn。
