@@ -14,6 +14,7 @@ MAM 的任务 TASK-ID 和执行者 AGENT-ID 一一绑定。每个执行者有自
 
 ```text
 PROJECT_ROOT/
+  .mam/env.json               # 项目配置
   MAM_ROOT/                   # MAM 根目录
     .tasks/TASK-ID/task.md    # Manager 编辑任务要求
     .tasks/TASK-ID/report.md  # 执行者编辑结果简报
@@ -31,8 +32,7 @@ PROJECT_ROOT/
 Manager 创建任务、填写任务要求并发布，再绑定执行 agent，agent 任务完成后根据情况启动 review 或归档。
 
 ```text
-mam task create --title TITLE
-mam task create --title TITLE --review TARGET-TASK-ID
+mam task create --title TITLE [--review TARGET-TASK-ID]
 mam task publish TASK-ID --file task
 mam task bind TASK-ID --agent AGENT-ID
 mam task archive TASK-ID --note NOTE
@@ -41,7 +41,7 @@ mam task archive TASK-ID --note NOTE
 - `create` 返回 `TASK-ID`；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求；然后发布任务。
 - 使用 codex 工具创建 subagent，要求其查看 `AGENTS.md` 并使用 `mam task show TASK-ID` 查看任务；获取 `AGENT-ID`，绑定执行 agent。
 - 途中追加要求时，先更新 `task.md` 并发布，再通知执行者读取新版本。
-- Review 的 `--review` 接收源任务的 `TASK-ID`。
+- Review 任务使用 `--review` 接收源任务的 `TASK-ID`。
 
 先用这些可执行命令查看已有任务和等待：
 
@@ -82,13 +82,15 @@ mam task publish TASK-ID --file report
 
 ```text
 mam job add TASK-ID --note NOTE --host HOST --pid PID
-mam job list
-mam job list --task TASK-ID
+mam job list [--task TASK-ID]
 mam job status JOB-ID
 mam job archive JOB-ID --note NOTE
 ```
 
-进程结束后，先记录结果并处理任务要求的临时文件，再执行 `mam job archive`。Manager 可用 `mam job list --attention` 查找需要跟进的登记。
+- HOST 可以使用 ssh 别名或 username@hostname。
+- list 不提供 TASK-ID 时显示所有任务中未归档的 job。
+
+job 状态包括 `running`、`stopped`、`archived`。进程停止后，先记录结果并处理任务要求的临时文件，再执行 `mam job archive`。Manager 可用 `mam job list --attention` 查找负责人 inactive 且 job 状态为 `stopped` 的 job。
 
 ## 休眠管理
 
@@ -100,7 +102,9 @@ mam wait
 
 MAM 从 `CODEX_THREAD_ID` 识别调用者。执行者等待自己任务的 jobs；Manager 等待 active 的执行者，并负责非 active 执行者留下的 jobs 和未归档任务。源任务已交给未归档的 review 任务时，Manager 等待 reviewer。
 
-有待处理事项就立即返回；否则最多等待一小时。退出时说明原因，并附上对应 job 或任务的信息。用户的 steer 和 Manager 发来的消息会解除对应等待，queue 消息保持排队。等待结束不会停止 job，也不会归档任务。
+`mam wait` 退出时说明原因，并附上对应 job 或任务的信息。用户的 steer 和 Manager 发来的消息会解除对应等待，queue 消息保持排队。等待结束不会停止 job，也不会归档任务。
+
+有待处理事项时 `mam wait` 会立即返回，并提供信息，此时无法进入休眠状态，应该立刻处理相关事项。 `mam wait` 最长等待 1 小时，若依然没有待办事项，可继续调用 `mam wait` 休眠。
 
 查看或手动解除等待：
 
@@ -110,8 +114,10 @@ mam wait stop manager
 mam wait stop --agent AGENT-ID
 ```
 
-## 开发验证
+## MAM 开发指南
 
-MAM 自身的开发 worktree、环境、验证和合并步骤见[开发说明](docs/development.md)。
+MAM 自身的开发 worktree、环境、验证和合并步骤见[MAM 开发指南](docs/development.md)。
 
-详细接口、状态语义和归档保护见[任务管理 CLI 接口说明](docs/task-management-design.zh-CN.md)；参数以 `mam task --help`、`mam workspace --help`、`mam job --help`、`mam wait --help` 及相应子命令的帮助为准。
+## MAM 设计细节
+
+详细接口、状态语义和归档保护见[MAM 设计细节](docs/task-management-design.zh-CN.md)，日常使用无需翻阅；参数以 `mam task --help`、`mam workspace --help`、`mam job --help`、`mam wait --help` 及相应子命令的帮助为准。
