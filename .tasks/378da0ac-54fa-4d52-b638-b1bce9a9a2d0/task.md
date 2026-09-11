@@ -25,3 +25,6 @@ review任务ae463958提出两项：cached terminal消费与diagnostic写常规Su
 RMBench recorder在mode=diagnostic时不生成常规_result.txt成功率入口，保留单集事实/时序/exit；smoke/formal原有产物不变。加实际recorder产物测试，不新建全局汇总框架。原已运行诊断目录的_result.txt可改为明确diagnostic命名并记录该后处理，不修改原episode/trace或声称旧运行用新代码。
 固定5s idle status probe的行为补CPU延迟边界测试，说明超时当worker异常的策略，不盲增加新配置。worker trace长期字节上限等建议暂不扩展，本任务仅一次有界诊断。补launcher记录实际RMBench执行tree精确HEAD，与共享manifest source commit分开，避免误导版本身份。
 提交必要最小增量后给原reviewer定向复核，无GPU重跑、无formal启动。禁止将首帧根因未知偷换成算法问题；后续取证由Manager裁定。
+
+## 阶段交付收尾
+d49f616/ad8b5c7已独立复核通过并合入本地主库，接受为状态查询/诊断边界改善，不声明四个首帧超时根因已解决。当前不继续单次GPU盲重试或正式复跑。请更新稳定Git诊断说明中的准确结论、版本、实际取证路径和仍未知边界，清理本task临时产物准备归档；原正式失败与单集诊断证据保留。后续新eval若再现故障，由eval owner带现有时序证据继续定位，Manager在C准入后另行裁定运行计划。
