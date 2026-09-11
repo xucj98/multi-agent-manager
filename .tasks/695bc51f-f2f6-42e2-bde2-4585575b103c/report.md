@@ -2,6 +2,11 @@
 
 研究目的：为既定 B 组补齐 put-back 的 `serial_lag30` 与 `no_memory` seed0 训练入口，使其与已有 full 三 seed、rearrange serial/no-memory 共享模型、loader 和训练参数，只替换 put-back 的数据、字段 schema、sidecar 与 robot norm。
 
+## 当前单模型放行状态
+
+- **no-memory / GPU7：可单独放行正式 20k。** 本模型的 50-step 训练、BF16 model-only 保存和 checkpoint-only 恢复均已完成；恢复证据及可复核路径见下文。正式训练尚未启动，等待 Manager 对此模型单独放行。
+- **serial_lag30 / GPU6：尚不可放行。** GPU6 为他人占用，按最新安排未探测性使用、未启动 smoke；待资源由 Manager 另行安排后才做本模型自身的训练和恢复 gate。
+
 ## 已交付，待快速验收
 
 - worktree：`/mnt/public/xcj/Projects/workspace/695bc51f-f2f6-42e2-bde2-4585575b103c/openpi`，分支 `task/695bc51f-f2f6-42e2-bde2-4585575b103c`，基点 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。
