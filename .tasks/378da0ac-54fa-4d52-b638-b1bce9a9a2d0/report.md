@@ -77,7 +77,7 @@ CPU 覆盖包含真实 localhost WebSocket → Robot Server → controller → �
 - `RMBench/.venv/bin/python -m unittest discover -s tests -p 'test_eval_diagnostics.py' -v`：3 项通过；fixture 输出既有 SAPIEN/资源告警，但无失败。
 - `JAX_PLATFORMS=cpu ... run_first_obs_timeline_diagnostic.py --dry-run`：17.5 秒通过。它验证 s1 `20000` checkpoint schema、三树 pin、GPU3 端口、trace path、原失败 `episode_id=17 / seed=100017` 和生成的完整命令；未启动 robot/policy/scheduler、未加载模型权重或使用 GPU。
 
-### GPU3 单次短诊断（等待 Manager 准入）
+### GPU3 单次短诊断（准入前计划）
 
 新入口是 [`run_first_obs_timeline_diagnostic.py`](/mnt/public/xcj/Projects/workspace/378da0ac-54fa-4d52-b638-b1bce9a9a2d0/RMBench/experiments/memory_chunk_20260910/commands/run_first_obs_timeline_diagnostic.py)，完整说明与命令在 [`README_first_obs_timeline_diagnostic.md`](/mnt/public/xcj/Projects/workspace/378da0ac-54fa-4d52-b638-b1bce9a9a2d0/RMBench/experiments/memory_chunk_20260910/README_first_obs_timeline_diagnostic.md)。它在启动前拒绝非 clean worktree，并硬校验：bridge `de0e9da`、OpenPI `a869498`、RMBench 是 `6139577` 的后继、GPU3、`rearrange_full_t_plus_1` s1 checkpoint 的 `20000`、`episode_id=17 / seed=100017`。结果唯一落在：
 
@@ -87,4 +87,45 @@ eval_result/memory_chunk_20260910/first_obs_timeline_rearrange_tplus1_s1_ep17_gp
 
 准入后执行顺序为：先用入口 `--prepare-audit` 生成只读 checkpoint 审计与派生 manifest，再运行不带 `--dry-run` 的同一命令。launcher 内部执行经验证的 `timeout --foreground --signal=INT --kill-after=30s 1500s ...`，以 SIGINT 让 runner 的 `finally` 回收 robot/policy 子进程；1500 秒为 GPU 阶段总墙钟上限。service startup/reset 保留源 launcher 的 660 秒预算，单 episode runner 为 75 秒，scheduler 首次 `get_obs` 仍是 30 秒，worker 内部 RPC 仍为 600 秒，仅用于在 client 超时后保留取证和收尾，并未扩大 scheduler timeout。
 
-若诊断再次超时，检查 scheduler traceback、`processes/rmbench_sim_worker.trace.jsonl` 与失败 episode 的 `bridge_rpc_timeline`：worker 已记 `get_obs_render_enter` 而无 return 说明卡在或晚于实际渲染调用；没有 worker receipt 则定位到 proxy/pipe 前；`worker_lost` 记录 returncode 与已知 active RPC。任何一次正常返回也只说明该次没有复现，不能放行四项 formal 重跑。GPU 诊断未启动；四个 partial run 仍不能拼接，正式重跑仍需 Manager 后续决定。
+若诊断再次超时，检查 scheduler traceback、`processes/rmbench_sim_worker.trace.jsonl` 与失败 episode 的 `bridge_rpc_timeline`：worker 已记 `get_obs_render_enter` 而无 return 说明卡在或晚于实际渲染调用；没有 worker receipt 则定位到 proxy/pipe 前；`worker_lost` 记录 returncode 与已知 active RPC。任何一次正常返回也只说明该次没有复现，不能放行四项 formal 重跑。四个 partial run 仍不能拼接，正式重跑仍需 Manager 后续决定。
+
+### GPU3 单次短诊断实际结果（2026-09-11）
+
+Manager 已发布 GPU3 准入后，按上文两条命令实际运行一次：先 `--prepare-audit`，再运行
+`first_obs_timeline_rearrange_tplus1_s1_ep17_gpu3`。启动前 GPU3 为 1 MiB / 0%，19430/19432
+无监听；三树均干净且分别固定为 bridge `de0e9da`、RMBench `ed1e00b`、OpenPI `a869498`。
+没有修改 C 严格基线、旧 launcher 或 scheduler 的 30 秒预算。
+
+诊断结果目录：
+
+```text
+/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/first_obs_timeline_rearrange_tplus1_s1_ep17_gpu3/
+```
+
+该次不是 formal 结果，也不构成 smoke 门禁。它完成一个指定 episode（scheduler exit 0 / `episode_terminal`）；
+75 秒 episode cap 与 1500 秒外层 cap 都没有触发。`diagnostics_summary.json` 的 `status` 为
+`completed`，仅表示该诊断 episode 正常结束，不能用于四项 partial run 的分母或正式成功率。
+
+worker 单调时钟给出本次冷路径的可复核时序：
+
+| 阶段 | 时长 / 边界 |
+| --- | --- |
+| reset worker receipt → response sent | 73,392.333 ms；在独立 660 秒 reset 预算内。 |
+| 首次 `get_obs` worker receipt → `get_obs_enter` | 0.087 ms。 |
+| `get_obs_enter` → `get_obs_render_enter` | 0.029 ms。 |
+| `get_obs_render_enter` → render return | 6,165.423 ms。 |
+| worker receipt → protocol response sent | 6,167.997 ms。 |
+
+因此，这一轮**没有可归因的失败首因**：最早的慢阶段是 reset，但它发生在 scheduler 启动前且已成功；
+原失败语义上的首次 `get_obs` 已到达 worker、立即进入渲染并在约 6.17 秒内返回，未触发 30 秒超时。
+这排除了本轮中的 worker 入口排队或 render 卡死，却不能解释历史四次间歇性 30 秒超时，也不能支持
+修改 timeout、归因于 memory/模型/seed，或放行 formal 重跑。
+
+完整 episode 产生的 proxy 事件超过 64 条，所以最终 `bridge_rpc_timeline` 保留的是末尾窗口，未保留
+初始 frame 的 controller lock-acquire 事件；worker JSONL 保留了该 frame 的 receipt/enter/render/return
+证据。末尾窗口中，后续长 `get_obs` 期间的 status probe 均为 cached、`lock_wait_ms=0`，这验证
+`ed2f470`/`de0e9da` 的状态诊断行为，但不构成首次 30 秒问题的根因修复。
+
+收尾已核对：worker 写入 `worker_stopped`；scheduler 正常 exit 0，policy/robot 均由 runner
+shutdown 以 `-15` 退出；GPU3 回到 1 MiB / 0%，19430/19432 无监听。保留上述 result、worker JSONL、
+scheduler 日志、输入审计和 manifest；没有自动重跑，也没有新增实现。
