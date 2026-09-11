@@ -1,5 +1,20 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日08:32 本机最后两路小时巡检
+
+已读最新task；08:32:18–19逐项job status均running，无error。两路日志继续前进，所有已落盘loss/grad_norm/param_norm有限，无可见训练报错。其余12项已收尾归档，未重复checkpoint读取或远端探测。
+
+| 本机GPU | 模型/seed | updates≈ | 最新实际标量 | 剩余ETA |
+| --- | --- | --- | --- | --- |
+| 0 | put-back t+30 / 2 | 16.0k | Step15900 loss=0.0008, grad_norm=0.0339, param_norm=1804.1646 | 4:03:16 |
+| 1 | put-back t+1 / 2 | 16.2k | Step16100 loss=0.0009, grad_norm=0.0371, param_norm=1804.3064 | 3:54:11 |
+
+两路各159/161条标量均为有限区间均值。kit为取整进度，ETA不含保存；GPU1预计12:26、GPU0约12:35完成更新。运行树仍d10完整SHA、git status为空，未改源码/参数。
+
+资源：GPU0已用73460MiB/空闲7579MiB/100%，GPU1为73406/7633MiB/100%，RAM可用846GiB。GPU2当前1MiB/0%；GPU3–7已有其他占用，本轮仅记录快照，不检查其他task或清理进程。此前本任务GPU4–7释放证据仍见各项收尾记录；本任务未启动eval或接续GPU工作。
+
+继续active turn及mam wait等待这两项结束事件，释放卡由Manager安排eval；下一小时09:32巡检。远端已完成全部本任务训练，自有进程退出；全机不可见外部占用的既有边界仍保留。
+
 ## 9月11日07:37 GPU5完成收尾
 
 本机 GPU5，memory20k_e7e5ac54_rearrange_full_t_plus_30_s2，job `0c82949f-f5c6-4772-aea6-1967e9cc2680`，PID2467721。最终20000保存与Save Finalize完成，MAM wait返回stopped；随后PID及同session/直接子进程均不存在，GPU5=1MiB已用/81038MiB空闲/0%。无自有残留需清理；未留存数值exit code，退出及保存分别有证据。
