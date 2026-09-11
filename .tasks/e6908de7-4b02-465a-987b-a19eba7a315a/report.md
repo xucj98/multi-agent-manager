@@ -8,7 +8,7 @@
 
 最小建议交Manager/公共owner：先针对该seed和首帧get_obs确认耗时/阻塞点，区分底层卡死与外层预算不匹配；若证实预算问题，在既有RPC调用边界显式协调有界timeout，不改memory/动作协议、不全局无界等待、不另造runner。本task未改超时或源码。失败项后续重试/补齐规则需Manager裁定，不能在同目录接续冒充原100。
 
-收尾：进程事件全部有退出，失败scheduler exit1、policy/robot正常shutdown -15；08:25核对自有GPU7进程为空、19470/19472已释放、GPU7=1MiB/81037MiB空闲/0%。job1803ad5f-b94a-4b64-bdc1-2c7f8ed9339c已按失败归档。failure_review.json保留核对结果。其他四项formal继续；按07:52授权，下一空卡优先rearrange t+30 seed1，保持原参数和独立smoke/formal，不重跑失败模型。
+收尾：进程事件全部有退出，失败scheduler exit1、policy/robot正常shutdown -15；08:25核对自有GPU7进程为空、19470/19472已释放、GPU7=1MiB/81037MiB空闲/0%。job1803ad5f-b94a-4b64-bdc1-2c7f8ed9339c已按失败归档。failure_review.json保留核对结果。其他四项formal继续，08:28落盘进度为rearrange t+1/t+30 seed0=23/24、put-back t+1 seed0=16、rearrange t+1 seed1=8，均无runtime_error。按07:52下一空卡优先授权，GPU7再次复核1MiB/0%和19470/19472空闲，已于08:27:26启动rearrange_full_t_plus_30_s1_20k_smoke2；保持原参数和独立smoke/formal，不重跑失败模型。当前GPU7为此新smoke，失败项仍保留待裁定。
 
 以下为此前启动与smoke记录；GPU7 put-back的运行状态以上述失败收尾为准。
 
