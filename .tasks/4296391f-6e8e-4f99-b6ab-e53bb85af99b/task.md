@@ -69,3 +69,6 @@ GPU1只读确认约24067MiB可用、PM建议8951。Manager允许现在通过已�
 用户明确GUI launcher与x1pro_takeover.sh是并列功能入口：前者GUI供非程序员，后者TUI调试；不需要同时使用。立即停止新增远端部署、重启、配置写入，由现场同事执行。不要为撤回再重启/恢复；停止正在筹备的后续写操作，若有已在途操作先核实最终状态。
 先快速向Manager报告已实际完成的policy/.82/.96代码变更、机器路径、服务PID和运行状态、哪些尚未完成。记录当前full实例URL和metadata验证、环境依赖实际缺口、机器人是否确实保持idle。只能声称实际观测，未知标注。
 据此交付简洁现场操作指南（仓库docs/tutorials/wash-cup-memory.md，本地worktree编辑提交允许），区分GUI launcher与TUI两种入口并建议沿现场惯用入口，不串联启动。既有原端口skip机制事实准确，--skip-policy非必需条件；不要在未核实现场端口差异时要求用户用新选项。列两机实际IP/角色的现场交接信息放任务报告，仓库文档用角色/RB_*变量避免硬编码。注明更新代码精确commit及取得方式、保留本机SDK/环境/配置、policy manager中full模型选择/URL、S2M14D/H50K30/phase、待机和现场受控检查；实际控制命令沿既有机制，不发明快捷键。检查用户能从可访问GitHub取得commit；未push的版本不能给git pull即可的假指令，告知Manager需发布哪个分支（你不要自行push）。完成指南供Manager验收转交，保持现有服务，无SSH写操作。
+
+## 操作指南补全可执行更新步骤
+cf7ffdb方向正确，但目前只有应为某commit，缺如何更新/重启。请补短的现场步骤（不远端执行）：现有GUI停止三项服务确保旧tmux子进程不保留旧代码→两机更新bridge→用现有解释器核对CPU依赖→主臂systemctl --user restart rb-launcher.service→GUI检查并启动。说明restart GUI不会自动重启已存在tmux服务，避免更新后继续跑旧scheduler。代码取得可从已更新policy机的Git仓库fetch精确041405f（参数化SSH目标和repo路径），不假设GitHub已有该commit；无需为此推GitHub。只核对已有本地源码/此前只读证据，.96路径/解释器未知则作为需现场确认变量，不能猜值。明确主臂light openpi_client.memory_config/PyYAML等实际新增依赖应如何通过原环境安装入口满足，机器人不需要安装模型权重/完整GPU openpi环境。若不足以写精确安装命令，明确现场CPU import失败的报告点，不编造。保持指南简洁，不另建部署框架，不再SSH。
