@@ -19,3 +19,6 @@ Run own tests and full suite. Publish small report with evidence and commits; cl
 
 ## User correction (latest, authoritative)
 Not “version changes cause error”; only failed tests cause error. Do not introduce version pinning, allowlists, mandatory approval certificates, or a fingerprint mismatch error. Revalidate behavior when appropriate; if tests pass, proceed.
+
+## Final state-based semantics
+Runtime now intentionally uses current-state pending-work checks, no completion replay/cursor/ack. Tests should cover inactive unarchived task returns (except delegated source under unarchived review), active owner job responsibility, and repeated return until handled. Only failing BEHAVIOR tests cause compatibility error, never version change. User asks no short polling.
