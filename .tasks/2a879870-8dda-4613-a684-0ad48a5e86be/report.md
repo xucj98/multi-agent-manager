@@ -258,3 +258,12 @@
 - C `records/<formal leaf>/watch-50/{snapshot.json,comparison.json,decoded-videos.json,episode_diagnostics.jsonl,seed_preflight.jsonl,video_checks.jsonl,worker.log}` 为固定快照；本机task `formal-first50/` 保存比较原始输入与comparison。既有report中视频混淆不沿用，以上只读本次正式leaf。
 - first50 job61c9d848已归档；正式jobac616c59仍运行，后半程watch100 PID414573/job `fb01b3a3-641f-4263-8c5d-212ebcb8f0ee` 已接续，完成100或实际infra异常才唤醒。按授权继续同一run，不更换leaf/seed，不按成绩重跑。
 - 已核对C1/C2/C3无进程引用退役diagnostic树，保留完全一致的retired-candidate.patch后，仅删除自己的 `diagnostic/renderer-reuse/RMBench` worktree/branch；40reset/协议/所有失败raw records保留，cleanup receipt在records/renderer-diagnostic-cleanup.json。活跃正式树/其依赖strict树不动。
+
+## 最终验收后 C 临时环境清理（2026-09-12 04:10 +08:00）
+
+- 删除前逐项核对：C1/C2/C3 的 cmdline、cwd、environment 均无 `2a879870` 或接管的 `5773b6ec` 路径引用；e690 的 C 独立三库树为 `workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c-eval`，heads 为 RMBench `17b55bf`、bridge `8ea6078`、OpenPI `a869498`，文本及软链扫描均未引用将删 workspace。
+- 已删除两处 C task 根 `workspace/2a879870-8dda-4613-a684-0ad48a5e86be`、`workspace/5773b6ec-6584-42db-9d0d-9ef5d40f7c31`，以及旧 owner OpenPI branch `task/5773b6ec-6584-42db-9d0d-9ef5d40f7c31-c-openpi-installer`。清理按 renderer-reviewed → strict/fresh → docs → records/diagnostics 的依赖顺序进行；task 内较早 README 快照 `c7d45eec…dede5f` 经核对已被稳定 README `1bafbae2…74276` 取代后删除。
+- 已删除 `memory_chunk_20260910` 下 8 个已验收 smoke/重复 formal leaf：`renderer_c{1,2,3}_smoke2_20260912`、`put_back_full_t_plus_1_s0_20k_c{1,2,3}_smoke2`、`put_back_full_t_plus_1_s0_20k_c1_smoke2_retry1`、`put_back_full_t_plus_1_s0_20k_renderer_100ep_20260912`。删除前全部是普通目录且内部软链数为 0；最终 C 100 结果仍保留在 `eval_result/cluster_c_eval_acceptance_20260911/put_back_full_t_plus_1_s0_20k_100ep`。
+- 必要 raw 证据已先归入该最终结果的 `historical_evidence/`：manifest 保持 SHA256 `895b1431a8f0d1621da65fc896ccaee8bc85f7b95fe0db3c28ab02fb018a4b45`（113 个 curated items / 2,875,430 B），其中包括两锁来源、原始 `uv pip check`、实际 closure 对照、renderer 失败/40-reset、三机 smoke receipt 与创建测量。新增 `cleanup_receipt.json` 的 SHA256 为 `143003cc0c05fe4d9434e904f54f3cb2d10aa17756fe79dac17170699ea4123d`。
+- 收尾复核：两 workspace 和 8 个 leaf 均 absent，C1–C3 无残留路径进程；稳定 `.local`、共享 uv/Python cache、稳定 shim `/mnt/public/xcj/Projects/RMBench -> state-vla/RMBench`、最终结果和 C tag `c-acceptance-renderer-17b55bf`（`17b55bff1c79a0c5a836d1da089765934cb3a5b0`）均在。本机两保留 tag `c-acceptance-renderer-17b55bf`、`c-acceptance-lazy-probe-9c71a3e` 也可解析。
+- e690 的 job `de532b30-cad1-4ff4-95d6-ef0f086d716f` 在删除前仍显示运行于 `wuwen-nx-aic`，本次没有停止或改动它；最终 MAM 查询显示 `stopped: process not found`，供 e690 owner/Manager 自行处理。`mam job list --task 2a879870-8dda-4613-a684-0ad48a5e86be` 为空，可由 Manager 归档本 task。
