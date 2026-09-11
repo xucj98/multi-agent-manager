@@ -107,3 +107,12 @@
 - 原始测量：C `workspace/2a879870-8dda-4613-a684-0ad48a5e86be/records/current-{rmbench,robot-bridge,openpi}-fresh-create.{log,metrics}`；三条均记录 `uv_symlink=PASS`。RMBench 的历史离线解析/闭包和 bridge client 缺包恢复日志仍单列在同一 records，未计入上表。
 - 稳定手册已实际写入 `C:/mnt/public/xcj/Projects/state-vla/README.md`（SHA256 `c7d45eec90b52bc0ed0cb972f21d46b84f3697b150a1429e919e0a5156dede5f`），内容含三机共享、三参数 worktree 命令、GPU 检查、smoke2→commit→formal、50/100 gate、独立 exp-group 回传和清理边界。写入前已从三份 `.metrics` 逐项校验表中五项数字；不触碰 active strict tree。
 - 正式结果说明将在独立 worktree `C:workspace/2a879870-8dda-4613-a684-0ad48a5e86be/docs/rmbench-formal-record`、branch `task/2a879870-8dda-4613-a684-0ad48a5e86be-c-formal-record`（base `3e69b1e`）完成，避免修改活跃 strict worktree。
+
+## Formal 100 基础设施门禁失败（2026-09-11 18:14 +08:00）
+
+- 唯一 C2 strict formal leaf 在达到 50 条前异常结束，outer `9732`/MAM job 已停止，runner exit 2。它**不是** 100/100 结果，不能归档到 `cluster_c_eval_acceptance_20260911`、不能回传为成绩，也不能与本机 69/100 比较。
+- 原始 `seed_preflight.jsonl` 有 23 条：episode 0–21 / seed `100000–100021` 连续 `accepted=true`；episode 22 / seed `100022` 的 `accepted=null`、`response.status=error`，原文为 `RMBench worker 'reset' failed: RPC failed (EOFError: worker closed the RPC stream during a frame)`。该 seed 不能静默跳过或用后续 seed 替换。
+- 22 条有效 terminal 中为 14 success、8 正常任务失败（`button_not_pressed_after_center=6`、`button_press_insufficient=2`）；episode 22 的 `accepted_reset_error` 是基础设施记录，不能纳入这 22 条或称为任务失败。前五视频与 5 后 no-video records 均通过，但不足以使此 leaf formal eligible。
+- worker 在 episode 22 的 354 steps 后立即写入 svulkan2 `Your GPU driver does not support Vulkan` / `ErrorIncompatibleDriver`，随后 RPC EOF。没有 Python traceback；C host 可读 dmesg 未见 OOM/Xid；robot/policy 按 runner shutdown 退出、19420/19422 已关闭、GPU2 回到 4 MiB。三台已通过 smoke 的 worker log 均无该 svulkan2 error，因此不把它当作可忽略的固定 warning。
+- 失败快照和 SHA256 已固化在 C `records/strict-formal-100-infrastructure-gate.json`（gate SHA256 `8e91aa33361c56250d9508217abee45725cdd98db4269b819256aa1507c1f825`）及同前缀的 preflight/diagnostics/video/process/worker/stdout 副本。`formal_eligible=false`；strict 三树、稳定 shim、失败 leaf 均未改动。
+- 下一步是只读定位 renderer/worker 生命周期的首因，采用不改 strict 源码的最小 C 环境门禁后，从**新 leaf**重启固定 `100000–100099`；在新的 run 前 50 条有效健康检查通过前，不修订当前验收专属文档或移动任何结果。
