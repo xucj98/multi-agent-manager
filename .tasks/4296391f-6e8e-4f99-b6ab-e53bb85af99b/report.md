@@ -489,3 +489,15 @@ policy 侧 full child 的 policy-only smoke、14D / 15 Hz / H50 / K30 metadata �
 
 GUI 与 TUI 是并列启动入口：GUI daemon 可以共存，但同一时刻只有一个入口启动那组三项服务。
 本次仅修改本地文档与报告；没有恢复或新增远端 SSH、代码同步、服务重启或配置写入。
+
+## TUI 环境刷新增量
+
+当前文档新增提交 `dfc9e1095badd7f37d9260d3275df3cca2700d90`：启动默认 TUI 前先检查并
+`export` `RB_POLICY_SSH`、`RB_ROBOT_SSH`、`RB_MASTER_SSH`、`RB_SCHEDULER_SSH`、
+`RB_POLICY_URL`、`RB_ROBOT_URL`、`RB_MASTER_URL`；已有 tmux server 时逐项执行
+`tmux set-environment -g`，新 server 则继承 export 后的环境。这防止默认 TUI 路径在旧 tmux
+全局环境中取到陈旧 URL/SSH target。
+
+同时删除 `RB_PY="$RB_PY"` 的无意义自赋值，bridge 路径改用
+`git -C "$BRIDGE_DIR" rev-parse --is-inside-work-tree`，支持 `.git` 为 worktree 文件。
+仅文档变更，`git diff --check` 通过；未进行远端操作。
