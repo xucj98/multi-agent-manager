@@ -79,7 +79,7 @@
 ## 正式 100 前两条门禁复核（2026-09-11 17:50 +08:00）
 
 - 前一快照后已实证正常切换：`seed_preflight.jsonl` 连续两条且仅两条，`(episode0, seed100000, accepted=true)`、`(episode1, seed100001, accepted=true)`；两条 terminal diagnostics 均为 `success`，无 rejected preflight。
-- episode 0 为 333 steps、video `ok=true`/333 frames；episode 1 为 terminal success、no-video check `enabled=false, ok=true`。两次 scheduler 均以 `episode_terminal` returncode 0 收尾，outer/robot/policy/worker 继续存活以执行后续固定序列。这一切换不是基础设施停滞。
+- episode 0 为 333 steps、video `ok=true`/333 frames；episode 1 为 terminal success，且**正式** `video_checks.jsonl` 记录为 `enabled=true, ok=true, frames=381`。此前将 C2 smoke 的 episode 1 no-video 结果误写为 formal，现已更正；两次 scheduler 均以 `episode_terminal` returncode 0 收尾，outer/robot/policy/worker 继续存活以执行后续固定序列。这一切换不是基础设施停滞。
 - 目前只计已落盘的 2/100；继续按原顺序观察，不重启、不挑选或跳过 seed。第 50 条将固定截面核对 accepted 连续性、success 趋势、failure categories、前五视频及 worker 状态。
 
 ## 正式 100 前五条视频门禁（2026-09-11 17:54 +08:00）
@@ -87,3 +87,9 @@
 - 固定序列 `seed100000–100004` 已全部 preflight accepted，严格连续且 `rejected=[]`；五条 diagnostics 已落盘，结果为 3 `Success` / 2 `Fail`。
 - 两个 `Fail` 分别为 episode 3/4（seed 100003/100004），均是模型任务终态 `button_not_pressed_after_center`、500 steps；它们不是 worker、renderer、cuRobo、RPC 或路径异常，已按正常表现失败保留在正式序列中。
 - 前五条视频均存在且 `ok=true`（frames `333,381,357,500,500`），满足 formal 的前五视频要求；worker stderr 对 `Traceback|FileNotFoundError|ConnectionResetError|AttributeError` 匹配数为 0。正式 job/服务保持运行，继续固定顺序 100000–100099。
+
+## Formal video 与回传路径更正（2026-09-11 18:00 +08:00）
+
+- 已从**正式** leaf 的原始 `video_checks.jsonl` 实读校正：episode 0–4 均为 `enabled=true, ok=true`（frames `333,381,357,500,500`）；episode 5–9 均为 `enabled=false, ok=true`。`config.yaml` 的实际 `eval_video_count=5`，与此一致。17:50 中把 C2 smoke 的 episode 1 no-video 结果误写到 formal 的表述已原位更正；formal episode 1 实际为 video `ok=true, frames=381`，不存在 smoke/formal 混计。
+- 当前 active formal 仍在原 leaf `eval_result/memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep`，不移动、不改名、不改路径。完成且通过连续 100、诊断/视频/退出/clean 验收后，才归档到 C 的独立布局 `eval_result/cluster_c_eval_acceptance_20260911/put_back_full_t_plus_1_s0_20k_100ep`，再按相同 `eval_result/<exp-group>/<run>` 布局回传本机；绝不写入或覆盖本机既有 `memory_chunk_20260910` 的 69/100 baseline。
+- 后续状态只在固定 50 条核对点、基础设施门禁变化或正式结束时发布，不逐集刷报。
