@@ -109,3 +109,6 @@ Manager已安排7ae41311训练rearrange serial/no-memory各seed1/2（GPU2–5）
 
 ## Manager待办清理与恢复责任
 恢复后续评测准备。C任务2a879870已三机smoke通过，renderer修复17b55bf/创建优化9c71a3e已独立review；正式100正在运行，首50为34/50对本机35/50，尚未完成5pp验收。先在现有任务整理剩余14模型清单、已完成/不完整/待跑状态和准确模型目录，确定迁移C的最小批次，不重复跑成功项。C最终验收之前不启动新GPU评估，准备完给Manager阶段report；不要为了active伪造job。原先get_obs修复已有378da0ac/ae463958后续报告，应先核对已修状态，不重开已解决问题。
+
+## C准入期间接续实际模型准备
+Manager接受14行队列状态(2完整保留、12待评)。现在提前传输12个待评模型到集群C，属于既定eval准备，不需等待最终100准入。先读C:/mnt/public/xcj/Projects/state-vla/README.md及2a879870已用checkpoint传输记录，沿既有稳定openpi/checkpoints布局，复用已有模型不重传，不覆盖活跃模型/环境。源只读20000 params/assets/metadata，使用本集群wuwen-nx-aic与C wuwen-4090-aic高速路径；最多两条并发，错开至少60s。先核实两侧磁盘/源目标对应，不复制训练数据或cache。真实rsync进程在本机登记mam job，完成后核对文件/metadata完整性和传输结果，失败不写ready。开始第一批后使用mam wait实际保持active（不能仅后台wait后final）；不逐分钟模型轮询。优先put_back_full_t_plus_30_s0与rearrange_full_t_plus_30_s0，后续按表序推进其余10个。此阶段不跑新GPU评估。你提交13192bb文档需先由Manager集成后再清理docs临时树；原三库树暂留供队列准备。
