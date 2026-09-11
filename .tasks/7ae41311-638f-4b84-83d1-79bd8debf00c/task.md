@@ -24,3 +24,6 @@
 
 ## Manager待办清理与恢复责任
 恢复现有四路训练责任。先核对实际进度、PID和20k完成状态；完成的验收产物并归档job，仍运行的使用新版mam wait保持active等停止事件，取代小时模型轮询。更新现有报告/台账，使用原worktree不重建，不重复训练。
+
+## 纠正本次等待交付
+刚才你启动后台mam wait后发送final结束turn；这不等于保持active，Manager实际收到agent_completed。请恢复后接续已有等待工具session，或者只停止自己的旧wait再新开mam wait。必须通过等待工具调用保持本turn，直到job事件/用户消息返回，再处理结果；不能仅启动后台等待进程就结束turn。此次无需再读全日志/重复进度检查。
