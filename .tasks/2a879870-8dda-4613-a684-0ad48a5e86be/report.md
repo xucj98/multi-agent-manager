@@ -75,3 +75,9 @@
 - 已实读正式 leaf 原始 JSON：仅 `episode_id=0, seed=100000, accepted=true`；其 terminal diagnostics 为 `success`、333 steps，`episode0.mp4` video check 为 `ok=true`（333 frames）。worker stderr 未见旧绝对路径异常或 traceback，只有既有 SAPIEN warning。
 - 当前尚未看到 episode 1 的 preflight/diagnostics/video record，100 条绝未完成；episode 0 scheduler 已以 `episode_terminal` returncode 0 退出，而 outer/服务仍在运行。我正在只读核查其是否处于下一集切换或存在活跃停滞，不做重启、跳 seed 或修改运行路径。
 - 下一验收点是固定 `seed100001` 的 accepted preflight 与连续 diagnostics；任何 rejected preflight、非连续 seed 或 worker/基础设施 traceback 都将保留为 formal gate failure，不能计入结果。现场原始路径：`C:/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep/{seed_preflight,episode_diagnostics,video_checks}.jsonl`，driver：`workspace/2a879870-8dda-4613-a684-0ad48a5e86be/records/strict-formal-100-driver.log`。
+
+## 正式 100 前两条门禁复核（2026-09-11 17:50 +08:00）
+
+- 前一快照后已实证正常切换：`seed_preflight.jsonl` 连续两条且仅两条，`(episode0, seed100000, accepted=true)`、`(episode1, seed100001, accepted=true)`；两条 terminal diagnostics 均为 `success`，无 rejected preflight。
+- episode 0 为 333 steps、video `ok=true`/333 frames；episode 1 为 terminal success、no-video check `enabled=false, ok=true`。两次 scheduler 均以 `episode_terminal` returncode 0 收尾，outer/robot/policy/worker 继续存活以执行后续固定序列。这一切换不是基础设施停滞。
+- 目前只计已落盘的 2/100；继续按原顺序观察，不重启、不挑选或跳过 seed。第 50 条将固定截面核对 accepted 连续性、success 趋势、failure categories、前五视频及 worker 状态。
