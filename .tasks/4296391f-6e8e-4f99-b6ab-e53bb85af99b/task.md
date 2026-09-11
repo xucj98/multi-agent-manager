@@ -97,3 +97,6 @@ GUI可以一直常驻，TUI用于调试，不能错误写成GUI和TUI程序不�
 
 ## 最小文档回归修正
 3906重写短指南误删dfc9的已有tmux set-environment刷新步骤，而默认TUI没有URL内联。请仅恢复该文档片段，避免本次schema迁移引入既有使用步骤回退；不扩TUI代码改造。独立review已通知。
+
+## Manager待办清理与恢复责任
+本轮为真机交付遗留收尾，不新增部署。旧wheel方案已被用户明确弃用，两侧各一份memory_config，d3e3d3d3 review已通过。更新陈旧报告为实际交付及剩余事项，不再实施wheel。只读核对本任务PM job9f91cf1c和现场交接，不停止/重启服务，不动真实机器人。若PID已停记录并归档job；若服务仍运行明确运行证据和归属；若连接不可达记录具体错误并给Manager可执行收尾方案，不能把unknown当stopped。核对已交付代码留存，清理本任务临时文件供归档，保持原workspace不重建。
