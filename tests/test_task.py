@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import shlex
 import shutil
 from pathlib import Path
 import subprocess
@@ -524,13 +525,28 @@ printf env > "$target/.venv/marker"
         scripts = self.root / "scripts"
         scripts.mkdir()
         implementation = ROOT / "scripts"
-        for name in ("create_worktree.sh", "local_create_worktree.sh"):
-            (scripts / name).write_bytes((implementation / name).read_bytes())
+        (scripts / "create_worktree.sh").write_bytes((implementation / "create_worktree.sh").read_bytes())
         shutil.copytree(ROOT / "multi_agent_manager", self.root / "multi_agent_manager", ignore=shutil.ignore_patterns("__pycache__"))
         shutil.copyfile(ROOT / "pyproject.toml", self.root / "pyproject.toml")
         self.git(self.root, "add", "scripts", "multi_agent_manager", "pyproject.toml")
         self.git(self.root, "commit", "-m", "environment entry")
-        (self.root / ".local/create_worktree.sh").write_bytes((scripts / "local_create_worktree.sh").read_bytes())
+        outside = tempfile.TemporaryDirectory(prefix="mam test Python ", dir="/tmp")
+        self.addCleanup(outside.cleanup)
+        test_python = Path(outside.name) / "python"
+        test_python.symlink_to(Path(sys.executable).resolve())
+        self.assertFalse(str(test_python).startswith("/mnt/public/"))
+        (self.root / ".local/create_worktree.sh").write_text(
+            """#!/usr/bin/env bash
+set -euo pipefail
+if [[ $# != 3 ]]; then
+  echo 'usage: .local/create_worktree.sh BASE_COMMIT BRANCH WORKSPACE_ROOT' >&2
+  exit 2
+fi
+source_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+cd "$source_root"
+base=$(git rev-parse --verify "$1^{commit}")
+""" + f"python={shlex.quote(str(test_python))}\n" + """git show "$base:scripts/create_worktree.sh" | bash -s -- "$base" "$2" "$3" "$python"
+""")
         linked = self.projects / "production state"
         self.git(self.root, "worktree", "add", "-b", "project/state-vla", str(linked), "main")
         self.configure(self.projects, linked, "project/state-vla")
@@ -557,10 +573,8 @@ printf env > "$target/.venv/marker"
 
         linked_readme.unlink()
         linked_readme.write_text("Keep this conflicting file.\n")
-        # Retry through the same local entry as workspace add: it selects the
-        # persistent shared Python, independently of the test runner's venv.
-        retry = subprocess.run(["bash", str(self.root / ".local/create_worktree.sh"), self.git(self.root, "rev-parse", "main"),
-                                f"task/{task}", str(path.parent)], cwd=self.root,
+        retry = subprocess.run(["bash", str(scripts / "create_worktree.sh"), self.git(self.root, "rev-parse", "main"),
+                                f"task/{task}", str(path.parent), str(test_python)], cwd=self.root,
                                capture_output=True, text=True)
         self.assertEqual(retry.returncode, 0, retry.stdout + retry.stderr)
         self.assertEqual(linked_readme.read_text(), "Keep this conflicting file.\n")
@@ -571,6 +585,18 @@ printf env > "$target/.venv/marker"
         linked_readme.symlink_to(source_readme)
         self.call("archive", task, "--note", "stdlib smoke finished")
         self.assertFalse(path.parent.exists())
+
+    def test_worktree_entry_rejects_non_python_with_diagnostic(self):
+        fake = Path(self.temp.name) / "not Python"
+        fake.write_text("#!/usr/bin/env bash\nprintf 'not-a-python\\n'\n")
+        fake.chmod(0o755)
+        workspace = Path(self.temp.name) / "workspace"
+        result = subprocess.run(["bash", str(ROOT / "scripts/create_worktree.sh"),
+                                 self.git(self.root, "rev-parse", "main"), "task/diagnostic",
+                                 str(workspace), str(fake)], cwd=self.root, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("shared Python must be a runnable Python >= 3.10", result.stderr)
+        self.assertFalse(workspace.exists())
 
     def test_regular_install_runs_without_source_or_git_cwd(self):
         source = Path(self.temp.name) / "package source"
