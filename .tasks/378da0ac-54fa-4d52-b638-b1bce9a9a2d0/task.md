@@ -1,0 +1,15 @@
+# formal episode首次get_obs超时定位与最小修复
+
+## 目标
+本机新schema14模型评估队列6run中4个在16/17/32/67个正常episode后因首次get_obs/logical_step0超时终止，2个完整100成功。你负责定位公共运行问题并在证据支持时最小修复，不改变memory/模型/动作/成功判定/seed、不把不完整run计为成功率、不盲目放大或移除timeout。源task e6908de7最新report有完整状态和证据。
+
+## 工作区与证据
+按MAM创建独立robot-bridge worktree以本机当前f0f585a2b5974c60b51cac65277f94d1097591a3为修复基线，RMBench按需要6139577，OpenPI按需要a869（仅需要模型短复现才建）。先读各AGENTS和bridge conventions。原故障运行bridge8ea6078543a875b5ae223df16891cdc1fe975c66，RMBench3e69b1e，OpenPIa869；只读对比最新是否已有相关修复，不能修改原运行树。
+证据根本机RMBench/eval_result/memory_chunk_20260910/，四个run：put_back_full_t_plus_30_s0_20k_100ep、rearrange_full_t_plus_1_s1_20k_100ep、rearrange_full_t_plus_30_s0_20k_100ep、rearrange_full_t_plus_1_s0_20k_100ep。各failure_review.json、processes日志、runtime error、trace及命令真实留存。两完整基线put_back_full_t_plus_1_s0_20k_100ep69/100、rearrange_full_t_plus_30_s1_20k_100ep92/100供对照。跨卡两个故障接近同一时间，不直接认定算法。
+
+## 调查与实施
+先确认第一阻塞点和超时层次：外层benchmark状态RPC30秒、scheduler get_obs默认30秒、simulation controller同一锁串行worker RPC内部600秒只是线索，不预设根因。比较worker响应/渲染/启动/队列等待/父进程退出/内存或GPU日志；区分慢首帧、被锁阻塞、worker死亡/卡死。历史证据若不足明确缺口，用CPU可控延迟/异常worker经真实RPC验证调度预算和状态查询，不靠mock单函数证明全链。必要GPU短复现先报告最小命令、卡和时长，Manager分配；不直接启动正式100或消耗训练卡0/1，不SSH操作现场。
+若证实预算/锁问题，在现有接口小修：有界等待、正确区分运行中与失联、避免状态检查被长get_obs错误阻塞，并保留错误传播/取消/资源回收；不重构scheduler循环、不新增session/plugin、不可把所有错误重试到成功。新增测试覆盖真实慢响应不会误判、worker死亡仍及时报错、清理不挂死；既有memory时序/现场wait/UDP不改。
+
+## 交付
+先给根因证据与推荐最小修复；可直接完成授权内可逆实现，但需要Manager及独立review后才能合入/正式实验。报告实际代码/测试/未证实内容和两种部署版本影响，给失败项重跑建议（Manager决定新run完整100还是其它策略，不能自己拼接旧结果）。有用诊断写Git docs短记录，原始结果保留，清理自己临时文件。提交代码及发布report，列workspace/commits；不自行merge/push、不扩MAM、不修改活跃环境。
