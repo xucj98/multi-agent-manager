@@ -1,8 +1,19 @@
-# 任务管理 CLI 接口说明
+# MAM 设计细节
 
-MAM 通过文件和 CLI 管理当前集群的任务，顶层命令为 `mam task`、`mam job`、`mam wait`、`mam workspace`。所有 agent 和管理命令在本机运行；GPU 作业可通过 SSH 在 wuwen-1 运行，两端共享 `/mnt/public`。除 `--help` 外，命令从当前目录逐级向上寻找最近的 `.mam/env.json`；没有配置或最近配置无效都会报错，且不会回退到更上层的配置。
+本文档提供 MAM 设计细节，开发 MAM 请参考并同步本文档；日常使用参考[README](../README.md)，安装见[安装说明](install.md)。MAM 顶层命令为 `mam task`、`mam job`、`mam wait`、`mam workspace`。默认项目结构如下：
 
-配置是唯一的项目选择来源，不提供 `--root` 或环境变量默认值。文件必须包含绝对路径的 `MAM_ROOT`、`PROJECT_ROOT` 和现有本地分支名 `MAM_BRANCH`：
+```text
+PROJECT_ROOT/
+  .mam/env.json               # 项目配置
+  MAM_ROOT/                   # MAM 根目录
+    .tasks/TASK-ID/task.md    # Manager 编辑任务要求
+    .tasks/TASK-ID/report.md  # 执行者编辑结果简报
+  REPO/                       # 一个项目下可以有多个 git 仓库
+  workspace/TASK-ID/          # 执行者的独立工作空间
+    REPO/                     # 按需创建的 worktree，分支为 task/TASK-ID
+```
+
+除 `--help` 外，命令从当前目录逐级向上寻找最近的 `.mam/env.json`；没有配置或最近配置无效都会报错，且不会回退到更上层的配置。配置是唯一的项目选择来源，文件必须包含绝对路径的 `MAM_ROOT`、`PROJECT_ROOT` 和现有本地分支名 `MAM_BRANCH`：
 
 ```json
 {
@@ -12,35 +23,21 @@ MAM 通过文件和 CLI 管理当前集群的任务，顶层命令为 `mam task`
 }
 ```
 
-`MAM_ROOT` 是保存任务、job、wait、锁和归档登记的 Git worktree 根，可为普通 checkout 或 linked worktree；工具不会将 linked worktree 归并到 primary checkout。`PROJECT_ROOT` 包含业务仓库和 workspace。路径在读取配置时解析为实际目录，避免同一目录的别名形成不同边界。
-
-日常命令和交付步骤见 [README 的任务管理](../README.md#任务管理)、[执行与交付](../README.md#执行与交付)、[进程管理](../README.md#进程管理)与[休眠管理](../README.md#休眠管理)。本文保留接口设计、状态语义和归档保护；安装见[安装说明](install.md)。
+`MAM_ROOT` 是保存任务、结果简报、job、wait、锁和归档登记的根目录。`PROJECT_ROOT` 包含业务仓库和 workspace。`MAM_BRANCH`
+用于记录该项目的任务和结果简报，所有 `MAM_ROOT/.tasks` 的内容只保存在该分支，不进入 `main`。
 
 使用者分为 Manager 和执行者。Manager 为 subagent 登记任务，自己的工作无需创建任务。代码实现、review、实验等是不同的任务内容，负责完成任务的 agent 统一称为执行者。
 
 ## 文件与发布
 
-任务、workspace 和工作分支使用同一个 `TASK-ID`，由工具生成：
-
-```text
-MAM_ROOT/
-  .tasks/TASK-ID/task.md       # Manager 编辑任务要求
-  .tasks/TASK-ID/report.md     # 执行者编辑结果简报
-  .local/tasks/TASK-ID.json    # 工具维护的登记与状态，不进入 Git
-  .local/waits/*.json          # 当前等待登记，不进入 Git
-
-PROJECT_ROOT/workspace/TASK-ID/
-  REPO/                        # 按需创建的 worktree，分支为 task/TASK-ID
-```
-
-`MAM_BRANCH` 上的 task.md、report.md 是已发布内容，工作目录中的修改是草稿。读取已发布内容无需切换 checkout；发布前 `MAM_ROOT` 必须已 checkout 到 `MAM_BRANCH`，CLI 不自动切换分支。这样代码可从 `main` 安装或开发，而生产管理 worktree 使用独立的项目分支保存项目记录。
+任务、workspace 和工作分支使用同一个 `TASK-ID`，由 MAM 在创建任务时生成。`MAM_BRANCH` 上的 task.md、report.md 是已发布内容，工作目录中的修改是草稿。读取已发布内容无需切换 checkout；发布前 `MAM_ROOT` 必须已 checkout 到 `MAM_BRANCH`，CLI 不自动切换分支。这样代码可从 `main` 安装或开发，而生产管理 worktree 使用独立的项目分支保存项目记录。
 
 ## 创建与执行
 
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
 | `mam task create --title TITLE` | Manager | 生成 `TASK-ID`，登记任务，创建 task.md、report.md 草稿和空 workspace；返回 `TASK-ID` 与文件、目录路径，状态为“进行中” |
-| `mam task create --title TITLE --review TASK-ID` | Manager | 创建任务，并在任务草稿中引用源 `TASK-ID` 当前已发布的要求、简报及已登记的交付代码 commit，供执行者 review |
+| `mam task create --title TITLE --review TARGET-TASK-ID` | Manager | 创建任务，并在任务草稿中引用源 `TASK-ID` 当前已发布的要求、简报及已登记的交付代码 commit，供执行者 review |
 | `mam task bind TASK-ID --agent AGENT-ID` | Manager | 将已启动的 subagent 绑定到任务；一个未归档任务对应一个执行 agent，一个 agent 同时绑定一个任务 |
 | `mam workspace add TASK-ID --repo REPO --base COMMIT` | 执行者 | 从 `PROJECT_ROOT/REPO` 调用该库的 `.local/create_worktree.sh`，从 base commit 新建 `task/TASK-ID` 分支及对应 `PROJECT_ROOT/workspace` worktree，同时创建环境和受控共享软链接；登记并返回路径与分支名 |
 
