@@ -26,3 +26,9 @@
 `require_compatible()` 的公开接口已就绪，Runtime owner 应在每次真正进入 block 前调用它；`cli.py`、`job_runtime.py` 和其他 wait 模块不在本任务的写入范围，未在本 worktree 改动。接口不保存 completion replay/cursor 状态，可直接配合当前 state-based pending-work 语义。
 
 自检仍将 `native_message_wake` 标为 `not-certified`：它不宣称已验证真实用户消息或 native manager-send 到 MAM wait 的端到端唤醒。真实 restart 的 App-supervisor replacement 行为同样按任务要求未在 live 服务上试验；安装器会在无法观察到 replacement 时安全失败，Manager 可在独立终端协调一次确认后的实机验收。
+
+## ResourceWarning follow-up
+
+- Commit `80b190fbdb17466d49a90cdc394bd97a2fafb6c9` closes the isolated App Server `stdin` and `stdout` pipes in `_stop()` even when the child has already exited, TERM times out and requires KILL, or TERM itself raises.
+- Added regression coverage for all three cleanup paths. `.venv/bin/python -W error::ResourceWarning -B -m unittest tests.test_wait_compat -v` passed 18 tests; the same warning policy passed the full suite (59 tests, 30.483s) and the live isolated compatibility probe.
+- No production restart was performed.
