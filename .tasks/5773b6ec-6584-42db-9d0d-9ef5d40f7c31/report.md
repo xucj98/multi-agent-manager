@@ -74,3 +74,22 @@ C 的 remote task root 是
 该旧 bridge 的 `openpi_client` 会按其已有 `scripts/deployment/install_openpi_client.sh` 从对应 OpenPI commit 构建的本地 wheel 正规安装到旧 bridge venv；最新 bridge 会单独证明没有此客户端依赖。不会用临时 `PYTHONPATH` 伪造旧环境。
 
 待完成：三个 current `.local` 实测与磁盘表、strict tree 安装/客户端 wheel、renderer/cuRobo 和三机真实 smoke2、单次登记的 C 100 rollout、50 条中点核查、结果回传和最终清理/README。
+
+## 阶段更新（2026-09-11 13:30 +08:00）
+
+bridge 首次 cache-miss 创建从 11:47 开始，解析和本地 editable build 已完成；实际阻塞是
+Fastly wheel 下载/解包，日志采样速度约 `45–50 KiB/s`，不适合继续盲等。已停止仅属于本任务的
+旧 uv 进程并归档对应 MAM job，保留原始日志。随后从本集群现有 uv cache 精确同步 bridge 所需
+`568.86 MB / 6,680 files`（约 94 秒），以 `UV_OFFLINE=1` 和 symlink 模式重新执行，`74` 个包
+安装耗时 `8.74 s`；`current/robot-bridge` 的 CPU 环境 smoke 于 13:14 exit 0，`robot_bridge`
+可导入，且最新 bridge 环境中 `openpi_client_spec=None`，符合“最新 bridge 不引入客户端依赖”。
+
+OpenPI 的离线依赖计划已从本集群 cache 精确补齐 `8.27 GB / 45,468 files`，传输时段
+13:10–13:26，实测 `8.78 MB/s`、无重试。跨机绝对 cache links 已改写为 C 的
+`/mnt/public/xcj/cache/uv`（228 条重写、21 条已有效）；10 条直接 wheel link 缺失项存在
+source-build/sdist fallback，须由下一步真实离线 `.local/create_worktree.sh` 验证，尚不声称成功。
+
+当前 C 没有运行中的 uv；已完成的是 bridge 离线环境与 CPU smoke、OpenPI cache 预置。尚未创建
+OpenPI/RMBench 环境，尚未进行 renderer/cuRobo、三机 smoke2 或正式 100 rollout。依 Manager
+验收要求，bridge 这次“失败后补 cache”的过程不计入一键成功耗时；三库缓存齐备后会在全新、可清理
+workspace 各实际执行一次入口，并单独记录可复现的一键创建耗时和磁盘变化。
