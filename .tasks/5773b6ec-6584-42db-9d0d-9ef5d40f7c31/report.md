@@ -190,3 +190,17 @@ wuwen-nx-aic → wuwen-4090-aic 的一条 --bwlimit=10240 流；C 共享盘可�
 workspace 实测三库一键创建时间和磁盘，当前恢复性安装不作为该验收数据。
 
 958eeae 的独立 CPU review 已由 c03e0009 承担；该 review 不写 C，环境施工不等待它。
+
+## OpenPI optimized-mode protection follow-up（2026-09-11 14:29 +08:00）
+
+按 c03e0009 的定向结论和 Manager 已发布的范围，新增本机受管提交
+`5f6ca06436c7b33905b442c769c7800d3f4a17e2`（基于 `958eeae`）。它只把本次
+transformers 私有覆盖的两项 installer 路径边界和 smoke 的四项覆盖完整性判断，从可被
+`python -O` 删除的 `assert` 改为显式 `RuntimeError`；未做全库 assert 审计，也未变更
+policy、simulator 或严格 runtime SHA。
+
+验证通过：`git diff --check`、`bash -n`、`py_compile`；并从实际 installer heredoc 提取最小
+fixture，以 `python -O` 创建 cache-backed `transformers/models` 子目录。修复后在第一次写入前
+明确拒绝，cache sentinel 未变化（`optimized_installer_boundary=PASS cache_modified_files=0`）。
+该提交现通知 Manager/c03e0009 复核；C 将在同步新 bundle/patch 后以 `PYTHONOPTIMIZE=1` 跑实际
+current OpenPI smoke，之后的 fresh one-click 与正式环境均使用该保护。
