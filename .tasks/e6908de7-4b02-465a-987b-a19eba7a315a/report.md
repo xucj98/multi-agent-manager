@@ -1,3 +1,11 @@
+# 09:30 GPU5 put-back t+1 seed0前50条中检完成
+
+`put_back_full_t_plus_1_s0_20k_100ep`前50条35 success/15正常失败（70%，仅中检，正式100继续）。失败原因button_not_pressed_after_center10、button_press_insufficient5。episode0–49与seed100000–100049严格顺序，无runtime_error，全部terminal、50个scheduler exit0。逐query最终trace记录684个实际执行query（635个K30、49个partial），1270个已记录字段更新均匹配last_executed行，无索引错配。正式目录`midpoint_review.json`保存检查摘要。
+
+没有同新20k训练/config的旧基准，不用不同实验强行计算10个百分点偏差；保留全部正常失败，继续既定100不改参数。GPU4已过50中检，当前56条；GPU7 seed1当前23条，无runtime_error。GPU3/6继续空闲，三次公共RPC失败待处置；源码冻结、失败产物全部保留。
+
+---
+
 # 09:19 GPU4 rearrange t+1 seed0前50条中检完成
 
 `rearrange_full_t_plus_1_s0_20k_100ep`前50条38 success/12正常任务失败（76%，仅中检，非正式100结果）。seed严格100000–100049，episode0–49顺序一致，无runtime_error，均terminal，50个scheduler exit0。正常失败为button_pressed_multiple_times4、block2_not_moved_to_middle4、button_press_insufficient2、button_not_pressed2；全部保留。
