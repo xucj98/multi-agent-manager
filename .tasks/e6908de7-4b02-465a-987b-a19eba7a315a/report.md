@@ -1,3 +1,15 @@
+# 11:24 稳定台账提交与集群C基线交接
+
+已按迁移发布要求提交稳定实验台账，文档commit `66f0a255a8c7878816ae1db1a42985f8990b3e04`（base主库6139577，分支codex/e6908de7-ledger）。仅文档worktree位于 /mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-ledger，无新环境；只改experiments/memory_chunk_20260910/EXPERIMENT_LEDGER.zh-CN.md。已核对新增产物链接/CPU证据、diff-check与干净提交；原三库运行树未修改、未合入文档，可由Manager合入主库。
+
+已收尾基线提名put-back full t+1 seed0 completed20k：69/100，31正常失败、0 runtime_error，前50检查35/50；GPU5已释放。C复现≤5pp即64–74/100，须独立环境匹配smoke后完整100。checkpoint为 /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s0/20000；结果/原命令launch.json/command.txt/final_review.json在共享RMBench/eval_result/memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep。运行冻结SHA是RMBench3e69b1e665a8eac0104d261b233f1b3339007e00、bridge8ea6078543a875b5ae223df16891cdc1fe975c66、openpia869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4；文档commit不是运行版本。
+
+完整现状14项：1完成、1运行、4基础设施失败、8未启动。运行GPU7 rearrange t+30 seed1，前50中检45/50已保存，继续完整100。四失败为rearrange t+1/t+30 seed0、rearrange t+1 seed1、put-back t+30 seed0；首次get_obs的30秒RPC超时，全部失败产物保留，需公共修复与失败重试规则裁定。未启动队列为put-back seed1 pair、rearrange seed2 pair、put-back seed2 pair、serial/no-memory；其中put-back seed2两项尚待20k交接，其余CPU已准备。
+
+C准入前不自行启动C正式run，当前本机run不停止不移动，后续新eval待准入后优先C；GPU3/4/5/6已释放且未接续新run。保持active turn跟进GPU7。已将完成基线、50/100证据、对应训练seed、真实路径和四失败边界写入稳定台账，不只留MAM报告。
+
+---
+
 # 10:53 首份正式100完成：GPU5 put-back t+1 seed0 69/100
 
 `put_back_full_t_plus_1_s0_20k_100ep`已完成100，benchmark completed/error null；69 success、31正常失败（button_not_pressed_after_center18、button_press_insufficient13），0 runtime_error。episode0–99/seed100000–100099原顺序完整保留，无补跑或重抽样。前50中检已于09:30完成。
