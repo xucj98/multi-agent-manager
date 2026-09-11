@@ -40,3 +40,6 @@ wash训练owner ad6bb77e-3892-4730-ae1a-7d9cd99a5728最新task/report：两20k c
 接受retry1根因。允许最小offline接线修复，优先把memory预测/索引作为offline评估信息妥善传递，避免通用机器人float32动作转换吞掉整数类型。不要在通用server或controller base引入模型专用memory字段分支，也不要全局改变既有机器人动作float32契约；可用offline controller局部handle_execute适配或现成评估请求字段实现，选择最小方案。写集允许本任务offline scheduler/controller及必要测试；确需改base先报具体不可替代原因。禁止通过float→int截断来掩盖错误输入。
 这次必须补真实WebSocket/codec→RobotServer→handle_execute→offline controller的CPU集成验证，运行完整fake-policy一集full和serial，核对integer IDs/rows、query标量、实际drain行/GT/mask/反馈，检查末尾/reset。不要再次只测直接execute或孤立helper。CPU用确定性fake预测即可，不加载模型；保留既有legacy drawer/action转换契约。先在这条真实RPC路径找出后续同类错误再交付，不让每次GPU试跑只暴露下一个可CPU捕获的接口错误。
 提交小修和定向集成结果给Manager，独立4296391复查。GPU2重试run为wash_memory_v1_20k_offline5ep_retry2，待准入后才跑，保留前次错误原始证据，最终清理重复失败临时目录按既定要求。全程今天只保证wash功能，不做架构重构。
+
+## 08:40 RPC 独立验收后准入
+Helmholtz已独立复核dd0914b170fe5d227f24d36b07d90c0e422b7e58，实际RPC full/serial各两集27 passed。Manager准入：固定该bridge commit和OpenPI a869498f，以GPU2执行两模型各5ep offline，输出新目录wash_memory_v1_20k_offline5ep_retry2。仍先检查卡/端口19580/19582、干净源码与握手；同一GPU顺序跑full后serial，完成后核对执行行/推理次数/指标、进程退出及释放。预计超1小时则登记mam job；失败先定位，不反复盲重试。此准入不代表真机验证通过。
