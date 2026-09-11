@@ -1,0 +1,7 @@
+# robot-bridge本地memory_config部署准入
+
+用户最终要求两库各自一份memory_config.py，互不依赖。源任务4296391f正在交付bridge增量，基线dfc9e1095badd7f37d9260d3275df3cca2700d90，原OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4保持不动。请读源task最新要求；创建独立bridge worktree按AGENTS阅读，先明确回归计划，作者commit到达后Manager通知ff候选做定向CPUreview。
+
+重点验收：bridge/memory_config.py与原OpenPI纯实现语义相同；scheduler/robot offline不再依赖openpi_client（阻断其import的最小环境真实full/serial checkpoint metadata初始化与必要回归）；原训练/推理schema行为不变，OpenPI工作树无交付改动；必要policy backend本身允许原模型OpenPI依赖但memory_config不能再被不必要依赖绑住。移除手工wheel安装脚本/指南要求，短现场流程WSL checkout→配RB→push_code auto→TUI→8088可满足依赖。GUI后台可以常驻，既有wait/UDP/takeover保持，不要求--skip-policy。
+
+不占GPU、不SSH、不改业务代码、不重构，不重跑没有改动的全部体系。读目标repo规范并给证据；可从本机OpenPI git show读取原纯模块对照，无需另建OpenPI环境。报告具体PASS/阻塞、路径行、CPU测试、候选commit和workspace。清理本task测试缓存，发布report，保留workspace归档。不要等待全文历史报告，按最新明确用户要求裁定。
