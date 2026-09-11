@@ -220,15 +220,71 @@ class AgentProbeTests(unittest.TestCase):
 
 
 class EventStreamTests(unittest.TestCase):
-    def test_resume_accepts_a_snapshot_larger_than_the_legacy_four_megabyte_cap(self) -> None:
-        padding = "x" * (5 * 1024 * 1024)
-
+    def test_idle_resume_does_not_page_turn_history(self) -> None:
         def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
             initialize = fixture.read_json(connection)
             fixture.send_json(connection, {"id": initialize["id"], "result": {}})
             self.assertEqual(fixture.read_json(connection)["method"], "initialized")
             resume = fixture.read_json(connection)
             self.assertEqual(resume["method"], "thread/resume")
+            self.assertEqual(resume["params"], {"threadId": "agent", "excludeTurns": True})
+            fixture.send_json(connection, {
+                "id": resume["id"],
+                "result": {"thread": {"id": "agent", "status": {"type": "idle"}, "turns": []}},
+            })
+
+        with AppServerFixture(handler) as fixture:
+            stream = runtime.AppServerEventStream.connect(fixture.path)
+            try:
+                snapshot = stream.resume("agent")
+            finally:
+                stream.close()
+        self.assertEqual(snapshot["thread"]["turns"], [])
+
+    def test_resume_rechecks_metadata_when_the_active_turn_finishes_during_paging(self) -> None:
+        def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
+            initialize = fixture.read_json(connection)
+            fixture.send_json(connection, {"id": initialize["id"], "result": {}})
+            self.assertEqual(fixture.read_json(connection)["method"], "initialized")
+            resume = fixture.read_json(connection)
+            fixture.send_json(connection, {
+                "id": resume["id"],
+                "result": {"thread": {"id": "agent", "status": {"type": "active"}, "turns": []}},
+            })
+            turns = fixture.read_json(connection)
+            self.assertEqual(turns["method"], "thread/turns/list")
+            fixture.send_json(connection, {
+                "id": turns["id"],
+                "result": {"data": [{"id": "turn-1", "status": "completed", "items": []}]},
+            })
+            read = fixture.read_json(connection)
+            self.assertEqual(read["method"], "thread/read")
+            self.assertEqual(read["params"], {"threadId": "agent", "includeTurns": False})
+            fixture.send_json(connection, {
+                "id": read["id"],
+                "result": {"thread": {"id": "agent", "status": {"type": "idle"}, "turns": []}},
+            })
+
+        with AppServerFixture(handler) as fixture:
+            stream = runtime.AppServerEventStream.connect(fixture.path)
+            try:
+                snapshot = stream.resume("agent")
+            finally:
+                stream.close()
+        self.assertEqual(snapshot["thread"]["status"], {"type": "idle"})
+        self.assertEqual(snapshot["thread"]["turns"], [{"id": "turn-1", "status": "completed", "items": []}])
+
+    def test_resume_accepts_a_snapshot_larger_than_the_legacy_four_megabyte_cap(self) -> None:
+        padding = "x" * (5 * 1024 * 1024)
+
+        def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
+            initialize = fixture.read_json(connection)
+            self.assertEqual(initialize["params"]["capabilities"], {"experimentalApi": True})
+            fixture.send_json(connection, {"id": initialize["id"], "result": {}})
+            self.assertEqual(fixture.read_json(connection)["method"], "initialized")
+            resume = fixture.read_json(connection)
+            self.assertEqual(resume["method"], "thread/resume")
+            self.assertEqual(resume["params"], {"threadId": "agent", "excludeTurns": True})
             response = json.dumps({
                 "id": resume["id"],
                 "result": {"thread": {"id": "agent", "status": {"type": "active"}, "turns": [], "padding": padding}},
@@ -236,6 +292,16 @@ class EventStreamTests(unittest.TestCase):
             self.assertGreater(len(response), 4 * 1024 * 1024)
             self.assertLessEqual(len(response), runtime.MAX_WEBSOCKET_FRAME_BYTES)
             _send_frame(connection, 1, response)
+            turns = fixture.read_json(connection)
+            self.assertEqual(turns["method"], "thread/turns/list")
+            self.assertEqual(
+                turns["params"],
+                {"threadId": "agent", "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded"},
+            )
+            fixture.send_json(connection, {
+                "id": turns["id"],
+                "result": {"data": [{"id": "turn-1", "status": "inProgress", "items": []}]},
+            })
 
         with AppServerFixture(handler) as fixture:
             stream = runtime.AppServerEventStream.connect(fixture.path)
@@ -244,6 +310,7 @@ class EventStreamTests(unittest.TestCase):
             finally:
                 stream.close()
         self.assertEqual(snapshot["thread"]["padding"], padding)
+        self.assertEqual(snapshot["thread"]["turns"], [{"id": "turn-1", "status": "inProgress", "items": []}])
 
     def test_resume_preserves_notification_received_before_its_snapshot(self) -> None:
         def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
@@ -260,6 +327,12 @@ class EventStreamTests(unittest.TestCase):
             fixture.send_json(connection, {
                 "id": resume["id"],
                 "result": {"thread": {"id": "agent", "status": {"type": "active"}, "turns": []}},
+            })
+            turns = fixture.read_json(connection)
+            self.assertEqual(turns["method"], "thread/turns/list")
+            fixture.send_json(connection, {
+                "id": turns["id"],
+                "result": {"data": [{"id": "turn-1", "status": "inProgress", "items": []}]},
             })
 
         with AppServerFixture(handler) as fixture:

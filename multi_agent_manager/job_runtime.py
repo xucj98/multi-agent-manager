@@ -374,7 +374,10 @@ class AppServerEventStream:
             stream = cls(websocket)
             stream.request(
                 "initialize",
-                {"clientInfo": {"name": "multi-agent-manager", "title": "Multi-agent manager", "version": "1.0"}},
+                {
+                    "clientInfo": {"name": "multi-agent-manager", "title": "Multi-agent manager", "version": "1.0"},
+                    "capabilities": {"experimentalApi": True},
+                },
             )
             stream.notify("initialized", {})
             return stream
@@ -443,7 +446,36 @@ class AppServerEventStream:
     def resume(self, thread_id: str) -> Any:
         """Subscribe without applying model, sandbox, or other overrides."""
 
-        return self.request("thread/resume", {"threadId": thread_id})
+        snapshot = self.request("thread/resume", {"threadId": thread_id, "excludeTurns": True})
+        if not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("thread"), Mapping):
+            return snapshot
+        thread = snapshot["thread"]
+        raw_status = thread.get("status")
+        status = raw_status.get("type") if isinstance(raw_status, Mapping) else raw_status
+        if status != "active":
+            return snapshot
+
+        # ``thread/resume`` normally hydrates every turn and its items.  Its
+        # metadata-only mode still subscribes this connection, so page only
+        # the newest turn to identify the currently active one.
+        page = self.request(
+            "thread/turns/list",
+            {"threadId": thread_id, "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded"},
+        )
+        if not isinstance(page, Mapping) or not isinstance(page.get("data"), list):
+            raise AppServerEventError("App Server thread/turns/list returned no turns page")
+        turns = page["data"]
+        if not any(isinstance(turn, Mapping) and turn.get("status") == "inProgress" for turn in turns):
+            # The active turn can complete between resume and the bounded page
+            # request. Re-read metadata in that narrow case so the waiter
+            # starts from the current status while retaining queued events.
+            current = self.request("thread/read", {"threadId": thread_id, "includeTurns": False})
+            if isinstance(current, Mapping) and isinstance(current.get("thread"), Mapping):
+                current_status = current["thread"].get("status")
+                current_type = current_status.get("type") if isinstance(current_status, Mapping) else current_status
+                if current_type != "active":
+                    thread = {**thread, "status": current_status}
+        return {**snapshot, "thread": {**thread, "turns": turns}}
 
     def poll(self, timeout: float | None) -> dict[str, Any] | None:
         if self._events:
