@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from contextlib import ExitStack
+import io
 import os
 from pathlib import Path
 import pty
 import select
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -161,6 +163,42 @@ class WaitCompatibilityTests(unittest.TestCase):
                     "trace_turn_mapping": True,
                 }
             )
+
+    def test_stop_closes_pipes_after_an_already_exited_process(self):
+        process = subprocess.Popen(
+            [sys.executable, "-c", "pass"], stdin=subprocess.PIPE, stdout=subprocess.PIPE
+        )
+        process.wait(timeout=5)
+        wait_compat._stop(process)
+        self.assertTrue(process.stdin.closed)
+        self.assertTrue(process.stdout.closed)
+
+    def test_stop_closes_pipes_after_termination_timeout(self):
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.stdin = io.BytesIO()
+        process.stdout = io.BytesIO()
+        process.wait.side_effect = [subprocess.TimeoutExpired(["codex"], 5), None]
+
+        wait_compat._stop(process)
+
+        process.terminate.assert_called_once_with()
+        process.kill.assert_called_once_with()
+        self.assertTrue(process.stdin.closed)
+        self.assertTrue(process.stdout.closed)
+
+    def test_stop_closes_pipes_when_termination_errors(self):
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.stdin = io.BytesIO()
+        process.stdout = io.BytesIO()
+        process.terminate.side_effect = OSError("process disappeared")
+
+        with self.assertRaisesRegex(OSError, "process disappeared"):
+            wait_compat._stop(process)
+
+        self.assertTrue(process.stdin.closed)
+        self.assertTrue(process.stdout.closed)
 
 
 class InstallerScriptTests(unittest.TestCase):

@@ -227,14 +227,23 @@ class _JsonLinesClient:
 
 
 def _stop(process: subprocess.Popen[bytes] | None) -> None:
-    if process is None or process.poll() is not None:
+    if process is None:
         return
-    process.terminate()
     try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=5)
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+    finally:
+        # Popen does not close PIPE handles after wait().  The probe owns both
+        # endpoints, including when the child already exited or termination
+        # itself failed.
+        for stream in (process.stdin, process.stdout):
+            if stream is not None:
+                stream.close()
 
 
 def _trace_evidence(trace: bytes, expected_turn_id: str) -> dict[str, bool]:
