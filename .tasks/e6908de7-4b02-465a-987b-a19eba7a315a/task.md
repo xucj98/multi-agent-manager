@@ -112,3 +112,6 @@ Manager已安排7ae41311训练rearrange serial/no-memory各seed1/2（GPU2–5）
 
 ## C准入期间接续实际模型准备
 Manager接受14行队列状态(2完整保留、12待评)。现在提前传输12个待评模型到集群C，属于既定eval准备，不需等待最终100准入。先读C:/mnt/public/xcj/Projects/state-vla/README.md及2a879870已用checkpoint传输记录，沿既有稳定openpi/checkpoints布局，复用已有模型不重传，不覆盖活跃模型/环境。源只读20000 params/assets/metadata，使用本集群wuwen-nx-aic与C wuwen-4090-aic高速路径；最多两条并发，错开至少60s。先核实两侧磁盘/源目标对应，不复制训练数据或cache。真实rsync进程在本机登记mam job，完成后核对文件/metadata完整性和传输结果，失败不写ready。开始第一批后使用mam wait实际保持active（不能仅后台wait后final）；不逐分钟模型轮询。优先put_back_full_t_plus_30_s0与rearrange_full_t_plus_30_s0，后续按表序推进其余10个。此阶段不跑新GPU评估。你提交13192bb文档需先由Manager集成后再清理docs临时树；原三库树暂留供队列准备。
+
+## 集群C最终准入，放行既定12项评估
+Manager核对2a879870最终证据：C100/100固定seed、70成功，本机69，19checks通过，255文件回传hash一致。现放行已整理12待评项，不重复2完整项。按C README在C workspace/本TASK-ID建自有三库worktree/环境，运行版本沿已验收RMBench17b55bf、bridge8ea6078、openpia869498，固定GPU映射和ICD；如某variant缺能力/入口需要修复先交Manager，不随意换算法。每模型完成自身2rollout有/无video smoke+产物检查，再固定源码同GPU串行100。模型到达即启动，不必等12个全传完；首批优先已指定两s0，先一机一run(C1/2/3实际空卡任选)，首批健康后可每机最多两run但每GPU仅一run，端口/cache独立，先报告实际资源不抢他人。每run前50比较可比历史/查基础设施，完整结果独立exp-group/run记录，不拼旧partial。真实job登记、本机MAM运行，等待使用mam wait。后续回传到本机RMBench同exp-group，保留旧两完整baseline。不要依赖2a879870或5773远端临时worktree/venv，它们将收尾清理；需shared stable cache/assets/model可继续用。你13192bb文档已合本机f58ac38，文档树可自行清理。
