@@ -1,5 +1,7 @@
 # Unified mam wait runtime
 
+## Delivery
+
 Delivered commits on branch task/21a41c32-660a-4cc5-9cf5-a7c656bcbeb5:
 
 - cc69d43761ac7f28534bf062b75c031a7dcc891e — unified wait runtime.
@@ -8,56 +10,65 @@ Delivered commits on branch task/21a41c32-660a-4cc5-9cf5-a7c656bcbeb5:
 - 8539bfe73da3bac847e1b02315acf4d4900ac171 — native Manager-input wake path.
 - 0dd2bcdf17f24688bc5452fd79a9066be543c782 — ignore lifecycle notifications for a bound agent that this executor wait has not snapshotted.
 
-Worktree: /mnt/public/xcj/Projects/workspace/21a41c32-660a-4cc5-9cf5-a7c656bcbeb5/multi-agent-manager (base 351c3a3e6dc807cae280a99d5f3c824f8d5750ff).
+Worktree: /mnt/public/xcj/Projects/workspace/21a41c32-660a-4cc5-9cf5-a7c656bcbeb5/multi-agent-manager
 
-The runtime provides plain automatic mam wait, current-state ownership and review delegation, fixed 3600-second exits with required identifiers, lifecycle event handling, and targeted user/native Manager input wakeups. It has no delivery cursor, acknowledgement, replay state, server restart, or GPU behavior. Compatibility remains a no-argument wait_compat.require_compatible() gate; this task did not edit wait_compat.py, installer code, or documentation.
+The runtime provides plain automatic mam wait, current-state ownership and review delegation, fixed 3600-second exits with required identifiers, lifecycle event handling, targeted user/native Manager input wakeups, and explicit errors. It has no delivery cursor, acknowledgement, replay state, server restart, GPU behavior, or production job changes.
 
-## Native Manager-input diagnosis and native path
+Compatibility remains a no-argument wait_compat.require_compatible() gate. This task did not edit wait_compat.py, installer code, or documentation.
 
-The earlier real normal send_input submission 01a09133-80ed-7873-ba02-89aa409e69c9 reached the target agent while its wait was armed. The target session journal recorded a new response_item with role user, content_item_kinds ["user.text"], and the current wait turn at 2026-09-11T16:01:25.671Z. The read-only App Server thread/read snapshot contains the matching userMessage item ID. In the same interval, App Server request tracing showed only configRequirements/read and fs/getMetadata; it did not show turn/steer or turn/start.
+## Native Manager-input implementation
 
-8539bfe treats the session journal as the observed native path. Before the compatibility probe it opens the exact current-session journal identified by CODEX_HOME, CODEX_SESSION_ID, and CODEX_THREAD_ID, tails only new records, and retains only turn/message identifiers and the user.text kind. It returns reason message, message received new message, and the affected agent only when the journal turn equals the current wait turn. The timestamp floor rejects late old same-turn records. Journal rotation, truncation, malformed records, or ambiguous identity return an explicit error.
+The observed normal Manager send_input path writes a current-turn response_item to the exact Codex session journal with role user and content_item_kinds containing user.text; it did not emit a traced turn/steer or turn/start request in the original diagnosis.
 
-The App Server subscription also recognizes matching item/started or item/completed userMessage notifications. It validates caller agent, current turn, item ID, and the invocation timestamp floor. RPC trace handling remains for turn/steer and turn/start paths.
+8539bfe opens that exact journal before the compatibility probe using CODEX_HOME, CODEX_SESSION_ID, and CODEX_THREAD_ID. It tails only new records and retains only turn/message identifiers and content kind. A matching current-turn user.text returns reason message, message received new message, and the affected agent. Timestamp floors reject old same-turn records; malformed, rotated, truncated, or ambiguous journals return explicit errors.
 
-## Retry evidence and follow-up fix
+The App Server subscription also recognizes matching item/started and item/completed userMessage notifications. It validates the caller, current turn, item ID, and timestamp floor. Trace handling remains for turn/steer and turn/start.
 
-The initial smoke against integration HEAD 60cfd89eab19de290872227c539ce4c706421436 was a real failure: normal Manager input arrived after readiness, but the CLI returned job_stopped for job e92b592d-87e4-4a7d-9888-d5fac284683e. Its evidence remains at:
+0dd2bcd fixes a real integration smoke defect: an executor snapshots only its caller, while the shared control stream can contain lifecycle events from another bound agent. Such unsnapshotted events are ignored until the next state reconciliation instead of aborting the caller's wait. The regression verifies that this event followed by a matching native item returns message.
 
-- /mnt/public/xcj/Projects/multi-agent-manager/.local/native-wait-result.json
-- /mnt/public/xcj/Projects/multi-agent-manager/.local/native-wait-output.txt
+## Coordinated 900-second native smoke: PASS
 
-After integration HEAD 758d523914ac5586cd9a5dda1a732c998b40a078, two subsequent ready-file attempts timed out before any fresh user input arrived. Their session-journal metadata contained only assistant records after arm, no role user / user.text record, so neither is a native-message pass or failure:
+Integration checkout: /mnt/public/xcj/Projects/multi-agent-manager/.local/wait-integration at 87f02d3db36546d23b6d65ee98f56224cf8c9f57.
 
-- job c92e728c-47a6-443f-95a7-e2677470836f, armed at 2026-09-11T16:40:55Z, later returned job_stopped;
-- job e11a2ad0-d828-4ad1-94c8-4f254512c319, armed at 2026-09-11T16:45:02Z, later returned job_stopped.
+One registered harmless local sleep 900s job was used, as required:
 
-A third attempt, job 92758ba3-ae87-467b-a7b0-9e5275d837b2, exposed a separate runtime bug. While the smoke sleep was still alive, CLI output was:
+- job: fb8b8aa3-843b-422d-83f9-603950d0f79d
+- wait PID: 67161
+- sleep PID: 67154
+- wait turn: 01a09167-b47b-7ac2-9829-65a89e6156c9
+- armed: 2026-09-11T16:59:10.002497Z
+
+Manager sent normal input after ready. The session journal recorded the matching current-turn user.text item at 2026-09-11T16:59:57.550Z. The actual CLI output completed at 2026-09-11T16:59:57.551423Z:
 
 ~~~json
 {
-  "reason": "error",
-  "message": "App Server event arrived before snapshot for 01a08f82-48d5-73c1-93c1-5c2734a2c0fe",
+  "status": "message",
+  "reason": "message",
+  "message": "received new message",
   "agent": "01a090d8-3590-7f91-b22c-3caf018058c1"
 }
 ~~~
 
-That agent is a different bound task. An executor wait intentionally snapshots only its caller, but the shared control stream can emit lifecycle events for other bound agents. 0dd2bcd ignores an event for a bound agent absent from this wait's snapshot; its current state is reconciled on the next refresh. The new regression sends such an event before a matching native userMessage event and verifies the executor returns reason message instead of failing.
+The monitor observed the sleep alive immediately at wait return. A later pre-cleanup job status still reported running at 2026-09-11T17:01:31.421887Z. Only after that observation, the smoke sleep was stopped and the registered job was archived with the factual note coordinated 900s native input smoke passed; stopped after message return cleanup.
 
-All three retry smoke jobs were stopped and archived with factual notes. Their independent output, stderr, metadata, and job-add records remain under /mnt/public/xcj/Projects/multi-agent-manager/.local/native-wait-retry-20260912-*.
+Complete no-message-body evidence is retained at:
+
+- /mnt/public/xcj/Projects/multi-agent-manager/.local/native-wait-coordinated-900-1789145948-result.json
+- /mnt/public/xcj/Projects/multi-agent-manager/.local/native-wait-coordinated-900-1789145948-output.txt
+- /mnt/public/xcj/Projects/multi-agent-manager/.local/native-wait-coordinated-900-1789145948-meta.json
+
+Earlier 180-second smoke evidence, including the initial real failure before the native journal implementation, remains separately retained and was not counted as a pass.
 
 ## Validation
 
 ~~~text
+Task worktree:
 .venv/bin/python -B -m unittest discover -s tests -v
-# 75 tests passed
+75 tests passed
 
-git diff --check
-# passed before commit
+Integrated checkout, using this task worktree interpreter:
+.venv/bin/python -B -m unittest discover -s tests -v
+102 tests passed
 ~~~
 
-The focused runtime suite also passed with the new regression. No server restart, production job change, or GPU operation occurred.
-
-## Remaining integration step
-
-Manager owns integration. Integrate 0dd2bcd into .local/wait-integration, then repeat the ready-file smoke from that checkout with this task worktree's .venv/bin/python. A pass requires actual CLI JSON with reason message, message received new message, agent 01a090d8-3590-7f91-b22c-3caf018058c1, and the registered sleep still alive at return. Do not count a coordination timeout or job_stopped as a native pass.
+All smoke jobs for this task are archived. No server restart, production job change, or GPU operation occurred.
