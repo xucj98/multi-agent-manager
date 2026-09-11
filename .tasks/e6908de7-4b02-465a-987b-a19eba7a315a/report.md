@@ -201,3 +201,23 @@ review 前不重启这两项 smoke，也不启动其他 C smoke/formal。
 `04:29` 发布快照中均 running、无 `20000`。论文台账的 C 已评/12项待评/10项训练中清单正在安全
 RMBench docs tree 更新；没有把训练中的路径写成 eval-ready。
 
+## 2026-09-12 C 队列与论文台账提交
+
+安全 docs worktree 从当前 RMBench `xcj-dev` `a7e94204715cccddf82674293b8b6fa0c51e9851`
+建立分支 `task/e6908de7-c-eval-ledger-20260912`，提交
+`564024207898fef1d5cabee48550a8aebf233529`，仅更新
+`experiments/memory_chunk_20260910/EXPERIMENT_LEDGER.zh-CN.md`。它登记了：
+
+- 两份仅有的完整结果（put-back full t+1/s0 `69/100`，rearrange full t+30/s1 `92/100`）及其
+  train/eval commit、failure 分类与不可比较边界；
+- 12 个已传 C 的 `d10cc01` checkpoint 的精确相对路径、schema/seed、传输验收状态；两个已有
+  C smoke leaf 明确为 `scheduler_first_infer_timeout` 基础设施失败、无成绩且无 formal；
+- 695bc51f 的 6 条 put-back 与 7ae41311 的 4 条 rearrange B 组训练的 config/schema/seed、
+  train commit 与预期输出路径，均标为训练中不可评，不预设结果或建立传输项；
+- 固定 smoke2→formal100、100条分母、50条检查和等待独立 review 的边界。
+
+文档 diff-check 通过；C 端实读 12/12 checkpoint 的 `_CHECKPOINT_METADATA`、`params`、`assets`、
+`metadata` 均存在；本机实读新增 B 组预期的十个 `20000` 目录均不存在，与 owner 已发布快照一致。
+未修改 C 冻结 eval tree、未启动 GPU、未停止服务或机器人。该 docs commit 待 Manager 集成；bridge
+`f962663` 仍待独立 review，review 通过前队列保持停止而非重试。
+
