@@ -49,3 +49,6 @@ GPU1只读确认约24067MiB可用、PM建议8951。Manager允许现在通过已�
 
 ## 现场交接责任确认
 用户确认jx-x1pro-m-060及现场WSL由内网同事更新。我们只完成已授权policy主机部署及验证，交付简短说明：bridge041405f、OpenPI a869（policy侧）、PM模型URL、现场x1pro_takeover.sh --skip-policy、现场同commit/CPU导入及phase/reset/takeover检查。不要尝试连接或更新master/WSL，不直接向同事发消息；由用户转交。真实机器人行为由现场验证，明确与已完成offline/CPU/policy-only测试的边界。
+
+## 用户报告8951握手错误：优先定位来源
+用户在PM看到8951持续报opening handshake failed / EOF before HTTP request line，示例UTC01:33:19。请优先停止本任务自行添加的任何裸TCP重复探活（如果有，先记录命令/来源），只读追查来源机器/IP/进程：核查本次部署检查命令、仍在运行的PM健康检查实现与旧进程加载版本，并用可用ss/短时抓包证明来源，避免再制造裸TCP探测。不要仅凭EOF堆栈断言来自launcher。区分你的一次性探测与持续周期性探测，给时间间隔和源/目的证据；不重启PM或其他policy实例。先快速回报已知是否本次工具产生，后给确证及最小修复方案。
