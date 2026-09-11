@@ -278,3 +278,14 @@ runtime error。已重新进入新版裸 `mam wait` 等待四个已登记 formal
 baseline，`triggered=false`；不同 target 的受控比较不被当作基础设施健康基线。两项 formal 均继续运行，
 这些数不作为正式成绩。C2 两项尚在 43/100、42/100，未到其 50 条检查点；四个 job 均保持运行，未接续
 新模型。
+
+## 2026-09-12 07:01 C2 两项 50 条检查
+
+台账增量提交 `2eff5dc5a17b0c6f7db2a6d9e4e8f046cf3934cb`，在前两项 C3 midpoint 的基础上记录 C2：
+
+- put-back full t+1/s1：episode 0–49 / seed 100000–100049，**25/50**；
+- put-back full t+30/s1：相同连续范围，**32/50**。
+
+两项均为 0 runtime error、全部 terminal、前五条视频存在且 episode 5–49 无额外视频。各自 runner
+`midpoint_checks.jsonl` 都是无完整历史主比较、`triggered=false`；因此没有启动10pp基础设施诊断，也不把
+这两项不同 target 的中期值当正式成绩。C2/C3 各继续两项 formal100，未有主机配额可接续下一模型。
