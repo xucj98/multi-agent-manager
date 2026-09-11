@@ -27,3 +27,6 @@
 
 ## 纠正本次等待交付
 刚才你启动后台mam wait后发送final结束turn；这不等于保持active，Manager实际收到agent_completed。请恢复后接续已有等待工具session，或者只停止自己的旧wait再新开mam wait。必须通过等待工具调用保持本turn，直到job事件/用户消息返回，再处理结果；不能仅启动后台等待进程就结束turn。此次无需再读全日志/重复进度检查。
+
+## 完成训练后的评估交接
+用户要求完成训练及时安排eval并更新实验台账。请核对各run实际结束状态；完成后验证最终20k checkpoint完整/可恢复及metadata、归档已处理训练job，并在report给出明确可评模型清单（config/schema/seed/commit/绝对checkpoint路径、研究目的、预期结论）。通过任务报告交给e6908de7评估队列，勿自行重复启动eval。仍在训练的继续保留真实状态和完成事件监控。无需为没有变化的等待窗口改报告或发心跳；任务全部交付后结束turn，不为已完成事项持续wait。
