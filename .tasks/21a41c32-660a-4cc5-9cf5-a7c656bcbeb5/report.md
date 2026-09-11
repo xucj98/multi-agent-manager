@@ -1,47 +1,50 @@
-task_revision: 7a891f70c74a71b033638b6712c4c7da19e91574
+# Unified `mam wait` runtime
 
-# Unified \`mam wait\` runtime
+Delivered commits on `task/21a41c32-660a-4cc5-9cf5-a7c656bcbeb5`:
 
-Delivered commits on \`task/21a41c32-660a-4cc5-9cf5-a7c656bcbeb5\`:
+- `cc69d43761ac7f28534bf062b75c031a7dcc891e` — unified wait runtime.
+- `89d094b289285d288be4f887e3a00c0278cd9c0c` — executable module entry and compatibility-mock isolation.
+- `675a53351a55be911b756b953c723e67f24929cb` — native-wait setup/race and large snapshot fixes.
+- `8539bfe73da3bac847e1b02315acf4d4900ac171` — native Manager-input wake path.
 
-- \`cc69d43761ac7f28534bf062b75c031a7dcc891e\` — unified wait runtime.
-- \`89d094b289285d288be4f887e3a00c0278cd9c0c\` — executable module entry and compatibility-mock isolation.
-- \`675a53351a55be911b756b953c723e67f24929cb\` — native-wait setup/race and large snapshot fixes.
+Worktree: `/mnt/public/xcj/Projects/workspace/21a41c32-660a-4cc5-9cf5-a7c656bcbeb5/multi-agent-manager` (base `351c3a3e6dc807cae280a99d5f3c824f8d5750ff`).
 
-Worktree: \`/mnt/public/xcj/Projects/workspace/21a41c32-660a-4cc5-9cf5-a7c656bcbeb5/multi-agent-manager\` (base \`351c3a3e6dc807cae280a99d5f3c824f8d5750ff\`).
+The runtime provides plain automatic `mam wait`, current-state ownership and review delegation, fixed 3600-second exits with required identifiers, lifecycle event handling, and targeted user/native Manager input wakeups. It has no delivery cursor, acknowledgement, replay state, server restart, or GPU behavior. Compatibility remains a no-argument `wait_compat.require_compatible()` gate; this task did not edit `wait_compat.py`, installer code, or documentation.
 
-The runtime provides plain automatic \`mam wait\`, current-state ownership and review delegation, fixed 3600-second exits with required identifiers, lifecycle event handling, and targeted user/native Manager input wakeups. It has no delivery cursor, acknowledgement, replay state, server restart, or GPU behavior. Compatibility remains a no-argument \`wait_compat.require_compatible()\` gate; this task did not edit \`wait_compat.py\`, installer code, or documentation.
+## Native Manager-input diagnosis and fix
 
-## Follow-up fixes
+The real normal `send_input` submission `01a09133-80ed-7873-ba02-89aa409e69c9` reached the target agent while its wait was armed. The target session journal recorded a new `response_item` with `role: user`, `content_item_kinds: ["user.text"]`, and the current wait turn at 2026-09-11T16:01:25.671Z. The read-only App Server `thread/read` snapshot contains the matching `userMessage` item ID. In the same interval, App Server request tracing showed only `configRequirements/read` and `fs/getMetadata`; it did not show `turn/steer` or `turn/start`.
 
-- Raised the bounded WebSocket frame cap from 4 MiB to 16 MiB. The live \`thread/resume\` frame that blocked the smoke was 4,938,839 bytes; after the change, a read-only live resume of the current active thread succeeded at 6,355,996 JSON bytes.
-- The CLI now opens the authoritative App Server trace path before the compatibility probe and passes that tail into the wait runtime. It accepts a future public \`wait_compat.configured_paths()\` helper and uses the integrated module's current \`_configured_paths()\` helper otherwise; no guessed path is used. A changed path after compatibility returns an explicit error.
-- Every trace increment, including the initial increment, is filtered by the invocation timestamp. Thus a buffered old span for the same turn cannot cancel a later wait.
+`8539bfe` treats this as the actual native path. Before the compatibility probe it opens the exact current-session journal identified by `CODEX_HOME`, `CODEX_SESSION_ID`, and `CODEX_THREAD_ID`, tails only new records, and retains only turn/message identifiers and the `user.text` kind. It returns `reason: "message"`, `message: "received new message"`, and the affected agent only when the journal turn equals the current wait turn. The timestamp floor rejects late old same-turn records. Journal rotation, truncation, malformed records, or ambiguous identity return an explicit error.
 
-Focused regressions cover a >4 MiB \`thread/resume\` response, input written during compatibility, and a late old same-turn trace span.
+The App Server subscription now also recognizes a matching `item/started` or `item/completed` `userMessage` notification. It validates caller agent, current turn, item ID, and the invocation timestamp floor. This covers the direct event form without reading message text. RPC trace handling remains for `turn/steer` and `turn/start` paths.
 
 ## Validation
 
-\`\`\`text
+```text
 .venv/bin/python -B -m unittest discover -s tests -v
-# 69 tests passed
+# 74 tests passed
+
 git diff --check
-# passed before commit
-\`\`\`
+# passed
+```
 
-The live \`thread/resume\` check was read-only. No server restart, production job change, or GPU operation occurred.
+New regressions cover native `userMessage` events, wrong-agent/wrong-turn/stale-event rejection, session-journal targeting and deduplication, session identity validation, and input appended while compatibility is running. Existing tests retain CLI reason/identifier assertions, manual cancellation, timeout, ownership/review, trace-boundary, and stale-trace coverage.
 
-## Native Manager-input smoke evidence
+The live `thread/read` diagnosis was read-only. No server restart, production job change, or GPU operation occurred.
 
-Actual smoke against integration HEAD \`18006592dadd19f923b8020a1e90a139997cc00d\` used the task worktree interpreter with integration as CWD, a registered <=180-second local sleep job \`ed2045cd-a69c-4a2c-afc8-8c417eea810b\`, and \`python -m multi_agent_manager.cli wait\`.
+## Native smoke status
 
-It failed before wait registration, so no readiness file was written and no Manager input was sent during an armed wait:
+The completed smoke against integration HEAD `60cfd89eab19de290872227c539ce4c706421436` is a real failure, not a pass. With registered job `e92b592d-87e4-4a7d-9888-d5fac284683e` and wait PID `29223`, Manager sent normal `send_input` with `interrupt=false` after the ready record. The CLI did not return `message`; after the 180-second sleep ended it returned:
 
-\`\`\`json
-{"status":"error","reason":"error","message":"App Server event connection failed: WebSocket frame is too large","agent":"01a090d8-3590-7f91-b22c-3caf018058c1"}
-\`\`\`
+```json
+{
+  "reason": "job_stopped",
+  "job": "e92b592d-87e4-4a7d-9888-d5fac284683e",
+  "note": "native Manager send_input smoke (sleep <=180s)"
+}
+```
 
-The sleep job was still alive when the CLI returned, then it was stopped and archived with the smoke cleanup note. This is a real FAIL for the old integration runtime, not native-message PASS evidence.
+The job was no longer alive at return and was archived with `native_message_pass=False`. Evidence is retained at `/mnt/public/xcj/Projects/multi-agent-manager/.local/native-wait-result.json` and `/mnt/public/xcj/Projects/multi-agent-manager/.local/native-wait-output.txt`.
 
-Manager integration must include \`675a53351a55be911b756b953c723e67f24929cb\`, then rerun the same bounded smoke from \`.local/wait-integration\` using this task worktree's \`.venv/bin/python\`. Write \`.local/native-wait-ready.json\` only after the actual wait record exists, send normal \`send_input\` with \`interrupt=false\`, and accept only CLI JSON with \`reason: "message"\`, \`message: "received new message"\`, the affected agent ID, and the job alive at return. Stop and archive that smoke job afterward.
-
+For the required retest, integrate `8539bfe`, run from `/mnt/public/xcj/Projects/multi-agent-manager/.local/wait-integration` with this task worktree's `.venv/bin/python`, register a harmless local sleep of at most 180 seconds, and write `.local/native-wait-ready.json` only after the actual wait record exists. After normal Manager `send_input` with `interrupt=false`, accept only real CLI JSON with `reason: "message"`, `message: "received new message"`, this agent ID, and the sleep still alive; then stop and archive the smoke job.
