@@ -14,6 +14,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 
 ENV_FILE = Path(".mam") / "env.json"
@@ -764,6 +765,13 @@ def wait_trace_path(wait_compat):
     return str(path)
 
 
+def wait_session_messages(wait_runtime, caller, started_at):
+    try:
+        return wait_runtime.SessionMessages.from_environment(caller, started_at=started_at)
+    except (wait_runtime.WaitRuntimeError, OSError, ValueError) as exc:
+        raise Error(str(exc)) from exc
+
+
 def wait_lock(agent):
     return f"wait-{wait_key(agent)}"
 
@@ -909,14 +917,14 @@ def wait_unified(store, args):
         from . import wait_runtime
     except ImportError as exc:
         raise Error("multi_agent_manager.wait_runtime is required for mam wait") from exc
+    started_at = time.time()
     wait_compat = wait_compat_module()
     trace_path = wait_trace_path(wait_compat)
+    trace = None
+    messages = None
     try:
-        trace = wait_runtime.TraceMessages(trace_path)
-    except wait_runtime.WaitRuntimeError as exc:
-        raise Error(str(exc)) from exc
-
-    try:
+        trace = wait_runtime.TraceMessages(trace_path, started_at=started_at)
+        messages = wait_session_messages(wait_runtime, caller, started_at)
         compatible = wait_compatibility(wait_compat)
         if compatible["log_path"] != trace_path:
             raise Error("App Server trace path changed while validating compatibility")
@@ -935,9 +943,16 @@ def wait_unified(store, args):
             active_wait_states=lambda: active_wait_states(store),
             process_probe=runtime().probe_process,
             trace=trace,
+            messages=messages,
+            message_floor_ms=int(started_at * 1000),
         )
+    except wait_runtime.WaitRuntimeError as exc:
+        raise Error(str(exc)) from exc
     finally:
-        trace.close()
+        if trace is not None:
+            trace.close()
+        if messages is not None:
+            messages.close()
 
 
 def wait_list(store, args):

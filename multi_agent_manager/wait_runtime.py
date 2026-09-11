@@ -28,6 +28,8 @@ JOB_REFRESH_SECONDS = 5.0
 JOB_PROBE_TIMEOUT_SECONDS = 3.0
 _AGENT_STATUSES = {"active", "idle", "notLoaded", "systemError"}
 _MESSAGE_METHODS = {"turn/steer", "turn/start"}
+_USER_TEXT_KIND = "user.text"
+MAX_SESSION_RECORD_BYTES = 16 * 1024 * 1024
 
 
 class WaitRuntimeError(RuntimeError):
@@ -77,6 +79,14 @@ class TraceMessage:
     method: str
 
 
+@dataclass(frozen=True)
+class SessionMessage:
+    """One text input observed in the local Codex session journal."""
+
+    turn_id: str
+    message_id: str
+
+
 def _timestamp(value: Any) -> float | None:
     if not isinstance(value, str):
         return None
@@ -114,14 +124,16 @@ def _thread_state(agent: str, result: Any) -> ThreadState:
 class TraceMessages:
     """Tail new App Server request-trace spans without retaining message text."""
 
-    def __init__(self, path: str | os.PathLike[str]) -> None:
+    def __init__(self, path: str | os.PathLike[str], *, started_at: float | None = None) -> None:
         self.path = Path(path)
         self._handle = None
         self._device_inode: tuple[int, int] | None = None
         self._partial = ""
         self._seen: set[tuple[str, str, str, str, str]] = set()
         self._seen_order: list[tuple[str, str, str, str, str]] = []
-        self._started_at = time.time()
+        if started_at is not None and (not isinstance(started_at, (int, float)) or isinstance(started_at, bool)):
+            raise ValueError("trace start time must be numeric")
+        self._started_at = time.time() if started_at is None else float(started_at)
         self._open(at_end=True)
 
     def _open(self, *, at_end: bool) -> None:
@@ -238,6 +250,171 @@ class TraceMessages:
             self._handle = None
 
 
+class SessionMessages:
+    """Tail current-thread text inputs from Codex's local session journal.
+
+    Manager ``send_input`` currently reaches a running agent through this
+    in-process journal path rather than a traced ``turn/steer`` RPC.  The
+    watcher retains only message and turn identifiers; it never returns or
+    persists message text.
+    """
+
+    def __init__(self, path: str | os.PathLike[str], *, started_at: float | None = None) -> None:
+        self.path = Path(path)
+        if started_at is not None and (not isinstance(started_at, (int, float)) or isinstance(started_at, bool)):
+            raise ValueError("session journal start time must be numeric")
+        self._started_at = time.time() if started_at is None else float(started_at)
+        self._handle = None
+        self._device_inode: tuple[int, int] | None = None
+        self._partial = b""
+        self._seen: set[tuple[str, str]] = set()
+        self._seen_order: list[tuple[str, str]] = []
+        self._open(at_end=True)
+
+    @classmethod
+    def from_environment(
+        cls, agent: str, *, environment: Mapping[str, str] | None = None, started_at: float | None = None
+    ) -> "SessionMessages":
+        """Open the unique current-session journal for ``CODEX_THREAD_ID``."""
+
+        env = os.environ if environment is None else environment
+        home, session_id = env.get("CODEX_HOME"), env.get("CODEX_SESSION_ID")
+        if not isinstance(home, str) or not home:
+            raise WaitRuntimeError("CODEX_HOME is required to observe native messages")
+        if not isinstance(session_id, str) or not session_id:
+            raise WaitRuntimeError("CODEX_SESSION_ID is required to observe native messages")
+        root = Path(home) / "sessions"
+        if not Path(home).is_absolute() or not root.is_dir() or root.is_symlink():
+            raise WaitRuntimeError("CODEX_HOME has no readable Codex sessions directory")
+        if not isinstance(agent, str) or not agent:
+            raise WaitRuntimeError("native message watcher has an invalid AGENT-ID")
+
+        matches: list[Path] = []
+        try:
+            candidates = sorted(root.glob(f"**/*-{agent}.jsonl"))
+        except OSError as exc:
+            raise WaitRuntimeError(f"cannot locate Codex session journal: {exc}") from exc
+        for candidate in candidates:
+            if candidate.is_symlink() or not candidate.is_file():
+                continue
+            try:
+                with candidate.open("rb") as handle:
+                    header = handle.readline(MAX_SESSION_RECORD_BYTES + 1)
+            except OSError as exc:
+                raise WaitRuntimeError(f"cannot read Codex session journal: {exc}") from exc
+            if len(header) > MAX_SESSION_RECORD_BYTES:
+                raise WaitRuntimeError("Codex session journal header is too large")
+            try:
+                row = json.loads(header)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise WaitRuntimeError("Codex session journal has an invalid header") from exc
+            if not isinstance(row, Mapping):
+                raise WaitRuntimeError("Codex session journal header is not an object")
+            payload = row.get("payload")
+            if (row.get("type") == "session_meta" and isinstance(payload, Mapping)
+                    and payload.get("id") == agent and payload.get("session_id") == session_id):
+                matches.append(candidate)
+        if len(matches) != 1:
+            raise WaitRuntimeError("cannot identify one current Codex session journal for CODEX_THREAD_ID")
+        return cls(matches[0], started_at=started_at)
+
+    def _open(self, *, at_end: bool) -> None:
+        try:
+            handle = self.path.open("rb")
+            stat = os.fstat(handle.fileno())
+        except OSError as exc:
+            raise WaitRuntimeError(f"cannot read Codex session journal: {exc}") from exc
+        if at_end:
+            handle.seek(0, os.SEEK_END)
+        if self._handle is not None:
+            self._handle.close()
+        self._handle = handle
+        self._device_inode = (stat.st_dev, stat.st_ino)
+        self._partial = b""
+
+    def _refresh_handle(self) -> None:
+        if self._handle is None:
+            raise WaitRuntimeError("Codex session journal was closed while waiting")
+        try:
+            stat = self.path.stat()
+        except OSError as exc:
+            raise WaitRuntimeError(f"cannot stat Codex session journal: {exc}") from exc
+        if (stat.st_dev, stat.st_ino) != self._device_inode:
+            raise WaitRuntimeError("Codex session journal rotated while waiting")
+        if stat.st_size < self._handle.tell():
+            raise WaitRuntimeError("Codex session journal was truncated while waiting")
+
+    def _remember(self, key: tuple[str, str]) -> bool:
+        if key in self._seen:
+            return False
+        self._seen.add(key)
+        self._seen_order.append(key)
+        if len(self._seen_order) > 4096:
+            stale = self._seen_order.pop(0)
+            self._seen.discard(stale)
+        return True
+
+    def _message(self, row: Mapping[str, Any]) -> SessionMessage | None:
+        if row.get("type") != "response_item":
+            return None
+        payload = row.get("payload")
+        if not isinstance(payload, Mapping) or payload.get("type") != "message" or payload.get("role") != "user":
+            return None
+        when = _timestamp(row.get("timestamp"))
+        if when is None:
+            raise WaitRuntimeError("Codex session journal user message has an invalid timestamp")
+        if when < self._started_at:
+            return None
+        metadata = payload.get("internal_chat_message_metadata_passthrough")
+        if not isinstance(metadata, Mapping):
+            raise WaitRuntimeError("Codex session journal user message has no turn metadata")
+        turn_id, message_id = metadata.get("turn_id"), payload.get("id")
+        kinds = metadata.get("content_item_kinds")
+        if not isinstance(turn_id, str) or not turn_id or not isinstance(message_id, str) or not message_id:
+            raise WaitRuntimeError("Codex session journal user message has invalid identifiers")
+        if not isinstance(kinds, list) or not all(isinstance(kind, str) for kind in kinds):
+            raise WaitRuntimeError("Codex session journal user message has invalid content metadata")
+        if _USER_TEXT_KIND not in kinds:
+            return None
+        key = (turn_id, message_id)
+        return SessionMessage(turn_id, message_id) if self._remember(key) else None
+
+    def poll(self) -> list[SessionMessage]:
+        self._refresh_handle()
+        assert self._handle is not None
+        try:
+            chunk = self._handle.read(MAX_SESSION_RECORD_BYTES + 1)
+        except OSError as exc:
+            raise WaitRuntimeError(f"cannot read Codex session journal: {exc}") from exc
+        if not chunk:
+            return []
+        lines = (self._partial + chunk).split(b"\n")
+        self._partial = lines.pop()
+        if len(self._partial) > MAX_SESSION_RECORD_BYTES:
+            raise WaitRuntimeError("Codex session journal record is too large")
+        messages: list[SessionMessage] = []
+        for line in lines:
+            if not line:
+                continue
+            if len(line) > MAX_SESSION_RECORD_BYTES:
+                raise WaitRuntimeError("Codex session journal record is too large")
+            try:
+                row = json.loads(line)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise WaitRuntimeError("Codex session journal has an invalid record") from exc
+            if not isinstance(row, Mapping):
+                raise WaitRuntimeError("Codex session journal record is not an object")
+            message = self._message(row)
+            if message is not None:
+                messages.append(message)
+        return messages
+
+    def close(self) -> None:
+        if self._handle is not None:
+            self._handle.close()
+            self._handle = None
+
+
 class UnifiedWait:
     """Own one unified wait and return one compact, actionable exit result."""
 
@@ -256,6 +433,8 @@ class UnifiedWait:
         stream_factory: Callable[[str], Any] = job_runtime.AppServerEventStream.connect,
         trace_factory: Callable[[str], TraceMessages] = TraceMessages,
         trace: Any | None = None,
+        messages: Any | None = None,
+        message_floor_ms: int | None = None,
         clock: Callable[[], float] = time.monotonic,
         control_check_seconds: float = CONTROL_CHECK_SECONDS,
         state_refresh_seconds: float = STATE_REFRESH_SECONDS,
@@ -273,6 +452,10 @@ class UnifiedWait:
         self.stream_factory = stream_factory
         self.trace_factory = trace_factory
         self.trace = trace
+        self.messages = messages
+        if message_floor_ms is not None and (not isinstance(message_floor_ms, int) or isinstance(message_floor_ms, bool)):
+            raise ValueError("message timestamp floor must be an integer")
+        self.message_floor_ms = int(time.time() * 1000) if message_floor_ms is None else message_floor_ms
         self.clock = clock
         self.control_check_seconds = self._positive_interval(control_check_seconds, "control check")
         self.state_refresh_seconds = self._positive_interval(state_refresh_seconds, "state refresh")
@@ -282,6 +465,9 @@ class UnifiedWait:
         self.tasks: tuple[Task, ...] = ()
         self.by_agent: dict[str, Task] = {}
         self.watched_turns: dict[tuple[str, str], AgentTarget] = {}
+        self.caller_turn: str | None = None
+        self._native_item_seen: set[tuple[str, str]] = set()
+        self._native_item_order: list[tuple[str, str]] = []
 
     @staticmethod
     def _positive_interval(value: float, label: str) -> float:
@@ -540,10 +726,12 @@ class UnifiedWait:
         if not isinstance(message, Mapping):
             raise WaitRuntimeError("App Server event is not an object")
         method, params = message.get("method"), message.get("params")
-        if method not in {"turn/started", "turn/completed", "thread/status/changed"}:
+        if method not in {"turn/started", "turn/completed", "thread/status/changed", "item/started", "item/completed"}:
             return None
         if not isinstance(params, Mapping):
             raise WaitRuntimeError(f"App Server {method} event has invalid params")
+        if method in {"item/started", "item/completed"}:
+            return self._native_item_event(method, params)
         agent = params.get("threadId")
         if not isinstance(agent, str) or agent not in self._managed_agents():
             return None
@@ -577,6 +765,42 @@ class UnifiedWait:
             return None
         return self._agent_result(target.task)
 
+    def _native_item_event(self, method: str, params: Mapping[str, Any]) -> dict[str, Any] | None:
+        """Recognize native manager input emitted as an observed UserMessage item."""
+
+        agent = params.get("threadId")
+        if agent != self.caller:
+            return None
+        turn_id = params.get("turnId")
+        if not isinstance(turn_id, str) or not turn_id:
+            raise WaitRuntimeError(f"App Server {method} native message has no turn id")
+        if turn_id != self.caller_turn:
+            return None
+        item = params.get("item")
+        if not isinstance(item, Mapping):
+            raise WaitRuntimeError(f"App Server {method} native message has no item")
+        if item.get("type") != "userMessage":
+            return None
+        item_id = item.get("id")
+        if not isinstance(item_id, str) or not item_id:
+            raise WaitRuntimeError(f"App Server {method} native message has no item id")
+        observed_at = params.get("startedAtMs")
+        if observed_at is None:
+            observed_at = params.get("completedAtMs")
+        if not isinstance(observed_at, int) or isinstance(observed_at, bool):
+            raise WaitRuntimeError(f"App Server {method} native message has no timestamp")
+        if observed_at < self.message_floor_ms:
+            return None
+        key = (turn_id, item_id)
+        if key in self._native_item_seen:
+            return None
+        self._native_item_seen.add(key)
+        self._native_item_order.append(key)
+        if len(self._native_item_order) > 4096:
+            stale = self._native_item_order.pop(0)
+            self._native_item_seen.discard(stale)
+        return self._message_result()
+
     def _drain_events(self) -> dict[str, Any] | None:
         while True:
             event = self.stream.poll(0)
@@ -589,6 +813,10 @@ class UnifiedWait:
     @staticmethod
     def _matching_message(trace: TraceMessages, turn_id: str) -> bool:
         return any(signal.turn_id == turn_id for signal in trace.poll())
+
+    @staticmethod
+    def _matching_session_message(messages: Any | None, turn_id: str) -> bool:
+        return messages is not None and any(signal.turn_id == turn_id for signal in messages.poll())
 
     def _current_turn(self) -> str:
         state = self.states.get(self.caller)
@@ -604,6 +832,8 @@ class UnifiedWait:
         role, bound, targets = self._refresh(require_caller_turn=True)
         if self._current_turn() != caller_turn:
             raise WaitRuntimeError("current caller turn changed while registering mam wait")
+        if self._matching_session_message(self.messages, caller_turn):
+            return role, bound, targets, self._message_result()
         result = self._drain_events()
         if result is None:
             result = self._reconcile(targets, probe_jobs=True, deadline=deadline)
@@ -624,6 +854,9 @@ class UnifiedWait:
 
             role, bound, targets = self._refresh(require_caller_turn=True)
             caller_turn = self._current_turn()
+            self.caller_turn = caller_turn
+            if self._matching_session_message(self.messages, caller_turn):
+                return self._message_result()
             if self._matching_message(trace, caller_turn):
                 return self._message_result()
             result = self._drain_events()
@@ -651,6 +884,8 @@ class UnifiedWait:
                 now = self.clock()
                 if now >= deadline:
                     return self._timeout_result()
+                if self._matching_session_message(self.messages, caller_turn):
+                    return self._message_result()
                 if self._matching_message(trace, caller_turn):
                     return self._message_result()
                 result = self._drain_events()
@@ -690,6 +925,8 @@ class UnifiedWait:
                 self.finish_wait(record)
             if trace is not None:
                 trace.close()
+            if self.messages is not None:
+                self.messages.close()
             if self.stream is not None:
                 self.stream.close()
 
@@ -706,6 +943,8 @@ def wait(
     active_wait_states: Callable[[], Mapping[str, str]],
     process_probe: Callable[..., Mapping[str, Any]],
     trace: Any | None = None,
+    messages: Any | None = None,
+    message_floor_ms: int | None = None,
 ) -> dict[str, Any]:
     """Run one unified wait with the concrete MAM storage callbacks."""
 
@@ -720,4 +959,6 @@ def wait(
         active_wait_states=active_wait_states,
         process_probe=process_probe,
         trace=trace,
+        messages=messages,
+        message_floor_ms=message_floor_ms,
     ).run()

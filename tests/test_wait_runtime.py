@@ -66,6 +66,16 @@ def event(method, agent, *, turn=None, status=None):
     return {"method": method, "params": params}
 
 
+def native_message_event(agent, turn, item_id, *, observed_at=1, method="item/started"):
+    params = {
+        "threadId": agent,
+        "turnId": turn,
+        "item": {"type": "userMessage", "id": item_id},
+        "startedAtMs": observed_at,
+    }
+    return {"method": method, "params": params}
+
+
 class FakeStore:
     def __init__(self, rows):
         self.rows = rows
@@ -124,6 +134,18 @@ class FakeTrace:
         self.closed = True
 
 
+class FakeSessionMessages:
+    def __init__(self, polls=()):
+        self.polls = list(polls)
+        self.closed = False
+
+    def poll(self):
+        return self.polls.pop(0) if self.polls else []
+
+    def close(self):
+        self.closed = True
+
+
 class WaitRuntimeTests(unittest.TestCase):
     def run_wait(
         self,
@@ -134,6 +156,7 @@ class WaitRuntimeTests(unittest.TestCase):
         events=(),
         on_resume=None,
         signals=(),
+        session_signals=(),
         probe=None,
         wait_states=lambda: {},
         clock=None,
@@ -145,6 +168,7 @@ class WaitRuntimeTests(unittest.TestCase):
         store = FakeStore(rows)
         stream = FakeStream(snapshots, queued=queued, events=events, clock=clock, on_resume=on_resume)
         trace = FakeTrace(signals)
+        messages = FakeSessionMessages(session_signals)
         record, finished = {}, []
 
         def begin(role, bound_task, turn_id):
@@ -164,6 +188,8 @@ class WaitRuntimeTests(unittest.TestCase):
             process_probe=probe or (lambda *args: {"status": "running"}),
             stream_factory=lambda path: stream,
             trace_factory=lambda path: trace,
+            messages=messages,
+            message_floor_ms=0,
             clock=(lambda: clock[0]) if clock is not None else wait_runtime.time.monotonic,
             control_check_seconds=control,
             state_refresh_seconds=state_refresh,
@@ -399,6 +425,41 @@ class WaitRuntimeTests(unittest.TestCase):
         self.assertEqual(result["agent"], CALLER)
         self.assertEqual(len(finished), 1)
 
+    def test_native_manager_input_item_wakes_only_matching_current_wait(self):
+        result, _, _, _, finished, _ = self.run_wait(
+            [task(agent=CALLER, jobs=[job()])],
+            {CALLER: snapshot(CALLER, turn="caller-turn")},
+            events=[
+                native_message_event(OTHER, "caller-turn", "wrong-agent"),
+                native_message_event(CALLER, "stale-turn", "wrong-turn"),
+                native_message_event(CALLER, "caller-turn", "old", observed_at=-1),
+                native_message_event(CALLER, "caller-turn", "current"),
+            ],
+            clock=[0.0],
+            state_refresh=10.0,
+            job_refresh=10.0,
+        )
+        self.assert_exit(result, "message", "received new message")
+        self.assertEqual(result["agent"], CALLER)
+        self.assertEqual(len(finished), 1)
+
+    def test_native_session_message_wakes_only_matching_current_wait(self):
+        result, _, _, record, finished, _ = self.run_wait(
+            [task(agent=CALLER, jobs=[job()])],
+            {CALLER: snapshot(CALLER, turn="caller-turn")},
+            session_signals=[
+                [],
+                [wait_runtime.SessionMessage("stale-turn", "stale")],
+                [wait_runtime.SessionMessage("caller-turn", "current")],
+            ],
+            clock=[0.0],
+            state_refresh=10.0,
+            job_refresh=10.0,
+        )
+        self.assert_exit(result, "message", "received new message")
+        self.assertEqual((result["agent"], record["turn_id"]), (CALLER, "caller-turn"))
+        self.assertEqual(len(finished), 1)
+
     def test_manual_stop_is_distinct_and_cleans_only_its_wait(self):
         calls = []
 
@@ -541,6 +602,59 @@ class TraceMessagesTests(unittest.TestCase):
             trace.close()
 
 
+class SessionMessagesTests(unittest.TestCase):
+    @staticmethod
+    def row(timestamp, turn, message_id, kinds):
+        return {
+            "timestamp": timestamp,
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": "user",
+                "id": message_id,
+                "internal_chat_message_metadata_passthrough": {
+                    "turn_id": turn,
+                    "content_item_kinds": kinds,
+                },
+            },
+        }
+
+    def test_session_messages_are_targeted_stale_safe_and_deduplicated(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rollout-current.jsonl"
+            path.touch()
+            watcher = wait_runtime.SessionMessages(path)
+            old = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+            current = (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
+            rows = [
+                self.row(old, "current-turn", "late-old", ["user.text"]),
+                self.row(current, "other-turn", "wrong-turn", ["user.text"]),
+                self.row(current, "current-turn", "environment", ["environments.environment_context"]),
+                self.row(current, "current-turn", "current", ["user.text"]),
+                self.row(current, "current-turn", "current", ["user.text"]),
+            ]
+            with path.open("a") as handle:
+                handle.write("".join(json.dumps(row) + "\n" for row in rows))
+            self.assertEqual(
+                watcher.poll(),
+                [wait_runtime.SessionMessage("other-turn", "wrong-turn"), wait_runtime.SessionMessage("current-turn", "current")],
+            )
+            self.assertEqual(watcher.poll(), [])
+            watcher.close()
+
+    def test_session_messages_require_the_current_session_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "codex"
+            path = home / "sessions" / "2026" / "09" / "12" / f"rollout-{CALLER}.jsonl"
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps({"type": "session_meta", "payload": {"id": CALLER, "session_id": "session"}}) + "\n")
+            watcher = wait_runtime.SessionMessages.from_environment(
+                CALLER, environment={"CODEX_HOME": str(home), "CODEX_SESSION_ID": "session"}
+            )
+            self.assertEqual(watcher.path, path)
+            watcher.close()
+
+
 class CliWaitOutputTests(unittest.TestCase):
     def test_trace_boundary_captures_input_written_during_compatibility(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -573,6 +687,47 @@ class CliWaitOutputTests(unittest.TestCase):
             with patch.dict(sys.modules, {"multi_agent_manager.wait_compat": module}), \
                     patch.object(multi_agent_manager, "wait_compat", module, create=True), \
                     patch.object(cli, "wait_caller", return_value=CALLER), \
+                    patch.object(cli, "wait_session_messages", return_value=FakeSessionMessages()), \
+                    patch.object(wait_runtime, "wait", side_effect=fake_wait):
+                self.assertEqual(cli.wait_unified(object(), object()), expected)
+            self.assertEqual(calls, ["paths", "compatibility", "wait"])
+
+    def test_session_boundary_captures_native_input_written_during_compatibility(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            trace_path = root / "app-server.log"
+            trace_path.touch()
+            journal = root / "codex" / "sessions" / "2026" / "09" / "12" / f"rollout-{CALLER}.jsonl"
+            journal.parent.mkdir(parents=True)
+            journal.write_text(json.dumps({
+                "type": "session_meta", "payload": {"id": CALLER, "session_id": "session"},
+            }) + "\n")
+            calls = []
+
+            def configured_paths():
+                calls.append("paths")
+                return Path("/tmp/app-server.sock"), trace_path
+
+            def require_compatible():
+                calls.append("compatibility")
+                now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                row = SessionMessagesTests.row(now, "caller-turn", "native-message", ["user.text"])
+                with journal.open("a") as handle:
+                    handle.write(json.dumps(row) + "\n")
+                return {"socket_path": "/tmp/app-server.sock", "log_path": str(trace_path)}
+
+            module = types.SimpleNamespace(configured_paths=configured_paths, require_compatible=require_compatible)
+            expected = {"status": "message", "reason": "message", "message": "received new message", "agent": CALLER}
+
+            def fake_wait(*_args, **kwargs):
+                calls.append("wait")
+                self.assertEqual(kwargs["messages"].poll(), [wait_runtime.SessionMessage("caller-turn", "native-message")])
+                return expected
+
+            with patch.dict(sys.modules, {"multi_agent_manager.wait_compat": module}), \
+                    patch.object(multi_agent_manager, "wait_compat", module, create=True), \
+                    patch.object(cli, "wait_caller", return_value=CALLER), \
+                    patch.dict(cli.os.environ, {"CODEX_HOME": str(root / "codex"), "CODEX_SESSION_ID": "session"}, clear=True), \
                     patch.object(wait_runtime, "wait", side_effect=fake_wait):
                 self.assertEqual(cli.wait_unified(object(), object()), expected)
             self.assertEqual(calls, ["paths", "compatibility", "wait"])
