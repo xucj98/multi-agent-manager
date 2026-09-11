@@ -1,4 +1,76 @@
-# `--skip-policy` 启动修复：待 3b678966-7bf3-48f2-b462-920f9cc6a33f 定向复核
+# policy 主机代码同步与现场前置状态
+
+## 已完成：policy 主机精确同步
+
+独立 review 已 PASS 后，已通过 `jx-4090-2-via-nx-aic` 将 policy 主机
+`/home/xucuijie/Projects/robot-bridge` 从干净的
+`124049fb78d29db1d77d13a9fd4a4b698fcfe6e9` 精确更新为
+`041405f0b35b2a173ac3461d297a43141d028026`。远端原本没有该对象；仅传输了
+`124049f..041405f` 的 git bundle（17,703 bytes，SHA-256
+`af943b080293f772c3c535ded811411755e2e94f7d9e726aee1334c144fc324c`），在远端
+校验后 fetch 到临时 ref，再 `git reset --hard` 到该 commit。同步前 `git status` 和
+`git clean -nd` 都为空，因此没有删除任何 untracked 文件；bundle 已在两端清理。
+
+同步后核对：
+
+- bridge HEAD 为 `041405f0b35b2a173ac3461d297a43141d028026`，工作树干净，
+  `git diff --check 124049f..HEAD` 通过。
+- OpenPI 未写入，仍为干净的
+  `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。
+- 以现有 OpenPI venv 在 `CUDA_VISIBLE_DEVICES=''` 下导入
+  `robot_bridge.scheduler.openpi`、`robot_bridge.scheduler.openpi_takeover` 和
+  `openpi_client.memory_config` 成功；三个模块分别来自更新后的 bridge 和固定 OpenPI
+  checkout。没有加载模型或占用 GPU。
+- 没有 stop/restart Policy Manager 或任何 child。同步前后 manager PID `3646`、
+  pourtea child PID `1249503`（:8949）和 `2140250`（:8950）一致；现有实例继续 running。
+  三个进程的 `/proc/<pid>/cwd` 都仍为该 bridge checkout；本次 diff 不涉及
+  policy-manager/runner，现有进程无需 source reload，而后续新建的 wash child 会从当前
+  `041405f` checkout 启动。
+
+## 刷新后的 PM/GPU 状态与 full 优先请求
+
+只读 `status` 结果：PM 基准端口为 `8949`，现有 pourtea 占用 :8949/GPU0/7.0G 和
+:8950/GPU0/7.2G；两个 wash 20k 模型均为 `complete=true`、`syncing=false`、
+`instances=[]`。GPU0 仅余 315 MiB，GPU1 余 24,067 MiB；PM 给出的
+`suggested_gpu` 是 `"1"`，`suggested_port` 是 `8951`。因此 full 的候选请求（**供
+Manager 决定并发出，本次未调用 deploy**）为：
+
+```json
+{
+  "cmd": "deploy",
+  "backend": "openpi",
+  "host": "wuwen-nx-aic",
+  "path": "pi05_x1pro_wash_cup_s2m_full_current_feedback/memory20k_ad6bb77e_wash_full_s0/20000",
+  "port": 8951,
+  "gpu": "1",
+  "memory_gb": 7.2,
+  "policy_config": null
+}
+```
+
+`memory_gb: 7.2` 只是复用当前 Pi05 child 的已用显存预算（对应约 0.3001 fraction），
+不是本次启动动作或 wash 模型实测结论；Manager 可在部署对话框中改为其确认的值。PM
+启动命令仍是既有的
+`/home/xucuijie/Projects/openpi/.venv/bin/python scripts/run_policy_manager.py --config configs/policy_manager.yaml`，
+child 使用 `scripts/run_policy_server.py --config configs/policy_backends/openpi.yaml`；本次代码差异
+不涉及 policy-manager/runner，因此不需要为这次 source sync 重启 PM。
+
+## 尚未就绪：scheduler/master 与现场 launcher
+
+本次只更新了 policy 主机，**不能称为真机全链路就绪**。`run_scheduler.sh` 会经
+`RB_SCHEDULER_SSH` 在 master 机器人上执行
+`cd ${RB_REPO:-$HOME/Projects/robot-bridge} ... scripts/run_scheduler.py`；因此实际
+scheduler/master `jx-x1pro-m-060` 的该 bridge checkout 必须也精确为 `041405f`，并在
+CPU-only 导入通过后才可启动 scheduler。执行
+`x1pro_takeover.sh --skip-policy` 的现场 WSL/launcher checkout 同样必须为 `041405f`，
+否则没有该选项或不会带入修复后的 URL 行为。
+
+本 task 没有连接、修改或启动 master/scheduler，也没有发真机动作。现场负责人完成这两处
+同 commit 同步、PM full child 显示 running 并把其 URL 写入既有
+`~/.robot_bridge_env.sh` 后，才可依 runbook 做 full 的 UI/homing/受控动作检查；serial
+须在 full 验收后另建 child。
+
+# `--skip-policy` 启动修复：独立 review PASS
 
 ## 提交与准入范围
 
@@ -24,7 +96,7 @@ runbook 现在要求先在 PM 确认 wash child 为“运行中”，复制其 U
 `bash scripts/launch/x1pro_takeover.sh --skip-policy`；明确该路径不会触碰 policy
 进程，且 URL 无效或 child 未就绪时应先修正 PM 状态。
 
-## CPU 验证与 reviewer 请求
+## CPU 验证与独立 review
 
 全程 CPU-only，未连接现场、未发真机动作、未更新远端 checkout，也没有停止或重启任何
 Policy Manager 实例。复跑命令：
@@ -46,8 +118,9 @@ git diff --check
 且没有 policy command，默认路径仍四次 SSH 并启动手工 policy。也覆盖缺失/非法 URL、
 help 和未知参数。
 
-请 reviewer `3b678966-7bf3-48f2-b462-920f9cc6a33f` 定向复核 skip/default 两条 shell
-路径、tmux URL 转发和 runbook 入口。review PASS 前不得把 `041405f` 同步到现场。
+reviewer `3b678966-7bf3-48f2-b462-920f9cc6a33f` 已对 skip/default 两条 shell 路径、
+tmux URL 转发和 runbook 入口给出 PASS；因此已按后续授权完成上文所述 policy 主机同步。
+该 PASS 不替代 scheduler/master 和现场 launcher 的同 commit 同步。
 
 # 08:36 live Memory v1 一致性、部署说明与现场只读复查交付
 
@@ -140,10 +213,10 @@ WebSocket/codec → policy server → RobotServer → `handle_execute` 路径跑
 - Memory v1 phase UI、K30 `memory_diagnostics`、homing/reset、idle/teleop/autonomous
   takeover 和 full/serial 不同反馈语义的现场检查边界。
 
-## 现场只读核查与最小部署方案
+## 现场只读核查与最小部署方案（同步前记录）
 
 通过 `jx-4090-2-via-nx-aic` 完成授权范围内核查，未写远端、未传输模型、未碰 PM 状态。
-当前远端普通 deployment checkout 均干净：
+当时远端普通 deployment checkout 均干净：
 
 - `/home/xucuijie/Projects/robot-bridge`：`124049fb78d29db1d77d13a9fd4a4b698fcfe6e9`。
 - `/home/xucuijie/Projects/openpi`：`a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。
@@ -157,16 +230,16 @@ Policy Manager 的两个 wash 本地模型都为 `complete=true`、`syncing=fals
 - `/home/xucuijie/Projects/openpi/checkpoints/wuwen-nx-aic/pi05_x1pro_wash_cup_s2m_serial_lag30/memory20k_ad6bb77e_wash_serial_s0/20000`
 
 PM 当前已有 8949/GPU0 和 8950/GPU0 运行实例，未重启。它按整棵已同步的 bridge/OpenPI
-checkout 与既有 `RB_PY` 启动 child，不能为单个 wash 模型选择独立源码或 venv；最小方案是
-Manager 审核 `a5caa5b` 后再同步 bridge 源码，保留现有实例，随后用 PM 新建 wash child 于
-空闲端口/经现场确认的 GPU，并把该 child 的 URL 作为 `RB_POLICY_URL`。不需要重复模型传输。
+checkout 与既有 `RB_PY` 启动 child，不能为单个 wash 模型选择独立源码或 venv；后续已按
+独立 review PASS 将 bridge 同步到 `041405f`，保留现有实例。现在仍须由 Manager 在空闲端口/
+确认的 GPU 新建 wash child，并把该 child 的 URL 作为 `RB_POLICY_URL`；不需要重复模型传输。
 
 ## 待现场/Manager 闭环
 
-1. Manager 对 `a5caa5b` / `0a33dd1` 做独立 review，决定是否将该 bridge 版本同步到 policy
-   server；当前远端仍刻意保持 `124049fb`。
-2. 现场内网与负责人可用后，由其部署 full PM child、按 runbook 进行 UI/metadata/homing/受控
-   动作检查，再在 full 通过后独立部署 serial。
+1. 独立 review 已 PASS，policy 主机 bridge 已同步到 `041405f`，OpenPI 保持 `a869`；现有 PM
+   实例未重启。master/scheduler 和现场 launcher 的同 commit 同步仍是全链路前置条件。
+2. 现场内网与负责人可用后，由 Manager 部署 full PM child、按 runbook 进行 UI/metadata/homing/
+   受控动作检查，再在 full 通过后独立部署 serial。
 3. GPU2 retry2 虽已获 `dd0914b` 准入，仍由 offline owner/Manager 按固定新输出路径执行并
    验收真实两模型 5ep 指标；该正式 GPU 结果和真机结果均不由本 CPU 复核代替。
 
