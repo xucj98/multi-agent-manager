@@ -19,3 +19,9 @@
 
 ## GPU3短诊断准入
 Manager已核对GPU3空闲，允许按已发布报告的两条命令执行一次诊断：bridge de0e9dac89601b792e0eb56e56d88175cbe643e7 / RMBench ed1e00b403c4f49cf2ad4f4fa7afd35609c55d6a / OpenPI a869，rearrange t+1 seed1原episode17/seed100017，端口19430/19432，新run first_obs_timeline_rearrange_tplus1_s1_ep17_gpu3。启动前再检查资源/端口，先prepare-audit，后一次实际运行；get_obs预算30s不变，单集75s/总1500s。此为诊断，不是正式评估，不要求任务成功；若因75s诊断时限结束，与原30s首帧超时分开记录。结束清理自己GPU进程/端口并保留阶段证据、首因和退出，禁止自动重复启动或在未裁定前formal100。已有诊断实现不再扩功能，只基于本次结果给下一步最小建议。
+
+## 独立review后的Manager裁定
+review任务ae463958提出两项：cached terminal消费与diagnostic写常规Success Rate。Manager采纳窄修复：runner不以episode_status_source=cached的terminal触发终态等待/结束，仍等权威worker状态；加慢reset/旧terminal跨连接测试。不要把review的假设序列写成四formal已确认首因，当前runner同步reset流程是否允许该序列需准确说明。
+RMBench recorder在mode=diagnostic时不生成常规_result.txt成功率入口，保留单集事实/时序/exit；smoke/formal原有产物不变。加实际recorder产物测试，不新建全局汇总框架。原已运行诊断目录的_result.txt可改为明确diagnostic命名并记录该后处理，不修改原episode/trace或声称旧运行用新代码。
+固定5s idle status probe的行为补CPU延迟边界测试，说明超时当worker异常的策略，不盲增加新配置。worker trace长期字节上限等建议暂不扩展，本任务仅一次有界诊断。补launcher记录实际RMBench执行tree精确HEAD，与共享manifest source commit分开，避免误导版本身份。
+提交必要最小增量后给原reviewer定向复核，无GPU重跑、无formal启动。禁止将首帧根因未知偷换成算法问题；后续取证由Manager裁定。
