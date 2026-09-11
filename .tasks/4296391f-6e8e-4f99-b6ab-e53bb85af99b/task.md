@@ -32,3 +32,6 @@ Manager已只读确认：远端/home/xucuijie/Projects/openpi HEAD673038f77fe824
 允许清理两库tracked modifications及确认属于代码的untracked文件，删除前核对git status/clean dry-run；保留被ignore的模型/数据/.venv、~/.robot_bridge_env.sh及Policy Manager状态/同步内容。不要git clean -fdx。可用临时git bundle或已有remote取精确commit，验证树与commit一致；勿把本机未提交文件同步进去。使用现场普通部署checkout，不为每个模型引入新架构。
 现有PM四个policy实例仍有使用者，不因代码同步擅自stop/restart服务；检查PM是否需重启才能应用必要变化，并把具体影响与最小操作报告Manager。先验证既有环境对新代码CPU导入/metadata加载是否可用，不升级/重装正在运行的共享.venv。环境确有不兼容时给最小依赖差异和影响方案，Manager裁定。没有授权真机动作；模型同步仍由用户已发起PM任务完成，不另传一份模型。
 把本授权与实际现场commit/操作写入报告。完成同步后继续live/offline memory一致性及现用x1pro_takeover.sh部署交付，今天不做架构重构。
+
+## offline RPC 修复独立复核
+retry1实际运行在首个execute因memory prediction IDs被通用handle_execute转成float32失败，尚无有效执行行。b86负责局部修复，不把memory专有逻辑加入通用机器人base。作者新commit到达后，请独立复核实际WebSocket/codec→RobotServer→handle_execute→offline controller路径：full和serial各完整fake-policy episode，整数ID/row/query身份、执行行数、GT/mask/反馈、尾部/reset及原机器人浮点动作合同。检查修复和CPU集成证据后给GPU2 retry2准入结论，不能只以直接调用execute单测代替RPC验证。你不修改作者写集。
