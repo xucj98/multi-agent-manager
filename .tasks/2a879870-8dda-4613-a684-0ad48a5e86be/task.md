@@ -30,3 +30,6 @@ bridge安装改动3ebf9d075e5e64a350ddb35cd8632e3abd04373c（含bdb4182）；Ope
 ## README定向修订（Manager审阅18:12）
 手册应面向后续eval执行者，不把本次严格旧版验收固定成所有后续实验协议。三库base commit/模型/seed/video数量由发布task给定；保留可替换三参数示例。明确agent/MAM命令在本集群本机执行，SSH到C1手工建workspace；C2/3只运行。旧版严格client安装/锁和本次具体commit、完整磁盘表/失败恢复放验收实验说明，不放通用入门主线；如果保留可复制的旧版示例，必须补齐实际client安装依赖步骤，否则读者按现有三条创建命令无法跑旧scheduler。默认新bridge不需要client，不能误导所有eval都装旧wheel。
 50条中检按前50个已完成episode做截面，保存快照；进程持续运行时文件可能已有51条，不能要求实时文件恰有50行从而误报门禁。仍须检查固定协议种子序列和无基础设施异常；本次100固定seed不变。只修改稳定README/文档，活跃formal不改。手册约100行内即可，避免实现细节/本次历史过程挤占操作步骤。
+
+## Vulkan候选环境修正的重跑边界
+Manager已读取episode22 svulkan2/RPC EOF证据：旧C100仅22条正常终态，不计完整验收，保留失败leaf。允许当前系统ICD候选的40次reset验证；它只检验worker生命周期，不能替代policy+video/no-video的2rollout。候选环境通过后先在同一C2 GPU按新环境完整smoke2并保存实际VK_ICD_FILENAMES等参数，产物/退出门禁通过后才以新leaf重新完整100（固定原seed和模型/源码）。新leaf从100000起，不拼接前22条，不挑成绩。保持旧smoke/失败/新smoke各自记录清晰。若仍出现错误，报告具体首因和下一最小诊断，不自动循环重试100。代码不改；环境差异如实保留。
