@@ -25,3 +25,6 @@ Main758d523 includes8539bfe native userMessage events and exact session journal 
 
 ## Latest integration and live evidence
 Latest main87f02d3 includes0dd2bcd ignoring unrelated lifecycle events. Re-review this small follow-up. Coordinated normal send_input after real readiness now returned reason=message/received new message on87f02d3; evidence root.local/native-wait-coordinated-900-1789145948-output.txt, ready wait67161/jobfb8b8aa3-843b-422d-83f9-603950d0f79d. Owner still collecting latency/live sleep/cleanup. Please check full latest integrated code and report final blockers; installer native compatibility coverage still must not silently overclaim based only on synthetic probe.
+
+## Final narrow recheck
+Main now includes86bc968 discovery-window fix (main36df252) andfe108cc installer recovery. Manager accepts exact manual recovery command/artifact plus nonzero on post-TERM failure as sufficient; automatic rollback/supervisor not required. Recheck just your two blockers and changed docs/tests on latest main, no new broad audit or repeat live smoke. Ensure bounded discovery lookback either covers invocation or errors rather than silently skipping, recovery plan mode600/no secrets output, TERM preflight and failure/signal recovery command correct. Earlier real native PASS and102 tests remain prior evidence. Publish final concise decision, workspace clean.
