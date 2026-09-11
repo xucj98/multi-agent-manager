@@ -13,3 +13,6 @@
 
 ## 交付
 先给根因证据与推荐最小修复；可直接完成授权内可逆实现，但需要Manager及独立review后才能合入/正式实验。报告实际代码/测试/未证实内容和两种部署版本影响，给失败项重跑建议（Manager决定新run完整100还是其它策略，不能自己拼接旧结果）。有用诊断写Git docs短记录，原始结果保留，清理自己临时文件。提交代码及发布report，列workspace/commits；不自行merge/push、不扩MAM、不修改活跃环境。
+
+## Manager对ed2f470的阶段裁定
+已读报告：状态探测被锁阻塞的问题有证据，ed2f470改善状态诊断/清理，但scheduler首次get_obs自身30秒超时仍未解决，不能把它称作四formal的完整修复或以一次smoke通过就恢复四项正式100。请继续最小阶段时序取证：worker get_obs进入/渲染/返回或失联、请求及锁等待边界，保留有界时间和异常，CPU测试诊断不改算法。提出GPU3短诊断run的精确launcher pin调整、命令、总时限、失败seed优先选择；Manager保留GPU3供此项，收到具体方案后再准入启动。不改C严格对照运行版本，不盲调大timeout。新增RMBench诊断launcher改动须在本task本地独立worktree提交，实验目录仍RMBench/eval_result/<exp-group>/<run>。最终根因如果仍未知如实说明，禁止归因于memory目标。
