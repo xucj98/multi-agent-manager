@@ -196,3 +196,9 @@
 - 已增加main guard且编译检查，在新 `records/renderer-protocol-20260912-retry2` 从原seed100000启动（driver133678，比较器133679）。比较器仅在双方exit0后生成comparison.json；失败会停止且保留日志。
 - C2原40-reset harness有main guard，独立健康运行；最后阶段检查已连续13个accepted（0–12），未到旧故障点。源码/配置始终未改。
 - 新静态证据 `renderer-source-audit.json`（本机task目录）确认remote candidate与17b55bf字节一致，setup_scene扣除renderer持有改动后AST完全相同；该静态检查不替代运行时结果。
+
+### Renderer 候选的实际协议对照通过（限定两seed诊断）
+
+- C1 `renderer-protocol-20260912-retry2` baseline与candidate均exit0，固定100000/100001均accepted。candidate重放baseline保存的同一50x14 float32保持动作；原worker执行30/队列剩20，与初始状态、instruction均完全一致。
+- 每seed初始及执行30后qpos与三相机240x320x3 uint8均逐元素相同（max_abs=0）；已独立确认图像非空且std约35–50，初始/执行后画面存在变化，非空图假阳性。NPZ hashes、逐数组形状/类型/差异与两份metadata均保存在C comparison.json，本机镜像 `renderer-protocol-comparison.json`。
+- 这是两条synthetic hold诊断而非policy rollout或video smoke，不能替代完整生命周期/三机smoke/100门禁。`17b55bf`及该运行证据现均可供Manager独立review。C2 40-reset继续运行，未提前进入formal。
