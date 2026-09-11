@@ -98,3 +98,13 @@ The final runtime commit records the scanned journal device/inode and verifies t
 The exact regression atomically replaces the journal after scan with a same-session journal containing current input before the old offset, padded beyond that offset. It failed against the prior code (no error raised) and passes with this fix. Journal tests: 4 passed. Full task-worktree suite: 77 passed; git diff --check passed. The publication records the delivery commit.
 
 The previous real native smoke PASS is retained; no additional live smoke, restart, GPU action, or production job operation was performed. Manager owns integration.
+
+## Actual pipx interpreter worktree retry regression
+
+Reproduced the installer failure using the interpreter read from /root/.local/bin/mam shebang: /root/.local/share/pipx/venvs/multi-agent-manager/bin/python (Python 3.12.3). The unchanged targeted test failed at line 563 with return code 2 and empty output.
+
+Root cause: initial workspace creation uses .local/create_worktree.sh to select persistent shared Python under /mnt/public; the test retry instead passed sys.executable from the /root pipx venv directly to scripts/create_worktree.sh. The script correctly rejects that nonpersistent interpreter path. scripts/create_worktree.sh and tests/test_task.py matched main0f3bbc7 before this change.
+
+The minimal tests/test_task.py fix retries through the same three-argument local entry used by workspace add. It retains real venv creation, editable installation, success assertions, conflicting README preservation, and archive protection. No test is skipped and no production path validation is relaxed.
+
+Verification: original targeted failure reproduced; fixed targeted test passed under actual pipx Python 3.12.3 and development venv; full task-branch suite under pipx Python passed all 77 tests. This branch does not contain the separately owned installer tests; the prior 109-test integrated installer suite was not rerun here. git diff --check passed. Delivery commit is recorded by this publication. No installer invocation or production service action occurred.
