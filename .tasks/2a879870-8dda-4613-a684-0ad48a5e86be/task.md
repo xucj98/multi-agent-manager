@@ -33,3 +33,7 @@ bridge安装改动3ebf9d075e5e64a350ddb35cd8632e3abd04373c（含bdb4182）；Ope
 
 ## Vulkan候选环境修正的重跑边界
 Manager已读取episode22 svulkan2/RPC EOF证据：旧C100仅22条正常终态，不计完整验收，保留失败leaf。允许当前系统ICD候选的40次reset验证；它只检验worker生命周期，不能替代policy+video/no-video的2rollout。候选环境通过后先在同一C2 GPU按新环境完整smoke2并保存实际VK_ICD_FILENAMES等参数，产物/退出门禁通过后才以新leaf重新完整100（固定原seed和模型/源码）。新leaf从100000起，不拼接前22条，不挑成绩。保持旧smoke/失败/新smoke各自记录清晰。若仍出现错误，报告具体首因和下一最小诊断，不自动循环重试100。代码不改；环境差异如实保留。
+
+## 用户追问149秒创建耗时：补一轮分段测量
+用户问的是RMBench单次149秒为何慢，非总排障4小时。原fresh日志中uv安装时间3.41+17.40+19.80+0.512+1.00约42.1秒，其中cuRobo1秒。Manager只读测当前已存在fresh venv的两次sorted(rglob)扫描分别4.996/4.802秒（70559entries，暖缓存复测，不能当原次计时）；仍不足以解释剩余耗时。
+请在本task自己的可清理profile子目录，使用同一入口/同一base补一次CPU-only完整创建分段计时（例如外部timestamp shell trace，不改受管installer），覆盖wrapper预检、git worktree、venv、每次uv调用含进程前后墙钟、双软链校验和收尾；不要只加总uv自报Installed时长。记录是否暖cache及共享FS条件，不将本次测量冒充原149秒。无GPU、无包版本变化、无活跃formal树修改；profile树/branch与临时文件登记并完成后自行清理。优先保留正在运行的renderer gate及必要结果验收，再并行此CPU测量。给Manager实际占比和是否值得修复，不凭猜测改安装流程或扩MAM。
