@@ -58,3 +58,6 @@ GPU1只读确认约24067MiB可用、PM建议8951。Manager允许现在通过已�
 请先报告已确认握手源证据；随后通过policy主机跳转核查两机hostname/用户/代码路径/现有环境/服务和~/.robot_bridge_env.sh，不猜账号或端口，尽量复用已有SSH配置。允许更新两机部署代码至已验收bridge041405f，保留硬件SDK/.venv/模型/设备配置。现场代码按用户既定原则可丢弃，以本地/GitHub为准；不对ignored目录做clean。不修改正在进行的遥操/机器人控制状态：若有active控制进程或动作必须先报告实际状态和最小替换步骤，Manager裁定。
 定位.82的旧探活所属进程/命令，若是本次准备的旧launcher探活，停用该探活而非屏蔽日志。先确认归属，不杀未知控制进程。核查scheduler执行机器为主臂.82，policy使用当前已部署wash full实例（从PM确认URL端口，内网policy地址沿现有配置）。机器人和master server端口沿各机实际配置，更新本次机器私有RB_*环境的拓扑，不提交IP到Git。保留wait-condition/UDP/takeover；只启动不会自动运动的服务和idle scheduler，启动前明确默认模式，不发homing/execute/UDP action或切autonomous。真实运动由现场人员执行。
 优先完成SSH/CPU导入/metadata/观测与idle连通，必要依赖差异先报告，不盲升级共享环境。服务预计>1小时用mam job add登记，多个进程分别记录。交付准确两机commit、端口、服务PID/状态、policy URL、待机模式与现场接管/启动步骤，不能将服务器ready等同真机运动验证。
+
+## 用户明确采用更新并重启 launcher
+用户判断不必单独处理旧探活，要求更新最新代码并重启launcher。按此执行：在实际.82/.96机器完成当前已验收版本更新，重启本次既有launcher及其需要更新的关联服务，保留配置并指向full PM实例，使用--skip-policy避免额外启动policy。无需另做旧探活修补，也不再为这一已授权launcher重启重复确认。不要重启PM或无关实例，不发homing/execute或进入autonomous；重启前后核对默认待机/接管状态。之后确认8951 EOF周期错误消失、实际scheduler采用14D Memory v1且H50/K30、服务连通和资源归属。若实际运行的launcher并非x1pro_takeover.sh，先读实际入口，沿同一部署机制应用已验收代码，不猜测用错入口。
