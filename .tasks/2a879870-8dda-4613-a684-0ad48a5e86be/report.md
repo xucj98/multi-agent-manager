@@ -143,3 +143,8 @@
 - 因此“C2 自动选择 bundled ICD”不是充分修复；已证实的近因是同一 strict worker 进程的反复 RMBench/SAPIEN renderer 生命周期在第 23 次 reset 崩溃。尚不能把 C++/driver 内部机制断言为已修复。该 test 无 policy、video 或 evaluator result leaf，22 条 reset-only 既不计分，也不与旧 formal 的 22 terminal 结果拼接。
 - 失败门禁已固化为 `C:workspace/2a879870-8dda-4613-a684-0ad48a5e86be/records/strict-c2-renderer-gate-retry1-infrastructure-gate.json`，SHA256 `6366eec49d0707f65ca4a542d6f01a9ec65c23205c8502bd2fe661186af0aea3`；原始 log SHA256 `a341ea81afac56a23b4e9d60d63574d52c3d44296f35bf8e67afe5ec9f391b4c`。C2 当前 dmesg 读取被拒、`coredumpctl` 不存在、core 由 apport 接管；这些可用性限制也已写入门禁。
 - 按 Manager 边界，**不循环 100**。后续需先对该 renderer 生命周期崩溃作环境/运行时级首因裁定；在此之前 `smoke_eligible=false`、`formal_eligible=false`，50 条中检不存在。
+
+### 有界 cache-cleanup 根因验证已启动（18:50 +08:00）
+
+- 基于 strict 源码差异，C2 GPU2 当前只运行隔离 diagnostic（outer PID `106978`）：同一 25 次 worker reset 生命周期、同一系统 ICD、无 policy/no-video/no result leaf；每 5 次在已关闭的 env 边界调用原 RMBench 已有的 `sapien.render.clear_cache()`。
+- 目的仅验证 `clear_cache_freq=5` 在原 evaluator 中存在、但 strict bridge worker 固定 `clear_cache=False` 是否解释第 23 次 renderer 崩溃。它不修改 strict 源，也不会作为 smoke/formal 运行方式或准入依据；结束后记录精确 exit code、日志和结果，再由 Manager 决定是否接受任何后续运行时修复路径。
