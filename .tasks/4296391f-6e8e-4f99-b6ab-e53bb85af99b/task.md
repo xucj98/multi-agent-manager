@@ -83,3 +83,9 @@ GUI可以一直常驻，TUI用于调试，不能错误写成GUI和TUI程序不�
 
 ## 用户确定交付流程：WSL checkout → push_code auto → TUI
 用户质疑手工wheel，理想流程明确为WSL checkout codex/unified-sim-real-runtime、配置RB_*、scripts/utils/push_code.sh auto、scripts/launch/x1pro_takeover.sh、:8088。不得再要求用户现场手工构建/传输/安装wheel或逐机git checkout。只做本地代码调查先提出最小可实施修复方案：push_code当前仅rsync bridge，不同步/安装scheduler新增的openpi_client.memory_config。说明依赖如何随现有交付自动满足且仍共用一份schema实现、不手拷维护第二份实现、不安装完整OpenPI训练环境、不依赖WSL未声明的openpi邻接仓库。比较已有依赖入口可否用固定轻量包/随发布源码等合理方案，先报告推荐方式和代价给Manager，不擅自大改架构或远端执行。清楚区分一次性环境准备与每次开发循环；测试需覆盖最小WSL仅bridge checkout起步，主臂缺轻量client时，以及已有tmux旧变量/旧服务的问题。指南最终应围绕用户这条短流程，而非堆手动补救命令。新代码方案待Manager裁定。
+
+## 用户授权实施：memory_config.py 归 robot-bridge
+用户明确：直接把memory_config.py放到robot-bridge，不再依赖该openpi-client包。替代此前wheel自动交付方案讨论。请在本task独立两库worktree实施：以已交付dfc9e1095badd7f37d9260d3275df3cca2700d90 bridge和a869498f OpenPI为基线；确认本机若有其他新commit勿覆盖。将纯schema模块迁至robot-bridge内合理公开位置，scheduler及offline直接导入，移除机器人安装openpi-client wheel的要求/专用安装脚本及对应过时文档测试。
+训练、模型推理及offline仍共用一份schema实现：OpenPI引用bridge中纯模块，避免依赖整个机器人框架/硬件SDK、额外包仓库/插件/动态路径搜索/手工PYTHONPATH。模块只能有原纯Python/NumPy/PyYAML等轻量依赖；不改变schema、模型、样本构造/时序/编码/反馈算法，旧checkpoint原metadata保持可用。OpenPI依赖如何以现有环境管理声明、两库怎样共同安装需明确可靠，不要求机器人安装完整OpenPI。不得保留两个手抄memory_config实现作为未来维护源。如历史openpi import兼容有确实必要，最多重导出而非重复实现，说明理由；不可让机器人继续依赖openpi_client。
+保留当前正在运行训练/仿真worktree及环境，不更新它们、不跑GPU、不操作远端。移除wheel手工部署流程，现场指南收敛为用户要求：WSL checkout→配RB_*→push_code.sh auto→x1pro_takeover.sh→8088。GUI后台可常驻，TUI默认路径与既有policy占用skip保持，不强制--skip-policy。
+验收：无openpi-client可导入的独立最小bridge环境中，真实checkpoint metadata建立full/serial MemoryContext、live/takeover/offline CPU回归通过；迁移前后schema样本/编码/mask/反馈输出一致，OpenPI相关sample/model-config/metadata CPU测试通过；import纯模块不加载硬件SDK/JAX/Torch；源树代码同步足以提供模块，push_code/TUI已有测试保持。保持测试有实际行为断言，避免只替换import。提交两库代码和必要简明文档，发布report给Manager独立review；不自行合并/push。清理临时产物，保留workspace验收。
