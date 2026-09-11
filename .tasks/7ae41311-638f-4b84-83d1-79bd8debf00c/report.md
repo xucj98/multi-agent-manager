@@ -45,3 +45,16 @@ MAM 在每条启动后立即按真实 host、PID、boot identity 和 start ticks
 | 5 | no-memory / 2 | `3957417` / `b13b2fbd-ce10-4fac-87d0-62761879e057` | `grad_norm=0.5735, loss=0.0517, param_norm=1802.3865` | 179 / 3.7 s/update | 20:35:28，约 9月12日 11:27 +08:00 |
 
 这些 ETA 仅按当前稳定进度行的吞吐估算，最终以 20,000 保存完成为准。后续改为约每小时巡检；任一路停止、报错或完成会立即处理并更新本文。
+
+## 首个小时巡检（2026-09-11 15:46:48 +08:00）
+
+只读取既有 job、进程、GPU 与训练日志，未重跑任何 GPU 门禁、恢复或数据检查。四个 MAM job 逐一实时刷新均为 `running`，原 PID/session 仍匹配；GPU2--5 分别占用 73,407、73,407、73,405、73,405 MiB，均为 100% 利用率。四份日志未匹配 traceback、OOM、exception 或非有限数值。
+
+| GPU | config / seed | 当前进度 / 稳定吞吐 | 最近有限训练标量 | 剩余 ETA |
+| --- | --- | --- | --- | --- |
+| 2 | serial-lag30 / 1 | 982 / 4.2 s/update | step900：`grad_norm=1.9051, loss=0.0396, param_norm=1802.4556` | 22:05:21 |
+| 3 | serial-lag30 / 2 | 976 / 4.1 s/update | step900：`grad_norm=2.4269, loss=0.0550, param_norm=1802.4596` | 21:53:04 |
+| 4 | no-memory / 1 | 1.10k / 3.7 s/update | step1000：`grad_norm=0.0465, loss=0.0036, param_norm=1802.4473` | 19:20:37 |
+| 5 | no-memory / 2 | 1.06k / 3.7 s/update | step1000：`grad_norm=0.0459, loss=0.0037, param_norm=1802.4462` | 19:40:52 |
+
+当前没有需要干预的异常，四路按原命令和输出目录继续训练；后续保持约小时巡检，任一路提前停止、异常或完成 20,000 会立即处理并发布更新。
