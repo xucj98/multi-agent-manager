@@ -1,3 +1,14 @@
+# 最终交付：C验收通过（2026-09-12 03:40 +08:00）
+
+- **completed：三机clean候选各2真实rollout + 新leaf单GPU串行100 + 前50/完整100门禁 + 独立归档回传 + 测量/操作说明。** 正式100/100原固定seed accepted，70成功/30正常失败；本机69/100，差+1个百分点，在64–74门槛内，无跳seed/拼旧22/按成绩重跑。formal exit0，19项最终checks全部true，GPU2最终4MiB、服务退出、source clean。当前无本任务活跃job；正式ac616c59及watch fb01b3a3已归档。
+- 正式raw leaf：C stable RMBench/eval_result/memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_renderer_100ep_20260912。退出后复制归档并同布局回传至**本机 `/mnt/public/xcj/Projects/RMBench/eval_result/cluster_c_eval_acceptance_20260911/put_back_full_t_plus_1_s0_20k_100ep`**。经nx-aic←4090-aic传回255文件/38494095B，全部文件集合及hash通过；manifest SHA256 `7c52fe17050b51315b1f8b165351396abf29d7c8fe70b60549661c5d92bd5dd8`。原本机baseline hash不变，原命令/config/绝对路径原文保留，archive_mapping.json明确实际原路径。
+- 前50 C34/50 vs本机35/50；完整C失败分类22次button_not_pressed_after_center、8次button_press_insufficient，本机18/13。逐seed共同成功50、共同失败11、仅C成功20、仅本机成功19（39条不同），因此是满足成功率门槛的复现，不宣称全部policy轨迹确定性一致。原runner历史profile baseline unavailable原文保留；本任务比较使用本机真实完整100基线并保存原hash。
+- 交付源码：renderer **17b55bf**（独立review通过）；创建优化 **9c71a3e**（稳定入口已应用，CPU syntax通过，无再次安装）。完整测量/实验说明本机RMBench task branch最终commit **bdfb8e04d9b946c43832f61746fe369324eb02dc**，`experiments/cluster_c_eval_acceptance_20260911/README.md`；C独立docs/rmbench-formal-record同内容commit **ab39f07**。两处文档不污染候选/旧strict树；C稳定state-vla/README.md通用操作手册仍保留。
+- 本机task证据：formal-final-acceptance.json、formal-full-comparison.json、formal-transfer-verification.json、formal-first50/、三机smoke acceptance及两份校验脚本；最终归档内cluster_c_acceptance.json/transfer_manifest.json提供可独立验收数据。既有两锁来源/实际版本/原始uv pip check及所有失败leaf/诊断原始日志保留。
+- **清理边界交Manager裁定：** 已清理自有CPU profile及退役renderer诊断源码树/branch，保留raw evidence。保留本任务formal/renderer-reviewed、其借用的formal/strict-100环境、fresh三库树、三机smoke与文档worktree供验收；旧owner workspace及本机worktree不擅删。稳定.local/shared caches/assets/checkpoint/shim长期保留，不属task临时清理。验收主线无剩余运行或技术阻塞，保留目录按既定统一清理裁定处理。
+
+---
+
 # C 接续现场快照（2026-09-11 16:31 +08:00）
 
 - 已接管 C 写入；16:00 后复查无遗留 uv、rsync 或 eval。原 owner 的 cache、checkpoint、assets 与 `workspace/5773.../records` 均只读复用，未重传。
