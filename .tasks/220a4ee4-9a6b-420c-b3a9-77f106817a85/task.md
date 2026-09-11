@@ -12,7 +12,8 @@ SimFoundry官方pinned 9e34ebefcd020583fbb755a8b57268dce78eca26：已发布A重�
 1. 将旧docs/roadmap.md完整保留为同目录docs/roadmap-legacy-2026-09-11.md，并明显标记历史记录。
 2. 重写docs/roadmap.md，中文新项目总路线，包含问题/贡献与待检验假设、诚实起点、保留/重做取舍、阶段里程碑到论文与公开release、并行依赖、资源与人员假设、主要风险/决策点。指向近期任务及旧历史。不要改写research proposal科研正文；说明当前实施排期以新roadmap为准，旧project-plan/roadmap是参考。
 3. docs/planning/near-term-tasks.md，中文近期任务卡，约6–8个有边界任务（小而可交付）分3条核心并行线：场景重建与生成、目标/多人终态与评价、抓取操作与执行。每卡含优先级、输入、输出文件/产物、验收、依赖、探索时间盒、失败时交付/降级、所需能力（不指定人选），标清可立即开始与依赖真实场景的部分。任务ID用计划编号如N01，不伪造已派发MAM任务。
-4. 最小更新README链接，确保用户能发现新路线；已有开发文档不动。
+4. 最小更新README链接与开头状态，确保用户能发现新路线，旧ManiSkill进展明确仅历史工程范围；已有开发文档不动。
+5. 最小同步docs/README.md文档入口：新roadmap+near-term为当前执行入口；旧project-plan、R/P/A简报、spec/ADR为历史/实现参考，新实现按选型决策采纳；表格增加近期任务和历史roadmap，旧双轨描述改新阶段/三线。不改既有代码合同的当前有效性。
 # Manager方向约束
 - 先一个端到端高质量样例（初态、多种合理终态、实际可执行轨迹，用户看图/视频验收），再10–20科学pilot，再100/200级论文集，最终1000是通过质量和成本门后的扩展选项。不要把旧验收状态继承到新数据。
 - 阶段交付不是只有工程量：验证多解且非任意解、人类评价可判定、open/explicit目标形成差异和planner/executor失败分离；真正模型实验、split冻结/scene-family+cousin隔离、reliability与偏差/泄漏检查、训练数据生产、论文与release均有位置。MVP规模/阈值是建议，不能冒充实验结论。
