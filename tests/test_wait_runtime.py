@@ -671,6 +671,36 @@ class SessionMessagesTests(unittest.TestCase):
             self.assertEqual(watcher.path, path)
             watcher.close()
 
+    def test_session_scan_to_open_replacement_rejects_old_offset(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            path = home / "sessions" / f"rollout-{CALLER}.jsonl"
+            path.parent.mkdir()
+            header = json.dumps({"type": "session_meta", "payload": {
+                "id": CALLER, "session_id": "session",
+            }}) + "\n"
+            old = "2026-09-12T00:00:00Z"
+            current = "2026-09-12T00:01:01Z"
+            path.write_text(header + json.dumps({"timestamp": old, "padding": "x" * 4096}) + "\n")
+            original_open = wait_runtime.SessionMessages._open
+
+            def replace_after_scan(instance, **kwargs):
+                message = json.dumps(self.row(current, "caller-turn", "replacement-input", ["user.text"])) + "\n"
+                replacement = path.with_suffix(".replacement")
+                replacement.write_text(header + message + "\n" * path.stat().st_size)
+                self.assertLess(len((header + message).encode()), kwargs["offset"])
+                self.assertGreater(replacement.stat().st_size, kwargs["offset"])
+                replacement.replace(path)
+                return original_open(instance, **kwargs)
+
+            with patch.object(wait_runtime.SessionMessages, "_open", new=replace_after_scan):
+                with self.assertRaisesRegex(wait_runtime.WaitRuntimeError, "replaced.*scan.*open"):
+                    watcher = wait_runtime.SessionMessages.from_environment(
+                        CALLER, environment={"CODEX_HOME": str(home), "CODEX_SESSION_ID": "session"},
+                        started_at=datetime.fromisoformat("2026-09-12T00:01:00+00:00").timestamp(),
+                    )
+                    watcher.close()
+
     def test_session_lookup_window_captures_input_written_between_discovery_and_open(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "codex"

@@ -341,7 +341,9 @@ class SessionMessages:
 
         try:
             with self.path.open("rb") as handle:
-                size = os.fstat(handle.fileno()).st_size
+                stat = os.fstat(handle.fileno())
+                self._device_inode = (stat.st_dev, stat.st_ino)
+                size = stat.st_size
                 lower = max(0, size - SESSION_LOOKBACK_BYTES)
                 handle.seek(lower)
                 tail = handle.read(SESSION_LOOKBACK_BYTES)
@@ -381,6 +383,10 @@ class SessionMessages:
         except OSError as exc:
             raise WaitRuntimeError(f"cannot read Codex session journal: {exc}") from exc
         if offset is not None:
+            # The offset belongs to the scanned inode, not merely its path.
+            if (stat.st_dev, stat.st_ino) != self._device_inode:
+                handle.close()
+                raise WaitRuntimeError("Codex session journal replaced between scan and open")
             handle.seek(offset)
         elif at_end:
             handle.seek(0, os.SEEK_END)
