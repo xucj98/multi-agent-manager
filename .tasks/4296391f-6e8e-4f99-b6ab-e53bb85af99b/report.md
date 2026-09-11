@@ -7,7 +7,8 @@ bridge 当前候选 HEAD 为 `f0f585a` (`docs(wash): refresh TUI tmux topology v
 (`fix(memory): ship bridge-local schema runtime`)，位于
 `/mnt/public/xcj/Projects/workspace/4296391f-6e8e-4f99-b6ab-e53bb85af99b/robot-bridge`
 的 `task/4296391f-6e8e-4f99-b6ab-e53bb85af99b` 分支。可交 reviewer
-Bernoulli 独立复核；**尚未合入、push 或部署**。
+Bernoulli 独立复核。Manager 已确认 `f0f585a` PASS、fast-forward 合入并 push GitHub；
+OpenPI 不变。现场现在可按已交付流程部署；本 agent 未执行任何远端部署。
 
 OpenPI 保持干净且未修改：
 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。bridge 的
@@ -58,8 +59,18 @@ reviewer 按仓库基线确认。
 
 ## 后续
 
-独立 review PASS 后再由 Manager 合入并发布同一 bridge commit，现场才可按已有
-`push_code.sh auto`/TUI 流程同步。当前不得据此声称已部署或真机全链路就绪。
+独立 review、合入和 GitHub push 已由 Manager 完成，现场可按已有
+`push_code.sh auto`/TUI 流程同步。当前报告仍不把可部署提交等同于已部署或真机全链路就绪。
+
+## 合入后本地收尾
+
+已清理两个 task worktree 中的 `.pytest_cache`、`.ruff_cache` 和源码 `__pycache__`，保留
+两库 `.venv`、独立 worktree 和 Git 历史供现场反馈。bridge worktree 保持 `f0f585a` 干净，
+OpenPI worktree 保持 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4` 干净。
+
+未 archive task 或 full 长服务。MAM job
+`9f91cf1c-8505-48e3-bd6e-cc7e8093a914` 仍登记为 running（最后缓存观测
+2026-09-11T02:20:29Z）；本次未对它做实时探测、停止或重启。
 
 # policy 主机代码同步与现场前置状态
 
