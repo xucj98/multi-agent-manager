@@ -26,3 +26,7 @@ bridge安装改动3ebf9d075e5e64a350ddb35cd8632e3abd04373c（含bdb4182）；Ope
 
 ## C正式结果回传避免覆盖本机基线
 当前C formal leaf与本机69/100 baseline的exp-group/run同名。运行期间不改输出路径、不移动目录。完整退出并验收后，将C本次正式结果整理为独立实验组cluster_c_eval_acceptance_20260911/put_back_full_t_plus_1_s0_20k_100ep，再同布局回传本机RMBench/eval_result；绝不能覆盖本机memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep基线。保留原始command/config内容（不伪称最初就在新目录启动），在验收实验说明写明C实际原路径→最终归档路径映射、原本机基线路径。复制前确认目的不存在，校验内容hash。C当前运行及固定协议不变，结果整理仅在所有进程退出后执行。
+
+## README定向修订（Manager审阅18:12）
+手册应面向后续eval执行者，不把本次严格旧版验收固定成所有后续实验协议。三库base commit/模型/seed/video数量由发布task给定；保留可替换三参数示例。明确agent/MAM命令在本集群本机执行，SSH到C1手工建workspace；C2/3只运行。旧版严格client安装/锁和本次具体commit、完整磁盘表/失败恢复放验收实验说明，不放通用入门主线；如果保留可复制的旧版示例，必须补齐实际client安装依赖步骤，否则读者按现有三条创建命令无法跑旧scheduler。默认新bridge不需要client，不能误导所有eval都装旧wheel。
+50条中检按前50个已完成episode做截面，保存快照；进程持续运行时文件可能已有51条，不能要求实时文件恰有50行从而误报门禁。仍须检查固定协议种子序列和无基础设施异常；本次100固定seed不变。只修改稳定README/文档，活跃formal不改。手册约100行内即可，避免实现细节/本次历史过程挤占操作步骤。
