@@ -52,3 +52,39 @@
 现有 `experiments/memory_chunk_20260910/commands/run_memory_schema_eval.py` 在第 212–213 行硬校验 bridge 为 `8ea6078`，不能直接用于 `ed2f470`。Manager 若要 GPU 进一步区分首帧慢渲染与 worker 卡死，应先建立带新 bridge pin 的独立、干净 launcher/manifest；不要修改活跃 8ea 运行树。建议只做一个 manager 指定空闲卡上的新 smoke（两集、独立 result run、保留 robot stderr 和 scheduler trace），并先为该 launcher 提供小于正式 3600 秒的明确诊断上限；当前冻结 launcher 的默认每集上限为 3600 秒，不适合作为未经批准的短复现命令。
 
 若该 smoke 无 runtime error，再由 Manager 决定四项各自是否在新版本从 episode 0 以原 seed 区间重新跑完整 100；旧 16/17/32/67 条只作原始证据，不能拼接为新分母或正式成功率。代码内容已变，更不能复用旧 smoke gate。
+
+## 阶段二：首帧时序取证与 GPU3 诊断方案
+
+Manager 的阶段裁定成立：`ed2f470` 只解决 runner 状态探测被同一 worker RPC 锁阻塞而误报的问题，不能解释或消除 scheduler 自身首次 `get_obs` 的 30 秒超时。物理首帧为何未按时返回仍未证实；本阶段没有把它归因于 memory、模型、seed、渲染或 GPU 争用。
+
+### 新提交与工作树
+
+| 仓库 | 工作树 / commit | 内容 |
+| --- | --- | --- |
+| robot-bridge | `/mnt/public/xcj/Projects/workspace/378da0ac-54fa-4d52-b638-b1bce9a9a2d0/robot-bridge` / `de0e9dac89601b792e0eb56e56d88175cbe643e7` | 在 `ed2f470` 之上增加 opt-in worker/proxy 时序取证和单 episode diagnostic mode。 |
+| RMBench | `/mnt/public/xcj/Projects/workspace/378da0ac-54fa-4d52-b638-b1bce9a9a2d0/RMBench` / `ed1e00b403c4f49cf2ad4f4fa7afd35609c55d6a` | 新增独立 GPU3 诊断 launcher 与说明；未修改 `run_memory_schema_eval.py`、`memory_schema_eval.yaml` 或 C 严格对照版本。 |
+| OpenPI | `/mnt/public/xcj/Projects/workspace/378da0ac-54fa-4d52-b638-b1bce9a9a2d0/openpi` / `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4` | 只创建固定版本 worktree，未改代码。 |
+
+`de0e9da` 的 worker JSONL（仅在 `params.worker_trace_path` 配置时启用）使用同一 request id 记录 `get_obs_enter`、实际 `get_obs_render_enter`、render return/error 和协议响应。controller 同时在最终 episode diagnostics 中保留至多 64 条 `bridge_rpc_timeline` 事件：请求写入、lock 获取时间、非阻塞 cached status probe、worker RPC 返回/失败和已观测的 worker lost。runner 将最后一次 status diagnostics 保留到 scheduler exit、episode timeout 和 worker lost 的失败记录中。它没有修改 scheduler `get_obs` 的 30 秒预算、模型、动作、memory、seed 或成功判定。
+
+CPU 覆盖包含真实 localhost WebSocket → Robot Server → controller → 子进程 worker 链：可控慢 render 时 status 返回 cached 且带 active `get_obs` lock 边界；worker trace 有进入/render/返回的有序事件；worker 被终止时 runner 记录 `robot_worker_lost` 和 timeline。另验证 diagnostic mode 仅运行指定 `episode_id=17`，由原评测 seed 序列得到 `seed=100017`，不使用 smoke 的两集语义。
+
+### CPU 验证
+
+- `robot-bridge/.venv/bin/python scripts/worktree_env_smoke.py`：通过。
+- `robot-bridge/.venv/bin/python -m pytest tests/robot/controllers/test_rmbench_simulation.py tests/benchmark tests/robot/test_server_dispatch.py tests/transport/test_websocket.py -q`：`51 passed, 1 skipped`；skip 仍是既有独立 RMBench Python 3.10 环境条件测试。
+- `robot-bridge/.venv/bin/python -m ruff check ...`：通过修改 bridge、worker、runner 和测试；`git diff --check` 通过。
+- `RMBench/.venv/bin/python -m unittest discover -s tests -p 'test_eval_diagnostics.py' -v`：3 项通过；fixture 输出既有 SAPIEN/资源告警，但无失败。
+- `JAX_PLATFORMS=cpu ... run_first_obs_timeline_diagnostic.py --dry-run`：17.5 秒通过。它验证 s1 `20000` checkpoint schema、三树 pin、GPU3 端口、trace path、原失败 `episode_id=17 / seed=100017` 和生成的完整命令；未启动 robot/policy/scheduler、未加载模型权重或使用 GPU。
+
+### GPU3 单次短诊断（等待 Manager 准入）
+
+新入口是 [`run_first_obs_timeline_diagnostic.py`](/mnt/public/xcj/Projects/workspace/378da0ac-54fa-4d52-b638-b1bce9a9a2d0/RMBench/experiments/memory_chunk_20260910/commands/run_first_obs_timeline_diagnostic.py)，完整说明与命令在 [`README_first_obs_timeline_diagnostic.md`](/mnt/public/xcj/Projects/workspace/378da0ac-54fa-4d52-b638-b1bce9a9a2d0/RMBench/experiments/memory_chunk_20260910/README_first_obs_timeline_diagnostic.md)。它在启动前拒绝非 clean worktree，并硬校验：bridge `de0e9da`、OpenPI `a869498`、RMBench 是 `6139577` 的后继、GPU3、`rearrange_full_t_plus_1` s1 checkpoint 的 `20000`、`episode_id=17 / seed=100017`。结果唯一落在：
+
+```text
+eval_result/memory_chunk_20260910/first_obs_timeline_rearrange_tplus1_s1_ep17_gpu3/
+```
+
+准入后执行顺序为：先用入口 `--prepare-audit` 生成只读 checkpoint 审计与派生 manifest，再运行不带 `--dry-run` 的同一命令。launcher 内部执行经验证的 `timeout --foreground --signal=INT --kill-after=30s 1500s ...`，以 SIGINT 让 runner 的 `finally` 回收 robot/policy 子进程；1500 秒为 GPU 阶段总墙钟上限。service startup/reset 保留源 launcher 的 660 秒预算，单 episode runner 为 75 秒，scheduler 首次 `get_obs` 仍是 30 秒，worker 内部 RPC 仍为 600 秒，仅用于在 client 超时后保留取证和收尾，并未扩大 scheduler timeout。
+
+若诊断再次超时，检查 scheduler traceback、`processes/rmbench_sim_worker.trace.jsonl` 与失败 episode 的 `bridge_rpc_timeline`：worker 已记 `get_obs_render_enter` 而无 return 说明卡在或晚于实际渲染调用；没有 worker receipt 则定位到 proxy/pipe 前；`worker_lost` 记录 returncode 与已知 active RPC。任何一次正常返回也只说明该次没有复现，不能放行四项 formal 重跑。GPU 诊断未启动；四个 partial run 仍不能拼接，正式重跑仍需 Manager 后续决定。
