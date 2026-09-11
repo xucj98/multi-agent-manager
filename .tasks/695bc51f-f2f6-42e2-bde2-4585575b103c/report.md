@@ -5,7 +5,7 @@
 ## 当前单模型放行状态
 
 - **no-memory：正式 20k 运行中。** 本模型的 50-step 训练、BF16 model-only 保存和 checkpoint-only 恢复已完成。2026-09-11 16:16 +08:00 GPU0 空闲后，以冻结 commit `a7f3e07` 启动 `memory20k_695bc51f_put_back_no_memory_s0`；MAM job `14bad7c3-59cb-45d5-8173-8eb92cb9b90a`、PID `3996599` 已登记为 running。已验证首个 update（16:21:40）以及 step100 有限 `grad_norm=0.7297, loss=0.0618, param_norm=1802.3864`；稳定约 3.7 s/update。
-- **serial_lag30：自身 smoke/恢复均已 PASS，可单独放行正式 20k。** 独立 review 已 PASS。GPU6 的 `smoke50_695bc51f_put_back_serial_lag30_s0` 完成 50 updates、最终有限 loss `0.3052`、BF16 保存和 checkpoint-only policy gate；正式 serial 尚未启动，等待 Manager 单独放行。
+- **serial_lag30：正式 20k 运行中。** 独立 review、GPU6 的 50-step smoke、BF16 保存和 checkpoint-only policy gate 均已 PASS。2026-09-11 16:40 +08:00 以冻结 commit `a7f3e07` 在 GPU6 启动 `memory20k_695bc51f_put_back_serial_lag30_s0`；MAM job `e087cfa2-04d2-460d-8b6e-974fdd7c7b1a`、PID `4009203` 已登记为 running，等待首个聚合 loss 后补充。
 
 ## 已交付，待快速验收
 
@@ -36,11 +36,12 @@
 - 50 updates 完成且五个日志区间均有限：step10 `grad_norm=87.0352, loss=1.6721, param_norm=1802.3909`；step20 `64.3239, 1.1431, 1802.3909`；step30 `53.7398, 0.6960, 1802.3909`；step40 `45.6514, 0.4851, 1802.3909`；step50 `30.7210, 0.3052, 1802.3909`。
 - checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/smoke50_695bc51f_put_back_serial_lag30_s0/50`，原子 Save Finalize 完成，仅含 `params/assets/metadata`，无 `train_state`。
 - GPU6 新解释器 checkpoint-only gate 通过：audit hook 拒绝训练数据、sidecar、源 norm/YAML 和 pi05_base 读取；从 checkpoint 恢复 56 个叶、3,353,466,650 个元素、6,706,933,300 bytes，全部 BF16、有限且逐 shape 匹配。真实 policy factory/inference 返回有限 `actions` `[50,14]`、serial `memory_prediction_ids` `[1,2]`，输出含 `key_state_prediction` 与 `policy_timing`。成功 gate 日志：`/mnt/public/xcj/Projects/openpi/logs/smoke50_695bc51f_put_back_serial_lag30_s0_checkpoint_gate_retry1.log`。
+- **初次 gate 与 retry1 留痕：** 初次 gate 已通过 metadata/BF16 参数树阶段，但在真实 policy inference 前因合成测试图像误用 HWC `[224,224,3]`，与 ALOHA policy 的 CHW `[3,224,224]` 外部输入约定不符而在图像 resize 停止；checkpoint、模型和训练进程均未失败。`retry1` 只将合成输入改为 CHW，随后完成相同 checkpoint-only 审计与真实推理并 PASS。初次日志保留于 `/mnt/public/xcj/Projects/openpi/logs/smoke50_695bc51f_put_back_serial_lag30_s0_checkpoint_gate.log`，成功 retry1 日志路径如上。
 
 ## GPU smoke 与正式计划
 
 - no-memory 正式运行位于 GPU0，日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s0.log`，仅最终 checkpoint `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s0/20000` 将保留 BF16 `params/assets/metadata`；按小时监控并在完成后归档 job。
-- serial 的正式计划保持独立 `exp_name` `memory20k_695bc51f_put_back_serial_lag30_s0`，仅在 Manager 单独放行后才启动并登记 MAM job；预期最终路径 `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s0/20000`。
+- serial 正式运行位于 GPU6，日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s0.log`，MAM job `e087cfa2-04d2-460d-8b6e-974fdd7c7b1a`；仅最终 checkpoint `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s0/20000` 将保留 BF16 `params/assets/metadata`，按小时监控并在完成后归档 job。
 - 两条 smoke 的 checkpoint、日志与 gate 证据暂留供验收；正式 no-memory 形成最终 checkpoint 后再按任务要求清理本任务 smoke 临时产物。
 
-独立 review `15254a5f` 已 PASS。本任务不会等待 4090/C 环境；no-memory 正式 20k 已运行，serial 恢复证据已可供单独验收/放行。
+独立 review `15254a5f` 已 PASS。本任务不会等待 4090/C 环境；no-memory 与 serial 正式 20k 均已运行。
