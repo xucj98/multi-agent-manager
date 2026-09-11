@@ -163,3 +163,10 @@
 - raw evidence 位于 C `workspace/2a879870-8dda-4613-a684-0ad48a5e86be/records/rmbench-walltrace-20260911/{events.tsv,bash-debug.tsv,installer.log,manifest.txt,summary.json,summary.md}`；raw SHA256 写入 `summary.json`。profile worktree、branch、profile parent 和 managed 临时 installer 均已验证 absent。清理的 `git worktree remove` 耗 `46.283 s`，单列在 summary，未混入 creation 指标。
 - C2 的 bounded cache-cleanup diagnostic 已终态 `exit=139`：25 次请求中 `0–18` / `100000–100018` 的 19 次 reset accepted，已有 `clear_cache()` 实际发生在 episode `4,9,14`；随后未记录下一次 acceptance 即再次出现 svulkan2 `ErrorIncompatibleDriver`、core dump 和 `Segmentation fault`。因此该候选不足以消除生命周期问题；它没有 policy 或 result leaf，不能作为 smoke/formal。退出后 GPU2 为 4 MiB、无 compute app，三个 strict tree clean。
 - 新 gate receipt 为 C `records/strict-c2-renderer-cache-gate-infrastructure-gate.json`，SHA256 `fc49aba51a9a41a516ec888c005d8973ac4def7da31d09b97f46394dd84ee950`；保留 raw log/exit/launch hash。按已发布边界，不再自动启动 C2 新 smoke 或 formal，等待独立的 renderer 根因裁定。
+
+## 恢复执行阶段（2026-09-12）
+
+- 已读取最新 Resume 裁定。复用原 failed-22/system-ICD/cache-cleanup 三份证据与全部环境，未重传或重建 renderer 环境。
+- renderer 最小候选为 RMBench `envs/_base_task.py` 8 insertions/1 deletion：进程内保留一个 SapienRenderer，scene/physics/camera 设置仍在原 setup_scene 重建。独立本机树 `workspace/2a879870-8dda-4613-a684-0ad48a5e86be/RMBench-renderer`、C 树 `state-vla/workspace/2a879870-8dda-4613-a684-0ad48a5e86be/diagnostic/renderer-reuse/RMBench`，branch `codex/2a879870-renderer-lifecycle`，base `3e69b1e`。
+- C2 GPU2 的原 bounded harness 已实际启动 40 reset，PID 144583，记录 `records/renderer-reuse-20260912/{launch.json,driver.log,result.json,exit}`；使用原 strict Python/bridge，candidate RMBench cwd，system ICD。等待跨越旧失败点；此为诊断，不作为 smoke/formal，未宣称协议等价已实证。
+- 创建优化已在现有 RMBench task worktree及 C .local 提取 installer 边界准备：两处 sorted(rglob) 改为惰性 rglob，保持“至少一个可解析至配置cache内的真实软链”的原判定；不写 venv 链接或覆盖私有文件。CPU-only fresh 创建/空间/清理 PID 130867 已启动，证据 `records/create-lazy-probe-20260912`。
