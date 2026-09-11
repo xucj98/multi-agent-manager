@@ -21,3 +21,6 @@
 先在report中写清每项为何训练：补齐B组同骨干serial和no-memory的三个训练seed，避免把seed0随机性当表示差异；对应full三seed已经完成。链接checkpoint路径，eval待C验收，不写预期成功率。按约小时监控，实际结束及时验收20000、完整参数/形状/BF16/有限值、模型单独恢复、metadata和退出/自有资源释放。必要结果同步给Manager纳入 RMBench/experiments/memory_chunk_20260910 台账。
 
 长作业登记MAM，等待按用户约定使用工具；不建立通用调度系统、不创建subagent。执行者可阶段汇报，由Manager继续唤醒；进程不依赖tool会话。清理自身临时文件、归档停止job，保留共享正式checkpoint。发布report，worktree最终由Manager归档。
+
+## Manager待办清理与恢复责任
+恢复现有四路训练责任。先核对实际进度、PID和20k完成状态；完成的验收产物并归档job，仍运行的使用新版mam wait保持active等停止事件，取代小时模型轮询。更新现有报告/台账，使用原worktree不重建，不重复训练。
