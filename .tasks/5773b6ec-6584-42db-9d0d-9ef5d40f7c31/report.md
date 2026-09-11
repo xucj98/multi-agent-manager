@@ -1,36 +1,76 @@
-# 集群C state-vla 三库评估环境
+# 集群 C state-vla 三库评估环境
 
-## 预检与正式对照裁定待办（2026-09-11）
+## 状态（2026-09-11）
 
-### 已确认的集群C连通性和共享状态
+严格对照已由 Manager 批准：本机 `put_back_full_t_plus_1_s0_20k_100ep` 为
+`69/100`、31 个正常任务失败、0 个 runtime error；C 的合格区间为 `64–74/100`。
+C 只会在三机 smoke 通过、代码干净和产物门禁通过后启动单次正式 100 rollout；届时立即登记本机 MAM job。
 
-- `wuwen-4090-1`、`wuwen-4090-2`、`wuwen-4090-3` 均可通过 SSH 访问。
-- 三机的 `/mnt/public` 都挂载自同一 yrfs；`state-vla`、`/mnt/public/xcj/cache/uv` 和 `/mnt/public/xcj/cache/shared-python` 的 inode 三机一致。`/mnt/public/xcj/Projects/state-vla` 已存在且为空。
-- 共享 `uv` 缓存已有 5.9 GB，`shared-python` 为 80 MB；目标 `state-vla/.cache` 尚不存在。三机 `PATH` 均未发现 `uv`，仅有系统 `/usr/bin/python3` 3.12.3，因此仍须验证 shared-python 是否为真实、可跨机执行的解释器，并准备稳定的 uv 可执行文件。
-- -1/-2 为 8 张 RTX 4090、驱动 550.127.08；-3 为 4 张 RTX 4090、驱动 580.82.07。-1/-2 的 GPU0 已有约 16.9 GiB 占用，-1 的 GPU3 也有约 1.3 GiB 占用；后续避开这些卡。驱动差异意味着环境须以 550 为最低约束，并在 580 上实测 CUDA 扩展与评测。
+## 连通性、稳定路径与风险
 
-### 本机受管 worktree
+- `wuwen-4090-1/-2/-3` 均可 SSH。三机的 C `/mnt/public` 是同一 yrfs；C 的
+  `state-vla`、`/mnt/public/xcj/cache/uv` 和 shared Python 路径可跨机读取。
+- -1/-2 是 8×RTX 4090、driver `550.127.08`；-3 是 4×RTX 4090、driver `580.82.07`。
+  每次 GPU smoke/正式启动前重新检查占用；不触碰其他人的服务或进程。
+- 稳定解释器为 shared CPython 3.11.14（bridge/OpenPI）和 3.10.19（RMBench）；稳定 uv 是
+  `state-vla/.cache/tools/uv/uv`，版本 `0.9.25`。所有 C 安装调用固定
+  `/mnt/public/xcj/cache/uv` 且指定 `--link-mode symlink`，不使用 hardlink。
+- 初始 C uv cache 为 `6,237,245,686` bytes。首次 bridge 安装正在向共享 cache 补齐缺失包，
+  因此耗时和 cache 增长会与随后的命中安装区分记录。缓存是后续三机环境的稳定依赖，不会作为本任务临时产物清理。
+- C 的 550/580 driver 差异和 PyTorch3D/cuRobo 二进制兼容性仍必须用实际 renderer/cuRobo 与三机 eval smoke 验证，不能仅以导入结果代替。
 
-已通过 MAM 创建干净、独立的检查/补丁 worktree：
+## 源码与本机受管改动
 
-| 仓库 | 路径 | base commit |
+C 稳定源码根为 `/mnt/public/xcj/Projects/state-vla`，origin 保持 GitHub：
+
+| 仓库 | C 源码提交 |
+| --- | --- |
+| robot-bridge | `f0f585a2b5974c60b51cac65277f94d1097591a3` |
+| OpenPI | `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4` |
+| RMBench | `6139577e360c27f866e4dbb3dd2fc067cc7ddd50` |
+
+GitHub 缺少直接 refs 的 OpenPI/RMBench 提交使用本任务临时 bundle 导入；不误称为 origin 的远端 ref。
+本机 MAM worktree 中的最小 installer 兼容改动已提交，保持默认 hardlink 行为，仅为 C 增加受校验的 opt-in symlink 模式：
+
+| 仓库 | 提交 |
+| --- | --- |
+| robot-bridge | `bdb41821039820f45c3f73ebc7db3c941a999b49`, `3ebf9d075e5e64a350ddb35cd8632e3abd04373c` |
+| OpenPI | `3435a2b60bfb34197adeb8fe54ad750aeb78a5ed` |
+| RMBench | `c59c6561de72092f95c14582ebaf8b1fe8728d00` |
+
+这些 patch 已针对 current 和严格旧版 installer 的五种组合全部实测可应用。
+
+## C 本地入口、资产和校验
+
+- 已部署且 gitignored：
+  - `state-vla/.local/create_worktree.sh`
+  - `state-vla/{robot-bridge,openpi,RMBench}/.local/create_worktree.sh`
+  - `state-vla/.local/patches/*-uv-symlink.patch`
+- 各仓包装器均保留三参数接口：
+  `bash .local/create_worktree.sh BASE_COMMIT NEW_BRANCH WORKSPACE_ROOT`。
+  通用入口只从稳定 source 根建立 worktree，临时取出指定 commit 的安装脚本、施加已提交的 symlink patch、验证 `.venv` 至 uv cache 的真实 symlink，并防止创建 bridge `eval_result` 与 OpenPI `user_checkpoints`。
+- 已经通过 `wuwen-nx-aic → wuwen-4090-aic` 同步并逐文件验证最小输入，而非复制全量训练数据：
+
+| 输入 | C 目标 | 校验 |
 | --- | --- | --- |
-| robot-bridge | `/mnt/public/xcj/Projects/workspace/5773b6ec-6584-42db-9d0d-9ef5d40f7c31/robot-bridge` | `f0f585a2b5974c60b51cac65277f94d1097591a3` |
-| openpi | `/mnt/public/xcj/Projects/workspace/5773b6ec-6584-42db-9d0d-9ef5d40f7c31/openpi` | `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4` |
-| RMBench | `/mnt/public/xcj/Projects/workspace/5773b6ec-6584-42db-9d0d-9ef5d40f7c31/RMBench` | `6139577e360c27f866e4dbb3dd2fc067cc7ddd50` |
+| checkpoint `20000` | `state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s0/20000` | 60 files、5,258,412,876 bytes，manifest `cb4032ce56b471eabb2f5138925af5cbce800cfbea8630aab85d44d9c665ab79` 全部通过 |
+| embodiments、objects、`demo_clean_state`、PyTorch3D/cuRobo wheel | `state-vla/RMBench/{assets,data}` 与 `state-vla/.cache/{wheels,curobo}` | 355 files，manifest `22353e70420a0e474173413b3c18df6dc015506faf8352f31e06107f16bfcd4c` 全部通过 |
 
-三树在创建后均干净。已阅读各库 AGENTS、worktree 环境说明及 RMBench 实验规范；openpi 与 RMBench 的受管环境脚本当前硬编码 uv hardlink 和 hardlink inode 校验，后续会在上述本机 worktree 中作保持默认 hardlink 行为的最小 symlink 模式兼容补丁，再提交供验收。
+C 的 remote task root 是
+`/mnt/public/xcj/Projects/state-vla/workspace/5773b6ec-6584-42db-9d0d-9ef5d40f7c31`；记录在其 `records/` 下。
+目前仅建立了 `current/robot-bridge`，其实际安装命令、时间和磁盘测量日志是
+`records/current-robot-bridge-create.log`，安装尚在进行，未将其误报为完成。
 
-### 正式100的候选稳定对照与版本差异
+## 严格运行树与后续门禁
 
-已只读检查现有评测负责人任务 `e6908de7-4b02-465a-987b-a19eba7a315a` 的已发布报告。其正式 run `memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep` 已完整完成，报告记录为 69/100 success、100 个 episode、100 个视频和无 runtime error；这是候选对照，不等同于本任务已确认基线。
+正式 C tree 将使用同级目录 `workspace/<TASK-ID>/formal/{RMBench,robot-bridge,openpi}`，固定：
 
-该 run 的冻结执行树为：RMBench `3e69b1e665a8eac0104d261b233f1b3339007e00`、robot-bridge `8ea6078543a875b5ae223df16891cdc1fe975c66`、openpi `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。本任务指定的环境版本分别是 RMBench `6139577e360c27f866e4dbb3dd2fc067cc7ddd50`、robot-bridge `f0f585a2b5974c60b51cac65277f94d1097591a3`、openpi `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。RMBench 和 bridge 均不同，不能将两者混为严格同版本对照。
+| 仓库 | 严格运行提交 |
+| --- | --- |
+| RMBench | `3e69b1e665a8eac0104d261b233f1b3339007e00` |
+| robot-bridge | `8ea6078543a875b5ae223df16891cdc1fe975c66` |
+| OpenPI | `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4` |
 
-在 Manager 与评测负责人确认下列事实前，不会启动 C 的正式100或传输大模型/数据：
+该旧 bridge 的 `openpi_client` 会按其已有 `scripts/deployment/install_openpi_client.sh` 从对应 OpenPI commit 构建的本地 wheel 正规安装到旧 bridge venv；最新 bridge 会单独证明没有此客户端依赖。不会用临时 `PYTHONPATH` 伪造旧环境。
 
-1. 该 69/100 run 是否被确认为稳定、可复用的正式基线；
-2. 对应 checkpoint 的精确路径、hash、所需最小 assets/data 及冻结的命令、seed 序列、H/K/memory 协议；
-3. 选择在 C 建立上述旧版严格运行树，还是先在本机以本任务新版本完成新的同版本 100 基线。
-
-环境搭建、缓存核验、三库 clone、symlink worktree 入口及不依赖此裁定的验证继续推进；正式评测会在 smoke、干净提交和产物门禁之后登记 MAM job。
+待完成：三个 current `.local` 实测与磁盘表、strict tree 安装/客户端 wheel、renderer/cuRobo 和三机真实 smoke2、单次登记的 C 100 rollout、50 条中点核查、结果回传和最终清理/README。
