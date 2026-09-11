@@ -35,3 +35,8 @@ Manager已只读确认：远端/home/xucuijie/Projects/openpi HEAD673038f77fe824
 
 ## offline RPC 修复独立复核
 retry1实际运行在首个execute因memory prediction IDs被通用handle_execute转成float32失败，尚无有效执行行。b86负责局部修复，不把memory专有逻辑加入通用机器人base。作者新commit到达后，请独立复核实际WebSocket/codec→RobotServer→handle_execute→offline controller路径：full和serial各完整fake-policy episode，整数ID/row/query身份、执行行数、GT/mask/反馈、尾部/reset及原机器人浮点动作合同。检查修复和CPU集成证据后给GPU2 retry2准入结论，不能只以直接调用execute单测代替RPC验证。你不修改作者写集。
+
+## 独立review裁定与最小启动修复
+3b678966已确认live S2M代码CPU PASS，发现runbook错误承诺选定PM URL时policy pane必skip：run_policy_server.sh只看远端RB_POLICY_PORT，与RB_POLICY_URL端口无关。Manager认可问题，但不采用根据任意TCP监听推断托管身份或无监听自动启动的方案。
+请在现有x1pro_takeover.sh增加明确CLI选项 --skip-policy：使用已经由Policy Manager部署的policy时，要求有效非空RB_POLICY_URL，policy pane只显示使用外部policy的说明，不调用run_policy_server.sh、不探测/启动/重启policy进程；正常无此选项保留既有手工启动行为。不新增RB_*变量、不改通用remote脚本、不改scheduler/controller。合理处理help/未知参数，明确skip路径无需checkpoint配置；避免tmux持久环境导致旧URL（核查沿现有环境机制正确传入）。复用既有测试方式，CPU fake tmux/ssh检验skip和默认路径，确保目标URL与基准端口不同也不启动policy。更新runbook使用该选项，声明PM child先就绪。
+提交后交3b678966 reviewer复核；不擅自更新现场到未验收commit。其余已验收live逻辑不重写，保持今天最小范围。正式wash offline已全部通过并留存retry2，源任务b86已归档。
