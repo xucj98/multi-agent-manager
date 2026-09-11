@@ -1,39 +1,40 @@
-# 独立验收：统一 `mam wait` 与安装器（未通过）
+# 独立复审：统一 mam wait、安装器与 native 输入（未通过）
 
-审查 workspace：`/mnt/public/xcj/Projects/workspace/8d648d66-b920-4a00-9472-cb7651412028/multi-agent-manager`。
+审查 workspace：/mnt/public/xcj/Projects/workspace/8d648d66-b920-4a00-9472-cb7651412028/multi-agent-manager。
 
-审查分支 HEAD 为 `686be5d`，其中合并了当前实现 `main` 的 `1800659`（运行时 `cc69d43`、兼容性/安装器 `e20da6d` + `e23d693` 和后续测试/pipe 修复）。未修改实现代码。
+审查分支 HEAD 为 63ca6bd，已合并 main@758d523（包括运行时 60cfd89、安装器 b4382a2 和 native 输入 8539bfe）。未修改实现代码，未重启生产 App Server。
 
 ## 阻断项
 
-1. **[P0] 安装器把不满足 trace 环境误判为成功。**
-   - 位置：`scripts/install.sh:305-334`，以及调用处 `471-478`。
-   - 触发：`runtime_logging_ready` 内嵌 Python 以 1（环境缺失）或 2（`/proc/PID/environ` 不可读）退出时，`if ...; then ...; fi` 后的 `$?` 是整个 `if` 的 0，不是 Python 的退出码。因此函数返回 0。调用方的 `if ! runtime_logging_ready ...; then status=$?` 也会丢失实际状态。
-   - 独立复现：source 脚本后调用 `runtime_logging_ready 1` 和不存在的 PID `999999`，两次都返回 0，`RUNTIME_ENV_ERROR` 分别说明缺少环境和 PID 不可读。
-   - 影响：新安装中 listener 缺少 JSON trace 时，脚本错误打印“already has JSON trace logging”、跳过带 `yes` 的重启流程，最后才在兼容性检查失败；不可读环境本应保证“不停止进程”，修复函数后仍会被调用处的 `!` 误分类。应在条件语句内保存命令状态，并在调用方使用非取反的 `if/else` 保存失败码。为两种状态各加 installer 测试。
+1. **[P1] native journal 在实际 invocation 边界仍有漏消息窗口。**
+   - 位置：multi_agent_manager/cli.py:920-928，multi_agent_manager/wait_runtime.py:292-319、321-328。
+   - 触发：CLI 先记录 started_at，但 SessionMessages.from_environment() 还要递归查找 journal、读取候选 header，最后才以 EOF 打开命中的文件。若 native user.text 在 started_at 之后、EOF 打开之前写入，它的时间戳虽属于本次调用，仍被 EOF tail 永久跳过；此时 event stream 尚未连接，也不能补回该事件。
+   - 独立复现：在临时当前-session journal 中记录边界后追加一条当前 turn 的 user.text，再调用 from_environment(..., started_at=boundary)，poll() 返回 []。本机当前 journal 可被唯一定位，但这一查询不是原子操作；现有回归测试只覆盖 watcher 已打开后的 compatibility 阶段。
+   - 影响：刚开始 mam wait 时的 native Manager 输入仍可能被遗漏，继而静默等待到其它状态变化或一小时超时。应把 journal 边界建立为可覆盖查找/打开阶段的稳定 offset，或从本次时间边界扫描当前 journal；补一条“写入发生在 from_environment 查找期间”的回归测试。不要只把 EOF tail 的建立时间当作调用边界。
 
-2. **[P0] 兼容性检查窗口会丢掉当前 wait 的用户或 Manager 输入。**
-   - 位置：`multi_agent_manager/cli.py:882-884`、`multi_agent_manager/wait_runtime.py:117-144`、`612-628`。
-   - 触发：`wait_unified()` 先执行每次都运行的 `wait_compatibility()`；随后 `TraceMessages` 才以 EOF 作为起点打开 trace。此窗口内到达的同一当前 turn 的 `turn/steer` 或 native `turn/start` 已在日志中，初次 tail 会永久忽略，而 App Server 生命周期订阅不订阅这两种请求。
-   - 独立复现：向临时 JSON trace 预写带当前 `turn.id` 的有效 `turn/steer` span 后构造 `TraceMessages`，`poll()` 返回 `[]`。本机一次真实 compatibility check 耗时约 1.4 秒，因此窗口不是理论上的瞬间。
-   - 影响：调用已经开始的 `mam wait` 可错过用户 steer 或 Manager 输入，继续等待，违反“消息解除对应当前等待／不能一小时静默”的目标。应在兼容性检查前记录本次调用的 trace 文件 offset/时间边界，检查完成后只扫描该边界之后、精确匹配当前 turn 的 span；该边界只在内存中使用，不需要 cursor、ack 或历史重放。补一个输入恰好发生在 compatibility gate 内的回归测试。
+2. **[P1] 已确认 TERM 后的任一 relaunch 失败会让 App Server 保持停止。**
+   - 位置：scripts/install.sh:1057-1088，文档见 docs/install.md:30-34。
+   - 触发：send_term 成功后，wait_for_target_departure、launch_same_style 或 wait_for_replacement 的失败分支只释放 lock 并以非零退出；脚本没有预检全部 launcher 条件，也没有 post-TERM trap/recovery。用户中断脚本也落在同一无恢复区间。
+   - 独立复现：用隔离的、满足 discovery 规则的 node wrapper/listener，令 wrapper 在 listener 退出后变得不可执行。安装器确实只 TERM 该 listener，随后报告 launcher 不可运行并返回 1；socket 不存在、原 wrapper 已退出、没有 replacement。这没有接触生产进程。
+   - 影响：一次已确认的安装操作可把可用 App Server 变为长期不可用，文档只说明会非零结束，未说明此后的恢复状态。应在 TERM 前预检捕获的 launch plan，并为 TERM 后失败/信号提供受身份约束的恢复或明确、可执行的人工恢复步骤；cleanup 只能针对本次安装器创建并记录身份的 wrapper。
 
-3. **[P1] 已确认 listener 的 TERM 不能证明新 `.bashrc` 环境会生效，安装文档的自动重启承诺缺少可行路径。**
-   - 位置：`scripts/install.sh:377-404`，`docs/install.md` 的“重启后”段落。
-   - 证据：本机实际树为 `node /usr/local/bin/codex … app-server`（PID 4126604）→ native listener（PID 4126625）。npm wrapper 的 `/usr/local/lib/node_modules/@openai/codex/bin/codex.js:231-244` 只把已有 `process.env` 复制给子进程，`274-295` 表明子进程退出时 wrapper 自身退出，不会重新读取 `.bashrc` 或自行 respawn。
-   - 影响：在原 listener 缺少 trace 环境的真实新装场景，写入 `.bashrc` 后只 TERM 子进程并不能使旧父进程获得新 export；外层 App 是否以读取 `.bashrc` 的方式重启也未验证。修复第 1 项后，脚本很可能在 20 秒内以“replacement listener appeared without…”失败，而文档目前表述为可完成的自动流程。需要先验证外层 App 的环境传播和 replacement 路径；若无法做到，安装器和文档应明确以不杀进程的非零结果收尾，而不是承诺自动生效。
+## 已接受问题的复查
 
-4. **[P2] 初始 trace 连接没有对晚写的陈旧行做时间过滤。**
-   - 位置：`multi_agent_manager/wait_runtime.py:124-144`、`212-234`。
-   - 触发：初次打开使用 EOF，但 `_require_new_timestamp` 为 false；如果旧 wait 的同一 active turn span 因缓冲/延迟在新 wait 打开后才追加，代码接受它。
-   - 独立复现：先构造 `TraceMessages`，再追加时间戳早一分钟、同一 turn 的 `turn/steer` 行，`poll()` 返回该信号。
-   - 影响：旧 wait 的消息可解除同一 turn 后续 wait，违背 stale-wait 隔离。第 2 项引入本次调用边界时应同时在初始增量行上过滤早于边界的时间戳，并保留现有 request/turn 去重。
+- **exit status propagation：已修复。** runtime_logging_ready() 保存 Python 的实际失败码，ensure_runtime_logging() 按 1（环境不匹配）和 2（不可读）分支处理。独立 source 检查在无 trace 环境时返回 1、无效 PID 返回 2；两条 installer 回归测试均通过。
+- **compatibility 前 trace 边界：已修复。** trace watcher 在 compatibility probe 前打开并共享给 runtime；回归测试在 probe 内追加当前 turn span，随后被读取。
+- **晚写陈旧 trace 行：已修复。** 每个增量行都按本次 started_at 过滤；针对初始 EOF tail 后追加旧 timestamp 的回归测试通过。本机真实 trace 使用微秒 timestamp，未发现秒级舍入问题。
+- **.bashrc 环境传播／确定性同式重启：happy path 已得到实证。** 安装器捕获实际 node wrapper 的 argv、cwd、stdio 和环境，只替换两项 trace 变量；隔离重启测试验证重新建立同式 wrapper。本机生产 listener 通过严格 discovery，当前已具备 JSON trace 环境，因此没有重启它。第 2 项仍阻止把失败路径视为安全完成。
 
-## 已验证的证据
+## Native 输入、queue 与兼容性证据
 
-- `.venv/bin/python -B -m unittest discover -s tests -v`：84 tests passed（26.8s），包括角色/责任矩阵、review delegation、状态即时返回、必需输出字段、取消、超时、断线和 trace rotation。
-- `bash -n scripts/install.sh` 与 `python -m multi_agent_manager.cli wait --help` 均成功。
-- 对当前真实 control socket 运行 `python -m multi_agent_manager.wait_compat` 成功；它验证 live control socket、JSON trace、隔离 server 的一般事件及 `turn.id` 映射，未启动真实模型 turn。
-- 以本审查任务绑定的 `CODEX_THREAD_ID` 执行真实 `mam wait` 空集路径，返回 `{"status":"empty","reason":"empty","message":"no active subagents or unarchived jobs",...}`，未创建等待登记。
+- 新 watcher 只保留 turn/message ID；它要求唯一、当前 session journal，缺少 CODEX_HOME／CODEX_SESSION_ID、header 不匹配、rotation、截断或无效 metadata 都会显式报错，不会退化为静默文件读取。
+- item 事件同样限定为 caller、当前 active turn、userMessage、本次时间边界，并做 ID 去重；其他 agent、其他 turn 和陈旧 event 不唤醒。
+- 以临时 CODEX_HOME 启动隔离 stdio App Server，调用 thread/queue/add（未调用 queue/start、未启动模型 turn）：结果仅有 queuedSubmission 与 thread/queue/changed，session journal 中没有 user-message row。当前 App Server schema 也表明 queue add 不返回 turn，queue start 才产生后续 turn；现有 current-turn 过滤会拒绝该后续 turn。因此没有发现 queue 会错误解除当前 wait。
+- wait_compat 仍明确输出 native user-message/native-manager-send **not certified**，docs/install.md:38 也如实说明这一点。它的 PASS 只验证 control socket、trace 和隔离 server 行为，不能替代真实 native smoke；本次 review 不将 native wake 标为已验收。真实 smoke 由 owner 重跑中，未等待或轮询。
 
-真实用户消息和 native Manager `send_input` 的端到端 smoke 仍由 Manager/运行时 owner 进行；上述 compatibility PASS 和单元测试不构成该路径的验收证据。因此当前不建议最终接受。
+## 验证
+
+- bash -n scripts/install.sh：通过。
+- .venv/bin/python -B -m unittest discover -s tests -v：**101 tests passed**（27.5s）。
+- .venv/bin/python -B -m multi_agent_manager.wait_compat：通过；对生产 control socket 仅做 initialize/trace 读取，输出明确不认证 native wake。
+- 生成的本机 App Server protocol schema 与隔离 queue probe 均未创建真实模型 turn；生产 App Server、GPU 作业和用户 session 内容均未修改。
