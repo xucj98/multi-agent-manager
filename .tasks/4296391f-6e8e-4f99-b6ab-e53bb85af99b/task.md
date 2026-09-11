@@ -20,3 +20,9 @@
 用户确认现用启动入口scripts/launch/x1pro_takeover.sh，环境由现场WSL的~/.robot_bridge_env.sh加载；当前训练服务器及用户均不在内网。policy为jx-4090-2，robot为jx-x1pro-060，master/scheduler为jx-x1pro-m-060。内网URL在用户消息，文档不硬编码这些地址，也不从此服务器探测连接；跳板机由用户确认，内网同事最终执行。部署说明沿原RB_POLICY_SSH/URL、RB_ROBOT_SSH/URL、RB_MASTER_SSH/URL、RB_SCHEDULER_SSH机制，说明哪些是现场既有值、哪些模型相关值要换。先交付可供同事执行的现有入口，不新建跨网框架，不发送真实动作。
 
 offline修复commit已到124049fb78d29db1d77d13a9fd4a4b698fcfe6e9（作者report已发布）：只改launcher和测试。请优先在自己的分支推进到该commit，对真实缺顶层query_stride的served_metadata/新schema K校验做约5–10分钟定向复核并先报告准入结论，让offline GPU2尽快重试；随后继续live/offline一致性与部署文档。重点确认数据采样stride与执行K不被混同、实际source/clean gate保留、legacy drawer不回归。你尚无业务实现修改时直接ff即可；若有自己修改先妥善保存，不丢代码。后续若改live文件，与作者launcher写集仍分离。
+
+## 08:05 Policy Server已可达（只读核对）
+用户已配置ssh jx-4090-2-via-nx-aic通达policy server，Policy Manager本机8100，已由用户添加wuwen-nx-aic源并同步两个模型。不要重复传输、取消或重启用户同步。
+Manager已只读确认：远端/home/xucuijie/Projects/openpi HEAD673038f77fe8245a1309d32c4e1701e748915ba3且checkpoint_metadata.py有未提交修改，新openpi_client/memory_config.py不存在。bridge根/home/xucuijie/Projects/robot-bridge HEAD68b70367104045bee1e9f540187fe5d45d920e7b，有多处同事修改（launcher/scheduler等）。Policy Manager PID3646使用openpi/.venv/bin/python，从bridge cwd启动。8950已有pourtea实例；8949/8951/8952也在运行。GPU0约315MiB free、GPU1约7150MiB free，不能擅自停服务或改现场checkout/环境。
+允许你通过该SSH别名只读研究Policy Manager既有部署参数、backend配置是否能为wash选择独立bridge/openpi源码及解释器，并给出最小部署方案/具体兼容缺口，先不要写远端或改共享环境。现用Manager JSON WebSocket ws://127.0.0.1:8100，cmd=status为只读；远端openpi/.venv有websockets.sync.client（连接时proxy=None）。避免输出无关模型完整metadata，筛选wash同步与必要拓扑。远端不是本集群共享文件系统，模型落点由Policy Manager管理。
+此调查与live/offline检查并行顺序自行安排，但先发offline准入让GPU2恢复（Manager已根据你的报告准入）。不占远端GPU、不发robot动作；有用结论写简报供Manager决定安装/部署动作。
