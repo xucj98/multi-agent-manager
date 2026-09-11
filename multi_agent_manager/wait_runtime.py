@@ -30,6 +30,11 @@ _AGENT_STATUSES = {"active", "idle", "notLoaded", "systemError"}
 _MESSAGE_METHODS = {"turn/steer", "turn/start"}
 _USER_TEXT_KIND = "user.text"
 MAX_SESSION_RECORD_BYTES = 16 * 1024 * 1024
+# The initial backwards scan occurs once while a native-message watcher is
+# created.  It is large enough to include one maximum-size journal row on each
+# side of the timestamp boundary; a rare missing boundary falls back to offset
+# zero rather than risk skipping an invocation-time input.
+SESSION_LOOKBACK_BYTES = 2 * MAX_SESSION_RECORD_BYTES
 
 
 class WaitRuntimeError(RuntimeError):
@@ -259,17 +264,22 @@ class SessionMessages:
     persists message text.
     """
 
-    def __init__(self, path: str | os.PathLike[str], *, started_at: float | None = None) -> None:
+    def __init__(
+        self, path: str | os.PathLike[str], *, started_at: float | None = None, include_started_at: bool = False
+    ) -> None:
         self.path = Path(path)
         if started_at is not None and (not isinstance(started_at, (int, float)) or isinstance(started_at, bool)):
             raise ValueError("session journal start time must be numeric")
+        if not isinstance(include_started_at, bool):
+            raise ValueError("session journal lookup window must be boolean")
         self._started_at = time.time() if started_at is None else float(started_at)
         self._handle = None
         self._device_inode: tuple[int, int] | None = None
         self._partial = b""
         self._seen: set[tuple[str, str]] = set()
         self._seen_order: list[tuple[str, str]] = []
-        self._open(at_end=True)
+        offset = self._lookup_start_offset() if include_started_at else None
+        self._open(at_end=offset is None, offset=offset)
 
     @classmethod
     def from_environment(
@@ -277,6 +287,9 @@ class SessionMessages:
     ) -> "SessionMessages":
         """Open the unique current-session journal for ``CODEX_THREAD_ID``."""
 
+        # Take the invocation boundary before journal discovery.  A native
+        # input can arrive between identifying the file and opening it.
+        boundary = time.time() if started_at is None else started_at
         env = os.environ if environment is None else environment
         home, session_id = env.get("CODEX_HOME"), env.get("CODEX_SESSION_ID")
         if not isinstance(home, str) or not home:
@@ -316,15 +329,60 @@ class SessionMessages:
                 matches.append(candidate)
         if len(matches) != 1:
             raise WaitRuntimeError("cannot identify one current Codex session journal for CODEX_THREAD_ID")
-        return cls(matches[0], started_at=started_at)
+        return cls(matches[0], started_at=boundary, include_started_at=True)
 
-    def _open(self, *, at_end: bool) -> None:
+    def _lookup_start_offset(self) -> int:
+        """Find a bounded pre-invocation journal boundary once at startup.
+
+        The normal poll path only consumes bytes appended after this offset.
+        If the bounded tail has no safely older timestamp, begin at zero so a
+        message written during discovery cannot be lost to an EOF seek.
+        """
+
+        try:
+            with self.path.open("rb") as handle:
+                size = os.fstat(handle.fileno()).st_size
+                lower = max(0, size - SESSION_LOOKBACK_BYTES)
+                handle.seek(lower)
+                tail = handle.read(SESSION_LOOKBACK_BYTES)
+        except OSError as exc:
+            raise WaitRuntimeError(f"cannot read Codex session journal: {exc}") from exc
+
+        offset = lower
+        if lower:
+            newline = tail.find(b"\n")
+            if newline < 0:
+                return 0
+            offset += newline + 1
+            tail = tail[newline + 1:]
+
+        rows: list[tuple[int, bytes]] = []
+        for row in tail.splitlines(keepends=True):
+            end = offset + len(row)
+            if row.endswith(b"\n"):
+                rows.append((end, row[:-1]))
+            offset = end
+
+        for end, row in reversed(rows):
+            if len(row) > MAX_SESSION_RECORD_BYTES:
+                continue
+            try:
+                value = json.loads(row)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if isinstance(value, Mapping) and (when := _timestamp(value.get("timestamp"))) is not None and when < self._started_at:
+                return end
+        return 0
+
+    def _open(self, *, at_end: bool, offset: int | None = None) -> None:
         try:
             handle = self.path.open("rb")
             stat = os.fstat(handle.fileno())
         except OSError as exc:
             raise WaitRuntimeError(f"cannot read Codex session journal: {exc}") from exc
-        if at_end:
+        if offset is not None:
+            handle.seek(offset)
+        elif at_end:
             handle.seek(0, os.SEEK_END)
         if self._handle is not None:
             self._handle.close()

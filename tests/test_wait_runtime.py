@@ -671,6 +671,37 @@ class SessionMessagesTests(unittest.TestCase):
             self.assertEqual(watcher.path, path)
             watcher.close()
 
+    def test_session_lookup_window_captures_input_written_between_discovery_and_open(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "codex"
+            path = home / "sessions" / "2026" / "09" / "12" / f"rollout-{CALLER}.jsonl"
+            path.parent.mkdir(parents=True)
+            started_at = datetime.now(timezone.utc).timestamp()
+            old = datetime.fromtimestamp(started_at - 60, timezone.utc).isoformat().replace("+00:00", "Z")
+            current = datetime.fromtimestamp(started_at + 1, timezone.utc).isoformat().replace("+00:00", "Z")
+            header = {"type": "session_meta", "payload": {"id": CALLER, "session_id": "session"}}
+            path.write_text(json.dumps(header) + "\n" + json.dumps(self.row(old, "old-turn", "old", ["user.text"])) + "\n")
+            original_open = wait_runtime.SessionMessages._open
+            opened = False
+
+            def append_during_lookup_window(instance, **kwargs):
+                nonlocal opened
+                if not opened:
+                    opened = True
+                    with path.open("a") as handle:
+                        handle.write(json.dumps(self.row(current, "caller-turn", "during-open", ["user.text"])) + "\n")
+                return original_open(instance, **kwargs)
+
+            with patch.object(wait_runtime.SessionMessages, "_open", new=append_during_lookup_window):
+                watcher = wait_runtime.SessionMessages.from_environment(
+                    CALLER,
+                    environment={"CODEX_HOME": str(home), "CODEX_SESSION_ID": "session"},
+                    started_at=started_at,
+                )
+            self.assertTrue(opened)
+            self.assertEqual(watcher.poll(), [wait_runtime.SessionMessage("caller-turn", "during-open")])
+            watcher.close()
+
 
 class CliWaitOutputTests(unittest.TestCase):
     def test_trace_boundary_captures_input_written_during_compatibility(self):
