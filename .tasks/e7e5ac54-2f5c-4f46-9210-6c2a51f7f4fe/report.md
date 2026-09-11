@@ -1,5 +1,18 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日10:06 恢复监控核查
+
+10:05:55–56实时job status确认GPU0/1均running，无error；日志持续前进，未见容量错误导致训练中断。
+
+| 本机GPU | 模型/seed | 最新真实标量更新 | loss / grad_norm / param_norm | 剩余ETA / 预计完成更新 |
+| --- | --- | --- | --- | --- |
+| 0 | put-back t+30 / 2 | Step17500 | 0.0006 / 0.0300 / 1804.2233 | 2:30:04 / 约12:36 |
+| 1 | put-back t+1 / 2 | Step17700 | 0.0008 / 0.0341 / 1804.3680 | 2:17:03 / 约12:23 |
+
+各175/177条已落盘标量全部有限（区间均值）；无可见Traceback/CUDA/RESOURCE_EXHAUSTED/OOM。稳定约3.6秒/update，ETA不含最终保存。GPU0用73427MiB、空闲7611MiB、100%；GPU1用73405MiB、空闲7633MiB、100%；RAM可用876GiB。冻结源码HEAD正确且git status为空。
+
+其余12项已验收并归档，不重复CPU读取。wuwen-1不再启用；此前本任务全部释放与外部不可见占用的边界保持不变。继续复用既有mam wait等待结束事件，按任务核验新20000 checkpoint/metadata、CPU参数恢复及进程/子进程/显存释放后归档；GPU策略恢复/评测仍由Manager排期。下一小时检查10:32。
+
 ## 9月11日09:32 本机最后两路小时巡检
 
 已读最新task；09:32:42–43逐项job status均running，无error。两路日志均继续前进，全部已落盘loss/grad_norm/param_norm有限，无可见训练报错。其余12项已收尾归档，本轮未重复checkpoint读取或远端探测。
