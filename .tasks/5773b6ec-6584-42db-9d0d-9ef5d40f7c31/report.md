@@ -204,3 +204,19 @@ fixture，以 `python -O` 创建 cache-backed `transformers/models` 子目录。
 明确拒绝，cache sentinel 未变化（`optimized_installer_boundary=PASS cache_modified_files=0`）。
 该提交现通知 Manager/c03e0009 复核；C 将在同步新 bundle/patch 后以 `PYTHONOPTIMIZE=1` 跑实际
 current OpenPI smoke，之后的 fresh one-click 与正式环境均使用该保护。
+
+## 现场阶段快报（2026-09-11 14:58 +08:00）
+
+RMBench 精确 uv cache 传输已在 14:22 完成：差量 `7,908,996,576` bytes、`983` 秒；最终统计已落在
+C `records/rmbench-cache-transfer.txt`。闭包中的 265 条 wheel links 已逐条核验，其中 223 条从
+`/root/.cache/uv/...` 的文本目标改为直接 C 共享路径 `/mnt/public/xcj/cache/uv/...`，42 条原本已正确。
+
+OpenPI 已部署准入后的 `5f6ca06` installer patch，并在 C current tree 以 `PYTHONOPTIMIZE=1` / `python -O`
+实际 CPU smoke 成功；其 editable 源和 site-packages 到共享 uv cache 的真实链接均已记录。bridge 的离线
+CPU smoke 也已通过。
+
+RMBench `.local` 已两次真实执行至离线 uv 解析，均未触网或启动 eval；失败发生在 torch/torchvision 的
+PyTorch index 解析其 numpy/pillow 依赖。两次失败日志和 task-owned worktree 自动清理证据均保留，当前 C
+没有 uv、create-worktree 或 eval 进程。正在用同一已验证 RMBench CPython 3.10 venv 导出的 264 项精确
+依赖闭包进行隔离离线验证；通过后只做最小 installer 固定化，重新从 `.local` fresh 入口创建，再做 RMBench
+CPU/GPU 与三机 smoke。
