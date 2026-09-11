@@ -1,34 +1,29 @@
 # 交付
 
-- `multi_agent_manager/wait_compat.py` 提供无参数 `require_compatible()`。每次调用都会重新验证 live control socket、该次 initialize 的 JSON trace 归因，以及隔离 stdio App Server 的 ephemeral-thread 通知、无模型 `turn/steer` 拒绝和 `turn.id` trace 映射；没有版本门槛、allowlist、证书、cursor、replay 或 ack 状态。
-- CLI/App 版本只在 `diagnostics` 中显示，且已从 behavioral fingerprint 排除：版本变化本身不会改变兼容性结论，只有探测行为失败才会报错。
-- `scripts/install.sh` 取代 `install_and_test.sh`，成为唯一入口 `bash scripts/install.sh`。它从当前 checkout 经 `pipx install --force` 安装 MAM，维护 `.bashrc` 的标记 trace 块（位于非交互 return 之前、仅删除完全匹配的旧 MAM trace 行、保留 mode、变更前备份并打印 rollback）；重复运行不累积 block 或备份。
-- 安装器用 control socket 的 kernel inode 找到唯一 listener，核对 `app-server --listen unix://`、listener 的 PID/start ticks/executable/socket 和 npm `node … codex … app-server` 父进程。只有交互终端输入完全匹配的 `yes` 后才会向该单一 listener 发 `TERM`；确认后再次核对完整 identity。默认、`no`、EOF、非交互或目标变化均不发信号且非零退出。替换 listener 未能由 App 自身出现时也非零退出，且不会启动 standalone fallback。
-- `docs/install.md` 现在给出 fresh `PROJECT_ROOT`、`.mam/env.json`、clone、`sudo apt install pipx` 和唯一安装命令的实际流程。
-- 兼容性测试增至 15 项，覆盖版本变化仍通过且 fingerprint 不变、断开的 live runtime、事件/trace/safety 失败，以及隔离的 `.bashrc` 幂等/回滚、精确 `yes`、非交互拒绝和确认后目标身份变化不发送信号。
+- `multi_agent_manager/wait_compat.py` 提供无参数 `require_compatible()`：每次重新验证 live control socket、该次 initialize 的 JSON trace 归因，以及隔离 stdio App Server 的 notification、无模型 `turn/steer` 拒绝和 `turn.id` trace 映射。版本仅在 diagnostics 中显示；没有 version gate、allowlist、certificate、cursor、replay 或 ack。
+- `scripts/install.sh` 是唯一入口。它从 checkout 经 `pipx install --force` 安装 MAM，并幂等维护 `.bashrc` 的标记 trace block、权限与可回滚备份。
+- 当 listener 缺少 trace 环境时，安装器只在交互终端输入精确的 `yes` 后才继续。它捕获 listener 与 npm `node … codex … app-server` wrapper 的 PID/start ticks、executable、argv、cwd、完整环境、stdio 和 log identity；取得已有 `app-server-startup.lock` 后重新比较该 record，才向该单一 listener 发 `TERM`。
+- 原 listener 与 wrapper 离开后，安装器以捕获的同一 node/npm wrapper 命令、cwd 和 app-server log 重建 listener。环境保持捕获值，只有 `RUST_LOG` 和 `LOG_FORMAT` 被替换为 trace 值；不会启动 native standalone daemon 或新 supervisor。替换 listener 必须通过 socket、log、环境和 wrapper-record 验证。
+- 若 App 在确认前后并发替换 target，安装器不 signal replacement：可验证的 replacement 继续运行，未验证的 replacement 清晰非零退出。没有版本、fingerprint、certificate 或 allowlist 会拒绝行为测试通过的版本。
+- `docs/install.md` 说明 fresh `PROJECT_ROOT`、`.mam/env.json`、clone、`sudo apt install pipx` 和唯一的 `bash scripts/install.sh` 工作流，以及 deterministic app-managed restart 的边界。
+
+## Review 8d648d66 fixes
+
+- `runtime_logging_ready()` 现在保留 embedded Python 的真实退出状态；`ensure_runtime_logging()` 将缺少 trace 环境（可走确认后的 restart）与 PID/environment 不可读（不 restart）分开处理。
+- 隔离测试覆盖两种状态、exact-yes/noninteractive、startup-lock cleanup、confirmation/replacement races、record 环境匹配、wrapper argv/cwd/env/log 重放，以及一个真实临时 Unix-socket node/npm wrapper 的完整 stop/relaunch/validate/cleanup。
 
 ## 验证
 
 - `bash -n scripts/install.sh` 与 `git diff --check`：通过。
-- `.venv/bin/python -B -m unittest tests.test_wait_compat -v`：15 passed。
-- `.venv/bin/python -B -m unittest discover -s tests -v`：56 passed，30.727s。
-- `python -m multi_agent_manager.wait_compat`：live 行为探测 PASS；只读验证 control socket、fresh trace binding 和隔离无模型 probe。
-- 只读执行 `discover_app_server` 与 `runtime_logging_ready`：识别当前 app-managed npm listener 及其 JSON trace 环境。开发期间未运行安装器主流程，因此未修改真实 `.bashrc`、未执行全局 `pipx install`、未重启 live App Server。
+- `.venv/bin/python -W error::ResourceWarning -B -m unittest tests.test_wait_compat -v`：27 passed。
+- `.venv/bin/python -W error::ResourceWarning -B -m unittest tests.test_job_runtime -v`：7 passed。
+- `.venv/bin/python -W error::ResourceWarning -B -m unittest tests.test_task -v`：34 passed。
+- `.venv/bin/python -W error::ResourceWarning -B -m multi_agent_manager.wait_compat`：PASS；只读验证当前 control socket，并启动隔离 stdio probe。
 
 ## 交付位置
 
 - Workspace: `/mnt/public/xcj/Projects/workspace/5b3fe28b-3d9c-444f-bf24-889b2453558c/multi-agent-manager`
 - Branch: `task/5b3fe28b-3d9c-444f-bf24-889b2453558c`
-- Commits: `e20da6d52525267e035549c3447fbd6d3409df27` (`Add behavioral wait compatibility checks`)；`e23d693e5f8af5c9234da0c60148af3dc72b2fcd` (`Add confirmed App Server installer`)
+- Commits: `e20da6d52525267e035549c3447fbd6d3409df27` (behavioral compatibility), `e23d693e5f8af5c9234da0c60148af3dc72b2fcd` (installer), `80b190fbdb17466d49a90cdc394bd97a2fafb6c9` (probe pipe cleanup), `679c859` (deterministic restart).
 
-## Runtime 交接与未认证范围
-
-`require_compatible()` 的公开接口已就绪，Runtime owner 应在每次真正进入 block 前调用它；`cli.py`、`job_runtime.py` 和其他 wait 模块不在本任务的写入范围，未在本 worktree 改动。接口不保存 completion replay/cursor 状态，可直接配合当前 state-based pending-work 语义。
-
-自检仍将 `native_message_wake` 标为 `not-certified`：它不宣称已验证真实用户消息或 native manager-send 到 MAM wait 的端到端唤醒。真实 restart 的 App-supervisor replacement 行为同样按任务要求未在 live 服务上试验；安装器会在无法观察到 replacement 时安全失败，Manager 可在独立终端协调一次确认后的实机验收。
-
-## ResourceWarning follow-up
-
-- Commit `80b190fbdb17466d49a90cdc394bd97a2fafb6c9` closes the isolated App Server `stdin` and `stdout` pipes in `_stop()` even when the child has already exited, TERM times out and requires KILL, or TERM itself raises.
-- Added regression coverage for all three cleanup paths. `.venv/bin/python -W error::ResourceWarning -B -m unittest tests.test_wait_compat -v` passed 18 tests; the same warning policy passed the full suite (59 tests, 30.483s) and the live isolated compatibility probe.
-- No production restart was performed.
+Development did not run installer main: no production `.bashrc` edit, pipx/global installation, or live App Server restart occurred. Native user-message/native-manager-send wake behavior remains `not-certified`; the compatibility probe does not falsely claim that end-to-end behavior is tested.
