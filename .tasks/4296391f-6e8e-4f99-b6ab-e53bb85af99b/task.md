@@ -100,3 +100,6 @@ GUI可以一直常驻，TUI用于调试，不能错误写成GUI和TUI程序不�
 
 ## Manager待办清理与恢复责任
 本轮为真机交付遗留收尾，不新增部署。旧wheel方案已被用户明确弃用，两侧各一份memory_config，d3e3d3d3 review已通过。更新陈旧报告为实际交付及剩余事项，不再实施wheel。只读核对本任务PM job9f91cf1c和现场交接，不停止/重启服务，不动真实机器人。若PID已停记录并归档job；若服务仍运行明确运行证据和归属；若连接不可达记录具体错误并给Manager可执行收尾方案，不能把unknown当stopped。核对已交付代码留存，清理本任务临时文件供归档，保持原workspace不重建。
+
+## 已确认PM存活后的等待责任
+Manager确认job PID2264677 running，勿归档/停止。本任务保留现场长服务监测责任，请继续mam wait保持active，直到其真实停止或用户交接。当前3s远端探测偶发跳板超时，可做本机SSH连接复用的最小修正：仅针对现有jx-4090-2-via-nx-aic别名启用ControlMaster/ControlPersist及私有ControlPath，备份现有SSH配置、不改其他host/认证/远端配置。先检查既有配置和socket，建立可复用连接，验证原身份的几次只读探测延迟，再回mam wait。若有必要修改本地配置，记录确切内容及恢复路径。无需再跑CPU/模型测试，不创建额外监控job。不能靠常驻高频模型重试消耗token。
