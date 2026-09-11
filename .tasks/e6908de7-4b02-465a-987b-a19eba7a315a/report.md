@@ -1,150 +1,66 @@
-# 11:24 稳定台账提交与集群C基线交接
+# 2026-09-11 11:38 本机正式评测阶段收尾
 
-已按迁移发布要求提交稳定实验台账，文档commit `66f0a255a8c7878816ae1db1a42985f8990b3e04`（base主库6139577，分支codex/e6908de7-ledger）。仅文档worktree位于 /mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-ledger，无新环境；只改experiments/memory_chunk_20260910/EXPERIMENT_LEDGER.zh-CN.md。已核对新增产物链接/CPU证据、diff-check与干净提交；原三库运行树未修改、未合入文档，可由Manager合入主库。
+14项仿真队列当前：**2份完整100已验收、4份基础设施失败已归档、8项尚未启动、0项运行**。本task无活跃GPU进程；GPU3/4/5/6/7各自退出时已核对显存释放与端口无监听。没有重复启动已有run，也未改变失败项timeout/seed/参数。
 
-已收尾基线提名put-back full t+1 seed0 completed20k：69/100，31正常失败、0 runtime_error，前50检查35/50；GPU5已释放。C复现≤5pp即64–74/100，须独立环境匹配smoke后完整100。checkpoint为 /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s0/20000；结果/原命令launch.json/command.txt/final_review.json在共享RMBench/eval_result/memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep。运行冻结SHA是RMBench3e69b1e665a8eac0104d261b233f1b3339007e00、bridge8ea6078543a875b5ae223df16891cdc1fe975c66、openpia869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4；文档commit不是运行版本。
+## 已完成正式结果
 
-完整现状14项：1完成、1运行、4基础设施失败、8未启动。运行GPU7 rearrange t+30 seed1，前50中检45/50已保存，继续完整100。四失败为rearrange t+1/t+30 seed0、rearrange t+1 seed1、put-back t+30 seed0；首次get_obs的30秒RPC超时，全部失败产物保留，需公共修复与失败重试规则裁定。未启动队列为put-back seed1 pair、rearrange seed2 pair、put-back seed2 pair、serial/no-memory；其中put-back seed2两项尚待20k交接，其余CPU已准备。
+| 模型 / train seed | 前50检查 | 正式100 | 失败边界 | 正式目录 |
+| --- | --- | --- | --- | --- |
+| put-back full t+1 / seed0 | 35/50，检查通过 | **69/100（69%）** | 31正常任务失败；0 runtime_error | put_back_full_t_plus_1_s0_20k_100ep |
+| rearrange full t+30 / seed1 | 45/50，检查通过 | **92/100（92%）** | 8正常任务失败；0 runtime_error | rearrange_full_t_plus_30_s1_20k_100ep |
 
-C准入前不自行启动C正式run，当前本机run不停止不移动，后续新eval待准入后优先C；GPU3/4/5/6已释放且未接续新run。保持active turn跟进GPU7。已将完成基线、50/100证据、对应训练seed、真实路径和四失败边界写入稳定台账，不只留MAM报告。
+真实结果根：`/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/`。
 
----
+两项均按episode0–99/seed100000–100099原顺序完整执行；各有100份episode JSON、100条视频检查，前5集视频完整解码、其余无视频。config_source里的audit/manifest逐字节继承一致，100个scheduler exit0，policy/robot正常shutdown -15，全部登记子进程退出。`midpoint_review.json`保存逐query最终trace/反馈行检查；`final_review.json`保存最终验收与清理事实；`launch.json`、`command.txt`、`config.yaml`和checkpoint_metadata保存实际命令与来源。无匹配旧20k训练/config基准，不强行与旧F0算10pp偏差；两份完成结果也不是同任务/seed配对，不能推导Q2目标差异。
 
-# 10:53 首份正式100完成：GPU5 put-back t+1 seed0 69/100
+put-back正常失败：button_not_pressed_after_center18、button_press_insufficient13；五视频帧数500/500/359/444/355。GPU5收尾1MiB/0%，19450/19452无监听，job a58e56cc-2281-4d88-89af-53bdee13a768已归档。
+rearrange正常失败：button_not_pressed3、button_press_insufficient4、block2_not_moved_to_middle1；五视频392/406/411/402/385帧。GPU7收尾1MiB/0%，19470/19472无监听，job48930d29-9e3c-430c-8f8a-e93671f08333已归档。
 
-`put_back_full_t_plus_1_s0_20k_100ep`已完成100，benchmark completed/error null；69 success、31正常失败（button_not_pressed_after_center18、button_press_insufficient13），0 runtime_error。episode0–99/seed100000–100099原顺序完整保留，无补跑或重抽样。前50中检已于09:30完成。
+已清理这两份完成run对应的自有smoke及GPU5/7 Warp缓存；正式目录保留smoke_verification摘要与全部正式结果。其它失败smoke/原始证据保留用于公共故障诊断。CPU准备输入/dry-run仍供剩余队列复用，未写checkpoint；不新增持久缓存/API。
 
-100份episode JSON、100条video检查均通过，5个视频完整解码（500/500/359/444/355帧），no-video95条无MP4；config_source audit/manifest逐字节继承一致，自身smoke摘要已保留。100个scheduler exit0，policy/robot正常shutdown -15，全部登记子进程退出；19450/19452无监听，GPU5=1MiB/81038MiB空闲/0%。正式目录`final_review.json`保存验证与清理证据，`launch.json`保留原外层实际启动参数；完整结果在共享主RMBench/eval_result/memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep。
+## 稳定实验台账提交
 
-本项验收后清理了自有put_back_full_t_plus_1_s0_20k_smoke2和GPU5 Warp缓存，门禁摘要、所有正式结果/metadata/中检原位保留；失败四项的smoke与证据均未动。GPU5释放后暂不接续新任务，公共RPC问题仍待Manager裁定。当前仅GPU7 rearrange t+30 seed1继续，已过50中检；三库仍冻结，运行结束前不改台账。无可比旧20k baseline，不作不匹配模型性能结论。
+仅文档分支 `codex/e6908de7-ledger`，从主库6139577建立未安装环境的临时worktree：
+`/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-ledger`。
 
----
+- `66f0a255a8c7878816ae1db1a42985f8990b3e04`：登记69/100完整基线、四失败边界、各模型真实状态及C对照入口。
+- `f2ec2cfe14d4a721a12d19ae9971af5c0e1777ff`：补rearrange seed1正式92/100与全部运行收尾。
 
-# 10:18 GPU7 rearrange t+30 seed1前50条中检完成
+只改 `experiments/memory_chunk_20260910/EXPERIMENT_LEDGER.zh-CN.md`。新增结果链接与CPU准备证据已核对，diff-check通过，文档树干净；可由Manager将以上两commit合入主库。没有将文档合入运行树改变source身份。原三个任务环境保留复用。
 
-`rearrange_full_t_plus_30_s1_20k_100ep`前50条45 success/5正常失败（90%，仅中检，非正式100）。失败为button_not_pressed2、button_press_insufficient3。episode0–49/seed100000–100049严格顺序，无runtime_error，全部terminal，50个scheduler exit0。逐query最终trace中751个实际执行query（701个K30、50个partial），2103个已记录字段更新全部匹配last_executed反馈行，未见索引错误。正式目录`midpoint_review.json`保存检查摘要。不存在同新20k训练/config的旧基准，不强行与F0做10个百分点比较；继续原参数100条，全部失败保留。
+## 集群C对照基线交接
 
-目前仅GPU5 put-back t+1 seed0与GPU7本项两个formal运行，原三库仍干净且固定SHA未变；按恢复要求核对过现有job，未重复启动run。四项RPC基础设施失败已退出归档并保留所有证据，GPU3/4/6先留空，仍待Manager公共修复/重试裁定。运行期间不merge或修改源码/台账。
+提名已收尾put-back full t+1训练seed0，**69/100**；31条均为正常任务失败，不因基础设施错误缺失episode。C准入的≤5pp对应64–74/100，须新环境自身smoke后完整100，不能复用已清理的本机smoke。
 
----
+运行冻结SHA（不是上述文档提交）：
+- RMBench `3e69b1e665a8eac0104d261b233f1b3339007e00`
+- robot-bridge `8ea6078543a875b5ae223df16891cdc1fe975c66`
+- openpi `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`
 
-# 09:51 第四项基础设施失败：GPU4 rearrange t+1 seed0停止于67条后
+Checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s0/20000`，完整params/assets/metadata只读使用。
+训练原始数据：`/mnt/public/xcj/Projects/RMBench/data/put_back_block/demo_clean_state`；转换集：`/mnt/public/xcj/cache/huggingface/lerobot/put_back_block_demo_clean_state_shared_memory`。
+实际评测为在线仿真put_back_block/demo_clean_eval，eval seed0、100000–100099，H50/K30、full last_executed、500步上限、instruction_generation_num100、前5集视频。
 
-09:50:04，`rearrange_full_t_plus_1_s0_20k_100ep`完成67条正常episode（55 success/12正常失败）后，episode67/seed100067首次get_obs在logical_step0超时30秒，scheduler exit1。runner记录scheduler_exited_before_terminal（与先前三项外层失败标签不同，但scheduler栈仍为相同get_obs TimeoutError）。最终68条记录、benchmark failed，不能作为完整100结果；已完成的前50条诊断仍有效但仅作中检。
+原命令/cwd在该正式run的launch.json，展开服务命令在command.txt。沿现有run_memory_schema_eval.py：variant put_back_full_t_plus_1，指定上述checkpoint、独立run名和分配GPU，prepare-audit→自身smoke2（video/no-video各1集）→引用自身smoke的formal100。
+资源：单卡串行、sim/policy同卡；原A100、XLA_PYTHON_CLIENT_MEM_FRACTION=0.4；两独立端口、可写结果/临时Warp缓存、三库环境、RMBench共享assets及机器人/渲染资源、PaliGemma tokenizer缓存。4090显存配置需由其自身smoke确认，不能预设0.4足够。无需重训或复制全部训练原始数据用于在线rollout，但须保留checkpoint完整溯源及所需仿真资源。
 
-全部登记子进程退出，policy/robot正常shutdown -15，19440/19442无监听，GPU4=1MiB/81037MiB空闲/0%。failure_review.json、68条原始结果、trace、metadata、视频和smoke均保留，未重跑。公共证据为processes/069-scheduler.stdout.log；现已有4/6已启动formal因该起始RPC超时提前失败，剩余GPU5/7仍运行，GPU3/4/6保持空闲，不继续填充新任务。需公共owner处置及Manager裁定失败项重试规则，不能改timeout绕过门禁。三树源码继续冻结。
+## 四个基础设施失败与裁定需求
 
----
+| run（均后缀_20k_100ep） | 正常完成条数 | 首次异常episode/seed | 结束CST | job（已归档） |
+| --- | ---: | --- | --- | --- |
+| put_back_full_t_plus_30_s0 | 16 | 16 / 100016 | 08:23:34 | 1803ad5f-b94a-4b64-bdc1-2c7f8ed9339c |
+| rearrange_full_t_plus_1_s1 | 17 | 17 / 100017 | 08:45:35 | 7a618537-3350-45cc-bb45-d3d8fe62f722 |
+| rearrange_full_t_plus_30_s0 | 32 | 32 / 100032 | 08:45:37 | 1e72397f-0602-4018-bc7c-4e112ad7501a |
+| rearrange_full_t_plus_1_s0 | 67 | 67 / 100067 | 09:50:04 | af7dd7c9-682c-4a78-9e6e-946cbf47672f |
 
-# 09:30 GPU5 put-back t+1 seed0前50条中检完成
+各run另含一条异常记录，不是完整100，未用不完整分母给正式分数。均在某集第一次get_obs、logical_step0遇到30秒transport超时；前三项runner报robot_status_transport_error，最后项报scheduler_exited_before_terminal，scheduler底层同为TimeoutError。原trace/metadata/视频/全部记录和smoke保留，各目录failure_review.json记录退出及GPU释放。GPU3与GPU6故障仅差2秒，跨模型/seed/卡，不能归因于某一target目标；慢首帧与底层卡死的根因尚未证实。
 
-`put_back_full_t_plus_1_s0_20k_100ep`前50条35 success/15正常失败（70%，仅中检，正式100继续）。失败原因button_not_pressed_after_center10、button_press_insufficient5。episode0–49与seed100000–100049严格顺序，无runtime_error，全部terminal、50个scheduler exit0。逐query最终trace记录684个实际执行query（635个K30、49个partial），1270个已记录字段更新均匹配last_executed行，无索引错配。正式目录`midpoint_review.json`保存检查摘要。
+公共代码证据（bridge8ea）：benchmark/runner.py:418外层状态RPC timeout=30、430–434失败即终止；scheduler/base.py:120–121使用WebSocketClient默认30秒（transport/websocket.py:113）；robot/controllers/rmbench_simulation.py:129–131同一锁串行worker RPC，本次内部rpc_timeout=600。首次get_obs可使状态查询等待同一锁，存在内外有界预算不匹配的可能，但不是已证实根因。
 
-没有同新20k训练/config的旧基准，不用不同实验强行计算10个百分点偏差；保留全部正常失败，继续既定100不改参数。GPU4已过50中检，当前56条；GPU7 seed1当前23条，无runtime_error。GPU3/6继续空闲，三次公共RPC失败待处置；源码冻结、失败产物全部保留。
+最小建议：公共owner先确认首次get_obs慢/阻塞点，若证实预算问题，在既有RPC边界协调有界timeout；不改memory/动作协议、不全局无界等待、不另建runner。失败项如何重试/形成完整100由Manager裁定。本task没有修改公共源码或参数绕过门禁。此前一次进度快照只看episode_status漏报GPU3 runtime错误，已在efc7b696报告更正；后续始终同时读取runtime_error、summary与MAM退出状态。
 
----
+## 后续队列与暂停边界
 
-# 09:19 GPU4 rearrange t+1 seed0前50条中检完成
+8项尚未GPU启动：put-back seed1 t+1/t+30、rearrange seed2 t+1/t+30、put-back seed2 t+1/t+30、rearrange serial_lag30 seed0/no_memory seed0。其中put-back seed2两项尚待最终20k/owner CPU交接；其它已完成CPU audit、smoke dry、formal dry。共12/14模型CPU已准备。
 
-`rearrange_full_t_plus_1_s0_20k_100ep`前50条38 success/12正常任务失败（76%，仅中检，非正式100结果）。seed严格100000–100049，episode0–49顺序一致，无runtime_error，均terminal，50个scheduler exit0。正常失败为button_pressed_multiple_times4、block2_not_moved_to_middle4、button_press_insufficient2、button_not_pressed2；全部保留。
-
-按每集query_id取最后trace检查：810个有实际执行的query，其中760个K30、50个partial；已有2280个字段反馈更新全部匹配last_executed索引，未见row/index错误。实际证据与检查摘要保存在正式目录`midpoint_review.json`。本新20k没有真正同训练/config的旧基准，不强行用F0做10个百分点对比；当前无须改协议/参数，按原固定100继续。
-
-三个公共RPC失败仍待Manager裁定，GPU3/6暂留空；GPU4/5/7继续，三树冻结不merge台账。前述失败结果均保留，未补跑。下一关键检查为put-back t+1 seed0第50条及各run退出事件。
-
----
-
-# 08:49 更正GPU3状态：与GPU6同时段出现第三次RPC失败
-
-`rearrange_full_t_plus_1_s1_20k_100ep`于08:45:35失败，完成17条正常success后，episode17发生robot_status_transport_error 30秒超时，最终18条记录。与GPU6的08:45:37仅差两秒，发生在不同target变体，不能归因于t+30模型本身。此前08:45快照只读取episode_status.failure_reason，基础设施错误存储在其它诊断/runner字段，导致将18条记录误述为推进且无新增runtime错误；以本次summary及进程退出证据更正。后续监控同时核对benchmark状态/顶层runtime诊断，不只看episode_status。
-
-全部登记子进程已退出，GPU3=1MiB/0%，19430/19432无监听。failure_review.json已保留，18条原记录与smoke不删除不重跑。GPU3和GPU6先留空，公共owner需结合同时段故障诊断；不改变现有源码/timeout。剩余GPU4 rearrange t+1 seed0、GPU5 put-back t+1 seed0、GPU7 rearrange t+30 seed1继续。三项失败均非完整100正式成绩。
-
----
-
-# 08:47 第二次相同RPC失败：GPU6 rearrange t+30 seed0提前结束
-
-08:45:37，`rearrange_full_t_plus_30_s0_20k_100ep`在完成32条正常episode（27 success、5正常失败）后，episode32/seed100032首个get_obs遇到30秒TimeoutError；runner同时报robot_status_transport_error，最终33条记录、benchmark failed。不是完整100，不能作为正式成功率。`processes/034-scheduler.stdout.log`、summary、33条原始记录和smoke均保留；`failure_review.json`已保存退出核对。scheduler exit1，policy/robot正常shutdown -15；全部登记子进程已退出，GPU6=1MiB/81037MiB空闲/0%，ss确认19460/19462无监听（初次bind受残留socket影响，未启动新任务）。
-
-与08:23 GPU7 put-back故障同为episode首次get_obs、logical_step0、30秒外层超时；发生在不同任务/seed/卡，已不是单一seed证据。公共边界缺口及最小建议见下文，仍未证实底层慢首帧或卡死的根因，未改timeout/源码/参数。请Manager协调公共owner诊断并裁定失败模型重试规则。GPU6本轮先保持空闲，不继续投入第三项来掩盖重复公共故障；其余GPU3/4/5/7四项继续按原配置推进，GPU7 seed1已完成首条，第二条在08:45仍有query14/step402进展。失败两项均未补跑/覆盖。
-
----
-
-# 08:37 GPU7 rearrange t+30 seed1 smoke PASS，formal100已启动
-
-GPU7已按07:52下一空卡优先条款运行配对seed1。自身20k smoke2 CLI exit0，两集success（392/405步），video392帧完整可读、no-video通过既有validate_smoke_run；config_source内audit/manifest逐字节一致，所有登记子进程退出（scheduler0，服务正常shutdown -15）。config SHA256为89ede174d421fa17aec278dbb116c38c18641612ab5e842ed42c86c3019f0659。
-
-08:36:37正式启动前复核GPU7=1MiB/81037MiB空闲/0%，19470/19472可绑定，原三树干净且SHA不变。run `rearrange_full_t_plus_30_s1_20k_100ep`，PID3521314，job48930d29-9e3c-430c-8f8a-e93671f08333；实际command保存在既有.local/memory_schema_eval/launches。对应smoke_verification.json随正式目录保留。
-
-当前五个formal为GPU3/4/5/6/7，GPU0/1/2不使用，远端停用。此前put-back t+30 seed0基础设施失败仍完整保留待Manager裁定，未重跑。其他四项继续推进，尚未到50条中检。不修改正在使用的源码/文档，不合入台账，保持active turn。
-
----
-
-# 08:26 GPU7 put-back t+30 seed0 formal提前失败，原产物保留
-
-08:23:34 runner终止，外层命令报告benchmark退出2。`put_back_full_t_plus_30_s0_20k_100ep`完成16条正常episode（13 success/3正常失败），episode16/seed100016于logical_step0出现基础设施失败，summary共17条、status=failed；不是完整100结果，不能用13/17作为正式100成绩。全部17条、视频、metadata、trace及smoke原位保留，未补跑/覆盖/删除失败条。
-
-首因证据：processes/018-scheduler.stdout.log显示08:23:04首次get_obs等待，最终transport TimeoutError 30.0s；runner同刻get_episode_status超时并报robot_status_transport_error。该episode没有Memory v1 query trace，最后状态ready/step0。未见此前模型推理错误；worker最后只见新实例导入信息，现有日志不足以判断是慢首帧还是底层挂起，不冒称根因已证实。
-
-代码证据（固定bridge 8ea）：robot_bridge/benchmark/runner.py:418写死client timeout=30，430–434状态RPC失败即终止；scheduler/base.py:120–121使用WebSocketClient默认30秒（transport/websocket.py:113）；rmbench_simulation.py:129–131用同一锁串行worker RPC，而本次worker rpc_timeout=600。get_obs等待期间状态查询可等待同一锁，外层预算比内部短。
-
-最小建议交Manager/公共owner：先针对该seed和首帧get_obs确认耗时/阻塞点，区分底层卡死与外层预算不匹配；若证实预算问题，在既有RPC调用边界显式协调有界timeout，不改memory/动作协议、不全局无界等待、不另造runner。本task未改超时或源码。失败项后续重试/补齐规则需Manager裁定，不能在同目录接续冒充原100。
-
-收尾：进程事件全部有退出，失败scheduler exit1、policy/robot正常shutdown -15；08:25核对自有GPU7进程为空、19470/19472已释放、GPU7=1MiB/81037MiB空闲/0%。job1803ad5f-b94a-4b64-bdc1-2c7f8ed9339c已按失败归档。failure_review.json保留核对结果。其他四项formal继续，08:28落盘进度为rearrange t+1/t+30 seed0=23/24、put-back t+1 seed0=16、rearrange t+1 seed1=8，均无runtime_error。按07:52下一空卡优先授权，GPU7再次复核1MiB/0%和19470/19472空闲，已于08:27:26启动rearrange_full_t_plus_30_s1_20k_smoke2；保持原参数和独立smoke/formal，不重跑失败模型。当前GPU7为此新smoke，失败项仍保留待裁定。
-
-以下为此前启动与smoke记录；GPU7 put-back的运行状态以上述失败收尾为准。
-
----
-
-# 08:00 五项formal100运行，GPU3 seed1 smoke已通过
-
-按06:53授权，在owner分别发布GPU4/6/7/5训练保存、CPU验收、进程退出和释放后逐卡接用；每次启动前显存均1MiB/0%，端口空闲，原三树干净。按最新07:52补充，GPU0/1不抢占，GPU2留wash，GPU3已获授权接用，wuwen-1停用。未修改源码/配置，未重跑技术50或旧drawer。
-
-## 已完成：四个20k自身smoke
-
-| variant（均训练seed0） | GPU | smoke结果 | 视频帧数 | 两条logical steps | config SHA256 |
-| --- | ---: | --- | ---: | --- | --- |
-| rearrange_full_t_plus_1 | 4 | 2/2，门禁PASS | 393 | 393/407 | 6f1d367559353dc42fa548f5ab9f700d216dfa08dd0f746dd98234f1d43a3afb |
-| rearrange_full_t_plus_30 | 6 | 2/2，门禁PASS | 392 | 392/405 | 336b3e2454acdb33328d491a834c9ef81ed2f5d4514581d90f2e26ed94ba1bb5 |
-| put_back_full_t_plus_1 | 5 | 1/2，门禁PASS | 333 | 333/500 | 7f9fa778a054e7138201069a4ebf7d6884d43e1e3fa6168e305e79751f0c5585 |
-| put_back_full_t_plus_30 | 7 | 2/2，门禁PASS | 332 | 332/329 | c0b903e28db9d52717a6ca61c873c692156ae3ea711e4ee5881c3e0e9e83ae5b |
-
-smoke run名均 `<variant>_s0_20k_smoke2`。四次CLI均exit0，既有validate_smoke_run验证当前manifest/source通过；每run两条accepted rollout无runtime_error，video/no-video各一集，视频逐帧读通。input_audit与input_manifest经config_source继承副本逐字节一致。每run两scheduler exit0，policy/robot正常runner_shutdown -15，所有start对应进程均已退出。
-
-put-back t+1第二条为正常step_limit_reached（500步），不改参数或重抽样。这里的成功数仅为smoke结果，不替代正式100成绩。真实20000权重恢复与新wire由匹配smoke覆盖，不再另跑技术验证。
-
-## 正在运行：五个formal100
-
-| GPU | run | 实际启动CST | PID | MAM job |
-| --- | --- | --- | ---: | --- |
-| 3 | rearrange_full_t_plus_1_s1_20k_100ep | 2026-09-11T07:59:47.951854+08:00 | 3388704 | 7a618537-3350-45cc-bb45-d3d8fe62f722 |
-| 4 | rearrange_full_t_plus_1_s0_20k_100ep | 2026-09-11T07:32:29.513716+08:00 | 3319712 | af7dd7c9-682c-4a78-9e6e-946cbf47672f |
-| 6 | rearrange_full_t_plus_30_s0_20k_100ep | 2026-09-11T07:33:30.188818+08:00 | 3321184 | 1e72397f-0602-4018-bc7c-4e112ad7501a |
-| 5 | put_back_full_t_plus_1_s0_20k_100ep | 2026-09-11T07:46:46.988207+08:00 | 3352946 | a58e56cc-2281-4d88-89af-53bdee13a768 |
-| 7 | put_back_full_t_plus_30_s0_20k_100ep | 2026-09-11T07:43:56.270325+08:00 | 3344284 | 1803ad5f-b94a-4b64-bdc1-2c7f8ed9339c |
-
-host均is-dcfi2kjdq7g3k6aa-devmachine-0。各run单GPU串行100，sim/policy同卡，分别引用自身smoke。robot/policy端口依次GPU4=19440/19442、GPU5=19450/19452、GPU6=19460/19462、GPU7=19470/19472；各卡独立Warp缓存。正式前重新核对空闲显存/端口与三树干净，可靠detach，立即登记各MAM job。
-
-实际command/cwd/PID/启动时间保留于本worktree .local/memory_schema_eval/launches/<run>.json；临时启动日志同名.log。正式run沿既有recorder保存实际命令、配置、checkpoint/served metadata和source；smoke验证摘要保存为正式目录smoke_verification.json（新启动项在runner建目录后复制）。不在空run目录提前写入文件。
-
-rearrange两项已完成正式首条并继续推进，put-back两项正在启动/首条阶段。尚未完成100，不宣称正式成绩。保持active turn，通过mam wait jobs --task等待并结合日志检查；第50条正常诊断，新20k尚无真正可比旧基准，不强行引用不同训练/模型/F0成功率。保留正常失败与全部100条，结束核对产物/退出、archive job，保留smoke门禁摘要后清理自有smoke和临时缓存。
-
-## GPU3新增与剩余队列
-
-已读07:52发布补充，GPU3启动前实测1MiB/81038MiB空闲/0%，19430/19432端口空闲、run名未占用、三树干净。rearrange_full_t_plus_1_s1_20k_smoke2于07:51:45启动，已完成2/2 success，logical steps392/406，视频392帧可读、no-video正确，既有门禁PASS，config_source逐字节一致；两scheduler exit0、policy/robot正常shutdown -15，全部自有子进程退出，CLI exit0。config SHA256 c37f27fd98cd41904d67c2907cc2b0cd850cf0a295d47ba4984aa4692a845e77。07:59:47已在GPU3启动对应formal100并登记job7a618537-3350-45cc-bb45-d3d8fe62f722（PID3388704）；正式前再次检查1MiB/0%和端口空闲。配对rearrange t+30 seed1保留下一空卡最高优先项，不按成绩筛选。
-
-统一EXPERIMENT_LEDGER.zh-CN.md已获知合入主库；当前三树由正式run使用，不merge或改文档。安全结束运行后再整合台账、更新对应模型行和实际结果链接/快照时间。
-
-## 剩余队列与位置
-
-14项按README既定训练seed配对队列推进，不按中途表现筛选。目前12份已完成owner保存/CPU门禁交接及本入口audit/smoke dry/formal dry（各exit0）；只剩本机训练中的put-back seed2两项待交接。未开始的9个formal仍在队列，不因首批开跑宣称任务完成。
-
-workspace: /mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a
-- RMBench: 3e69b1e665a8eac0104d261b233f1b3339007e00
-- robot-bridge: 8ea6078543a875b5ae223df16891cdc1fe975c66
-- openpi: a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4
-
-正式结果根: /mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/。
-CPU准备输出: 本RMBench/.local/memory_schema_eval/cpu_20k_20260911；临时audit/manifest在inputs/，checkpoint保持只读。三树继续冻结，后续全部运行结束再更新实验README，避免改变运行source身份。
-
-旧drawer正式产物原样保留。wash公共接口缺口已交Manager协调，详见前轮report bf6d8e8f167bf5e1d705afcc3eb1f06b5f82c28b，本轮不跨写公共实现。
+已读集群C迁移新条款：C未准入前不自行启动C正式run，已启动本机run均原位收尾；后续新eval在C准入与根README/workspace要求发布后优先排C。当前无可等待的活跃job；等待C准入及四失败的公共处置/重试裁定，未自行接续空卡新任务。任务整体14模型队列尚未完成，不标记全任务完成。
