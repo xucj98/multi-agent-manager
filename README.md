@@ -92,16 +92,23 @@ mam job archive JOB-ID --note NOTE
 
 ## 休眠管理
 
-需要保持 active turn 等待已登记的长任务时使用：
+当前工作已处理完、需要保持 active turn 等待时，直接运行：
+
+```bash
+mam wait
+```
+
+MAM 从 `CODEX_THREAD_ID` 识别调用者。执行者等待自己任务的 jobs；Manager 等待 active 的执行者，并负责非 active 执行者留下的 jobs 和未归档任务。源任务已交给未归档的 review 任务时，Manager 等待 reviewer。
+
+有待处理事项就立即返回；否则最多等待一小时。退出时说明原因，并附上对应 job 或任务的信息。用户的 steer 和 Manager 发来的消息会解除对应等待，queue 消息保持排队。等待结束不会停止 job，也不会归档任务。
+
+查看或手动解除等待：
 
 ```text
-mam wait jobs [--task TASK-ID] [--timeout TIMEOUT]
 mam wait list
 mam wait stop manager
 mam wait stop --agent AGENT-ID
 ```
-
-`mam wait stop` 只停止对应 agent 的等待，不会停止或归档 job。
 
 ## 开发验证
 

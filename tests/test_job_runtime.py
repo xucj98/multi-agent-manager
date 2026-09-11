@@ -219,5 +219,62 @@ class AgentProbeTests(unittest.TestCase):
         self.assertTrue(all("timed out" in value["error"].lower() for value in result.values()))
 
 
+class EventStreamTests(unittest.TestCase):
+    def test_resume_accepts_a_snapshot_larger_than_the_legacy_four_megabyte_cap(self) -> None:
+        padding = "x" * (5 * 1024 * 1024)
+
+        def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
+            initialize = fixture.read_json(connection)
+            fixture.send_json(connection, {"id": initialize["id"], "result": {}})
+            self.assertEqual(fixture.read_json(connection)["method"], "initialized")
+            resume = fixture.read_json(connection)
+            self.assertEqual(resume["method"], "thread/resume")
+            response = json.dumps({
+                "id": resume["id"],
+                "result": {"thread": {"id": "agent", "status": {"type": "active"}, "turns": [], "padding": padding}},
+            }, separators=(",", ":")).encode()
+            self.assertGreater(len(response), 4 * 1024 * 1024)
+            self.assertLessEqual(len(response), runtime.MAX_WEBSOCKET_FRAME_BYTES)
+            _send_frame(connection, 1, response)
+
+        with AppServerFixture(handler) as fixture:
+            stream = runtime.AppServerEventStream.connect(fixture.path)
+            try:
+                snapshot = stream.resume("agent")
+            finally:
+                stream.close()
+        self.assertEqual(snapshot["thread"]["padding"], padding)
+
+    def test_resume_preserves_notification_received_before_its_snapshot(self) -> None:
+        def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
+            initialize = fixture.read_json(connection)
+            self.assertEqual(initialize["method"], "initialize")
+            fixture.send_json(connection, {"id": initialize["id"], "result": {}})
+            self.assertEqual(fixture.read_json(connection)["method"], "initialized")
+            resume = fixture.read_json(connection)
+            self.assertEqual(resume["method"], "thread/resume")
+            fixture.send_json(connection, {
+                "method": "turn/completed",
+                "params": {"threadId": "agent", "turn": {"id": "turn-1"}},
+            })
+            fixture.send_json(connection, {
+                "id": resume["id"],
+                "result": {"thread": {"id": "agent", "status": {"type": "active"}, "turns": []}},
+            })
+
+        with AppServerFixture(handler) as fixture:
+            stream = runtime.AppServerEventStream.connect(fixture.path)
+            try:
+                snapshot = stream.resume("agent")
+                queued = stream.poll(0)
+            finally:
+                stream.close()
+        self.assertEqual(snapshot["thread"]["id"], "agent")
+        self.assertEqual(queued, {
+            "method": "turn/completed",
+            "params": {"threadId": "agent", "turn": {"id": "turn-1"}},
+        })
+
+
 if __name__ == "__main__":
     unittest.main()

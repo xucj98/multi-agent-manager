@@ -8,7 +8,6 @@ from dataclasses import dataclass
 import fcntl
 import hashlib
 import json
-import math
 import os
 from pathlib import Path
 import re
@@ -19,10 +18,6 @@ import time
 import uuid
 
 ENV_FILE = Path(".mam") / "env.json"
-WAIT_POLL_SECONDS = 0.2
-WAIT_PROBE_TIMEOUT_SECONDS = 0.5
-
-
 class Error(RuntimeError):
     pass
 
@@ -711,20 +706,70 @@ def status(store, args):
 
 
 def wait_agent(args):
-    supplied = getattr(args, "agent", None)
-    source = "--agent" if supplied is not None else "CODEX_THREAD_ID"
-    agent = supplied if supplied is not None else os.environ.get("CODEX_THREAD_ID")
+    agent = getattr(args, "agent", None)
     if not isinstance(agent, str) or not agent or agent != agent.strip() or any(char in agent for char in "\r\n\t"):
-        raise Error(f"{source} must be a non-empty single-line AGENT-ID")
+        raise Error("--agent must be a non-empty single-line AGENT-ID")
     return agent
 
 
-def wait_timeout(value):
-    if value is None:
-        return None
-    if not math.isfinite(value) or value < 0:
-        raise Error("--timeout must be a finite number of seconds greater than or equal to zero")
-    return value
+def wait_caller():
+    agent = os.environ.get("CODEX_THREAD_ID")
+    if not isinstance(agent, str) or not agent or agent != agent.strip() or any(char in agent for char in "\r\n\t"):
+        raise Error("CODEX_THREAD_ID must be a non-empty canonical AGENT-ID")
+    try:
+        if str(uuid.UUID(agent)) != agent:
+            raise ValueError()
+    except ValueError:
+        raise Error("CODEX_THREAD_ID must be a canonical AGENT-ID") from None
+    return agent
+
+
+def wait_compat_module():
+    try:
+        from . import wait_compat
+    except ImportError as exc:
+        raise Error("multi_agent_manager.wait_compat is required for mam wait") from exc
+    return wait_compat
+
+
+def wait_compatibility(module=None):
+    wait_compat = module or wait_compat_module()
+    try:
+        result = wait_compat.require_compatible()
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
+    if not isinstance(result, dict):
+        raise Error("wait compatibility check returned no runtime paths")
+    socket_path, log_path = result.get("socket_path"), result.get("log_path")
+    if not isinstance(socket_path, str) or not socket_path or not isinstance(log_path, str) or not log_path:
+        raise Error("wait compatibility check returned invalid runtime paths")
+    return result
+
+
+def wait_trace_path(wait_compat):
+    # The compatibility module is the authority for configured runtime paths.
+    # Discover its trace path before the intentionally thorough probe, so an
+    # input received during that probe remains in this wait's trace tail.
+    discover = getattr(wait_compat, "configured_paths", None)
+    if not callable(discover):
+        discover = getattr(wait_compat, "_configured_paths", None)
+    if not callable(discover):
+        raise Error("wait compatibility module cannot discover its configured trace path")
+    try:
+        _, log_path = discover()
+        path = Path(log_path)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise Error(f"cannot discover App Server trace path: {exc}") from exc
+    if not path.is_absolute():
+        raise Error("wait compatibility module returned a non-absolute trace path")
+    return str(path)
+
+
+def wait_session_messages(wait_runtime, caller, started_at):
+    try:
+        return wait_runtime.SessionMessages.from_environment(caller, started_at=started_at)
+    except (wait_runtime.WaitRuntimeError, OSError, ValueError) as exc:
+        raise Error(str(exc)) from exc
 
 
 def wait_lock(agent):
@@ -823,12 +868,13 @@ def wait_stop_manager(store):
         return cancel_wait(store, target["agent"], expected=target)
 
 
-def begin_wait(store, agent, task, timeout):
+def begin_wait(store, agent, role, task, turn_id):
     observation = runtime().probe_process("local", os.getpid())
     if observation["status"] != "running" or not isinstance(observation.get("identity"), dict):
         raise Error("cannot confirm this wait process identity")
     record = {"agent": agent, "pid": os.getpid(), "identity": observation["identity"], "token": str(uuid.uuid4()),
-              "kind": "jobs", "task": task, "timeout": timeout, "started_at": now(), "cancelled": None}
+              "kind": "unified", "role": role, "task": task, "turn_id": turn_id, "timeout": 3600,
+              "started_at": now(), "cancelled": None}
     with store.lock(wait_lock(agent)):
         existing, state = active_wait(store, agent)
         if existing:
@@ -842,8 +888,9 @@ def begin_wait(store, agent, task, timeout):
 def wait_cancelled(store, record):
     with store.lock(wait_lock(record["agent"])):
         current = store.read_wait(record["agent"])
-        return (not current or current.get("token") != record["token"]
-                or current.get("identity") != record["identity"] or bool(current.get("cancelled")))
+        if not current or current.get("token") != record["token"] or current.get("identity") != record["identity"]:
+            raise Error("current wait registration changed unexpectedly")
+        return bool(current.get("cancelled"))
 
 
 def finish_wait(store, record):
@@ -853,69 +900,59 @@ def finish_wait(store, record):
             store.remove_wait(record["agent"])
 
 
-def wait_targets(store, task):
-    tasks = [store.read(task)] if task else store.all()
-    return [{"task": data["id"], "job": dict(job)} for data in tasks if data["status"] != "archived"
-            for job in data["jobs"] if job["status"] != "archived"]
-
-
-def stopped_target(target):
-    probe = target["job"].get("probe")
-    return target["job"].get("status") == "stopped" or isinstance(probe, dict) and probe.get("status") == "stopped"
-
-
-def wait_result(status, agent, task, target=None, observation=None):
-    result = {"status": status, "agent": agent}
-    if task:
-        result["task_filter"] = task
-    if target:
-        result.update({"task": target["task"], "job": target["job"]["id"]})
-    if observation:
-        result["probe"] = observation
-    return result
-
-
-def wait_jobs(store, args):
-    agent, timeout = wait_agent(args), wait_timeout(args.timeout)
-    targets = wait_targets(store, args.task)
-    stopped = next((target for target in targets if stopped_target(target)), None)
-    if stopped:
-        return wait_result("stopped", agent, args.task, stopped)
-    if not targets:
-        return wait_result("empty", agent, args.task)
-    if timeout == 0:
-        return wait_result("timeout", agent, args.task)
-    record = begin_wait(store, agent, args.task, timeout)
-    deadline = None if timeout is None else time.monotonic() + timeout
-    try:
-        while True:
-            if wait_cancelled(store, record):
-                return wait_result("cancelled", agent, args.task)
-            if deadline is not None and time.monotonic() >= deadline:
-                return wait_result("timeout", agent, args.task)
-            for target in targets:
-                if wait_cancelled(store, record):
-                    return wait_result("cancelled", agent, args.task)
-                budget = WAIT_PROBE_TIMEOUT_SECONDS
-                if deadline is not None:
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0:
-                        return wait_result("timeout", agent, args.task)
-                    budget = min(budget, remaining)
-                job = target["job"]
-                observation = runtime().probe_process(job["host"], job["pid"], job["identity"], budget)
-                if observation["status"] == "stopped":
-                    return wait_result("stopped", agent, args.task, target, observation)
-            if deadline is not None and time.monotonic() >= deadline:
-                return wait_result("timeout", agent, args.task)
-            remaining = WAIT_POLL_SECONDS if deadline is None else max(0, deadline - time.monotonic())
-            time.sleep(min(WAIT_POLL_SECONDS, remaining))
-    finally:
-        finish_wait(store, record)
-
-
 def wait_description(record):
-    return f"jobs TASK-ID={record['task']}" if record.get("task") else "jobs (all unarchived)"
+    if record.get("kind") == "unified":
+        role = record.get("role", "unknown")
+        return f"unified {role} TASK-ID={record['task']}" if record.get("task") else f"unified {role}"
+    return "legacy jobs wait"
+
+
+def active_wait_states(store):
+    return {record["agent"]: state for record, state in active_wait_records(store)}
+
+
+def wait_unified(store, args):
+    caller = wait_caller()
+    try:
+        from . import wait_runtime
+    except ImportError as exc:
+        raise Error("multi_agent_manager.wait_runtime is required for mam wait") from exc
+    started_at = time.time()
+    wait_compat = wait_compat_module()
+    trace_path = wait_trace_path(wait_compat)
+    trace = None
+    messages = None
+    try:
+        trace = wait_runtime.TraceMessages(trace_path, started_at=started_at)
+        messages = wait_session_messages(wait_runtime, caller, started_at)
+        compatible = wait_compatibility(wait_compat)
+        if compatible["log_path"] != trace_path:
+            raise Error("App Server trace path changed while validating compatibility")
+
+        def begin(role, task, turn_id):
+            return begin_wait(store, caller, role, task, turn_id)
+
+        return wait_runtime.wait(
+            store,
+            caller,
+            socket_path=compatible["socket_path"],
+            log_path=compatible["log_path"],
+            begin_wait=begin,
+            cancelled=lambda record: wait_cancelled(store, record),
+            finish_wait=lambda record: finish_wait(store, record),
+            active_wait_states=lambda: active_wait_states(store),
+            process_probe=runtime().probe_process,
+            trace=trace,
+            messages=messages,
+            message_floor_ms=int(started_at * 1000),
+        )
+    except wait_runtime.WaitRuntimeError as exc:
+        raise Error(str(exc)) from exc
+    finally:
+        if trace is not None:
+            trace.close()
+        if messages is not None:
+            messages.close()
 
 
 def wait_list(store, args):
@@ -1168,12 +1205,9 @@ def parser():
     p.add_argument("job", metavar="JOB-ID", help="registered job")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
     p.set_defaults(func=job_archive)
-    waits = command(commands, "wait", "wait for registered jobs and manage wakeups").add_subparsers(required=True)
-    p = command(waits, "jobs", "wait until a selected unarchived job stops")
-    p.add_argument("--task", metavar="TASK-ID", help="limit monitoring to one TASK-ID")
-    p.add_argument("--timeout", type=float, metavar="TIMEOUT", help="return timeout after this many seconds")
-    p.add_argument("--agent", metavar="AGENT-ID", help="waiter AGENT-ID; defaults to CODEX_THREAD_ID")
-    p.set_defaults(func=wait_jobs)
+    wait = command(commands, "wait", "wait for this agent's MAM work and manage wakeups")
+    wait.set_defaults(func=wait_unified)
+    waits = wait.add_subparsers(dest="wait_command")
     p = command(waits, "list", "list current waits")
     p.set_defaults(func=wait_list, renderer="wait_list")
     p = command(waits, "stop", "wake one waiter without changing its monitored jobs")
@@ -1209,3 +1243,7 @@ def main(argv=None, *, cwd=None):
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
