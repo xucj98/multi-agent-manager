@@ -238,3 +238,12 @@
 - 现有测量/恢复记录已整理到本机任务独立RMBench的 `experiments/cluster_c_eval_acceptance_20260911/README.md` 草稿，不改活跃树。后续以首50或异常为检查点，不逐episode汇报。
 
 - 启动后实证补充：正式seed100000已accepted；config.yaml为test_num100/eval_video_count5/pi0_step30，recorder17b55bf，实际9个相关进程环境均cuda:0映射GPU2/system ICD，证据records/<formal leaf>/live-device-evidence.json。实验测量/恢复/启动说明已本机独立文档提交 `ece7de6`，活跃C树不改。当前通过MAM wait等待首50或异常事件。
+
+### 正式前50截面通过，继续后50（2026-09-12 02:40 +08:00）
+
+- 02:38:36保存正式前50个完成episode：episode0–49/seed100000–100049，全部accepted、正常terminal，无runtime/worker infra标记。C **34/50**，本机相同seed **35/50**（全基线69/100）；当前差1条、-2个百分点，尚不当成完整100验收。
+- 失败分类C：button_not_pressed_after_center11、button_press_insufficient5；本机同截面10/5。原模型/seed/H50/K30/memory时序未调参，旧22结果不拼分母。
+- 正式video_checks前5为video、5–49无video均ok；另ffprobe实际解码前5分别500/362/356/500/356帧，hash与大小保留，确认5–49无mp4。GPU2运行显存13064MiB，无中断。
+- C `records/<formal leaf>/watch-50/{snapshot.json,comparison.json,decoded-videos.json,episode_diagnostics.jsonl,seed_preflight.jsonl,video_checks.jsonl,worker.log}` 为固定快照；本机task `formal-first50/` 保存比较原始输入与comparison。既有report中视频混淆不沿用，以上只读本次正式leaf。
+- first50 job61c9d848已归档；正式jobac616c59仍运行，后半程watch100 PID414573/job `fb01b3a3-641f-4263-8c5d-212ebcb8f0ee` 已接续，完成100或实际infra异常才唤醒。按授权继续同一run，不更换leaf/seed，不按成绩重跑。
+- 已核对C1/C2/C3无进程引用退役diagnostic树，保留完全一致的retired-candidate.patch后，仅删除自己的 `diagnostic/renderer-reuse/RMBench` worktree/branch；40reset/协议/所有失败raw records保留，cleanup receipt在records/renderer-diagnostic-cleanup.json。活跃正式树/其依赖strict树不动。
