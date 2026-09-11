@@ -22,3 +22,6 @@ Re-review latest main after integrated 675a533 (main60cfd89) and 679c859 install
 
 ## Native path follow-up
 Main758d523 includes8539bfe native userMessage events and exact session journal tail. Review targeting, invocation boundary, stale/other-agent rejection, and whether normal queued user messages could spuriously wake (user queue must remain queued; steer wakes). Check native journal prerequisites are behaviorally tested or fail explicitly, not silently accepted by installer while native wake unavailable. Actual native smoke being repeated by owner now; no PASS yet. Do not require collecting message bodies or add replay/ack APIs.
+
+## Latest integration and live evidence
+Latest main87f02d3 includes0dd2bcd ignoring unrelated lifecycle events. Re-review this small follow-up. Coordinated normal send_input after real readiness now returned reason=message/received new message on87f02d3; evidence root.local/native-wait-coordinated-900-1789145948-output.txt, ready wait67161/jobfb8b8aa3-843b-422d-83f9-603950d0f79d. Owner still collecting latency/live sleep/cleanup. Please check full latest integrated code and report final blockers; installer native compatibility coverage still must not silently overclaim based only on synthetic probe.
