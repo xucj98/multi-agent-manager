@@ -35,3 +35,9 @@
 - worker 首因已逐条复现：strict 旧版 `curobo_{left,right}.yml` 写死 `/mnt/public/xcj/Projects/RMBench/assets/...`，而 C 该旧路径不存在；Curobo 在 planner child 初始化时抛 `FileNotFoundError`。上层的 `AttributeError: 'put_back_block' object has no attribute 'block'` 和 `ConnectionResetError` 是其后续包装，非任务表现失败。
 - 已保留整个失败 leaf 与 `records/strict-c1-smoke2-infrastructure-gate.json`（含 17:23 截面、PIDs、20 个 seeds、0 accepted、两份日志 SHA256）。为防继续扫固定对照种子，已对已核实属于此失效 run 的 outer/bridge `70362/70572` 及随后遗留的 robot/policy `70647/70648` 发送 `SIGTERM`；最终四 PID 均退出。没有停止任何其他进程。
 - 门禁状态：`formal_eligible=false`，严格 100 未启动。下一步只处理这个机器路径兼容问题：先对照现有 C entrypoint 的临时 YAML/兼容路径约定，以 strict RMBench assets 建立可审计的外部 shim 或 runtime overlay（不改 strict 三树），随后从同一 `seed=100000` 重跑 C1 two-rollout；只有 0/1 两条 accepted、video/no-video 产物和子进程收尾都通过，才继续 C2/C3。
+
+## C1 路径修正后重启（2026-09-11 17:28 +08:00）
+
+- C-only 外部兼容软链已创建：`/mnt/public/xcj/Projects/RMBench -> .../workspace/2a879870-8dda-4613-a684-0ad48a5e86be/formal/strict-100/RMBench`；它仅满足旧 Curobo YAML 的绝对 assets 路径，不改 strict 三树。`records/strict-rmbench-legacy-assets-shim.json` 记录 target commit `3e69b1e` 和 YAML/collision/URDF SHA256；两份 YAML 均以 strict RMBench `.venv` 在 C1 GPU1 加载为 `cuda:0`，之后三树仍 clean。
+- 新的固定-seed C1 smoke 已于 17:28 启动：run `put_back_full_t_plus_1_s0_20k_c1_smoke2_retry1`，outer PID `82805`，bridge `82986`，robot `83074`，policy `83075`，命令/预启动 GPU/strict commits 写入 `strict-c1-smoke2-retry1-launch.txt`。它会重新从 `seed=100000` 执行两条 accepted rollout；旧 leaf 的 20 条基础设施拒绝不会被续用。
+- 17:29 观察：服务均存活、checkpoint/policy 尚在加载，driver 的 connection refused 仍是启动重试；新 leaf `seed_preflight.jsonl` 和 worker stderr 都为 0，尚无任何 acceptance/rejection，不能提前声称 smoke 通过。
