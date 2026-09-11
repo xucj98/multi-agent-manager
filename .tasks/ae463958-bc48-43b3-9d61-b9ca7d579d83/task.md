@@ -1,0 +1,7 @@
+# 慢get_obs状态查询与时序取证独立review
+
+源任务378da0ac，已知四formal首次get_obs自身30s超时根因未明；额外状态RPC被同一worker锁阻塞会误报失联。作者bridge ed2f470+de0e9dac89601b792e0eb56e56d88175cbe643e7（基线f0f585a），RMBench ed1e00b403c4f49cf2ad4f4fa7afd35609c55d6a提供单集诊断，GPU3原ep17/seed100017一次未复现（首帧6.168s、reset73s）。不是原问题已解决或formal已准入。
+
+按MAM创建自己必要bridge/RMBench独立worktree并读AGENTS/conventions。仅CPU只读review，不占GPU/远端，不修改代码。审阅状态缓存是否正确区分busy/last_complete与实时terminal；锁同步/多连接/worker异常/5s健康探测会否误杀有效请求；shutdown中断reap是否有界及是否遗留子进程；trace上限/异常传播/默认关闭/算法无变化。当前源码和实际localhost RPC测试是否覆盖这些，必要定向复跑，不加无必要全面测试。
+评估新增近数百行时序/单集模式是否有明显冗余或破坏既有API、真机wait/UDP，不为方便取证改动作成功判定或无界等待。RMBench诊断脚本固定种子/版本/上限与真实输出对应，诊断产物不混成正式成功率。报告具体可合入项与阻塞、文件行/测试/两库commit、哪些首帧根因仍未知；不以单次成功替代正式验收。
+完成发布report，清理自己测试缓存与临时文件，保留worktree归档。不要重复GPU诊断。后续如何正式重跑由Manager裁定。
