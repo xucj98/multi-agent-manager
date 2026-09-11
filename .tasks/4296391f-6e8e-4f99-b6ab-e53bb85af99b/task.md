@@ -80,3 +80,6 @@ GUI可以一直常驻，TUI用于调试，不能错误写成GUI和TUI程序不�
 
 ## TUI文档最终核对
 默认041405f TUI路径没有--skip-policy分支的URL内联赋值。启动前文档需export实际填写的RB_*；已有tmux server时用tmux set-environment -g刷新所需拓扑变量，避免旧URL继续进入新pane；无tmux server时新进程继承export即可。不修改代码。删除RB_PY自赋值，用git -C rev-parse校验仓库代替要求.git为目录，以兼容worktree。其余仅必要文档修正，不扩范围。
+
+## 用户确定交付流程：WSL checkout → push_code auto → TUI
+用户质疑手工wheel，理想流程明确为WSL checkout codex/unified-sim-real-runtime、配置RB_*、scripts/utils/push_code.sh auto、scripts/launch/x1pro_takeover.sh、:8088。不得再要求用户现场手工构建/传输/安装wheel或逐机git checkout。只做本地代码调查先提出最小可实施修复方案：push_code当前仅rsync bridge，不同步/安装scheduler新增的openpi_client.memory_config。说明依赖如何随现有交付自动满足且仍共用一份schema实现、不手拷维护第二份实现、不安装完整OpenPI训练环境、不依赖WSL未声明的openpi邻接仓库。比较已有依赖入口可否用固定轻量包/随发布源码等合理方案，先报告推荐方式和代价给Manager，不擅自大改架构或远端执行。清楚区分一次性环境准备与每次开发循环；测试需覆盖最小WSL仅bridge checkout起步，主臂缺轻量client时，以及已有tmux旧变量/旧服务的问题。指南最终应围绕用户这条短流程，而非堆手动补救命令。新代码方案待Manager裁定。
