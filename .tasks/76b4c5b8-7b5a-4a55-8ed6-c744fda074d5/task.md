@@ -1,0 +1,8 @@
+# 集群C环境入口独立review
+
+源task5773b6ec正在部署C三库环境，用户要求uv symlink，-1安装、-2/-3运行，手工remote workspace/TASK-ID，三机真实eval和C100相差<=5pp。你先并行复核已提交的版本管理脚本变化，不在C创建/安装环境或占GPU，避免与作者共享缓存施工冲突。
+
+按MAM独立创建所需三库worktree并阅读AGENTS和环境说明。候选bridge3ebf9d075e5e64a350ddb35cd8632e3abd04373c（含bdb418），OpenPI3435a2b60bfb34197adeb8fe54ad750aeb78a5ed，RMBenchc59c6561de72092f95c14582ebaf8b1fe8728d00。基线分别f0f585a/a869/6139577。候选若已更新先看源report最新commit，不擅自审未提交工作。
+重点：opt-in symlink模式真正传给所有uv安装、仍默认hardlink且不影响本机；symlink校验能识别实际site-package/cache路径，不仅字符串/目录存在；依赖及Python路径共享、独立venv、源码editable指向本worktree、软链接指向稳定源，不依赖临时脚本或/root私有目录；保留既有路径/非空数据/冲突保护；脚本接口兼容。
+可只读查看作者C .local入口及state-vla/README.md，未经另授权不写C；同一源码脚本如何用于严格旧commit installer要明确，patch仅改变安装方式、不能把runtime dirty tree冒充固定版本。关注过度复杂的通用wrapper或patch框架，提出具体可简化处，不能为假想跨集群移植重构。
+本地定向CPU脚本检查/模拟参数校验即可，作者负责真实C安装与运行。收到三脚本耗时/磁盘和三机smoke/C100时再审计指标和路径；此阶段仅代码准入，不把它冒称整个C验收完成。报告PASS/具体阻塞、三个commits、测试和待补现场证据，发布简报。清理自己临时缓存，保留worktree供Manager归档，不自行修改业务代码/merge/push。
