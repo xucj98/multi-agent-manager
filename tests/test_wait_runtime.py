@@ -443,6 +443,23 @@ class WaitRuntimeTests(unittest.TestCase):
         self.assertEqual(result["agent"], CALLER)
         self.assertEqual(len(finished), 1)
 
+    def test_executor_ignores_other_bound_agent_lifecycle_before_its_snapshot(self):
+        result, stream, _, _, finished, _ = self.run_wait(
+            [task(agent=CALLER, jobs=[job()]), task(OTHER_TASK, "other task", OTHER)],
+            {CALLER: snapshot(CALLER, turn="caller-turn")},
+            events=[
+                event("turn/started", OTHER, turn="other-turn"),
+                native_message_event(CALLER, "caller-turn", "native-input"),
+            ],
+            clock=[0.0],
+            state_refresh=10.0,
+            job_refresh=10.0,
+        )
+        self.assert_exit(result, "message", "received new message")
+        self.assertEqual(result["agent"], CALLER)
+        self.assertEqual(stream.resumed, [CALLER])
+        self.assertEqual(len(finished), 1)
+
     def test_native_session_message_wakes_only_matching_current_wait(self):
         result, _, _, record, finished, _ = self.run_wait(
             [task(agent=CALLER, jobs=[job()])],

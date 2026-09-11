@@ -737,7 +737,12 @@ class UnifiedWait:
             return None
         previous = self.states.get(agent)
         if previous is None:
-            raise WaitRuntimeError(f"App Server event arrived before snapshot for {agent}")
+            # The shared control stream can notify a bound agent before this
+            # wait has subscribed and snapshotted it (an executor normally
+            # subscribes only to itself).  Its current state is reconciled on
+            # the next refresh, so this unrelated notification must not abort
+            # the caller's wait.
+            return None
         if method == "thread/status/changed":
             raw_status = params.get("status")
             status = raw_status.get("type") if isinstance(raw_status, Mapping) else raw_status
