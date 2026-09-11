@@ -202,3 +202,8 @@
 - C1 `renderer-protocol-20260912-retry2` baseline与candidate均exit0，固定100000/100001均accepted。candidate重放baseline保存的同一50x14 float32保持动作；原worker执行30/队列剩20，与初始状态、instruction均完全一致。
 - 每seed初始及执行30后qpos与三相机240x320x3 uint8均逐元素相同（max_abs=0）；已独立确认图像非空且std约35–50，初始/执行后画面存在变化，非空图假阳性。NPZ hashes、逐数组形状/类型/差异与两份metadata均保存在C comparison.json，本机镜像 `renderer-protocol-comparison.json`。
 - 这是两条synthetic hold诊断而非policy rollout或video smoke，不能替代完整生命周期/三机smoke/100门禁。`17b55bf`及该运行证据现均可供Manager独立review。C2 40-reset继续运行，未提前进入formal。
+
+### C2 候选已越过原故障点
+
+- `renderer-reuse-20260912-retry1` 已连续24个accepted reset：episode0–23 / seed100000–100023；原formal/system-ICD失败的100022现已accepted。40次尚未完成，不提前PASS；job `1ee98405` 保持运行，下一验收为40连续accepted、exit0、stderr与GPU回收。
+- 两seed动作/图像对照已PASS且可审阅；源码候选17b55bf、创建优化9c71a3e及本机原始证据镜像已提供。formal100仍待review后真实smoke门禁，不拼旧22条。
