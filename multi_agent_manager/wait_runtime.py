@@ -122,7 +122,6 @@ class TraceMessages:
         self._seen: set[tuple[str, str, str, str, str]] = set()
         self._seen_order: list[tuple[str, str, str, str, str]] = []
         self._started_at = time.time()
-        self._require_new_timestamp = False
         self._open(at_end=True)
 
     def _open(self, *, at_end: bool) -> None:
@@ -138,10 +137,6 @@ class TraceMessages:
         self._handle = handle
         self._device_inode = (stat.st_dev, stat.st_ino)
         self._partial = ""
-        # A replacement file may already contain pre-wait rows.  JSON logging
-        # includes a timestamp, so use it to avoid treating those stale rows as
-        # a message for this wait.  Initial opening tails to EOF instead.
-        self._require_new_timestamp = not at_end
 
     def _refresh_handle(self) -> None:
         if self._handle is None:
@@ -162,7 +157,6 @@ class TraceMessages:
         elif stat.st_size < self._handle.tell():
             self._handle.seek(0)
             self._partial = ""
-            self._require_new_timestamp = True
 
     def _remember(self, key: tuple[str, str, str, str, str]) -> bool:
         if key in self._seen:
@@ -210,7 +204,11 @@ class TraceMessages:
             if not isinstance(row, Mapping):
                 continue
             when = _timestamp(row.get("timestamp"))
-            if self._require_new_timestamp and (when is None or when < self._started_at):
+            # The initial descriptor tails from EOF, but an old buffered row
+            # can still be appended after a later wait starts.  Apply this
+            # invocation's timestamp floor to every increment, including the
+            # first one, so it cannot wake the newer wait.
+            if when is None or when < self._started_at:
                 continue
             for span in self._spans(row):
                 method = span.get("rpc.method")
@@ -257,6 +255,7 @@ class UnifiedWait:
         process_probe: Callable[..., Mapping[str, Any]] = job_runtime.probe_process,
         stream_factory: Callable[[str], Any] = job_runtime.AppServerEventStream.connect,
         trace_factory: Callable[[str], TraceMessages] = TraceMessages,
+        trace: Any | None = None,
         clock: Callable[[], float] = time.monotonic,
         control_check_seconds: float = CONTROL_CHECK_SECONDS,
         state_refresh_seconds: float = STATE_REFRESH_SECONDS,
@@ -273,6 +272,7 @@ class UnifiedWait:
         self.process_probe = process_probe
         self.stream_factory = stream_factory
         self.trace_factory = trace_factory
+        self.trace = trace
         self.clock = clock
         self.control_check_seconds = self._positive_interval(control_check_seconds, "control check")
         self.state_refresh_seconds = self._positive_interval(state_refresh_seconds, "state refresh")
@@ -615,7 +615,7 @@ class UnifiedWait:
         try:
             deadline = self.clock() + WAIT_SECONDS
             try:
-                trace = self.trace_factory(self.log_path)
+                trace = self.trace if self.trace is not None else self.trace_factory(self.log_path)
                 self.stream = self.stream_factory(self.socket_path)
             except job_runtime.AppServerEventError as exc:
                 raise WaitRuntimeError(str(exc)) from exc
@@ -705,6 +705,7 @@ def wait(
     finish_wait: Callable[[dict[str, Any]], None],
     active_wait_states: Callable[[], Mapping[str, str]],
     process_probe: Callable[..., Mapping[str, Any]],
+    trace: Any | None = None,
 ) -> dict[str, Any]:
     """Run one unified wait with the concrete MAM storage callbacks."""
 
@@ -718,4 +719,5 @@ def wait(
         finish_wait=finish_wait,
         active_wait_states=active_wait_states,
         process_probe=process_probe,
+        trace=trace,
     ).run()

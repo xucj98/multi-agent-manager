@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import contextlib
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import io
 import json
 import multi_agent_manager
@@ -501,6 +501,19 @@ class WaitRuntimeTests(unittest.TestCase):
 
 
 class TraceMessagesTests(unittest.TestCase):
+    def test_initial_timestamp_floor_rejects_a_late_old_same_turn_span(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "app-server.log"
+            path.touch()
+            trace = wait_runtime.TraceMessages(path)
+            old = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+            stale = {"timestamp": old, "span": {"rpc.transport": "unix_socket", "rpc.method": "turn/steer",
+                      "turn.id": "same-turn", "rpc.request_id": "stale", "app_server.connection_id": "1"}}
+            with path.open("a") as handle:
+                handle.write(json.dumps(stale) + "\n")
+            self.assertEqual(trace.poll(), [])
+            trace.close()
+
     def test_trace_is_targeted_deduplicated_stale_safe_and_handles_rotation(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "app-server.log"
@@ -529,6 +542,41 @@ class TraceMessagesTests(unittest.TestCase):
 
 
 class CliWaitOutputTests(unittest.TestCase):
+    def test_trace_boundary_captures_input_written_during_compatibility(self):
+        with tempfile.TemporaryDirectory() as directory:
+            trace_path = Path(directory) / "app-server.log"
+            trace_path.touch()
+            calls = []
+
+            def configured_paths():
+                calls.append("paths")
+                return Path("/tmp/app-server.sock"), trace_path
+
+            def require_compatible():
+                calls.append("compatibility")
+                now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                message = {"timestamp": now, "span": {"rpc.transport": "in-process", "rpc.method": "turn/start",
+                           "turn.id": "caller-turn", "rpc.request_id": "during-compat",
+                           "app_server.connection_id": "connection"}}
+                with trace_path.open("a") as handle:
+                    handle.write(json.dumps(message) + "\n")
+                return {"socket_path": "/tmp/app-server.sock", "log_path": str(trace_path)}
+
+            module = types.SimpleNamespace(configured_paths=configured_paths, require_compatible=require_compatible)
+            expected = {"status": "message", "reason": "message", "message": "received new message", "agent": CALLER}
+
+            def fake_wait(*_args, **kwargs):
+                calls.append("wait")
+                self.assertEqual(kwargs["trace"].poll(), [wait_runtime.TraceMessage("caller-turn", "turn/start")])
+                return expected
+
+            with patch.dict(sys.modules, {"multi_agent_manager.wait_compat": module}), \
+                    patch.object(multi_agent_manager, "wait_compat", module, create=True), \
+                    patch.object(cli, "wait_caller", return_value=CALLER), \
+                    patch.object(wait_runtime, "wait", side_effect=fake_wait):
+                self.assertEqual(cli.wait_unified(object(), object()), expected)
+            self.assertEqual(calls, ["paths", "compatibility", "wait"])
+
     def test_default_wait_accepts_no_wait_options_or_jobs_subcommand(self):
         parsed = cli.parser().parse_args(["wait"])
         self.assertIs(parsed.func, cli.wait_unified)

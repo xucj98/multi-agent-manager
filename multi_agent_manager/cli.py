@@ -723,11 +723,16 @@ def wait_caller():
     return agent
 
 
-def wait_compatibility():
+def wait_compat_module():
     try:
         from . import wait_compat
     except ImportError as exc:
         raise Error("multi_agent_manager.wait_compat is required for mam wait") from exc
+    return wait_compat
+
+
+def wait_compatibility(module=None):
+    wait_compat = module or wait_compat_module()
     try:
         result = wait_compat.require_compatible()
     except RuntimeError as exc:
@@ -738,6 +743,25 @@ def wait_compatibility():
     if not isinstance(socket_path, str) or not socket_path or not isinstance(log_path, str) or not log_path:
         raise Error("wait compatibility check returned invalid runtime paths")
     return result
+
+
+def wait_trace_path(wait_compat):
+    # The compatibility module is the authority for configured runtime paths.
+    # Discover its trace path before the intentionally thorough probe, so an
+    # input received during that probe remains in this wait's trace tail.
+    discover = getattr(wait_compat, "configured_paths", None)
+    if not callable(discover):
+        discover = getattr(wait_compat, "_configured_paths", None)
+    if not callable(discover):
+        raise Error("wait compatibility module cannot discover its configured trace path")
+    try:
+        _, log_path = discover()
+        path = Path(log_path)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise Error(f"cannot discover App Server trace path: {exc}") from exc
+    if not path.is_absolute():
+        raise Error("wait compatibility module returned a non-absolute trace path")
+    return str(path)
 
 
 def wait_lock(agent):
@@ -881,26 +905,39 @@ def active_wait_states(store):
 
 def wait_unified(store, args):
     caller = wait_caller()
-    compatible = wait_compatibility()
     try:
         from . import wait_runtime
     except ImportError as exc:
         raise Error("multi_agent_manager.wait_runtime is required for mam wait") from exc
+    wait_compat = wait_compat_module()
+    trace_path = wait_trace_path(wait_compat)
+    try:
+        trace = wait_runtime.TraceMessages(trace_path)
+    except wait_runtime.WaitRuntimeError as exc:
+        raise Error(str(exc)) from exc
 
-    def begin(role, task, turn_id):
-        return begin_wait(store, caller, role, task, turn_id)
+    try:
+        compatible = wait_compatibility(wait_compat)
+        if compatible["log_path"] != trace_path:
+            raise Error("App Server trace path changed while validating compatibility")
 
-    return wait_runtime.wait(
-        store,
-        caller,
-        socket_path=compatible["socket_path"],
-        log_path=compatible["log_path"],
-        begin_wait=begin,
-        cancelled=lambda record: wait_cancelled(store, record),
-        finish_wait=lambda record: finish_wait(store, record),
-        active_wait_states=lambda: active_wait_states(store),
-        process_probe=runtime().probe_process,
-    )
+        def begin(role, task, turn_id):
+            return begin_wait(store, caller, role, task, turn_id)
+
+        return wait_runtime.wait(
+            store,
+            caller,
+            socket_path=compatible["socket_path"],
+            log_path=compatible["log_path"],
+            begin_wait=begin,
+            cancelled=lambda record: wait_cancelled(store, record),
+            finish_wait=lambda record: finish_wait(store, record),
+            active_wait_states=lambda: active_wait_states(store),
+            process_probe=runtime().probe_process,
+            trace=trace,
+        )
+    finally:
+        trace.close()
 
 
 def wait_list(store, args):

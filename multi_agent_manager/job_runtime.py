@@ -19,6 +19,10 @@ from typing import Any, Mapping
 
 PROCESS_TIMEOUT_SECONDS = 3.0
 APP_SERVER_TIMEOUT_SECONDS = 3.0
+# ``thread/resume`` carries a complete thread snapshot.  A busy Codex thread
+# can exceed the old 4 MiB transport cap, while a finite bound still protects
+# the client from an untrusted frame header.
+MAX_WEBSOCKET_FRAME_BYTES = 16 * 1024 * 1024
 DEFAULT_SOCKET_PATH = "/root/.codex/app-server-control/app-server-control.sock"
 _IDENTITY_KEYS = ("host", "boot_id", "start_ticks")
 _SAFE_REMOTE_HOST = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@-]*\Z")
@@ -308,7 +312,7 @@ class _WebSocket:
             size = int.from_bytes(self._take(2), "big")
         elif size == 127:
             size = int.from_bytes(self._take(8), "big")
-        if size > 4 * 1024 * 1024:
+        if size > MAX_WEBSOCKET_FRAME_BYTES:
             raise _ProbeError("WebSocket frame is too large")
         mask = self._take(4) if second & 0x80 else None
         payload = self._take(size)
