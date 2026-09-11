@@ -39,7 +39,7 @@ Table-1000 的 schema 刻意保持后端无关：SceneSpec 要有稳定 asset/ob
 
 - 完整安装约 **250 GB**：conda env 约 100 GB、`deps/` 约 82 GB（其中 VOID 41 GB）、HF cache 约 12 GB，外加 checkpoints；标准安装建立多个 conda env（`simfoundry`、`hunyuan`、`any6d`、`da3`、`void`、`nerfstudio_simfoundry`、`3dgrut`）。见[INSTALL](https://github.com/NVlabs/SimFoundry/blob/9e34ebefcd020583fbb755a8b57268dce78eca26/docs/INSTALL.md#L5-L75)。
 - 24 GiB RTX 4090 可跑标准视频 pipeline，但 stage 7 默认约需 29 GiB，必须设置 `s7_mesh.low_vram=true`（约 6 GiB、CPU offload）；16 GiB 是总的最低下限，articulation 至少 18 GiB。见[VRAM 说明](https://github.com/NVlabs/SimFoundry/blob/9e34ebefcd020583fbb755a8b57268dce78eca26/docs/INSTALL.md#L17-L28)。首 pilot 不选 `pixal3d`：官方把它的 24 GiB profile 限为 low-vram，且多物体/cousin 仍标为未覆盖实验。[该 caveat](https://github.com/NVlabs/SimFoundry/blob/9e34ebefcd020583fbb755a8b57268dce78eca26/docs/INSTALL.md#L151-L171)。
-- reconstruction、articulation 和 B 都调用 Vertex AI/Gemini，要求启用 billing 的 GCP project/认证；HF gated models 也需账号/接受条款，checkpoint 下载并非小依赖。见[服务与 checkpoint](https://github.com/NVlabs/SimFoundry/blob/9e34ebefcd020583fbb755a8b57268dce78eca26/docs/INSTALL.md#L180-L226)。
+- reconstruction、articulation 和 B 都使用 Gemini。默认的 Vertex AI 路径要求启用 billing 的 GCP project/认证；但 README 明确提供无 GCP project 时使用 AI Studio `GEMINI_API_KEY` 的替代路径，因此不能把 billing GCP 写成所有部署的必需条件。HF gated models 仍需账号/接受条款，checkpoint 下载并非小依赖。见[README 的 API-key 替代路径](https://github.com/NVlabs/SimFoundry/blob/9e34ebefcd020583fbb755a8b57268dce78eca26/README.md#L67-L82)和[服务与 checkpoint](https://github.com/NVlabs/SimFoundry/blob/9e34ebefcd020583fbb755a8b57268dce78eca26/docs/INSTALL.md#L180-L226)。
 - Apache-2.0 只覆盖 NVIDIA 代码。官方列出了 required/optional 的非 OSS、non-commercial、地域限制和无许可组件；尤其 Any6D、FoundationPose/Stereo、Hunyuan 等必须逐项审查。见[安装边界](https://github.com/NVlabs/SimFoundry/blob/9e34ebefcd020583fbb755a8b57268dce78eca26/docs/INSTALL.md#L418-L436)。
 
 **建议：** 若获准安装，使用专用的 SimFoundry conda 根和独立 data/cache，绝不混入 Table-1000 的 ManiSkill `.venv`。这是根据其多 conda env、editable installs 和外部 assets 的隔离建议，不是官方承诺的兼容性结论。
@@ -50,13 +50,13 @@ Table-1000 的 schema 刻意保持后端无关：SceneSpec 要有稳定 asset/ob
 
 先做的可复现第一里程碑：在专用环境以 pinned commit 重跑一个官方示例视频的 A 完整重建，保存 `s14_og/reconstructed_og_scene.json`、preview、`settled_poses.json`，再运行官方 C `smoke-random`。这是官方 documented smoke 路径；先证明 native OG 加载，再谈移植。[官方 smoke](https://github.com/NVlabs/SimFoundry/blob/9e34ebefcd020583fbb755a8b57268dce78eca26/docs/INSTALL.md#L274-L291)。
 
-建议 pilot 范围为 3 个单平面刚体桌面场景、每个 6–10 个物体、无 articulation；同时保留原视频的取得许可与三件已知尺寸物体作尺度核验。量化 go/no-go：
+建议 pilot 范围为 3 个单平面刚体桌面场景、每个 6–10 个物体、无 articulation；同时保留原视频的取得许可与三件已知尺寸物体作尺度核验。以下是**探索期暂定** go/no-go 门槛；其中 90%、15% 和 8/10 等数字仅用于 pilot 决策，**不是**正式 benchmark release 标准，pilot 后应依据误差分布和人类标注结果重新冻结。
 
 1. 3/3 完成 A 并通过 OG native smoke；每个场景有固定 commit、配置、模型调用/缓存状态和输出 hash。
 2. ≥90% 目标物体能一对一映射为 Table-1000 object ID；100% 进入候选库的资产有 source/capture 权利、hash、SimFoundry commit、模型/配置和许可审查记录。
 3. 三个已知尺寸物体的 median bbox 相对误差 ≤15%，且无一件 >25%；超过此值说明需要人工重建/尺度校正，自动导入无成本优势。
 4. ManiSkill adapter 导入后，每场景 10 次 reset/settle 中 ≥9 次无穿透、飞散或掉出 workspace；每场景至少一个 pick→place primitive ≥8/10 成功。未达到时先修资产/碰撞，不进入语义扩容。
-5. 每场景收集 ≥3 个独立 human layout；至少保留两种可接受但结构不同的终态，且 B task YAML 不作为标签或主榜 evaluator。否则它只证明可生成显式 task，不证明 SOP-open 场景价值。
+5. **联合科研验收（非 A 场景生成线完成前置）**：每场景收集 ≥3 个独立 human layout；至少保留两种可接受但结构不同的终态，且 B task YAML 不作为标签或主榜 evaluator。该项独立报告 scene 的 SOP-open 研究有效性；未完成不阻止 A/asset adapter pilot 收束，但阻止把该 scene 当作已验证的 Table-1000 多解 benchmark 样本。
 
 任一许可/provenance 缺口、无法确定性转入 ManiSkill、或第 4 项失败，即为 **no-go（暂停扩容，保留为 OG-only 原型）**；通过后才值得比较“人工资产制作时间 vs. SimFoundry+adapter+QA 总时间”。
 
@@ -69,7 +69,7 @@ Table-1000 的 schema 刻意保持后端无关：SceneSpec 要有稳定 asset/ob
 | P2 adapter contract | OG/URDF/USD → asset catalog + SceneSpec 的字段映射、坐标/scale 约定、artifact layout；可先用 schema mock 编写设计。 | 可与 P1 并行；用 P1 产物做实现验收。 |
 | P3 资产 provenance/physics QA | source-rights、许可证、hash、visual/collision/scale/reachability checklist。 | 可与 P1/P2 并行；是任何场景入库的硬 gate。 |
 | P4 ManiSkill compiler 与 reset/skill QA | 仅导入 P2 合格资产的 minimal scene compiler，10-reset 与 primitive 报告。 | 依赖 P2/P3；不把 OG native pass 误认为 ManiSkill pass。 |
-| P5 多解语义与人类标注 | 人类 layout/pairwise protocol、goal-graph 映射、B YAML 的“候选而非真值”审计规则。 | 与 P0–P3 并行；独立于 SimFoundry 是否通过，避免生成管线定义评价语义。 |
+| P5 多解语义与人类标注 | 人类 layout/pairwise protocol、goal-graph 映射、B YAML 的“候选而非真值”审计规则。 | 与 P0–P3 并行，不是 P1/A 场景生成线的完成前置；其联合科研验收决定是否可作为 SOP-open benchmark 样本，避免生成管线定义评价语义。 |
 
 ## 交付说明
 
