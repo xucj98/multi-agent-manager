@@ -4,6 +4,8 @@ import contextlib
 from datetime import datetime, timezone
 import io
 import json
+import multi_agent_manager
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -546,9 +548,21 @@ class CliWaitOutputTests(unittest.TestCase):
     def test_compatibility_gate_is_called_without_arguments_and_supplies_runtime_paths(self):
         require = Mock(return_value={"socket_path": "/tmp/app.sock", "log_path": "/tmp/app.log"})
         module = types.SimpleNamespace(require_compatible=require)
-        with patch.dict(sys.modules, {"multi_agent_manager.wait_compat": module}):
+        with patch.dict(sys.modules, {"multi_agent_manager.wait_compat": module}), \
+                patch.object(multi_agent_manager, "wait_compat", module, create=True):
             self.assertEqual(cli.wait_compatibility(), {"socket_path": "/tmp/app.sock", "log_path": "/tmp/app.log"})
         require.assert_called_once_with()
+
+    def test_python_module_entry_invokes_cli_main(self):
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            [sys.executable, "-m", "multi_agent_manager.cli", "wait", "--help"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("wait for this agent's MAM work", result.stdout)
 
     def test_cli_json_retains_reason_and_required_identifiers_for_each_exit(self):
         cases = [

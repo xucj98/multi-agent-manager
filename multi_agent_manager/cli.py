@@ -1191,3 +1191,7 @@ def main(argv=None, *, cwd=None):
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
