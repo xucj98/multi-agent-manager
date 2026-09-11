@@ -1,3 +1,19 @@
+# 最终文档与清理交付：准备由 Manager 合并归档
+
+RMBench 新交付commit `6139577e360c27f866e4dbb3dd2fc067cc7ddd50`，基于创建时当前xcj-dev `f94fb475458be193d525e984749b204063025023`；独立workspace `/mnt/public/xcj/Projects/workspace/b86b3d02-29f2-437a-a5e7-db427a7df96c/RMBench`。仅修改 `experiments/memory_chunk_20260910/EXPERIMENT_LEDGER.zh-CN.md` 和该组 `README.md` 导航，未修改active sim源树、源码或其他sim结果。
+
+台账更新两wash模型实际20k保存与训练验收、稳定训练日志/checkpoint路径、正式retry2各5ep指标及汇总、实际执行query计数口径、source/退出/释放证据；明确full逐行与serial逐query不可直接排名、训练内回放非泛化或闭环成功率。两次失败以独立历史小节记录首因、完整commit和参数化历史命令，不计入成功结果。
+
+检查：新增13处文档路径链接均存在；表格数据来自正式artifact_audit.json；git diff --check通过；新RMBench环境CPU基础import通过（未运行GPU/render smoke，文档收尾无需GPU）。三个worktree均干净：bridge `dd0914b170fe5d227f24d36b07d90c0e422b7e58`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`、RMBench如上。
+
+Git失败记录提交后，已删除共享eval_result/memory_chunk_20260910下 `wash_memory_v1_20k_offline5ep` 与 `wash_memory_v1_20k_offline5ep_retry1` 两个诊断完成的失败目录，逻辑大小208481577 bytes（约198.82 MiB）。已清理本task三worktree共25处__pycache__/pytest/ruff缓存，不跟随共享软链接、不删除.venv或共享缓存。正式retry2原有443文件SHA256前后一致，原数据和两份共享checkpoint保留。清理回执：`/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_20k_offline5ep_retry2/final_cleanup_receipt.json`。
+
+当前正式结果唯一入口：`/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_20k_offline5ep_retry2`，稳定模型路径见Git台账。历史report/命令的task workspace仅是当时运行留痕，不是归档后的部署入口；未来运行应由Manager另建对应固定commit环境。下方历史报告中“失败目录保留”和workspace交接描述已由本段收尾覆盖。
+
+本task实现、独立复核、正式offline、文档和清理均完成，无在跑进程或剩余实施项；未自行合并或归档，worktree保留供Manager合并验收后归档。
+
+以下保留成功运行与历史交付记录。
+
 # GPU2 retry2 正式 offline 完成（2026-09-11 08:41:34–08:44:06 CST）
 
 依据08:40准入，从原干净固定bridge `dd0914b170fe5d227f24d36b07d90c0e422b7e58` / OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4` 执行，同一GPU2顺序full→serial各固定5ep[0..4]。launcher用时151.29秒、退出0；10个episode exit均0。两个policy exit=-15、shutdown_requested=true，是launcher完成后的主动回收。未改源码、未改训练、未合并部署。运行小于1小时，未登记长job。
