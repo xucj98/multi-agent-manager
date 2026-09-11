@@ -5,3 +5,6 @@
 阅读MAM规范、回报CODEX_THREAD_ID，用canonical table-1000/scripts/worktree_env/mam_workspace_add.sh TASK-ID f8340d5de7ac5452a6a8d726c1fc11047c0ae6b1 创建独立worktree，读AGENTS。只读检查canonical outputs和旧库/mnt/public/xcj/table-1000及迁移备份里的视频/计划索引，别读参与者令牌。优先找到历史验收证据，不能将20/20参考计划等同用户验收。用真实物理执行渲染，不能用终态插值视频冒充。与scene agent协调不同空闲GPU，不全套测试/改参数求通过/长程搜索。
 # 交付
 先尽快返回已有视频候选绝对路径和依据，再复现。输出任务outputs下MP4及6-12关键帧contact sheet（初态、抓取、放置、关键失败、终态），记录来源commit、场景/plan、命令、完整/partial、运行约束。至少1条真实回放，第二条短比较尽力；若复现失败保留失败视频日志，不美化。自行查看关键帧并给manager视觉问题。不宣称用户接受未确认结果。>1h程序登记job，优先短复现。收尾cleanup和publish report，不派发subagent。
+
+# 用户补充（最新优先）
+确切历史附件为 /root/.codex/attachments/4fab4938-bbba-48fe-9e71-a57087bb125c/probe-0001-physical-tidy-best-effort (1).mp4 。停止历史定位，先分析附件生成关键帧供manager亲看，hash核对历史记录。用户认为杂乱不足、整理效果不佳、抓取单一，逐项给具体时间点证据。保留附件原样；真实回放仅最短一条，不作长程修复。
