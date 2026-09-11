@@ -41,3 +41,8 @@
 - C-only 外部兼容软链已创建：`/mnt/public/xcj/Projects/RMBench -> .../workspace/2a879870-8dda-4613-a684-0ad48a5e86be/formal/strict-100/RMBench`；它仅满足旧 Curobo YAML 的绝对 assets 路径，不改 strict 三树。`records/strict-rmbench-legacy-assets-shim.json` 记录 target commit `3e69b1e` 和 YAML/collision/URDF SHA256；两份 YAML 均以 strict RMBench `.venv` 在 C1 GPU1 加载为 `cuda:0`，之后三树仍 clean。
 - 新的固定-seed C1 smoke 已于 17:28 启动：run `put_back_full_t_plus_1_s0_20k_c1_smoke2_retry1`，outer PID `82805`，bridge `82986`，robot `83074`，policy `83075`，命令/预启动 GPU/strict commits 写入 `strict-c1-smoke2-retry1-launch.txt`。它会重新从 `seed=100000` 执行两条 accepted rollout；旧 leaf 的 20 条基础设施拒绝不会被续用。
 - 17:29 观察：服务均存活、checkpoint/policy 尚在加载，driver 的 connection refused 仍是启动重试；新 leaf `seed_preflight.jsonl` 和 worker stderr 都为 0，尚无任何 acceptance/rejection，不能提前声称 smoke 通过。
+
+## C1 retry 实际进展（2026-09-11 17:30 +08:00）
+
+- 兼容路径生效后的第一个固定 seed 已验证：retry1 `seed_preflight.jsonl` 记录 `seed=100000, accepted=true`；这是对原 20 条基础设施 rejection 的直接反证。worker stderr 仅见 SAPIEN 的现有警告，没有旧 `FileNotFoundError`，真实 scheduler 已进入 episode 0，`ffmpeg` 正在写 `episode0.mp4`。
+- 此时 `episode_diagnostics.jsonl` / `video_checks.jsonl` 仍为 0，episode 0 尚未结束；不能把 accepted preflight 当作 two-rollout PASS。C1 的 outer/bridge/robot/policy 均保持运行，下一验收点仍是 episode 0 video、episode 1 no-video、两条诊断和服务退出。
