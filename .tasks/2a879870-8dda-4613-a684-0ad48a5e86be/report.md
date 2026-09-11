@@ -22,3 +22,9 @@
 - 严格 runner 的 `--prepare-audit` 已完成，固定 checkpoint 的 H50/K30、schema、输入审计与 manifest 均通过；C1 GPU1 的 `--dry-run` 已输出实际 robot/policy/scheduler 命令。记录：`strict-rollout-prepare-audit.log`、`strict-rollout-c1-smoke-dry-run.log`。
 - **正在运行：无。** Manager 17:12 未见本任务安装/eval 进程是准确的：安装与 dry-run 已结束，实际 rollout 尚未启动。最新命令是 C1 的启动前门禁，确认 `GPU1=1 MiB`、无 compute app、目标 run leaf 不存在、strict 三树 clean；记录于本次 task records/终端检查。
 - **当前阻塞：无。** 下一条已授权命令为从 strict RMBench 目录用 strict OpenPI Python 执行 `run_memory_schema_eval.py --variant put_back_full_t_plus_1 --checkpoint .../20000 --run-name put_back_full_t_plus_1_s0_20k_c1_smoke2 --gpu 1 --mode smoke`。该 runner 自动执行两条 accepted rollout：episode 0 video、episode 1 no-video。完成后先验收产物/服务退出/clean，再依次在 C2 GPU2 与 C3 GPU0 跑同协议 smoke；尚未进入正式 100。
+
+## 即时现场快照（2026-09-11 17:18 +08:00）
+
+- **C1 真实 strict smoke 正在运行，未停止。** host `is-ddfwxekq6usner7v-devmachine-0`、GPU1，outer PID `70362`（17:13 启动，17:18 已存活 04:52），bridge `70572`、robot `70647`、policy `70648` 均存活；policy 已加载 `.../20000` checkpoint 并完成 robot/policy metadata 握手。实际命令为 strict RMBench 中 `run_memory_schema_eval.py --variant put_back_full_t_plus_1 --checkpoint .../20000 --run-name put_back_full_t_plus_1_s0_20k_c1_smoke2 --gpu 1 --mode smoke`。
+- **当前真实阻塞：Curobo planner 每个 seed preflight 都因旧绝对资产路径失败。** `rmbench_sim_worker.stderr.log` 的最后 traceback 是 `FileNotFoundError: /mnt/public/xcj/Projects/RMBench/assets/embodiments/aloha-agilex/collision_aloha_{left,right}.yml`；该路径不存在，而 strict worktree 的 assets 在 `.../formal/strict-100/RMBench/assets/...`。scheduler 因而记录 `AttributeError: 'put_back_block' object has no attribute 'block'` 与 `ConnectionResetError`，目前 seed `100000–100005` 均 rejected、尚无 accepted rollout 或 video。
+- 最近只读检查为 `ps -p 70362,70572,70647,70648`、目标 run 的 `seed_preflight.jsonl` 与 `processes/rmbench_sim_worker.stderr.log` tail；下一验收点是保留本次失败证据后，定位并采用已有 C symlink-vm GPU guard 的最小隔离路径修正，使 strict tree 不改动，再重新运行 C1 的固定 two-rollout smoke。未重跑已通过的 offline 安装/闭包审计，也未启动文档整理。
