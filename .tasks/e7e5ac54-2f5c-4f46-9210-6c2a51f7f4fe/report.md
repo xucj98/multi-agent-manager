@@ -1,5 +1,44 @@
 # Memory 20k：远端八路与本机六路
 
+## 9月11日12:39 全部14项完成，稳定交接资料已留存
+
+14/14正式训练均完成实际20000、最终BF16保存、CPU完整参数恢复/shape/有限性、metadata/norm以及自有进程/子进程和逐卡显存释放验收；全部training job已归档。最后GPU1于12:26:55保存完成、GPU0于12:36:16保存完成，最终loss均0.0006，释放时各1MiB/0%。训练数值exit code原detach未留存，不将stopped当作exit0；CPU审计命令exit0。
+
+稳定索引：`/mnt/public/xcj/Projects/openpi/checkpoints/memory20k_e7e5ac54_manifest.json`。每项原run目录（config/exp）新增`artifacts/`：`train.log`、`closure-evidence.md`、`manifest.json`（SHA256），其中12项另有原始`closure-audit.json`。最早两项rearrange seed1没有独立JSON，保留当时已发布CPU及metadata补验原文，不补造审计、不重复CPU模型读取。14份日志复制后逐份hash相符，12份原始审计逐字节相符。`20000/`内容及所有checkpoint均保留，未修改。
+
+| 主机/GPU | 模型/seed | 最终loss | 保存完成 |
+| --- | --- | --- | --- |
+| wuwen-1/0 | rearrange full t+1 / 0 | 0.0007 | 05:03:04.753 |
+| wuwen-1/1 | rearrange full t+30 / 0 | 0.0007 | 04:58:03.156 |
+| wuwen-1/2 | rearrange serial lag30 / 0 | 0.0133 | 05:08:39.897 |
+| wuwen-1/3 | rearrange no-memory / 0 | 0.0004 | 05:18:31.161 |
+| wuwen-1/4 | put-back full t+1 / 0 | 0.0006 | 06:04:59.518 |
+| wuwen-1/5 | put-back full t+30 / 0 | 0.0006 | 05:34:52.617 |
+| wuwen-1/6 | rearrange full t+1 / 1 | 0.0007 | 04:41:29.545 |
+| wuwen-1/7 | rearrange full t+30 / 1 | 0.0007 | 04:36:01.011 |
+| 本机/0 | put-back full t+30 / 2 | 0.0006 | 12:36:16.076 |
+| 本机/1 | put-back full t+1 / 2 | 0.0006 | 12:26:55.655 |
+| 本机/4 | rearrange full t+1 / 2 | 0.0005 | 07:22:48.370 |
+| 本机/5 | rearrange full t+30 / 2 | 0.0006 | 07:37:18.914 |
+| 本机/6 | put-back full t+1 / 1 | 0.0007 | 07:23:06.639 |
+| 本机/7 | put-back full t+30 / 1 | 0.0006 | 07:34:14.919 |
+
+已清理本任务10份/tmp小时快照临时文件；有价值结果已进入稳定run资料与本report。工作树未发现需清理的pytest/ruff/mypy缓存，未动共享缓存、原日志或checkpoint。冻结worktree仍保留供Manager验收归档。
+
+wuwen-1本任务8项早已逐卡释放，06:05记录的不可见外部占用边界保留，未重新使用或探测该机。本机GPU0/1均已交回Manager，不启动新GPU。完整policy checkpoint-only GPU恢复/wire及评测仍由Manager安排，本次CPU恢复不等同GPU推理。
+
+本任务已无运行training job，停止训练小时巡检和MAM事件等待；下一动作是Manager验收/归档及评测排期，无下一训练检查时间。
+
+## 9月11日12:36 GPU0完成收尾
+
+本机 GPU0，memory20k_e7e5ac54_put_back_full_t_plus_30_s2，job `dcb7d214-5351-4301-b0cd-1bac56f59de3`，PID2944062。最终20000保存与Save Finalize完成，MAM wait返回stopped；随后PID及同session/直接子进程均不存在，GPU0=1MiB已用/81038MiB空闲/0%。无自有残留需清理；未留存数值exit code，退出及保存分别有证据。
+
+checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_30/memory20k_e7e5ac54_put_back_full_t_plus_30_s2/20000`。
+本机固定解释器显式CUDA_VISIBLE_DEVICES为空/JAX_PLATFORMS=cpu，实际读回51叶/3353433872元素，全BF16、全有限、全部参数路径与注册config shape一致，CPU核验exit0。父目录仅20000，有原子commit，仅params/assets/metadata，无optimizer；metadata JSON/JSONL/YAML解析通过，d10/clean/实际command/config协议一致，demo_clean_state来源和norm与验收资产吻合。200条标量均有限，Step20000：grad_norm=0.0322, loss=0.0006, param_norm=1804.2836，未见训练报错。
+
+逐参数shape及完整CPU审计：`/mnt/public/xcj/Projects/workspace/e7e5ac54-2f5c-4f46-9210-6c2a51f7f4fe/closure/memory20k_e7e5ac54_put_back_full_t_plus_30_s2.json`。
+对应training job按结果归档；累计14项完成/0项未完成。本任务不在wuwen-1接续任何GPU工作；06:05记录的不可见外部占用边界继续保留，本轮未重新探测远端；本机释放卡交Manager安排eval；完整policy GPU恢复/wire/评测未由本任务擅自启动。全部训练已完成，不再安排训练小时巡检。正在按用户要求留存稳定run目录的日志与closure审计，准备交Manager归档。
+
 ## 9月11日12:32 本机最后一路小时巡检
 
 实时job status为running，无error。日志持续前进，已落盘标量全部有限，无可见训练报错；其余13项已收尾归档，未重复checkpoint读取或远端探测。
