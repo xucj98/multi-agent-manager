@@ -113,7 +113,7 @@ worker 单调时钟给出本次冷路径的可复核时序：
 | reset worker receipt → response sent | 73,392.333 ms；在独立 660 秒 reset 预算内。 |
 | 首次 `get_obs` worker receipt → `get_obs_enter` | 0.087 ms。 |
 | `get_obs_enter` → `get_obs_render_enter` | 0.029 ms。 |
-| `get_obs_render_enter` → render return | 6,165.423 ms。 |
+| `get_obs_render_enter` → render return | 6,166.858 ms。 |
 | worker receipt → protocol response sent | 6,167.997 ms。 |
 
 因此，这一轮**没有可归因的失败首因**：最早的慢阶段是 reset，但它发生在 scheduler 启动前且已成功；
@@ -171,3 +171,41 @@ sidecar 同时明确这是事后核实，而非原 launcher 写入：实际 RMBe
 四个 historical formal 的 scheduler 首次 `get_obs` 自身 30 秒超时的首因仍未知。上述 cached-status、cached-terminal 和 5 秒 probe 修复改善故障分类、API 终态语义与取证边界，但没有证明或消除 scheduler 首帧超时；GPU3 单次正常返回同样不能放行 formal。四个 partial leaf 继续只作原始证据，不能合并为任何新的成功率或分母。
 
 请 `ae463958-bc48-43b3-9d61-b9ca7d579d83` 对 `d49f6165cf5f1b5a7111c0826e52bde2d0b9e479` 与 `ad8b5c7cab1af696c303339d11cf0f82f8a066ac` 定向复核：cached terminal 权威性、diagnostic result 隔离、5 秒 probe 的 worker 异常策略、实际 RMBench execution-tree provenance，以及上述“慢 reset”仅为防御边界而非四项 formal 首因的表述。
+
+## 阶段四：稳定记录、取证核对与归档准备（2026-09-11）
+
+独立复核已通过的 `d49f616` / `ad8b5c7` 已合入本地主库；它们仍仅是状态查询、诊断边界和结果入口改善，未解决或声明解决四项 formal 首次 `get_obs` 的 30 秒超时。
+
+### 最终诊断结论与未知边界
+
+- GPU3 的唯一获准诊断没有复现：首次 `get_obs` 在 worker receipt 后 0.087 ms 进入、0.029 ms 后进入 render、render 后 6,166.858 ms 返回，协议响应总计 6,167.997 ms；reset 的 73,392.333 ms 发生在 scheduler 启动前且处于独立 660 秒 reset 预算内。
+- 先前报告中的 render-return 暂记值已按保存的 worker 单调时钟更正为 6,166.858 ms。该次正常返回不能解释历史间歇性故障，也不能归因给 memory、模型、seed、渲染或 GPU，不能放行 formal 重跑。
+- 历史四个 leaf 均在 reset 成功、`logical_step=0` 后留下 scheduler `get_obs` 的 30 秒 `TimeoutError`，但旧运行没有 worker trace。因此仍不能在请求未到 worker、worker 内部排队、render 路径卡住和其他间歇性失联之间判定首因；C 再现时由 eval owner 依该阶段边界保留新 leaf 的 scheduler traceback、worker trace、`processes.jsonl` 与失败 episode diagnostics 再定位。
+
+### 稳定 Git 记录与待集成提交
+
+本地主 RMBench `xcj-dev` 已有稳定记录 `1d463111913e39848175943781cb0cf6b408575e`。本任务分支在其上补交：
+
+| 仓库 | 待集成 commit | 内容 |
+| --- | --- | --- |
+| RMBench | `bffc9e47900a4a8874fbce9c8264e22ced6795e3` | 更正 raw worker trace 的 render-return 数值，并索引四个历史 incomplete formal leaf 及其未知边界。 |
+
+记录文件为 `experiments/memory_chunk_20260910/README_first_obs_timeline_diagnostic.md`。该 commit 只修改该 README；未改 `run_memory_schema_eval.py`、`memory_schema_eval.yaml`、C 严格旧版对照、scheduler 30 秒预算或任一实验产物。
+
+### 取证保留与清理
+
+只读核对后，下列四个历史 formal leaf 仍各自保留 `config.yaml`、`command.txt`、`episode_diagnostics.jsonl`、`processes.jsonl`、`failure_review.json` 与对应 scheduler 日志：
+
+- `put_back_full_t_plus_30_s0_20k_100ep`：episode 16 / seed 100016。
+- `rearrange_full_t_plus_1_s1_20k_100ep`：episode 17 / seed 100017。
+- `rearrange_full_t_plus_30_s0_20k_100ep`：episode 32 / seed 100032。
+- `rearrange_full_t_plus_1_s0_20k_100ep`：episode 67 / seed 100067。
+
+GPU3 diagnostic leaf 仍在
+`/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/first_obs_timeline_rearrange_tplus1_s1_ep17_gpu3/`；sidecar 的 7 个未改动证据哈希全部匹配，常规 `_result.txt` 仍不存在，`diagnostic_result.txt` 存在且不含 `Success Rate`。
+
+已删除本 task worktree 的 22 个 Python/pytest/ruff cache；保留三库 worktree、`.local`/`.venv`、共享 `eval_result` 与 `logs` 链接，未删除任何正式或诊断证据。robot-bridge/RMBench/openpi task worktree 均 clean，分别停在 `d49f616`、`bffc9e4`、`a869498`；未启动新的 GPU、formal、smoke、训练或真机进程。
+
+### 归档条件
+
+待 Manager 处理 `bffc9e4` 的集成并验收本次发布简报后，本任务可归档。worktree 与上述证据路径应保留到归档完成；之后只有 C 评测在其冻结版本上再现故障时，由 eval owner 使用本记录继续取证，当前不启动额外 GPU 诊断或正式重跑。
