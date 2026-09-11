@@ -102,4 +102,16 @@
 | serial_lag30 | 2 | 2 | 1469115 | 88818158-8a76-4e96-a1a5-5641dd0b47cf |
 | no_memory | 2 | 3 | 1469245 | cadcb4ac-ceb3-4a8c-a773-2ee11516f789 |
 
-四条 job 已在本机 MAM 登记 remote host/PID/boot_id/start_ticks，状态 running；当前等待初始化完成后的首批 updates/有限 loss。GPU4–7 启动前空闲，留给 Manager 排期，不扩展实验清单。启动初检后阶段交付，不建立高频模型巡检。
+四条 job 已在本机 MAM 登记 remote host/PID/boot_id/start_ticks，状态 running；首批 updates/有限 loss 已于下方初检确认。GPU4–7 启动前空闲，留给 Manager 排期，不扩展实验清单。启动初检后阶段交付，不建立高频模型巡检。
+
+
+## 2026-09-11T23:50:19+08:00 四路启动初检完成
+
+四路均已完成至少 100 updates，首个完整 grad_norm/loss/param_norm 均为有限值。启动早期有额外初始化延迟，至 step64–72 时已稳定约 3.5–3.8 s/update。
+
+- serial_lag30 seed1：`Step 100: grad_norm=67.2492, loss=0.5693, param_norm=1802.3906`。日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s1.log`；最终 checkpoint `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s1/20000`。
+- no_memory seed1：`Step 100: grad_norm=0.7081, loss=0.0599, param_norm=1802.3864`。日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s1.log`；最终 checkpoint `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s1/20000`。
+- serial_lag30 seed2：`Step 100: grad_norm=49.1644, loss=0.5893, param_norm=1802.3906`。日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s2.log`；最终 checkpoint `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s2/20000`。
+- no_memory seed2：`Step 100: grad_norm=0.7033, loss=0.0599, param_norm=1802.3864`。日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s2.log`；最终 checkpoint `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s2/20000`。
+
+阶段交付：四项由 queued 全部转为 running，本任务现在共六路正式训练（本机两路 seed0 + wuwen-1 四路 seed1/2）。冻结 a7f3e07/bs32/20k，未重复 seed-only smoke 或扩展实验。远端 GPU4–7 初检仍为 4 MiB/0%，供 Manager 排期。普通有界日志初检脚本已完成退出；本轮不创建周期模型巡检或等待 job，由 Manager 接手后续训练完成、最终 BF16/metadata/assets 核验、独立恢复与归档。
