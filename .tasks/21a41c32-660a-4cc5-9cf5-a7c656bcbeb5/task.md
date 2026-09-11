@@ -50,3 +50,6 @@ Manager now integrates cc69d43 and compatibility e20da6d in root .local/wait-int
 
 ## Integration test finding
 Combined main (runtime+compat) full suite ran 80 tests, 1 failure: test_wait_runtime.CliWaitOutputTests.test_compatibility_gate_is_called_without_arguments_and_supplies_runtime_paths mocks missing module but with real module installed cli.wait_compatibility invoked live probe and returned real paths instead of fake /tmp. Fix test isolation against actual installed module; rerun combined suite. Also report actual native smoke, currently no readiness file observed. Use YOUR worktree .venv/bin/python; primary MAM root has no .venv.
+
+## Manager-adjudicated independent review fixes
+Review8d648d66 findings2/4 accepted: capture per-invocation trace boundary BEFORE compatibility probe so steer during setup is observed; apply invocation timestamp floor also on initial read so old same-turn spans appended late cannot cancel later waits. No persistent delivery cursor/ack; this is local current wait boundary only. Add regression tests for input during compatibility and late timestamp-old span. Required socket/log path discovery must not postpone boundary; coordinate compat lightweight discovery if necessary, no unsupported guessed path fallback. Native smoke remains required; complete after these fixes. Reviewer report has precise paths/lines.
