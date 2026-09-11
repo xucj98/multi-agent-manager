@@ -9,3 +9,6 @@
 正式计划：GPU6 serial seed0，GPU7 no-memory seed0；单卡bs32、20k、H50/K30、相同pi05_base初始化、仅最终20000 BF16模型及metadata/assets。已有run禁止混写，失败retry新目录。正式开跑前提交配置commit和smoke证据给Manager，Manager快速验收后即放行，不等C。冻结源码，使用独立exp_name/可靠detach/python -u -B，登记mam job，确认初始updates/loss。评估另由C验收后安排。
 
 report记录研究目的、实际命令/commit、数据/norm和结果路径、完成与缺口。正式训练如放行则按小时监控，完成后核实权重/metadata完整、退出资源释放并归档job。清理本任务smoke临时产物，保留正式checkpoint及待Manager归档worktree。不创建subagent，不改MAM，不修改他人运行树。
+
+## Manager放行：put-back no-memory seed0
+独立review15254a5f配置/真实CPU样本PASS，作者GPU7已完成50updates、有限loss、BF16完整保存与checkpoint-only恢复actions[50,14]。Manager已核对报告及实际保存日志，现正式放行GPU7 no-memory seed0的20k训练。沿a7f3e07冻结树、单卡bs32/20k/相同base及data/norm、最终BF16模型及metadata，独立exp_name不覆盖。立即重新确认GPU7空闲后启动、登记job并验证有效updates/有限loss，不等C或serial。先保留门禁简报到正式run artifacts再清理自身smoke临时checkpoint。serial配置review也PASS，但其GPU smoke尚未完成，仍等GPU6空闲，不碰其他占用。
