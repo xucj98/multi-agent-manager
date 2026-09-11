@@ -124,3 +124,9 @@ Manager核对2a879870最终证据：C100/100固定seed、70成功，本机69，1
 实验台账统一RMBench/experiments/<exp-group>，结果RMBench/eval_result/<exp-group>/<run>。逐run记录研究问题、设计变量/控制变量、预期结论、train commit/config/schema/seed、训练及checkpoint路径、eval commit/config/路径、实际成功率和失败分类、与基线差异及限制。现在先建立完整待评清单与状态，正式结果到达后更新，不等全部完成才记账。前50与已有可比结果差超过10个百分点先排查；固定100同GPU串行，单个smoke含2rollout(1video/1无video)，产物检查通过才formal。实验代码与台账交付提交，清理短smoke等临时产物但保留必要故障证据。
 
 不用无变化等待进度写report或commentary；mam wait挂起时不做几十秒一次轮询。完成实际可执行工作后再等待事件。
+
+## Manager准入：f962663首次infer预算
+独立review03d538a0通过。接受显式policy_first_infer_timeout=90.0，仅首个infer；其余30s不变。冻结bridge f9626636c4776d8eb15f9c556775cb2d12c000e5，RMBench17b55bf、OpenPIa869498及原模型/seed/H50/K30保持。先在本机独立代码树准备并提交运行清单/config的最小更新，再同步C的本任务部署树；后续代码修改均在本机完成。
+立即恢复首2项各自新leaf matching smoke2，避免同时冷启动：先启动第一项，首infer完成后再启动第二项。每项完整video/no-video、metadata、exit、资源收尾门禁通过，即可直接同GPU正式100，无需再次等Manager批准。失败保留证据不得当成功，超过90s仍退出并报告，不自动无限放大预算。
+首2项健康后接续12项队列，按现有授权最多2/host且1/GPU，实际资源冲突优先避让。正式50截面/100收尾与台账同步，raw结果回传本机RMBench的同组两层目录。不能把串行27.23s诊断写成严格证明并发编译是唯一根因。所有代码修改和测试保持本机，C只运行部署副本与GPU程序。
+台账5640242已通过review，Manager合入RMBench主xcj-dev；后续增量基于最新台账更新。不要重复已完成2run。
