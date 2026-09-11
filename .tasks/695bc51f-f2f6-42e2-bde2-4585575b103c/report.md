@@ -44,4 +44,25 @@
 - serial 正式运行位于 GPU6，日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s0.log`，MAM job `e087cfa2-04d2-460d-8b6e-974fdd7c7b1a`；仅最终 checkpoint `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s0/20000` 将保留 BF16 `params/assets/metadata`，按小时监控并在完成后归档 job。
 - 两条 smoke 的 checkpoint、日志与 gate 证据暂留供验收；正式 no-memory 形成最终 checkpoint 后再按任务要求清理本任务 smoke 临时产物。
 
+## 已授权后续队列（均为 queued，尚未启动）
+
+四项均使用冻结 commit `a7f3e07`、单卡 batch32/20k/H50/K30、相同 put-back 数据/sidecar/14D norm/pi05_base，只变 `--seed` 和独立 `--exp-name`。2026-09-11 16:49 +08:00 已核对四个 checkpoint 根目录和日志文件均不存在。每次仅在本机实际空闲 GPU 上启动，先复核 `nvidia-smi` 与本项目其他 task/job；不使用 wuwen-1、不碰占用进程，也不重复 GPU smoke。
+
+1. **queued — serial_lag30 seed1**
+   - checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s1/20000`
+   - log：`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s1.log`
+   - command：`env CUDA_VISIBLE_DEVICES=<FREE_GPU> XLA_PYTHON_CLIENT_MEM_FRACTION=0.90 HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot OPENPI_DATA_HOME=/mnt/public/cache/openpi .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_back_block_serial_lag30 --exp-name=memory20k_695bc51f_put_back_serial_lag30_s1 --seed=1 --no-wandb-enabled`
+2. **queued — no-memory seed1**
+   - checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s1/20000`
+   - log：`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s1.log`
+   - command：`env CUDA_VISIBLE_DEVICES=<FREE_GPU> XLA_PYTHON_CLIENT_MEM_FRACTION=0.90 HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot OPENPI_DATA_HOME=/mnt/public/cache/openpi .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_back_block_no_memory --exp-name=memory20k_695bc51f_put_back_no_memory_s1 --seed=1 --no-wandb-enabled`
+3. **queued — serial_lag30 seed2**
+   - checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s2/20000`
+   - log：`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s2.log`
+   - command：`env CUDA_VISIBLE_DEVICES=<FREE_GPU> XLA_PYTHON_CLIENT_MEM_FRACTION=0.90 HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot OPENPI_DATA_HOME=/mnt/public/cache/openpi .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_back_block_serial_lag30 --exp-name=memory20k_695bc51f_put_back_serial_lag30_s2 --seed=2 --no-wandb-enabled`
+4. **queued — no-memory seed2**
+   - checkpoint：`/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s2/20000`
+   - log：`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s2.log`
+   - command：`env CUDA_VISIBLE_DEVICES=<FREE_GPU> XLA_PYTHON_CLIENT_MEM_FRACTION=0.90 HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot OPENPI_DATA_HOME=/mnt/public/cache/openpi .venv/bin/python -u -B scripts/train.py pi05_rmbench_put_back_block_no_memory --exp-name=memory20k_695bc51f_put_back_no_memory_s2 --seed=2 --no-wandb-enabled`
+
 独立 review `15254a5f` 已 PASS。本任务不会等待 4090/C 环境；no-memory 与 serial 正式 20k 均已运行。
