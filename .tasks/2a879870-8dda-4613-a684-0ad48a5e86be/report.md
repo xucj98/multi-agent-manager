@@ -148,3 +148,9 @@
 
 - 基于 strict 源码差异，C2 GPU2 当前只运行隔离 diagnostic（outer PID `106978`）：同一 25 次 worker reset 生命周期、同一系统 ICD、无 policy/no-video/no result leaf；每 5 次在已关闭的 env 边界调用原 RMBench 已有的 `sapien.render.clear_cache()`。
 - 目的仅验证 `clear_cache_freq=5` 在原 evaluator 中存在、但 strict bridge worker 固定 `clear_cache=False` 是否解释第 23 次 renderer 崩溃。它不修改 strict 源，也不会作为 smoke/formal 运行方式或准入依据；结束后记录精确 exit code、日志和结果，再由 Manager 决定是否接受任何后续运行时修复路径。
+
+## Renderer gate 与 CPU-only 分段测量快照（2026-09-11 19:06 +08:00）
+
+- C2 的隔离 `clear_cache_freq=5` 诊断已自行退出 `139`，不是 smoke/formal：同一严格 worker、system ICD、无 policy/result leaf 下，episode/seed `0–18` 的 19 次 reset 均 `accepted=true`，并在每第 5 次关闭后的边界实际调用已有 `sapien.render.clear_cache()`；下一次 renderer 创建仍写出 `ErrorIncompatibleDriver`，随后 `timeout: ... core dump` / `Segmentation fault`。这说明该清理候选在此 harness 中**不足以**消除生命周期崩溃，不能据此改严格运行方式或启动新 smoke/formal。原始 `strict-c2-renderer-cache-gate.{log,exit,launch.txt}` 已保留；退出时 exit 文件为 `139`，未触碰失败后 GPU 上来源不明的残余占用。
+- 149 秒问题的 CPU-only profile 已在 C1 以原始入口、同一 `6139577`、同一离线锁和 shared warm cache 启动，且 `CUDA_VISIBLE_DEVICES=`；私有路径为 `workspace/2a879870-8dda-4613-a684-0ad48a5e86be/profile/rmbench-walltrace`，唯一 branch 为 `task/2a879870-8dda-4613-a684-0ad48a5e86be-c-profile-rmbench-walltrace-20260911`。外部 trace 已分别记录 wrapper 预检、git checkout、每个 uv、两次 symlink/rglob 校验与收尾，原 installer 未改。
+- 目前该 profile 的全部 uv 安装阶段已完成，managed installer 的第一个 symlink probe 已输出 `symlink=PASS`；原入口正运行其随后 wrapper-level `sorted(venv.rglob("*"))` 验证，尚未退出，因此尚不发布分段归因或占比。退出后会先完成 task 自建 worktree/branch 清理，再从 raw trace 给出实测分段与未解释 residual，不凭猜测优化。
