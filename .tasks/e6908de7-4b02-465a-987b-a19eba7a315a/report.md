@@ -264,3 +264,17 @@ smoke 门和对应 raw leaf/MAM job，并保留两个原始 30 秒失败 leaf。
 t+1/s1 与 t+30/s1 分别完成 8/100、7/100。所有已完成 episode 均为正常 terminal 记录，未见
 runtime error。已重新进入新版裸 `mam wait` 等待四个已登记 formal；既有 C3 50 条监控仍保留。到达
 50 条或进程退出后才做下一次处理，不重复 smoke 或启动超过每 host 两项的并发。
+
+## 2026-09-12 06:50 C3 两项 50 条检查
+
+台账增量提交 `c37684b58348e56800ad8828cb92912db1dea274` 与
+`2bcd01c8f70c3fee00d4ed2019f543168acb13a2`，仅记录 C3 的两个 midpoint，不改变 C eval 运行树。
+
+- put-back full t+30/s0：episode 0–49 / seed 100000–100049，**38/50**、0 runtime error、全部 terminal；
+  前五条视频存在，5–49 未产生额外视频。
+- rearrange full t+30/s0：相同连续范围，**43/50**、0 runtime error、全部 terminal；视频策略同样正确。
+
+两份 raw leaf 各自已有 runner 写入的 `midpoint_checks.jsonl`，都说明没有可作主要10pp判断的完整历史
+baseline，`triggered=false`；不同 target 的受控比较不被当作基础设施健康基线。两项 formal 均继续运行，
+这些数不作为正式成绩。C2 两项尚在 43/100、42/100，未到其 50 条检查点；四个 job 均保持运行，未接续
+新模型。
