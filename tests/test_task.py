@@ -557,8 +557,10 @@ printf env > "$target/.venv/marker"
 
         linked_readme.unlink()
         linked_readme.write_text("Keep this conflicting file.\n")
-        retry = subprocess.run(["bash", str(scripts / "create_worktree.sh"), self.git(self.root, "rev-parse", "main"),
-                                f"task/{task}", str(path.parent), sys.executable], cwd=self.root,
+        # Retry through the same local entry as workspace add: it selects the
+        # persistent shared Python, independently of the test runner's venv.
+        retry = subprocess.run(["bash", str(self.root / ".local/create_worktree.sh"), self.git(self.root, "rev-parse", "main"),
+                                f"task/{task}", str(path.parent)], cwd=self.root,
                                capture_output=True, text=True)
         self.assertEqual(retry.returncode, 0, retry.stdout + retry.stderr)
         self.assertEqual(linked_readme.read_text(), "Keep this conflicting file.\n")
