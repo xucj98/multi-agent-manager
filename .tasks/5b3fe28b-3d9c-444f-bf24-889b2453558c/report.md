@@ -12,18 +12,24 @@
 - `runtime_logging_ready()` 现在保留 embedded Python 的真实退出状态；`ensure_runtime_logging()` 将缺少 trace 环境（可走确认后的 restart）与 PID/environment 不可读（不 restart）分开处理。
 - 隔离测试覆盖两种状态、exact-yes/noninteractive、startup-lock cleanup、confirmation/replacement races、record 环境匹配、wrapper argv/cwd/env/log 重放，以及一个真实临时 Unix-socket node/npm wrapper 的完整 stop/relaunch/validate/cleanup。
 
+## 最终 review 修复（`fe108cc`）
+
+- 在重新核对 listener record 后、发送 `TERM` 前，安装器用同一启动路径完整预检捕获的 node/npm launch plan：socket 仍为当前 control socket、node/Codex wrapper、argv、cwd、环境、stdio、log identity，以及 `/dev/null` 和 append log 都可用。预检失败明确报告“no process was stopped”。
+- 紧邻 `TERM` 前，在 control 目录下创建 `700` 私有恢复目录，把含完整捕获环境的 `launch-plan.b64` 以 `600` 保存，并生成 `700` 的 `recover-app-server.sh`。任何 TERM 后的等待、启动、验证失败，或受管 `INT`/`HUP`/`TERM`/异常退出，都会释放 startup lock、以非零状态结束并仅打印可复制的 `Recovery command: bash …/recover-app-server.sh`；不会输出计划或环境内容。验证成功后删除恢复工件并清除 traps。
+- 恢复脚本取得同一 startup lock 后按捕获的 app-managed node/npm 命令启动；它不引入 supervisor、retry 或 standalone fallback。若 wrapper 已不可执行，它报告该失败且不声称服务已恢复。
+- `docs/install.md` 说明预检、TERM 后的恢复命令、`600` 计划文件，以及恢复后须再次运行安装器验证的边界。
+
 ## 验证
 
 - `bash -n scripts/install.sh` 与 `git diff --check`：通过。
-- `.venv/bin/python -W error::ResourceWarning -B -m unittest tests.test_wait_compat -v`：27 passed。
-- `.venv/bin/python -W error::ResourceWarning -B -m unittest tests.test_job_runtime -v`：7 passed。
-- `.venv/bin/python -W error::ResourceWarning -B -m unittest tests.test_task -v`：34 passed。
-- `.venv/bin/python -W error::ResourceWarning -B -m multi_agent_manager.wait_compat`：PASS；只读验证当前 control socket，并启动隔离 stdio probe。
+- `.venv/bin/python -W error::ResourceWarning -B -m unittest discover -s tests -v`：73 passed。
+- `.venv/bin/python -W error::ResourceWarning -B -m multi_agent_manager.wait_compat`：PASS；只读验证当前 control socket，并启动隔离 stdio probe。输出仍明确 native user-message/native-manager-send wake 未认证。
+- 新增隔离覆盖：预检失败不 TERM；TERM 后 wrapper 启动失败时的私有 mode-600 恢复计划和命令；`INT` 与受管退出的非零恢复路径和 lock 释放；成功路径的 artifact/trap cleanup；已有临时 Unix-socket node/npm 完整重启 harness 断言成功后没有残留恢复目录。
 
 ## 交付位置
 
 - Workspace: `/mnt/public/xcj/Projects/workspace/5b3fe28b-3d9c-444f-bf24-889b2453558c/multi-agent-manager`
 - Branch: `task/5b3fe28b-3d9c-444f-bf24-889b2453558c`
-- Commits: `e20da6d52525267e035549c3447fbd6d3409df27` (behavioral compatibility), `e23d693e5f8af5c9234da0c60148af3dc72b2fcd` (installer), `80b190fbdb17466d49a90cdc394bd97a2fafb6c9` (probe pipe cleanup), `679c859` (deterministic restart).
+- Commits: `e20da6d52525267e035549c3447fbd6d3409df27` (behavioral compatibility), `e23d693e5f8af5c9234da0c60148af3dc72b2fcd` (installer), `80b190fbdb17466d49a90cdc394bd97a2fafb6c9` (probe pipe cleanup), `679c859` (deterministic restart), `fe108cc` (preflight and post-TERM recovery).
 
 Development did not run installer main: no production `.bashrc` edit, pipx/global installation, or live App Server restart occurred. Native user-message/native-manager-send wake behavior remains `not-certified`; the compatibility probe does not falsely claim that end-to-end behavior is tested.
