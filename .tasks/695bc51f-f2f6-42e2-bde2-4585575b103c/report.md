@@ -115,3 +115,18 @@
 - no_memory seed2：`Step 100: grad_norm=0.7033, loss=0.0599, param_norm=1802.3864`。日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s2.log`；最终 checkpoint `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s2/20000`。
 
 阶段交付：四项由 queued 全部转为 running，本任务现在共六路正式训练（本机两路 seed0 + wuwen-1 四路 seed1/2）。冻结 a7f3e07/bs32/20k，未重复 seed-only smoke 或扩展实验。远端 GPU4–7 初检仍为 4 MiB/0%，供 Manager 排期。普通有界日志初检脚本已完成退出；本轮不创建周期模型巡检或等待 job，由 Manager 接手后续训练完成、最终 BF16/metadata/assets 核验、独立恢复与归档。
+
+## 2026-09-12 02:51 +08:00 恢复运行期责任
+
+最新 task revision `88555d38` 覆盖此前阶段交付后的监控安排。本次复用原干净 worktree，只读核对六路均 running，均无最终 20000 目录，暂无停止 job 可验收/归档。
+
+| 模型 | seed | 最新完整 step | loss |
+|---|---|---|---|
+| no_memory | 0 | 10200 | 0.0010 |
+| serial_lag30 | 0 | 10000 | 0.0087 |
+| no_memory | 1 | 3000 | 0.0020 |
+| no_memory | 2 | 2900 | 0.0021 |
+| serial_lag30 | 1 | 3200 | 0.0278 |
+| serial_lag30 | 2 | 3200 | 0.0253 |
+
+六路最近 grad_norm/loss/param_norm 均有限。继续承担原六路的停止后 20k 产物核验、台账、临时产物清理及 job 归档；不重复训练。现在实际调用新版 `mam wait` 保持 active 等待停止事件，不安排分钟/小时模型训练巡检。
