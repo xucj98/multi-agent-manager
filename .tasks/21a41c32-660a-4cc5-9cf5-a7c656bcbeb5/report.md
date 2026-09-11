@@ -90,3 +90,11 @@ Validation after this commit:
 
 The previously recorded coordinated 900-second native smoke PASS remains the live evidence. Per the published requirement, no unrelated smoke was repeated for this lookup-window-only repair.
 
+
+## Final inode correction (review f18404a)
+
+The final runtime commit records the scanned journal device/inode and verifies the reopened descriptor before seeking its offset. Replacement closes the descriptor and raises the explicit error `Codex session journal replaced between scan and open`. Only wait_runtime.py and its regression tests changed.
+
+The exact regression atomically replaces the journal after scan with a same-session journal containing current input before the old offset, padded beyond that offset. It failed against the prior code (no error raised) and passes with this fix. Journal tests: 4 passed. Full task-worktree suite: 77 passed; git diff --check passed. The publication records the delivery commit.
+
+The previous real native smoke PASS is retained; no additional live smoke, restart, GPU action, or production job operation was performed. Manager owns integration.
