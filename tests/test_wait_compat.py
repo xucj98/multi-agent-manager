@@ -7,9 +7,12 @@ import json
 import os
 from pathlib import Path
 import pty
+import re
 import select
 import signal
 import shutil
+import shlex
+import socket as unix_socket
 import subprocess
 import sys
 import tempfile
@@ -407,6 +410,29 @@ if restart_app_server /tmp/control.sock; then exit 0; else exit 7; fi
             self.assertFalse(marker.exists())
             self.assertIn("no process was stopped", result.stderr)
 
+    def test_launch_plan_preflight_failure_never_calls_term(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "term-called"
+            body = r'''
+discover_app_server() {
+    TARGET_PID=123; TARGET_START_TICKS=10; TARGET_EXECUTABLE=/opt/codex
+    TARGET_PARENT_PID=122; TARGET_PARENT_START_TICKS=9; TARGET_PARENT_EXECUTABLE=/usr/bin/node
+    TARGET_LOG_PATH=/tmp/app-server.log; TARGET_LAUNCH_PLAN=plan
+    TARGET_SOCKET="$1"; TARGET_RECORD=old
+}
+confirm_restart() { return 0; }
+acquire_startup_lock() { return 0; }
+release_startup_lock() { :; }
+launch_same_style() { LAUNCH_ERROR='captured launch plan preflight failed'; return 1; }
+send_term() { : > "$TERM_MARKER"; }
+if restart_app_server /tmp/control.sock; then exit 0; else exit 7; fi
+'''
+            result = self.run_sourced(body, env={"TERM_MARKER": str(marker)})
+            self.assertEqual(result.returncode, 7)
+            self.assertFalse(marker.exists())
+            self.assertIn("captured launch plan preflight failed", result.stderr)
+            self.assertIn("no process was stopped", result.stderr)
+
     def test_concurrent_valid_replacement_never_signals_or_launches(self):
         with tempfile.TemporaryDirectory() as directory:
             killed = Path(directory) / "kill-called"
@@ -448,9 +474,15 @@ discover_app_server() {
 confirm_restart() { printf 'confirm\n' >> "$EVENTS"; }
 acquire_startup_lock() { printf 'lock\n' >> "$EVENTS"; }
 release_startup_lock() { printf 'unlock\n' >> "$EVENTS"; }
+prepare_recovery_artifacts() { [[ "$1" == plan && "$2" == /tmp/control.sock ]] || return 1; printf 'prepare\n' >> "$EVENTS"; }
+arm_post_term_guard() { printf 'arm\n' >> "$EVENTS"; }
+finish_post_term_restart() { printf 'finish\n' >> "$EVENTS"; release_startup_lock; }
 send_term() { printf 'term\n' >> "$EVENTS"; }
 wait_for_target_departure() { printf 'departed\n' >> "$EVENTS"; TARGET_LAUNCH_PLAN=cleared-by-discovery; RESTART_OUTCOME=departed; }
-launch_same_style() { [[ "$1" == plan ]] || return 1; printf 'launch\n' >> "$EVENTS"; LAUNCHED_WRAPPER_PID=456; LAUNCHED_WRAPPER_START_TICKS=20; }
+launch_same_style() {
+    if [[ "$1" == --preflight ]]; then [[ "$2" == plan ]] || return 1; printf 'preflight\n' >> "$EVENTS"; return 0; fi
+    [[ "$1" == plan ]] || return 1; printf 'launch\n' >> "$EVENTS"; LAUNCHED_WRAPPER_PID=456; LAUNCHED_WRAPPER_START_TICKS=20;
+}
 wait_for_replacement() { printf 'replacement\n' >> "$EVENTS"; TARGET_PID=789; TARGET_SOCKET="$1"; RESTART_OUTCOME=relaunched; }
 if restart_app_server /tmp/control.sock; then exit 0; else exit 7; fi
 '''
@@ -458,7 +490,21 @@ if restart_app_server /tmp/control.sock; then exit 0; else exit 7; fi
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(
                 events.read_text(encoding="utf-8").splitlines(),
-                ["discover1", "confirm", "lock", "discover2", "term", "departed", "launch", "replacement", "unlock"],
+                [
+                    "discover1",
+                    "confirm",
+                    "lock",
+                    "discover2",
+                    "preflight",
+                    "prepare",
+                    "arm",
+                    "term",
+                    "departed",
+                    "launch",
+                    "replacement",
+                    "finish",
+                    "unlock",
+                ],
             )
 
     def test_launch_same_style_replays_wrapper_command_and_environment(self):
@@ -508,6 +554,15 @@ if restart_app_server /tmp/control.sock; then exit 0; else exit 7; fi
                     "log_identity": {"device": log_stat.st_dev, "inode": log_stat.st_ino},
                 },
             }
+            with unix_socket.socket(unix_socket.AF_UNIX) as control_socket:
+                control_socket.bind(str(socket))
+                preflight = self.run_sourced(
+                    'if launch_same_style --preflight "$LAUNCH_PLAN"; then exit 0; else exit $?; fi',
+                    env={"LAUNCH_PLAN": self.encoded_record(plan)},
+                )
+                self.assertEqual(preflight.returncode, 0, preflight.stderr)
+                self.assertFalse(capture.exists())
+            socket.unlink()
             result = self.run_sourced(
                 'if launch_same_style "$LAUNCH_PLAN"; then printf "launched=%s:%s\\n" "$LAUNCHED_WRAPPER_PID" "$LAUNCHED_WRAPPER_START_TICKS"; else exit $?; fi',
                 env={"LAUNCH_PLAN": self.encoded_record(plan)},
@@ -524,6 +579,179 @@ if restart_app_server /tmp/control.sock; then exit 0; else exit 7; fi
             self.assertEqual(captured["environment"]["RUST_LOG"], "off,codex_app_server::message_processor=trace,codex_app_server::app_server_tracing=info")
             self.assertEqual(captured["environment"]["LOG_FORMAT"], "json")
             self.assertIn("fake npm wrapper started", log_path.read_text(encoding="utf-8"))
+
+    def test_post_term_launch_failure_preserves_private_recovery_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cwd = root / "cwd"
+            cwd.mkdir()
+            control_socket_path = root / "app-server-control.sock"
+            log_path = root / "app-server.log"
+            log_path.write_text("", encoding="utf-8")
+            (root / "app-server-startup.lock").touch()
+            node = root / "node"
+            node.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            node.chmod(0o755)
+            wrapper = root / "codex"
+            wrapper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            wrapper.chmod(0o755)
+            secret = "post-term-recovery-secret"
+            log_stat = log_path.stat()
+            plan = {
+                "socket": str(control_socket_path),
+                "log_path": str(log_path),
+                "parent": {
+                    "pid": 12,
+                    "start_ticks": 34,
+                    "executable": str(node),
+                    "argv": ["node", str(wrapper), "app-server", "--listen", "unix://"],
+                    "cwd": str(cwd),
+                    "environment": {
+                        "PATH": os.environ["PATH"],
+                        "RECOVERY_SECRET": secret,
+                        "RUST_LOG": "old-trace",
+                        "LOG_FORMAT": "text",
+                    },
+                    "stdin": "/dev/null",
+                    "stdout": str(log_path),
+                    "stderr": str(log_path),
+                    "log_identity": {"device": log_stat.st_dev, "inode": log_stat.st_ino},
+                },
+            }
+            term_marker = root / "term-called"
+            control_socket = unix_socket.socket(unix_socket.AF_UNIX)
+            try:
+                control_socket.bind(str(control_socket_path))
+                body = r'''
+discover_app_server() {
+    TARGET_PID=123; TARGET_START_TICKS=10; TARGET_EXECUTABLE=/opt/codex
+    TARGET_PARENT_PID=122; TARGET_PARENT_START_TICKS=9; TARGET_PARENT_EXECUTABLE="$TEST_NODE"
+    TARGET_LOG_PATH="$TEST_LOG"; TARGET_LAUNCH_PLAN="$TEST_PLAN"
+    TARGET_SOCKET="$1"; TARGET_RECORD=old
+}
+confirm_restart() { return 0; }
+send_term() { : > "$TERM_MARKER"; rm -f -- "$TEST_WRAPPER" "$TEST_SOCKET"; }
+wait_for_target_departure() { RESTART_OUTCOME=departed; }
+if restart_app_server "$TEST_SOCKET"; then exit 0; else exit $?; fi
+'''
+                result = self.run_sourced(
+                    body,
+                    env={
+                        "TERM_MARKER": str(term_marker),
+                        "TEST_LOG": str(log_path),
+                        "TEST_NODE": str(node),
+                        "TEST_PLAN": self.encoded_record(plan),
+                        "TEST_SOCKET": str(control_socket_path),
+                        "TEST_WRAPPER": str(wrapper),
+                    },
+                )
+            finally:
+                control_socket.close()
+
+            self.assertNotEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(term_marker.exists())
+            self.assertIn("no longer runnable", result.stderr)
+            self.assertNotIn(secret, result.stdout)
+            self.assertNotIn(secret, result.stderr)
+            match = re.search(r"^Recovery command: bash (.+)$", result.stderr, flags=re.MULTILINE)
+            self.assertIsNotNone(match, result.stderr)
+            recovery_command = shlex.split(match.group(1))
+            self.assertEqual(len(recovery_command), 1)
+            recovery_script = Path(recovery_command[0])
+            recovery_plan = recovery_script.with_name("launch-plan.b64")
+            self.assertTrue(recovery_script.is_file())
+            self.assertTrue(os.access(recovery_script, os.X_OK))
+            self.assertEqual(recovery_script.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(recovery_plan.stat().st_mode & 0o777, 0o600)
+
+            recovery = subprocess.run(
+                ["bash", str(recovery_script)],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertNotEqual(recovery.returncode, 0)
+            self.assertIn("Recovery failed", recovery.stderr)
+            self.assertIn("no longer runnable", recovery.stderr)
+            self.assertNotIn(secret, recovery.stdout)
+            self.assertNotIn(secret, recovery.stderr)
+
+    def test_post_term_signal_preserves_recovery_command_and_releases_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            control_socket_path = root / "app-server-control.sock"
+            (root / "app-server-startup.lock").touch()
+            secret = "signal-recovery-secret"
+            body = r'''
+if ! prepare_recovery_artifacts "$TEST_PLAN" "$TEST_SOCKET"; then exit 7; fi
+if ! acquire_startup_lock "$TEST_SOCKET"; then exit 8; fi
+arm_post_term_guard
+kill -INT "$$"
+'''
+            result = self.run_sourced(
+                body,
+                env={"TEST_PLAN": secret, "TEST_SOCKET": str(control_socket_path)},
+            )
+            self.assertEqual(result.returncode, 130, result.stderr)
+            self.assertIn("SIGINT", result.stderr)
+            self.assertNotIn(secret, result.stdout)
+            self.assertNotIn(secret, result.stderr)
+            match = re.search(r"^Recovery command: bash (.+)$", result.stderr, flags=re.MULTILINE)
+            self.assertIsNotNone(match, result.stderr)
+            recovery_script = Path(shlex.split(match.group(1))[0])
+            self.assertTrue(recovery_script.is_file())
+            self.assertEqual(recovery_script.with_name("launch-plan.b64").stat().st_mode & 0o777, 0o600)
+            released = self.run_sourced(
+                'if acquire_startup_lock "$TEST_SOCKET"; then release_startup_lock; else exit $?; fi',
+                env={"TEST_SOCKET": str(control_socket_path)},
+            )
+            self.assertEqual(released.returncode, 0, released.stderr)
+
+    def test_post_term_exit_guard_reports_recovery_and_nonzero(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            control_socket_path = root / "app-server-control.sock"
+            (root / "app-server-startup.lock").touch()
+            body = r'''
+if ! prepare_recovery_artifacts "$TEST_PLAN" "$TEST_SOCKET"; then exit 7; fi
+if ! acquire_startup_lock "$TEST_SOCKET"; then exit 8; fi
+arm_post_term_guard
+exit 0
+'''
+            result = self.run_sourced(
+                body,
+                env={"TEST_PLAN": "exit-guard-secret", "TEST_SOCKET": str(control_socket_path)},
+            )
+            self.assertNotEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Recovery command: bash", result.stderr)
+            released = self.run_sourced(
+                'if acquire_startup_lock "$TEST_SOCKET"; then release_startup_lock; else exit $?; fi',
+                env={"TEST_SOCKET": str(control_socket_path)},
+            )
+            self.assertEqual(released.returncode, 0, released.stderr)
+
+    def test_success_cleanup_removes_recovery_artifacts_and_traps(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            control_socket_path = root / "app-server-control.sock"
+            body = r'''
+if ! prepare_recovery_artifacts "$TEST_PLAN" "$TEST_SOCKET"; then exit 7; fi
+printf 'artifact=%s\n' "$RECOVERY_DIR"
+arm_post_term_guard
+clear_post_term_guard
+discard_recovery_artifacts
+[[ -z "$RECOVERY_DIR" && -z "$RECOVERY_PLAN_PATH" && -z "$RECOVERY_SCRIPT_PATH" && -z "$POST_TERM_GUARD" ]]
+trap -p EXIT HUP INT TERM
+'''
+            result = self.run_sourced(
+                body,
+                env={"TEST_PLAN": "cleanup-secret", "TEST_SOCKET": str(control_socket_path)},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            artifact_line = next(line for line in result.stdout.splitlines() if line.startswith("artifact="))
+            self.assertFalse(Path(artifact_line.partition("=")[2]).exists())
+            self.assertEqual(result.stdout.splitlines(), [artifact_line])
 
     def test_isolated_restart_recreates_the_captured_node_wrapper(self):
         node = shutil.which("node")
@@ -607,6 +835,7 @@ fi
                 replacement_parent = int(line.split(" parent=", 1)[1])
                 self.assertNotEqual(replacement_parent, initial.pid)
                 self.assertIn("Verified replacement listener", result.stdout)
+                self.assertEqual(list(root.glob("mam-app-server-recovery.*")), [])
                 deadline = time.monotonic() + 5
                 while socket.exists() and time.monotonic() < deadline:
                     time.sleep(0.02)

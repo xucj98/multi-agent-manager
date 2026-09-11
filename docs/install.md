@@ -31,6 +31,8 @@ LOG_FORMAT=json
 
 确认后，安装器取得已有的 `app-server-startup.lock`，重新核对 listener 的 PID/启动时间/可执行文件/socket，以及 npm `node … codex … app-server` 父进程的 PID、argv、cwd、环境和 stdio。它只停止这个已重核对的 listener，等待原 npm wrapper 退出后，以捕获的同一 node/npm 命令、cwd 和 app-server log 重启；捕获的环境保持不变，只有 `RUST_LOG` 与 `LOG_FORMAT` 被替换为上述 trace 值。它不会启动 native standalone daemon 或新的 supervisor。随后它确认替换 listener 的 socket、log 和实际环境。若 App 在确认后自行替换目标，安装器不会停止替换进程：替换进程通过同样检查时继续，否则明确以非零状态结束。
 
+发送 `TERM` 前，安装器会完整预检捕获的启动计划。若 `TERM` 后的等待、启动或验证失败，或被 `INT`、`HUP`、`TERM` 打断，它会以非零状态结束并打印 `Recovery command: bash /…/recover-app-server.sh`。该文件与包含捕获环境的启动计划放在 control 目录下的私有目录中，计划文件权限为 `600`；请在单独终端执行打印出的命令，然后重新运行安装器验证结果。恢复命令仍可能因为捕获的 npm wrapper 已不可执行而失败，并不保证已恢复服务。
+
 随后它在 pipx 安装的 Python 环境中运行完整单元测试与 `multi_agent_manager.wait_compat` 的实时行为检查。无法验证 listener、log、环境或行为测试时都会非零退出，并且不会尝试 standalone fallback。
 
 `require_compatible()` 每次 wait 前都重新检查 control socket、只读 initialize trace、隔离 stdio App Server 的通知送达和 `turn.id` trace 映射。它返回本次验证的 socket、trace 日志和 fingerprint。版本信息只用于排障；版本变化从不阻止通过行为测试的运行时。探测不会创建真实模型 turn 或修改现有 thread。

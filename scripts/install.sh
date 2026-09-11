@@ -32,6 +32,11 @@ PROCESS_ERROR=''
 TERMINATION_ERROR=''
 MATCH_ERROR=''
 RESTART_OUTCOME=''
+RECOVERY_DIR=''
+RECOVERY_PLAN_PATH=''
+RECOVERY_SCRIPT_PATH=''
+RECOVERY_ERROR=''
+POST_TERM_GUARD=''
 
 incomplete() {
     printf 'Installation/verification incomplete: %s\n' "$*" >&2
@@ -610,6 +615,204 @@ release_startup_lock() {
     fi
 }
 
+clear_post_term_guard() {
+    POST_TERM_GUARD=''
+    trap - EXIT HUP INT TERM
+}
+
+print_recovery_command() {
+    if [[ -z "$RECOVERY_SCRIPT_PATH" ]]; then
+        return 1
+    fi
+    printf 'Recovery command: bash %q\n' "$RECOVERY_SCRIPT_PATH" >&2
+}
+
+discard_recovery_artifacts() {
+    local directory="$RECOVERY_DIR"
+    RECOVERY_ERROR=''
+    if [[ -z "$directory" ]]; then
+        return 0
+    fi
+    if ! rm -rf -- "$directory"; then
+        RECOVERY_ERROR="could not remove protected recovery artifacts at $directory"
+        return 1
+    fi
+    RECOVERY_DIR=''
+    RECOVERY_PLAN_PATH=''
+    RECOVERY_SCRIPT_PATH=''
+}
+
+write_recovery_script() {
+    local installer="$1" plan_path="$2" socket="$3" destination="$4"
+    (
+        umask 077
+        {
+            printf '%s\n' '#!/usr/bin/env bash'
+            printf '%s\n' 'set -euo pipefail'
+            printf 'readonly MAM_RECOVERY_INSTALLER=%q\n' "$installer"
+            printf 'readonly MAM_RECOVERY_PLAN=%q\n' "$plan_path"
+            printf 'readonly MAM_RECOVERY_SOCKET=%q\n' "$socket"
+            cat <<'SH'
+if [[ ! -f "$MAM_RECOVERY_PLAN" || -L "$MAM_RECOVERY_PLAN" ]]; then
+    printf 'Recovery failed: protected launch plan is unavailable at %s\n' "$MAM_RECOVERY_PLAN" >&2
+    exit 1
+fi
+if [[ "$(stat -c '%a' -- "$MAM_RECOVERY_PLAN" 2>/dev/null || true)" != 600 ]]; then
+    printf 'Recovery failed: protected launch plan must have mode 600 at %s\n' "$MAM_RECOVERY_PLAN" >&2
+    exit 1
+fi
+if [[ ! -f "$MAM_RECOVERY_INSTALLER" || -L "$MAM_RECOVERY_INSTALLER" ]]; then
+    printf 'Recovery failed: installer source is unavailable at %s\n' "$MAM_RECOVERY_INSTALLER" >&2
+    exit 1
+fi
+source "$MAM_RECOVERY_INSTALLER"
+if ! launch_plan="$(<"$MAM_RECOVERY_PLAN")"; then
+    printf 'Recovery failed: could not read the protected launch plan\n' >&2
+    exit 1
+fi
+if ! acquire_startup_lock "$MAM_RECOVERY_SOCKET"; then
+    printf 'Recovery failed: %s\n' "${RESTART_ERROR:-could not acquire the App Server startup lock}" >&2
+    exit 1
+fi
+trap 'release_startup_lock' EXIT
+if launch_same_style "$launch_plan"; then
+    release_startup_lock
+    trap - EXIT
+    printf 'Recovery launch started from the protected captured plan (wrapper PID %s). Re-run bash scripts/install.sh to verify it.\n' "$LAUNCHED_WRAPPER_PID"
+    exit 0
+else
+    launch_status=$?
+fi
+release_startup_lock
+trap - EXIT
+printf 'Recovery failed: %s\n' "${LAUNCH_ERROR:-the captured app-managed npm wrapper could not be started}" >&2
+exit "$launch_status"
+SH
+        } > "$destination"
+    )
+}
+
+prepare_recovery_artifacts() {
+    local launch_plan="$1" socket="$2" control_directory root installer directory
+    RECOVERY_ERROR=''
+    if [[ -z "$launch_plan" || "$socket" != /* ]]; then
+        RECOVERY_ERROR='cannot prepare recovery artifacts from an invalid captured launch plan'
+        return 1
+    fi
+    control_directory="$(dirname -- "$socket")"
+    if [[ ! -d "$control_directory" ]]; then
+        RECOVERY_ERROR="the App Server control directory is unavailable at $control_directory"
+        return 1
+    fi
+    if ! root="$(repository_root)" || [[ ! -f "$root/scripts/install.sh" || -L "$root/scripts/install.sh" ]]; then
+        RECOVERY_ERROR='the current installer source is unavailable for recovery'
+        return 1
+    fi
+    installer="$root/scripts/install.sh"
+    if ! directory="$(mktemp -d -- "$control_directory/mam-app-server-recovery.XXXXXX")"; then
+        RECOVERY_ERROR='could not create a private App Server recovery directory'
+        return 1
+    fi
+    RECOVERY_DIR="$directory"
+    RECOVERY_PLAN_PATH="$directory/launch-plan.b64"
+    RECOVERY_SCRIPT_PATH="$directory/recover-app-server.sh"
+    if ! chmod 700 -- "$RECOVERY_DIR"; then
+        discard_recovery_artifacts >/dev/null 2>&1 || true
+        RECOVERY_ERROR='could not protect the App Server recovery directory'
+        return 1
+    fi
+    if ! (umask 077; printf '%s\n' "$launch_plan" > "$RECOVERY_PLAN_PATH"); then
+        discard_recovery_artifacts >/dev/null 2>&1 || true
+        RECOVERY_ERROR='could not write the protected App Server launch plan'
+        return 1
+    fi
+    if ! chmod 600 -- "$RECOVERY_PLAN_PATH"; then
+        discard_recovery_artifacts >/dev/null 2>&1 || true
+        RECOVERY_ERROR='could not protect the App Server launch plan'
+        return 1
+    fi
+    if ! write_recovery_script "$installer" "$RECOVERY_PLAN_PATH" "$socket" "$RECOVERY_SCRIPT_PATH"; then
+        discard_recovery_artifacts >/dev/null 2>&1 || true
+        RECOVERY_ERROR='could not write the App Server recovery command'
+        return 1
+    fi
+    if ! chmod 700 -- "$RECOVERY_SCRIPT_PATH"; then
+        discard_recovery_artifacts >/dev/null 2>&1 || true
+        RECOVERY_ERROR='could not protect the App Server recovery command'
+        return 1
+    fi
+}
+
+post_term_failure() {
+    local reason="$1"
+    clear_post_term_guard
+    release_startup_lock
+    incomplete "$reason" || true
+    printf 'The captured app-managed npm launch plan remains in a protected recovery artifact.\n' >&2
+    if print_recovery_command; then
+        :
+    else
+        printf 'Recovery artifact was unexpectedly unavailable; do not assume the App Server was restored.\n' >&2
+    fi
+    return 1
+}
+
+handle_post_term_exit() {
+    local status="$1"
+    if [[ "$POST_TERM_GUARD" != 1 ]]; then
+        return "$status"
+    fi
+    if ((status == 0)); then
+        status=1
+    fi
+    post_term_failure 'App Server restart exited before replacement verification completed after recovery preparation.' || true
+    return "$status"
+}
+
+handle_post_term_signal() {
+    local signal_name="$1" status="$2"
+    if [[ "$POST_TERM_GUARD" == 1 ]]; then
+        post_term_failure "App Server restart was interrupted by SIG${signal_name} after recovery preparation; its stop/relaunch state may be incomplete." || true
+    fi
+    exit "$status"
+}
+
+recovery_artifacts_are_protected() {
+    if [[ -z "$RECOVERY_DIR" || ! -d "$RECOVERY_DIR" || -L "$RECOVERY_DIR" ]] \
+        || [[ -z "$RECOVERY_SCRIPT_PATH" || ! -f "$RECOVERY_SCRIPT_PATH" || -L "$RECOVERY_SCRIPT_PATH" || ! -x "$RECOVERY_SCRIPT_PATH" ]] \
+        || [[ -z "$RECOVERY_PLAN_PATH" || ! -f "$RECOVERY_PLAN_PATH" || -L "$RECOVERY_PLAN_PATH" ]]; then
+        return 1
+    fi
+    [[ "$(stat -c '%a' -- "$RECOVERY_DIR" 2>/dev/null || true)" == 700 ]] \
+        && [[ "$(stat -c '%a' -- "$RECOVERY_SCRIPT_PATH" 2>/dev/null || true)" == 700 ]] \
+        && [[ "$(stat -c '%a' -- "$RECOVERY_PLAN_PATH" 2>/dev/null || true)" == 600 ]]
+}
+
+arm_post_term_guard() {
+    if ! recovery_artifacts_are_protected; then
+        RECOVERY_ERROR='the protected App Server recovery command is unavailable'
+        return 1
+    fi
+    POST_TERM_GUARD=1
+    trap 'handle_post_term_exit "$?"' EXIT
+    trap 'handle_post_term_signal HUP 129' HUP
+    trap 'handle_post_term_signal INT 130' INT
+    trap 'handle_post_term_signal TERM 143' TERM
+}
+
+finish_post_term_restart() {
+    clear_post_term_guard
+    release_startup_lock
+    if discard_recovery_artifacts; then
+        return 0
+    fi
+    incomplete "the replacement listener was verified, but $RECOVERY_ERROR; remove them manually" || true
+    if print_recovery_command; then
+        :
+    fi
+    return 1
+}
+
 confirm_restart() {
     local pid="$1" executable="$2" socket="$3" response
     printf '\nCodex App Server restart required for trace logging.\nTarget PID: %s\nExecutable: %s\nSocket: %s\n' "$pid" "$executable" "$socket" >&2
@@ -698,11 +901,28 @@ wait_for_target_departure() {
 }
 
 launch_same_style() {
-    local launch_plan="$1" result status
+    local mode='launch' launch_plan result status
+    case "$#" in
+        1)
+            launch_plan="$1"
+            ;;
+        2)
+            if [[ "$1" != --preflight ]]; then
+                LAUNCH_ERROR='usage: launch_same_style [--preflight] LAUNCH_PLAN'
+                return 2
+            fi
+            mode='preflight'
+            launch_plan="$2"
+            ;;
+        *)
+            LAUNCH_ERROR='usage: launch_same_style [--preflight] LAUNCH_PLAN'
+            return 2
+            ;;
+    esac
     LAUNCH_ERROR=''
     LAUNCHED_WRAPPER_PID=''
     LAUNCHED_WRAPPER_START_TICKS=''
-    if result="$(python3 - "$RUST_LOG_VALUE" "$LOG_FORMAT_VALUE" 3<<< "$launch_plan" 2>&1 <<'PY'
+    if result="$(python3 - "$mode" "$RUST_LOG_VALUE" "$LOG_FORMAT_VALUE" 3<<< "$launch_plan" 2>&1 <<'PY'
 import base64
 import json
 import os
@@ -711,7 +931,7 @@ import stat
 import subprocess
 import sys
 
-required_rust, required_format = sys.argv[1:]
+mode, required_rust, required_format = sys.argv[1:]
 
 
 def fail(message):
@@ -757,6 +977,8 @@ def start_ticks(pid):
 
 
 plan, parent = decode_plan()
+if mode not in {"preflight", "launch"}:
+    fail("the captured app-managed npm launch mode is invalid")
 socket = plan["socket"]
 log_path = plan["log_path"]
 executable = parent["executable"]
@@ -793,13 +1015,16 @@ except FileNotFoundError:
     socket_stat = None
 except OSError:
     fail("cannot inspect the control socket before restart")
-if socket_stat is not None:
+if mode == "preflight":
+    if socket_stat is None or not stat.S_ISSOCK(socket_stat.st_mode):
+        fail("the confirmed control socket is no longer present for the captured launch plan")
+elif socket_stat is not None:
     fail("the original control socket path remains; refusing to overwrite it")
 try:
     with open("/proc/net/unix", encoding="ascii") as handle:
         for line in handle:
             values = line.rstrip("\n").split(maxsplit=7)
-            if len(values) == 8 and values[5] == "01" and values[7] == socket:
+            if mode == "launch" and len(values) == 8 and values[5] == "01" and values[7] == socket:
                 fail("an App Server listener appeared before the captured wrapper could be launched")
 except OSError:
     fail("cannot inspect Unix listeners before restart")
@@ -809,18 +1034,21 @@ environment["RUST_LOG"] = required_rust
 environment["LOG_FORMAT"] = required_format
 try:
     with open("/dev/null", "rb", buffering=0) as stdin_handle, open(log_path, "ab", buffering=0) as log_handle:
-        process = subprocess.Popen(
-            argv,
-            executable=executable,
-            cwd=cwd,
-            env=environment,
-            stdin=stdin_handle,
-            stdout=log_handle,
-            stderr=log_handle,
-            close_fds=True,
-            start_new_session=True,
-            umask=0o077,
-        )
+        if mode == "launch":
+            process = subprocess.Popen(
+                argv,
+                executable=executable,
+                cwd=cwd,
+                env=environment,
+                stdin=stdin_handle,
+                stdout=log_handle,
+                stderr=log_handle,
+                close_fds=True,
+                start_new_session=True,
+                umask=0o077,
+            )
+    if mode == "preflight":
+        raise SystemExit(0)
     try:
         launched_start_ticks = start_ticks(process.pid)
     except (OSError, ValueError):
@@ -836,6 +1064,9 @@ PY
         status=$?
         LAUNCH_ERROR="${result:-the captured app-managed npm wrapper could not be started}"
         return "$status"
+    fi
+    if [[ "$mode" == preflight ]]; then
+        return 0
     fi
     read -r LAUNCHED_WRAPPER_PID LAUNCHED_WRAPPER_START_TICKS <<< "$result"
     if [[ ! "$LAUNCHED_WRAPPER_PID" =~ ^[0-9]+$ || ! "$LAUNCHED_WRAPPER_START_TICKS" =~ ^[0-9]+$ ]]; then
@@ -1054,9 +1285,34 @@ restart_app_server() {
         release_startup_lock
         return 1
     fi
+    if launch_same_style --preflight "$old_launch_plan"; then
+        :
+    else
+        incomplete "${LAUNCH_ERROR:-the captured app-managed npm launch plan could not be preflighted}; no process was stopped"
+        release_startup_lock
+        return 1
+    fi
+    if prepare_recovery_artifacts "$old_launch_plan" "$socket"; then
+        :
+    else
+        incomplete "${RECOVERY_ERROR:-could not prepare the protected App Server recovery command}; no process was stopped"
+        release_startup_lock
+        return 1
+    fi
+    if arm_post_term_guard; then
+        :
+    else
+        clear_post_term_guard
+        discard_recovery_artifacts >/dev/null 2>&1 || true
+        incomplete "${RECOVERY_ERROR:-could not arm the protected App Server recovery command}; no process was stopped"
+        release_startup_lock
+        return 1
+    fi
     if send_term "$old_pid" "$old_start_ticks" "$old_executable" "$socket"; then
         :
     else
+        clear_post_term_guard
+        discard_recovery_artifacts >/dev/null 2>&1 || true
         incomplete "${TERMINATION_ERROR:-could not terminate the verified listener}; no other process was targeted"
         release_startup_lock
         return 1
@@ -1065,29 +1321,26 @@ restart_app_server() {
     if wait_for_target_departure "$socket" "$old_record" "$old_parent_pid" "$old_parent_start_ticks" "$old_parent_executable"; then
         :
     else
-        incomplete "$RESTART_ERROR; no standalone fallback was launched"
-        release_startup_lock
+        post_term_failure "$RESTART_ERROR; no standalone fallback was launched" || true
         return 1
     fi
     if [[ "$RESTART_OUTCOME" == concurrent-replacement ]]; then
-        release_startup_lock
+        finish_post_term_restart || return 1
         return 0
     fi
     if launch_same_style "$old_launch_plan"; then
         :
     else
-        incomplete "$LAUNCH_ERROR; no standalone fallback was launched"
-        release_startup_lock
+        post_term_failure "$LAUNCH_ERROR; no standalone fallback was launched" || true
         return 1
     fi
     if wait_for_replacement "$socket" "$old_record" "$LAUNCHED_WRAPPER_PID" "$LAUNCHED_WRAPPER_START_TICKS" "$old_parent_executable"; then
         :
     else
-        incomplete "$RESTART_ERROR; no standalone fallback was launched"
-        release_startup_lock
+        post_term_failure "$RESTART_ERROR; no standalone fallback was launched" || true
         return 1
     fi
-    release_startup_lock
+    finish_post_term_restart || return 1
     printf 'Verified replacement listener PID %s at %s with its socket, log, and trace environment.\n' "$TARGET_PID" "$TARGET_SOCKET"
 }
 
