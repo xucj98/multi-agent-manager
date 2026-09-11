@@ -52,3 +52,8 @@
 - C1 retry1 已完整结束并通过：preflight 固定为 `(episode0, seed100000, accepted=true)`、`(episode1, seed100001, accepted=true)`；两条 terminal status 均为 `success`。episode 0 写入 `episode0.mp4`（297,342 bytes、333 帧、video check `ok=true`），episode 1 的 no-video check 为 `enabled=false, ok=true`；`_result.txt` 已生成，任务进程与 19410/19412 端口均已退出。
 - 依照 Manager 裁定，等 C1 停止后才处理 shim。`strict/assets` 与稳定 `state-vla/RMBench/assets` 已用递归 regular-file SHA256 与 symlink spelling 全量比对：346 entries、完全相同、manifest `12c45bfc94b606c7c4df515d11999bf2e689e4fd89e5dc09dc2265811e280fd8`；证据 `records/strict-vs-stable-assets-equivalence.json`。随后将 `/mnt/public/xcj/Projects/RMBench` 原子从 task strict tree 改指稳定 `/mnt/public/xcj/Projects/state-vla/RMBench`，记录 `strict-rmbench-legacy-assets-shim-switch.json`；strict tree 仍 clean。
 - C2 GPU2 与 C3 GPU0 已只读确认空闲并能看到共享 strict tree/旧路径入口。下一步从稳定 shim 启动 C2 same fixed seeds 的真实 smoke；C1 retry1 是唯一有效 C1 smoke，先前 `...c1_smoke2` 仍是 20 条基础设施失败 leaf，显式不计入任何对照/正式结果。
+
+## 三机真实 smoke 当前运行（2026-09-11 17:36 +08:00）
+
+- C1 已 PASS 并结束；C2/C3 现已实际启动（均用稳定 shim、同一 strict commits、固定从 seed100000 开始）：C2 host `is-ddj72hiexddjfwo6-devmachine-0` / GPU2 / outer PID `3635` / run `put_back_full_t_plus_1_s0_20k_c2_smoke2`，17:35 启动；C3 host `is-ddj72jhhjdy7hiyj-devmachine-0` / GPU0 / outer PID `3631` / run `put_back_full_t_plus_1_s0_20k_c3_smoke2`，17:36 启动。
+- 各自 prelaunch 记录（GPU idle、端口、leaf 不存在、三树 clean、stable shim target 和完整命令）分别为 `strict-c2-smoke2-{prelaunch-gpu.csv,launch.txt}`、`strict-c3-smoke2-{prelaunch-gpu.csv,launch.txt}`。两个结果 leaf、端口和 WARP cache GPU 子目录互不重叠；当前仅处于 model/service startup，尚未将 C2/C3 称为通过。
