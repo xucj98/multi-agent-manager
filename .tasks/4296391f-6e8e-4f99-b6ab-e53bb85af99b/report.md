@@ -2,7 +2,8 @@
 
 ## 准入结论
 
-bridge 候选提交为 `3906dd0032637410359be6dd5006b3f793f3191c`
+bridge 当前候选 HEAD 为 `f0f585a` (`docs(wash): refresh TUI tmux topology vars`)，
+其功能父提交为 `3906dd0032637410359be6dd5006b3f793f3191c`
 (`fix(memory): ship bridge-local schema runtime`)，位于
 `/mnt/public/xcj/Projects/workspace/4296391f-6e8e-4f99-b6ab-e53bb85af99b/robot-bridge`
 的 `task/4296391f-6e8e-4f99-b6ab-e53bb85af99b` 分支。可交 reviewer
@@ -23,6 +24,9 @@ OpenPI 保持干净且未修改：
 - 新增本地 schema 行为回归，并以真实 wash full/serial 20k metadata 构建
   `MemoryContext`；文档收敛为 WSL checkout → 配置 `RB_*` → `push_code.sh auto` →
   `x1pro_takeover.sh` → `:8088`，不要求手工 wheel。
+- `f0f585a` 仅恢复既有 TUI 文档的 tmux 全局环境刷新：在 export 所需 `RB_*` 后，若已有
+  tmux server，逐项执行 `tmux set-environment -g`。默认路径没有 `--skip-policy` 的 URL
+  内联赋值，因此这一步防止旧 pane 继承过期拓扑变量；未改 shell 或 Python 代码。
 
 ## CPU 证据
 
