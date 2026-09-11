@@ -27,3 +27,8 @@
 3. 一个模型在C完整跑100 rollout，需与本机完整100 rollout基线成功率差<=5个百分点（100次下<=5次成功差）。复用已完成本机模型/训练seed/ckpt哈希，固定任务/数据/环境seed序列/H/K/memory协议、仿真器和policy代码commit。优先与本机eval负责人e6908de7确认一个完整已收尾的对照结果、具体冻结三库commit/命令。环境搭建可以最新代码；正式对照需相同代码状态，若需要旧commit环境确保依赖仍可正常安装而不是路径猜测。对照选定和额外传输/代码差异先报告Manager裁定，不能默默变配置。若没有可直接使用的严格同版本基线，提出最小本机补跑计划，不拿不同版本直接归因GPU硬件。
 4. 正式100在三机smoke通过、代码干净/提交及产物门禁通过后启动，本机mam job add登记C进程，说明host/GPU/用途；只同步所需一个ckpt和eval资源。C输出RMBench/eval_result/<exp-group>/<run>，本机最终同结构回传并校验。50rollout时先检查趋势与协议，不提前以50样本验收；完整100若差>5pp，保留原结果并分析，不靠重跑挑结果通过。
 5. 报告表列三脚本耗时/独占与缓存磁盘、三机smoke、C100和本机100成功计数/差值、固定版本/模型/数据和结果路径。实验说明最终RMBench/experiments/<exp-group>，必要Git代码改动仍本机独立worktree提交复核；不要扩MAM功能。
+
+## 用户确认后续C集群eval与手工workspace管理
+用户要求Manager继续推进，C验收通过后后续新eval迁至C，当前已启动本机eval不搬迁。暂不扩MAM；负责eval的subagent在C:/mnt/public/xcj/Projects/state-vla/workspace/TASK-ID手动创建workspace及各库worktree，使用本task提供的.local/create_worktree.sh。本机MAM task/agent仍一一绑定，远端worktree登记到其report，不在C启动agent或另装MAM。
+请在本task稳定state-vla根交付README.md，供后续eval执行者开工前阅读；内容只写可执行的当前环境操作手册：三台机器/共享路径、-1安装与-2/-3运行、uv symlink共享缓存不可随意删除、创建workspace/TASK-ID和所需worktree的准确命令、各库.local脚本3参数接口、GPU检查/占用登记、smoke2一有video一无video→commit→单GPU串行100/50检查、输出RMBench/eval_result/<exp-group>/<run>及本机回传与实验说明、完成后由执行者清理smoke/临时文件和自己的remote worktree/branch/workspace、保留共享模型/数据/缓存。只删除任务自己创建的分支，不删仓库工作分支或他人目录；清理不跟随共享软链。
+README不写MAM新接口、复杂后端或猜测尚未验证的命令。先随环境实现起草，三机/100eval验收完成后更新为实测可用版本。路径稳定、简洁清楚，Manager验收后将其路径写进每个后续eval任务要求，作为必读。源文档副本可随本task报告留在本机MAM，避免只有临时目录有价值说明。
