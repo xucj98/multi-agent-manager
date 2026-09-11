@@ -18,3 +18,7 @@ GPU0/1/6/7当前均有外部占用，2–5为本项目四路训练。此前指�
 
 ## Manager放行：put-back serial seed0
 独立配置/CPU review15254a5f PASS；现GPU6实际50updates、完整BF16保存、checkpoint-only gate恢复56leaf并返回actions[50,14]/memory_prediction_ids[1,2]均通过。Manager已核对报告及gate日志，正式放行serial seed0的20k：沿a7f3e07冻结版本、已定base/data/norm/bs32/20k、独立exp_name、不覆盖。在本机0/1/6/7任一实际空闲卡启动（优先刚释放的6），立即登记job并确认有效updates/loss，不等C。报告简述gate初次失败与retry1差异，保留门禁必要证据，勿把初次失败隐去。两个正式run按小时监控；不修改活跃源码。
+
+## 后续已授权队列：补齐B组put-back三个训练seed
+为避免已验收模型开跑后再临时准备下一批，现同步排入既定B组的四项：put-back serial_lag30 seed1/2、put-back no-memory seed1/2。同a7f3e07配置/数据/norm/base/bs32/20k，仅seed和唯一exp_name改变；原任务每类seed0不重复。先准备准确命令与各独立目录写report，标为queued，不能写已启动。
+首两项seed0正常更新后，以上四项可按本机实际释放的GPU直接依次启动：serial seed1、no-memory seed1、serial seed2、no-memory seed2；本机0–7均可，但先检查本项目其他task登记与实际显存，禁止抢占/终止任何既有作业，2–5当前7ae任务训练需等其明确结束。wuwen-1仍不使用。已验收相同路径无需每个seed重复50step；正常入口检查后启动登记MAM与updates/loss证据。最多一GPU一训练，不为队列持卡、不改源码，失败报告。若整机无空卡按约30分钟核对并报告，Manager也协调。此为原72训练预算中的B组既定重复，不依赖C验收或seed0评估成绩。完成后每个模型独立恢复/留痕/台账/资源清理照原协议。
