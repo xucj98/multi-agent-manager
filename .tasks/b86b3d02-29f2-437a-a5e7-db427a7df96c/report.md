@@ -1,3 +1,45 @@
+# GPU2 retry2 正式 offline 完成（2026-09-11 08:41:34–08:44:06 CST）
+
+依据08:40准入，从原干净固定bridge `dd0914b170fe5d227f24d36b07d90c0e422b7e58` / OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4` 执行，同一GPU2顺序full→serial各固定5ep[0..4]。launcher用时151.29秒、退出0；10个episode exit均0。两个policy exit=-15、shutdown_requested=true，是launcher完成后的主动回收。未改源码、未改训练、未合并部署。运行小于1小时，未登记长job。
+
+产物根：`/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_20k_offline5ep_retry2`。每集config/exit/metrics/NPZ/JPG齐全；每模型checkpoint路径、训练/转换metadata及hash、policy命令/日志、served_metadata、policy_exit均保留；顶层provenance记录真实源码/解释器、manifest、命令。`artifact_audit.json`及`audit_artifacts.py`保存本次产物核验结果和可复跑检查，`resource_release.json`保存回收结果。
+
+启动前GPU2=1MiB/0%、19580/19582无监听，两真实checkpoint dry-run ready；启动时clean和真实policy源码/解释器握手、15Hz/H50/K30门禁全部通过。结束后两库仍干净，GPU2=1MiB/0%、两端口无监听，/proc按实际argv检查无本run launcher/policy进程。
+
+每模型执行行依次1216/1509/702/1115/983，共5525；实际NPZ执行记录中的唯一query依次41/51/24/38/33，共187。该计数来自真实已执行产物，不是把逻辑行数当infer次数；原policy日志没有逐请求计数器，未声称额外的独立服务计数。所有query/model row/执行游标与K30及尾部一致。检查action/GT有限、形状正确，memory整数ID与bool mask正确；从NPZ重新计算action MAE、phase有效计数/accuracy与metrics一致；继承metadata各文件hash及served身份与启动探针一致。
+
+| 模型 | ep | 执行行 | 推理query | action MAE | phase accuracy | 有效phase样本 | transition accuracy（数） |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| wash_full | 0 | 1216 | 41 | 0.03604275 | 98.903879% | 1186 | 75.00%（4） |
+| wash_full | 1 | 1509 | 51 | 0.01466552 | 99.930556% | 1440 | 100.00%（5） |
+| wash_full | 2 | 702 | 24 | 0.01417364 | 97.740964% | 664 | 60.00%（5） |
+| wash_full | 3 | 1115 | 38 | 0.02179482 | 99.884125% | 863 | 80.00%（5） |
+| wash_full | 4 | 983 | 33 | 0.02070949 | 99.777778% | 900 | 80.00%（5） |
+| wash_full 汇总 | — | 5525 | 187 | 0.02182205 | 99.366713% | 5053 | — |
+| wash_serial | 0 | 1216 | 41 | 0.04609120 | 100.000000% | 39 | 100.00%（4） |
+| wash_serial | 1 | 1509 | 51 | 0.02273091 | 100.000000% | 47 | 100.00%（5） |
+| wash_serial | 2 | 702 | 24 | 0.02053581 | 100.000000% | 22 | 100.00%（5） |
+| wash_serial | 3 | 1115 | 38 | 0.03005073 | 100.000000% | 30 | 100.00%（5） |
+| wash_serial | 4 | 983 | 33 | 0.03278577 | 100.000000% | 31 | 100.00%（5） |
+| wash_serial 汇总 | — | 5525 | 187 | 0.03085954 | 100.000000% | 169 | — |
+
+汇总action按执行行加权，phase按有效样本加权。full按实际drain逐行评估、serial按query评估，且availability/边界mask会排除无效目标；5053与169不能当作同一采样粒度直接比较。GT仅评分，模型反馈按既定memory配置。固定5ep属于既定数据集，不是新划分的泛化测试；本结果是offline动作/phase指标，不是闭环成功率或真机实验效果，也不代表原始scheduler架构重构完整完成。
+
+真机交接代码路径：bridge `/mnt/public/xcj/Projects/workspace/b86b3d02-29f2-437a-a5e7-db427a7df96c/robot-bridge`；OpenPI为同级`openpi`，commit如上。本轮未启动真机或更改其部署。模型路径：
+- wash_full: `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_x1pro_wash_cup_s2m_full_current_feedback/memory20k_ad6bb77e_wash_full_s0/20000`
+- wash_serial: `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_x1pro_wash_cup_s2m_serial_lag30/memory20k_ad6bb77e_wash_serial_s0/20000`
+
+实际命令（原run已存在，禁止覆盖重跑）：
+
+```bash
+CUDA_VISIBLE_DEVICES=2 PYTHONPATH=/mnt/public/xcj/Projects/workspace/b86b3d02-29f2-437a-a5e7-db427a7df96c/robot-bridge:/mnt/public/xcj/Projects/workspace/b86b3d02-29f2-437a-a5e7-db427a7df96c/openpi/packages/openpi-client/src \
+/mnt/public/xcj/Projects/workspace/b86b3d02-29f2-437a-a5e7-db427a7df96c/robot-bridge/.venv/bin/python scripts/launch/drawer_offline.py --manifest configs/input_manifests/wash_cup_memory_v1_offline5.json --raw-root /mnt/public/datasets/x1pro/wash-cup --checkpoint-root OpenPI=/mnt/public/xcj/Projects/openpi --policy-python /mnt/public/xcj/Projects/workspace/b86b3d02-29f2-437a-a5e7-db427a7df96c/openpi/.venv/bin/python --policy-port 19580 --robot-port 19582 --output /mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/wash_memory_v1_20k_offline5ep_retry2
+```
+
+前两次失败保留原始日志、命令、metadata/provenance、exit和dtype探针，只删除两处已不用的raw input软链接视图，不动原始数据；清理清单为`failure_temp_cleanup.json`。本次无实现阻塞、运行及回收完成，供Manager验收及后续文档/台账整合。
+
+以下保留历史报告；旧待准入/失败状态已由上述结果更新。
+
 # 08:12 RPC 最小接线修复交付：CPU 集成通过，待 Helmholtz 独立复核
 
 交付 bridge commit：`dd0914b170fe5d227f24d36b07d90c0e422b7e58`，基于 `124049fb78d29db1d77d13a9fd4a4b698fcfe6e9`；原 workspace `/mnt/public/xcj/Projects/workspace/b86b3d02-29f2-437a-a5e7-db427a7df96c/robot-bridge` 已提交且干净。OpenPI 仍为 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，本轮未修改。
