@@ -13,3 +13,7 @@
 
 ## 台账及交接
 在RMBench/experiments/memory_chunk_20260910新增独立U组说明（避免与e690主台账写冲突），先写研究问题、变量、预期结论、每run train/ckpt及计划eval路径。正式启动后登记mam job，检查初始有限loss与GPU映射，完成后验收最终checkpoint、资源释放和训练job归档，给e690评估负责人可评清单。评估用C集群和smoke2→100既定协议，你不重复启动eval。完整任务要求及报告统一MAM .tasks，交付commit、路径、测试、运行job。事件等待用mam wait；不要无变化轮询/心跳/每次超时写report；实际工作完成后结束turn。
+
+## Manager正式训练准入
+独立review f6293543通过，Manager验收。现在立即按既定GPU映射和唯一exp_name启动6条20k：本机1/7为rearrange seed0/1，wuwen-1 GPU4为rearrange seed2、5/6/7为put-back seed0/1/2。启动前复查卡空闲；冻结OpenPI6266bd8bbfa5f3e451f7253c476d1108e1ff5e1e，bs32/20k/BF16 final only，源schema与review一致。无需再重复smoke/CPU或等待其他评估结果。
+逐条mam job add登记真实进程，初始有限loss和实际设备映射验收后报告6个job/路径与预计完成；更新U台账运行状态。若某卡被外部占用，只阻塞该条，其余独立开跑。持续以mam wait完成事件监控，结束后验收产物交e690评估；不得把启动成功写成训练完成。
