@@ -334,15 +334,44 @@ def service_status(config: ProjectConfig) -> dict[str, Any]:
         return _status_mapping(store, state)
 
 
+_DAEMON_BOOTSTRAP = """\
+import runpy
+import sys
+
+package_parent = sys.argv.pop(1)
+sys.path.insert(0, package_parent)
+runpy.run_module("multi_agent_manager.wake_runtime", run_name="__main__", alter_sys=True)
+"""
+
+
+def _caller_package_parent() -> str:
+    """Return the resolved parent that supplied this running runtime module.
+
+    ``MAM_ROOT`` is a project-state checkout and is deliberately not used as a
+    code root.  It may be a different worktree from the installation or the
+    current source checkout that called ``start_service``.
+    """
+
+    package = Path(__file__).resolve().parent
+    if package.name != "multi_agent_manager" or not (package / "__init__.py").is_file():
+        raise WakeRuntimeError("cannot resolve the current multi_agent_manager package for detached service startup")
+    return str(package.parent)
+
+
 def _spawn_service(config: ProjectConfig, token: str, log_path: Path) -> subprocess.Popen[bytes]:
     environment = os.environ.copy()
     # The detached scheduler is not a Manager action and must never capture
-    # the caller's thread identity through an inherited environment.
+    # the caller's thread identity or Python import path through an inherited
+    # environment.  ``-I -S`` below also enforces this in the child.
     environment.pop("CODEX_THREAD_ID", None)
+    environment.pop("PYTHONPATH", None)
     command = [
         sys.executable,
-        "-m",
-        "multi_agent_manager.wake_runtime",
+        "-I",
+        "-S",
+        "-c",
+        _DAEMON_BOOTSTRAP,
+        _caller_package_parent(),
         "--service",
         "--mam-root",
         str(config.mam_root),

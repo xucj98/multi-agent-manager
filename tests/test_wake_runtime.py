@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -77,6 +79,52 @@ class AcceptedThenLost:
     def __init__(self, error, turn_id="turn-after-lost-reply"):
         self.error = error
         self.turn_id = turn_id
+
+
+_ISOLATED_SOURCE_DAEMON_SCRIPT = """\
+import contextlib
+import sys
+import time
+from pathlib import Path
+
+source_root = Path(sys.argv[1]).resolve()
+mam_root = Path(sys.argv[2]).resolve()
+project_root = Path(sys.argv[3]).resolve()
+shadow_marker = Path(sys.argv[4]).resolve()
+sys.path.insert(0, str(source_root))
+
+from multi_agent_manager import cli, job_runtime, wake_runtime
+
+if Path(wake_runtime.__file__).resolve().parent.parent != source_root:
+    raise RuntimeError("isolated source runner imported a different wake runtime")
+
+config = cli.ProjectConfig(mam_root, project_root, "project/isolated-source")
+store = cli.Store(config)
+try:
+    result = wake_runtime.start_service(config)
+    if result.get("status") != "awaiting_manager" or not result.get("ready_at") or not result.get("running"):
+        raise RuntimeError(f"detached source daemon did not become ready: {result}")
+    if shadow_marker.exists():
+        raise RuntimeError("detached daemon executed the shadow MAM_ROOT package")
+finally:
+    with contextlib.suppress(Exception):
+        wake_runtime.stop_service(config)
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        state = wake_runtime._load_state(store)
+        pid = state.get("pid")
+        identity = state.get("identity")
+        if not isinstance(pid, int) or not isinstance(identity, dict):
+            break
+        if job_runtime.probe_process("local", pid, identity).get("status") == "stopped":
+            break
+        time.sleep(0.05)
+    else:
+        raise RuntimeError("isolated source daemon did not stop")
+
+if shadow_marker.exists():
+    raise RuntimeError("detached daemon executed the shadow MAM_ROOT package")
+"""
 
 
 class WakeRuntimeTests(unittest.TestCase):
@@ -181,6 +229,18 @@ class WakeRuntimeTests(unittest.TestCase):
 
     def state(self):
         return wake_runtime._load_state(self.store)
+
+    @staticmethod
+    def _write_shadow_wake_runtime(mam_root, marker):
+        package = mam_root / "multi_agent_manager"
+        package.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        (package / "wake_runtime.py").write_text(
+            "from pathlib import Path\n"
+            f"Path({str(marker)!r}).write_text('shadowed', encoding='utf-8')\n"
+            "raise SystemExit(97)\n",
+            encoding="utf-8",
+        )
 
     def test_routing_matrix_mixed_jobs_and_empty_task(self):
         self.task(TASK_ONE, title="stopped and running", jobs=[self.job("stopped", status="stopped", note="formal eval"), self.job("running", pid=43)])
@@ -568,6 +628,8 @@ class WakeRuntimeTests(unittest.TestCase):
         daemon_projects = Path(self.temporary.name) / "daemon-projects"
         daemon_root.mkdir()
         daemon_projects.mkdir()
+        shadow_marker = daemon_root / "shadowed-from-mam-root"
+        self._write_shadow_wake_runtime(daemon_root, shadow_marker)
         config = cli.ProjectConfig(daemon_root, daemon_projects, "project/daemon")
         store = cli.Store(config)
         started = False
@@ -578,6 +640,7 @@ class WakeRuntimeTests(unittest.TestCase):
             self.assertTrue(result["running"])
             self.assertTrue(result["healthy"])
             self.assertTrue(result["ready_at"])
+            self.assertFalse(shadow_marker.exists())
 
             stopped = wake_runtime.stop_service(config)
             self.assertEqual(stopped["status"], "disabled")
@@ -593,6 +656,45 @@ class WakeRuntimeTests(unittest.TestCase):
         finally:
             if started:
                 wake_runtime.stop_service(config)
+
+    def test_isolated_source_checkout_daemon_ignores_mam_root_shadow_and_pythonpath(self):
+        daemon_root = Path(self.temporary.name) / "isolated-source-mam"
+        daemon_projects = Path(self.temporary.name) / "isolated-source-projects"
+        daemon_root.mkdir()
+        daemon_projects.mkdir()
+        shadow_marker = daemon_root / "shadowed-from-mam-root"
+        self._write_shadow_wake_runtime(daemon_root, shadow_marker)
+        source_root = Path(wake_runtime.__file__).resolve().parent.parent
+        self.assertTrue((source_root / "multi_agent_manager" / "wake_runtime.py").is_file())
+
+        environment = os.environ.copy()
+        environment["PYTHONPATH"] = str(daemon_root)
+        environment["CODEX_THREAD_ID"] = EXECUTOR
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-I",
+                "-S",
+                "-c",
+                _ISOLATED_SOURCE_DAEMON_SCRIPT,
+                str(source_root),
+                str(daemon_root),
+                str(daemon_projects),
+                str(shadow_marker),
+            ],
+            cwd=daemon_root,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            f"isolated source daemon failed\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+        )
+        self.assertFalse(shadow_marker.exists())
 
     def test_existing_bound_project_without_manager_fails_instead_of_guessing(self):
         # Remove the manager record made by setUp and leave a real executor binding.

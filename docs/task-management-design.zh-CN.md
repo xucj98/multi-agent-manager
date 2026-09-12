@@ -102,6 +102,8 @@ Agent 做完可执行工作时直接结束当前 turn，不再调用 `mam wait`�
 
 `start` 在返回前会等待子进程确认已读取本项目的 token、PID 和身份记录；已存活但尚未完成首个调度周期的 active 服务显示为 `pending`，不会提前报告为 `healthy`。无法核验已有 PID/身份时拒绝启动第二个 daemon，保留可见错误供人工处理。
 
+daemon 保留 `MAM_ROOT` 作为项目状态和日志的 cwd，但不从该目录导入代码。启动子进程以隔离 Python bootstrap 将当前调用方 `wake_runtime.__file__` 所在包的已解析父目录置于导入路径首位，并忽略 cwd、继承的 `PYTHONPATH` 与 site-package 回退；因此独立状态 worktree 中的旧/缺失同名包不能覆盖当前安装或 source-checkout 调用方，未预安装的 CPU source 测试也可启动同一代码。
+
 安装方调用同一组同步 Python API：`start_service(config, manager=None)`、`stop_service(config)`、`service_status(config)`。它不另行实现 supervisor。启动或重连时由 `multi_agent_manager.wake_compat.require_compatible()` 验证现有 App Server；验证失败会明确报错或保留错误状态，而不会在每次 job 探测时重复运行行为探测。
 
 Manager 身份只可由显式 `--manager` 或既有项目记录确定。首次未绑定的 Manager 执行 `task create` 或 `task bind` 时，CLI 才会从 `CODEX_THREAD_ID` 自动登记它；已绑定的执行者和即将被绑定的 agent 都不能被误记为 Manager。全新项目还没有绑定 task 时，服务可以处于 `awaiting_manager`，不宣称可投递；首次 Manager create/bind 后会自动继续。已有绑定任务却没有可确定的 Manager 时，服务必须失败并提示 `mam service start --manager AGENT-ID`，不能猜测任意未绑定线程。
