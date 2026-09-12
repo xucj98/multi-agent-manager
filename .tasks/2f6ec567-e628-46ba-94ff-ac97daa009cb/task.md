@@ -1,0 +1,21 @@
+# C1 nvidia-smi / nvitop PID 显示修复
+
+用户明确要求尝试修复 wuwen-4090-1 的 nvidia-smi 进程列表缺失、nvitop No Such Process/N/A。具体执行由 terra/max 完成，Manager 核对事实与方案后裁决。前置诊断 TASK-ID 82bbbd0b-ee27-4a34-92c6-3d8e1cccdd8b，先 mam task show --file report 读取；不重复基础诊断。
+
+## 执行边界
+先读 AGENTS/README/.local/README。先回 CODEX_THREAD_ID 绑定。任务工作空间用于诊断与候选文件；若修改项目仓库，用独立 worktree 并阅读其AGENTS。不要为纯系统工具修复修改MAM代码。
+
+正在跑的 C1 七路正式评估必须继续；禁止 GPU reset、驱动卸载/重载/升级、容器重建、服务/评估重启、全局 /proc 或 PID namespace 改动、kill 他人进程。不读取 /proc/*/fd/0、不输出凭据/整份environ。不尝试越过集群隔离或访问未授权的其他租户环境。
+
+用户授权了可逆的修复尝试。可用独立临时目录/用户态独立环境验证候选；不直接覆盖系统 nvidia-smi/nvitop 或全局Python/NVML库，不改shell默认入口，先交具体diff、复现结果和rollback给Manager审阅。避免盲目pip升级，先找版本行为或机制证据。
+
+## 排查与候选要求
+1. 核查驱动/NVML与nvitop来源、版本和当前调用路径；检查是否存在本平台提供的容器PID适配、受支持监控入口、错误的库选择/包装或环境差异。只读必要且非敏感字段。
+2. 查官方nvitop/NVIDIA/平台可用文档与上游issue，确定当前版本是否有现成namespace映射支持。不要把通用“用host PID namespace重建容器”当作可在线应用的修复。
+3. 只有具备可验证映射证据时，才能显示NVML PID对应的本地命令、CPU、用户名；compute/graphics分别核对，不能用显存相近、PID偏移、GPU编号或CUDA_VISIBLE_DEVICES推测一一映射。单个renderer不出现在compute列表本身也不证明其NVML PID不一致（需检查graphics）。
+4. 优先验证能使用户原有两个命令恢复真实进程信息的最小方案。若只能提供独立监控命令/补充视图，要明确是替代查看方式而非原命令已修复。未映射行保留未知，不隐藏占用或伪造归属。
+5. 任一候选先在独立进程/环境运行，核验GPU总显存/占用和可见本地进程真实一致、无PID误映射，运行前后评估进程身份与结果增量正常。不要新启GPU负载作测试。
+6. 有可信方案尽早发给Manager；没有可在线修复入口时，给出已排除路径、具体缺少的能力和最小后续措施，不无限探索，也不将“尚未找到”写成绝对不可修。
+
+## 交付
+发布report：根因证据、尝试及实际输出、候选文件/diff/准确命令、适用范围、风险/回滚、是否真正修复nvidia-smi和nvitop各自显示；保存最小必要证据。未验收不部署默认命令。当前可执行事项结束正常结束turn，由MAM唤醒，不轮询。
