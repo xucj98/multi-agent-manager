@@ -551,3 +551,41 @@ C1 GPU1 的 `c_rearrange_no_memory_trainseed1_evalseed0_100ep_r2` 已完成首�
 
 安全 docs worktree 的台账提交 `82e51e7`（`task/e6908de7-r2-running-ledger`）将主状态、eval_seed 覆盖表的“待 review”更新为已准入的“待排队”，并准确标出上述 C1/C3 formal 运行中；没有把运行项写成分数或把缺失 eval 填0。`git diff --check`通过，两个 docs worktree均干净，C运行树未修改。
 
+
+
+## 2026-09-12 19:20 CST：主动唤醒迁移后的 r2 队列接续与 C2 收尾
+
+已读取18:35主动唤醒条款。本轮完成可执行接续、结果留痕和已停止 job 收尾后正常结束 turn；不为监控保留 active。C runtime 在启动前实读为干净的 RMBench `9d8f47887a50ea691e5624de139f10bfcfb54412`、bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，未修改活跃 runtime、机器人、Warp 或 checkpoint。
+
+### 新通过的 smoke 与已登记 formal
+
+以下 smoke 都核对了 completed/零 runtime error、两个 accepted environment seed、video/no-video、config_source lineage 和 scheduler exit；任务成功数不作为门禁。各 formal 均在通过 smoke 的同卡启动并已登记：
+
+| host/GPU | checkpoint / eval seed | smoke accepted seed | formal MAM job |
+| --- | --- | --- | --- |
+| C1 GPU4 | rearrange no-memory / train1 / eval2 | `300000, 300001` | `7888aa9f-f4bb-4aca-847c-408edcebd7a5` |
+| C3 GPU2 | put-back full t+30 / train0 / eval1 | `200000, 200001` | `3d9a4ea3-abf4-4b7e-bbfe-40a27785c3d0` |
+| C1 GPU3 | rearrange no-memory / train2 / eval0 | `100000, 100001` | `ce4244c2-9207-4fc5-8271-9e9d99a5bda2` |
+| C3 GPU3 | put-back full t+30 / train0 / eval2 | `300000, 300001` | `3c3b8746-aecc-493f-8c79-104534d1d6e7` |
+
+既有 C1 GPU1/GPU2 的 no-memory train1 eval0/eval1，以及 C3 GPU1 的 put-back t+1 train0 eval2 仍保持原登记 running。因此当前共有7个已登记 formal；所有正式 leaf 保持100 rollout，不把 smoke 或 partial 写成分数。
+
+C1 GPU5 的 rearrange no-memory train2/eval1 smoke、C3 GPU0 的 put-back t+1 train1/eval1 smoke 已启动且尚未完成；C1 GPU6/7 等待 GPU5 的首个 infer 后再按同主机错开冷启动。C3 无空卡。C2 不再接续，见下节。
+
+### C2 两项 stopped job 收尾
+
+C2 GPU6 (`1c64c244-3c1b-462b-baec-34f3a3ba7264`) 和 GPU7 (`c98c5377-3fc2-4c9f-b775-702feed541dd`) 的 rearrange full t+30/train0 eval1/eval2 都在 episode 22 的 accepted reset 遇到 `worker EOF` 后停止。两项均有23条 partial episode：前者20成功、后者21成功；无 `final_review`，不作为100条正式分数或自动重试。
+
+各 leaf 已写入 `failure_review.json`，保留 diagnostics、episode JSON、process records、worker stderr 与 outer log；两个 MAM job 已按“不完整基础设施证据、不自动重试”归档。两条记录的 worker stderr 均含 renderer 初始化错误，但本轮只记录观察结果，不将其断言为根因或修改基础设施。C2 GPU6/7 在归档前端口空闲、显存约4–5 MiB；由于同型失败重复出现，本任务暂停在 C2 继续启动，等待具体诊断/裁定。
+
+### 台账交付
+
+安全 docs tree：`/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r2-running-ledger`，分支 `task/e6908de7-r2-running-ledger`。此前的 `71ee83b` 已将用户指南收敛为 run/输出/端口用法；本轮可集成增量为：
+
+- `49daa98`：C2 EOF failure 分类与当时队列状态；
+- `d1247e2`：两条新增 smoke 的实际启动；
+- `d380508`：两条 smoke 转 formal 的 MAM ID 与覆盖表状态。
+
+该树干净，`git diff --check`通过。台账主概述和覆盖表同步列出7个 formal、2个 smoke、C2两个不可计分 partial 和稳定结果链接；没有碰冻结 eval tree 或把缺失 eval 写为0。
+
+下一次停止事件由 MAM 主动唤醒后，先完成对应 formal 的50/100收尾或短 smoke→formal 门禁，再接续当时实际空闲卡；不重复 C2 这两个未知 EOF leaf。
