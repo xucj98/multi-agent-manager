@@ -20,3 +20,7 @@
 已读取新增要求。liveprobe 会在生产 service 停止前、轻量 `wake_compat` 通过后建立临时 fixture 项目和专用 thread，真实验证 job-stopped/executor 与 task-ready/fixture-Manager 两条投递；它不会触碰生产 `MAM_ROOT`、用户 thread 或 GPU。
 
 当前运行时 `start_service(config, manager=None)` 在 parent 和 detached child 各走默认 compatibility 路径。新增要求限定 fixture 只能复用刚完成的轻量检查一次，不能为此跳过 scheduler/delivery。因此需要 runtime 提供一个**仅 keyword-only 的 fixture bootstrap compatibility mapping**（public 两参数调用保持不变）：parent 持久化已验证的 socket/result，child 的首个 `WakeScheduler` 仅据此标记 ready；一旦连接失败，仍恢复正常 `require_compatible()` 重连检查。liveprobe 缺少此受控注入将明确失败，不会静默改成双重/模拟 E2E。
+
+## 裁定更正
+
+前一版中关于 fresh `awaiting_manager` 可以推迟 App Server 检查，以及建议 `initial_compatibility` fixture bootstrap 参数的两处表述均已撤回。当前实现遵循最新合同：每次安装在接触生产 scheduler 前，无条件运行无模型 `wake_compat.require_compatible()` 和隔离真实 delivery liveprobe；没有 App Server 时即以非零退出，即使生产项目仍处于 `awaiting_manager`。liveprobe 直接调用既有 `start_service(config, manager=fixture_manager)`，允许 parent/child 重复轻量检查，不增加绕过、证书或公共 API。
