@@ -998,3 +998,28 @@ not-reportable r2 item 的 fresh matching smoke2→formal100；不重跑 C1 进�
 
 C2 receipt path remains
 `/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c-eval-renderer-r3-2e9677c/records/renderer_reset_gate_c2_gpu6_r3_2e9677c.json`。
+
+### C3 smoke 验收与 formal 接续（2026-09-13 01:23 CST）
+
+已验收并归档 stopped MAM smoke `d7437ff4-4dbc-48c6-8c44-6ebb77a494a7`。`
+`c_rearrange_full_t_plus_30_trainseed0_evalseed1_smoke2_r3` 的
+`diagnostics_summary.json` 为 `completed`、target 2、无 benchmark error；
+`seed_preflight.jsonl` 记录 200000 与 200001 都 `accepted=true`，
+`episode_diagnostics.jsonl` 中二者都是 terminal success、无 runtime error。episode0 视频为 393 帧且
+`video_checks.jsonl` 为 ok；episode1 的 no-video 证据也为 ok。两个 scheduler child returncode 均为 0，
+worker/outer/process logs 对 EOF、renderer/native、segfault、traceback 和 runtime-error marker 的扫描均为 0。
+`checkpoint_metadata/lineage/config_source/` 已逐文件继承 input audit/manifest。该 smoke 的 2/2 成功仅为
+基础设施门禁证据，不是正式分数或选择依据。
+
+同一 clean 的 C3 runtime、checkpoint、train/eval seed 和端口已直接启动 fresh formal100：
+
+```text
+MAM job: 5be8d262-f6f6-45a4-ae0d-5b02e3dfc043
+run: c_rearrange_full_t_plus_30_trainseed0_evalseed1_100ep_r3
+host/GPU/ports: C3 GPU0 / 19400,19402
+fixed environment seeds: 200000..200099
+smoke reference: c_rearrange_full_t_plus_30_trainseed0_evalseed1_smoke2_r3
+runtime: RMBench 2e9677ce8ec9f623395184f63f32ddafa66e5e44; bridge f9626636c4776d8eb15f9c556775cb2d12c000e5; OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4
+```
+
+启动时 formal leaf 不存在，三库 tracked 状态 clean；runner 已写入 command/config/lineage，服务正在启动，尚无正式 terminal 或结果。C2 GPU6 的独立 40-reset gate `546b6d60-f038-4924-b60d-ece5d9489309` 仍 running 且 receipt 尚未出现，未据此推断进度或 PASS。
