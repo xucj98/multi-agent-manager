@@ -147,3 +147,6 @@ Manager发现当前EXPERIMENT_LEDGER的队列表仍把已完成首批4项写作f
 沿既有匹配smoke门禁，各run一个smoke含2rollout（1有video、1无），检查产物后才formal；相同checkpoint复用只读文件与已安装环境，无需重新传模型/装环境/重训。代码在本机独立树修改提交，新runtime版本用新部署worktree，不改活跃eval树。seed支持或调度新增代码须交独立review再大规模启动；既有seed0合法运行继续。
 
 台账按checkpoint列eval0/1/2的成功数、每项路径及合计/300；未齐时明确部分完成，不把缺失填0。完整后报告3组结果及合计率，仍按训练seed分别报告，跨模型按相同eval条件配对比较。研究计划从1变3 eval seeds为用户此次扩大样本的决定，记录调整日期，不把看过seed0后的新增写成原先预注册。逐run50检查和100收尾/回传/归档保持。先交明确seed映射和并发开跑计划，再持续执行授权队列。
+
+## Additional completed B checkpoints (2026-09-12 14:02 CST)
+7ae41311 has now finished and validated serial-lag30 train seed1 and seed2 as well as no-memory seed1/2. Their report contains exact paths and CPU restore evidence. Include all four in the existing authorized C evaluation queue: each train checkpoint eval seeds0/1/2 x100, preserve previous valid eval0, no change to protocol. Do not wait for further handoff of these models. Continue local-only code fixes with independent review for any new eval seed implementation before scaling; return current seed mapping and concurrency proposal if not yet published.
