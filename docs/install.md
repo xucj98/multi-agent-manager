@@ -1,6 +1,6 @@
 # 安装与更新
 
-在新的 `PROJECT_ROOT` 中先创建项目配置，再 clone MAM。将示例中的绝对路径替换为实际路径；`MAM_BRANCH` 必须是 clone 中已有的本地分支。
+在新的 `PROJECT_ROOT` 中创建项目配置后，从任一属于同一 Git 仓库的 MAM worktree 运行安装器。`MAM_ROOT` 是项目状态与 service 所在的 worktree；安装 checkout 可以是另一个 worktree，二者不必是同一路径，但必须共享 Git common directory。
 
 ```bash
 project=/absolute/path/to/PROJECT_ROOT
@@ -14,27 +14,45 @@ cat > "$project/.mam/env.json" <<JSON
 JSON
 git clone git@github.com:xucj98/multi-agent-manager.git "$project/multi-agent-manager"
 cd "$project/multi-agent-manager"
-sudo apt install pipx
+sudo apt install -y pipx
 bash scripts/install.sh
 ```
 
-`bash scripts/install.sh` 是唯一的安装入口。它从当前 checkout 用 `pipx install --force` 安装 MAM，把 `~/.local/bin` 加入当前 shell 的 `PATH`，并在 `~/.bashrc` 的非交互 return 之前维护一个带标记的 trace 配置块。更新同一 checkout 后再次运行这一条命令即可。脚本为每次 `.bashrc` 更新创建保留权限的备份，并打印可直接执行的 rollback 命令；它只删除完全匹配的旧 MAM trace export，不改其他内容。
+安装器先运行 checkout 的单元测试，并以 `pipx install --force` 安装当前 checkout。它将 `~/.local/bin` 写入带标记的 `~/.bashrc` 和一个 login startup file（已有的 `.bash_profile`、`.bash_login`，否则 `.profile`）；`.bashrc` 的块位于常见 noninteractive `return` 之前。正在运行的父 shell 不能被子脚本改写，重新打开 interactive 或 login shell 后 `mam` 会在 `PATH` 中。安装器保留其他 startup 内容，只移除完全匹配的旧 MAM trace block，并在改写前创建备份。
 
-当前 Codex App Server 需要以下环境才会写入行为探测需要的 JSON trace：
+当前集群没有可用 systemd bus。`mam service` 的 runtime 在 `MAM_ROOT/.local/service` 管理单项目、identity-safe 的 detached daemon；安装器不创建 shell supervisor，不重启 Codex App Server，也不会影响其他项目的 service。
 
-```text
-RUST_LOG=off,codex_app_server::message_processor=trace,codex_app_server::app_server_tracing=info
-LOG_FORMAT=json
+每次安装或更新都在接触生产 scheduler 前执行两类验收：
+
+- 无模型 API 检查使用新的随机未知 thread ID，依次验证 `thread/read`、`thread/resume`、latest-turn 和 `turn/start` 的实际 event-stream RPC 拒绝路径。它不创建或修改 thread，也不发模型请求。
+- 隔离真实 delivery 检查在安装临时目录中新建 fixture project、已登记 task、四个持久化专用 thread 和短本地 job。它用 `gpt-5.6-terra`/`max` 完成一个 executor baseline turn，验证 job 停止后 executor 收到准确的 `JOB-ID`/note/task title，并验证 no-job 与 archived-job task 一次批量投递到该 fixture 的 Manager；两个不应收到消息的 executor 保持未 materialize，成为未投递的 API 实证。验收固定最多三个模型 turn，并在静默窗口确认没有重复 start；随后 stop fixture service、archive fixture job/task 和仅本次创建的 thread，并删除带所有权标记的临时根。App Server 对从未 materialize 的 thread 返回 `no rollout found`，receipt 会如实标出没有可 archive 的 rollout；每次验收 JSON 记录所创建的 task/job/thread/turn ID 与清理结果。
+
+因此 App Server 不可用时安装必定非零退出，即使生产项目尚无 Manager、最终会处于 `awaiting_manager`。轻量检查不声称已观察 event notification 或真实 delivery；后一项才是每次安装的一键真实投递验收。失败时安装 transcript 保留截断并对常见 `TOKEN`/`SECRET`/`PASSWORD`/`API_KEY` assignment 打码的诊断，fixture 仍会清理自身资源。
+
+两项验收通过后，安装器才对当前项目调用 `mam service status`、必要时 `stop`、`start` 和最终 `status`。更新时只会替换同一项目的 detached singleton，保留 runtime 的持久化 Manager binding 与 pending delivery state；它不会在 compatibility/live acceptance 失败时停止现有 service。
+
+成功结果有两种：
+
+- `scheduler healthy`：daemon 已有持久化 Manager binding，可投递待办。
+- `scheduler awaiting first Manager binding`：新项目没有 Manager 且没有 bound task，daemon 空闲等待。首次由未绑定 Manager 执行的 task create/bind 会登记 Manager，此后无需重新安装；此状态不表示已经开始投递任务。
+
+已有 bound task 却没有可确定的 Manager 时，安装以非零状态退出并提示：
+
+```bash
+mam service start --manager AGENT-ID
 ```
 
-环境修改不会改变已经运行的 App Server。安装器先从 control socket 确认唯一的 app-managed npm listener，再检查该 listener 的实际环境。若需要重启，它会显示准确的 PID、可执行文件和 socket，并且只有在交互终端输入**完全匹配的** `yes` 后才会向这个单一 PID 发送 `TERM`。请从单独的终端运行安装器，因为重启可能断开 Codex App 的连接。默认输入、`no`、EOF 或非交互运行都会保留所有进程、以非零状态报告安装/验证未完成。
+首次设置也可以显式传入该值；安装器不会从自己的 `CODEX_THREAD_ID` 猜测 Manager：
 
-确认后，安装器取得已有的 `app-server-startup.lock`，重新核对 listener 的 PID/启动时间/可执行文件/socket，以及 npm `node … codex … app-server` 父进程的 PID、argv、cwd、环境和 stdio。它只停止这个已重核对的 listener，等待原 npm wrapper 退出后，以捕获的同一 node/npm 命令、cwd 和 app-server log 重启；捕获的环境保持不变，只有 `RUST_LOG` 与 `LOG_FORMAT` 被替换为上述 trace 值。它不会启动 native standalone daemon 或新的 supervisor。随后它确认替换 listener 的 socket、log 和实际环境。若 App 在确认后自行替换目标，安装器不会停止替换进程：替换进程通过同样检查时继续，否则明确以非零状态结束。
+```bash
+MAM_SERVICE_MANAGER=AGENT-ID bash scripts/install.sh
+```
 
-发送 `TERM` 前，安装器会完整预检捕获的启动计划。若 `TERM` 后的等待、启动或验证失败，或被 `INT`、`HUP`、`TERM` 打断，它会以非零状态结束并打印 `Recovery command: bash /…/recover-app-server.sh`。该文件与包含捕获环境的启动计划放在 control 目录下的私有目录中，计划文件权限为 `600`；请在单独终端执行打印出的命令，然后重新运行安装器验证结果。恢复命令仍可能因为捕获的 npm wrapper 已不可执行而失败，并不保证已恢复服务。
+日常查看和恢复在项目目录中使用 pipx launcher：
 
-随后它在 pipx 安装的 Python 环境中运行完整单元测试与 `multi_agent_manager.wait_compat` 的实时行为检查。无法验证 listener、log、环境或行为测试时都会非零退出，并且不会尝试 standalone fallback。
-
-`require_compatible()` 每次 wait 前都重新检查 control socket、只读 initialize trace、隔离 stdio App Server 的通知送达和 `turn.id` trace 映射。它返回本次验证的 socket、trace 日志和 fingerprint。版本信息只用于排障；版本变化从不阻止通过行为测试的运行时。探测不会创建真实模型 turn 或修改现有 thread。
-
-该探测尚未认证从真实用户消息或 native manager-send 到 MAM wait 的端到端唤醒；需要 Manager 协调真实线程测试后才能将该能力标为已验证。
+```bash
+mam service status
+mam service start
+mam service start --manager AGENT-ID
+mam service stop
+```
