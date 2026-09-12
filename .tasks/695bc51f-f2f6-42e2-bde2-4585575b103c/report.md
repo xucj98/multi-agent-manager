@@ -52,3 +52,7 @@ env CUDA_VISIBLE_DEVICES=<GPU> XLA_PYTHON_CLIENT_MEM_FRACTION=0.90 HF_LEROBOT_HO
 serial首次smoke gate在参数恢复成功后因合成图片误用HWC[224,224,3]而在resize失败；retry1仅改为ALOHA约定CHW[3,224,224]后通过。原失败与retry1日志完整保留，不能将首次失败隐去。no-memory seed0最终gate摘要的input_memory_ids=[1,1]是沿用serial输出标签，实际obs已移除该字段；后续gate脚本标签已修正为null，无模型/训练变更。
 
 完整过程历史：`/mnt/public/xcj/Projects/openpi/logs/put_back_695bc51f_final_artifacts/report_history_before_final.md`。最终恢复脚本：`/mnt/public/xcj/Projects/openpi/logs/put_back_695bc51f_final_artifacts/put_back_final_gate.py`。历史中的running/queued/等待要求仅为当时快照，以本报告六项READY为准。当前所有训练与交接工作完成，正式eval成绩由e690后续产出；不再维持等待。
+
+## Final archive cleanup
+
+已从本 task 的 OpenPI worktree 移出 `.pytest_cache`、`.ruff_cache` 与 9 个源码/client `__pycache__` 目录；源码范围内不再残留这些临时缓存，`git status --short` 为空。共享 `.venv`、链接、tracked files、最终checkpoint和稳定gate证据均未触碰。该共享挂载不支持系统回收站，缓存暂存于可恢复隔离目录 `/tmp/mam-695bc51f-cache-8UbpR7`，不在待归档 worktree 内。Manager 可重试归档。
