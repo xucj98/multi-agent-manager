@@ -1,14 +1,37 @@
 #!/usr/bin/env bash
-# Install this checkout, prepare App Server trace logging, and test it.
+# Install this checkout and manage its project-local proactive wake scheduler.
+# The detached daemon is owned by ``mam service``.  Optional mam wait retains
+# its App Server trace setup; a verified listener is restarted only after an
+# exact interactive confirmation.
 set -euo pipefail
 
-readonly TRACE_BEGIN='# >>> MAM Codex App Server trace >>>'
-readonly TRACE_END='# <<< MAM Codex App Server trace <<<'
+readonly PATH_BEGIN='# >>> MAM PATH >>>'
+readonly PATH_END='# <<< MAM PATH <<<'
+readonly LEGACY_TRACE_BEGIN='# >>> MAM Codex App Server trace >>>'
+readonly LEGACY_TRACE_END='# <<< MAM Codex App Server trace <<<'
+readonly STARTUP_WAIT_ATTEMPTS=40
+readonly STARTUP_WAIT_SECONDS=0.5
+readonly TRACE_BEGIN="$LEGACY_TRACE_BEGIN"
+readonly TRACE_END="$LEGACY_TRACE_END"
 readonly RUST_LOG_VALUE='off,codex_app_server::message_processor=trace,codex_app_server::app_server_tracing=info'
 readonly LOG_FORMAT_VALUE='json'
 readonly RESTART_WAIT_SECONDS=20
 readonly STOP_WAIT_SECONDS=10
 
+CHECKOUT_ROOT=''
+MAM_ROOT=''
+PROJECT_ROOT=''
+LOCAL_BIN=''
+MAM_BIN=''
+SOURCE_PYTHON=''
+INSTALLED_PYTHON=''
+INSTALL_TMP=''
+COMPATIBILITY_JSON=''
+SERVICE_ERROR=''
+SERVICE_STATE=''
+SERVICE_MANAGER_ARGS=()
+WAIT_SOCKET=''
+WAIT_LOG_PATH=''
 TARGET_RECORD=''
 TARGET_PID=''
 TARGET_START_TICKS=''
@@ -39,7 +62,9 @@ RECOVERY_ERROR=''
 POST_TERM_GUARD=''
 
 incomplete() {
-    printf 'Installation/verification incomplete: %s\n' "$*" >&2
+    # Keep an unattended install transcript self-contained.  Individual tools
+    # have already bounded/redacted external diagnostics before reaching here.
+    printf 'MAM proactive wakeup installation: FAIL\n%s\n' "$*"
     return 1
 }
 
@@ -51,57 +76,186 @@ repository_root() {
 
 find_project_config() {
     local directory="$1"
-    while [[ "$directory" != / ]]; do
+    while :; do
         if [[ -f "$directory/.mam/env.json" ]]; then
             printf '%s\n' "$directory/.mam/env.json"
             return 0
         fi
+        [[ "$directory" == / ]] && return 1
         directory="$(dirname -- "$directory")"
     done
-    [[ -f "/.mam/env.json" ]] && printf '%s\n' '/.mam/env.json'
 }
 
 validate_project_config() {
-    python3 - "$1" <<'PY'
+    local config_path="$1"
+    python3 - "$config_path" <<'PY'
 import json
-import os
+from pathlib import Path
 import sys
 
-path = sys.argv[1]
+path = Path(sys.argv[1])
 try:
-    with open(path, encoding="utf-8") as handle:
-        data = json.load(handle)
-except (OSError, ValueError) as exc:
-    print(f"invalid project configuration {path}: {exc}", file=sys.stderr)
+    data = json.loads(path.read_text(encoding="utf-8"))
+except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    print(f"invalid project configuration: {exc}", file=sys.stderr)
     raise SystemExit(1)
 if not isinstance(data, dict):
-    print(f"invalid project configuration {path}: expected a JSON object", file=sys.stderr)
+    print("invalid project configuration: expected a JSON object", file=sys.stderr)
     raise SystemExit(1)
-for key in ("MAM_ROOT", "PROJECT_ROOT"):
-    if not isinstance(data.get(key), str) or not os.path.isabs(data[key]):
-        print(f"invalid project configuration {path}: {key} must be an absolute path", file=sys.stderr)
+for key in ("MAM_ROOT", "PROJECT_ROOT", "MAM_BRANCH"):
+    if key not in data:
+        print(f"invalid project configuration: missing {key}", file=sys.stderr)
         raise SystemExit(1)
-if not isinstance(data.get("MAM_BRANCH"), str) or not data["MAM_BRANCH"]:
-    print(f"invalid project configuration {path}: MAM_BRANCH must be a non-empty string", file=sys.stderr)
+if not isinstance(data["MAM_BRANCH"], str) or not data["MAM_BRANCH"]:
+    print("invalid project configuration: MAM_BRANCH must be a non-empty string", file=sys.stderr)
     raise SystemExit(1)
+resolved = {}
+for key in ("MAM_ROOT", "PROJECT_ROOT"):
+    raw = data[key]
+    if not isinstance(raw, str) or not raw or "\x00" in raw or "\r" in raw or "\n" in raw:
+        print(f"invalid project configuration: {key} must be a single-line absolute path", file=sys.stderr)
+        raise SystemExit(1)
+    candidate = Path(raw)
+    if not candidate.is_absolute():
+        print(f"invalid project configuration: {key} must be an absolute path", file=sys.stderr)
+        raise SystemExit(1)
+    try:
+        candidate = candidate.resolve(strict=True)
+    except OSError as exc:
+        print(f"invalid project configuration: cannot resolve {key}: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+    if not candidate.is_dir():
+        print(f"invalid project configuration: {key} must name a directory", file=sys.stderr)
+        raise SystemExit(1)
+    resolved[key] = candidate
+try:
+    resolved["MAM_ROOT"].relative_to(resolved["PROJECT_ROOT"])
+except ValueError:
+    print("invalid project configuration: MAM_ROOT must be inside PROJECT_ROOT", file=sys.stderr)
+    raise SystemExit(1)
+print(resolved["MAM_ROOT"])
+print(resolved["PROJECT_ROOT"])
 PY
 }
 
+same_git_repository() {
+    local checkout_common state_common
+    if ! checkout_common="$(git -C "$CHECKOUT_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
+        incomplete 'the installation checkout is not a Git worktree'
+        return 1
+    fi
+    if ! state_common="$(git -C "$MAM_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
+        incomplete 'the configured MAM_ROOT is not a Git worktree'
+        return 1
+    fi
+    if ! python3 - "$checkout_common" "$state_common" <<'PY'
+from pathlib import Path
+import sys
+try:
+    left = Path(sys.argv[1]).resolve(strict=True)
+    right = Path(sys.argv[2]).resolve(strict=True)
+except OSError:
+    raise SystemExit(1)
+raise SystemExit(0 if left == right else 1)
+PY
+    then
+        incomplete 'the installation checkout and configured MAM_ROOT are not worktrees of the same Git repository'
+        return 1
+    fi
+}
+
+choose_source_python() {
+    if [[ -x "$CHECKOUT_ROOT/.venv/bin/python" ]]; then
+        SOURCE_PYTHON="$CHECKOUT_ROOT/.venv/bin/python"
+    elif command -v python3 >/dev/null 2>&1; then
+        SOURCE_PYTHON="$(command -v python3)"
+    else
+        incomplete 'Python 3 is required to run the MAM test suite'
+        return 1
+    fi
+    if ! "$SOURCE_PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
+        incomplete 'MAM requires Python 3.10 or newer'
+        return 1
+    fi
+}
+
+run_tests() {
+    # A clean checkout is tested before pipx has installed it.  Test code can
+    # start a detached service from MAM_ROOT, where cwd no longer identifies
+    # this checkout, so keep the checkout first in every test subprocess.
+    local checkout_pythonpath="$CHECKOUT_ROOT"
+    if [[ -n "${PYTHONPATH:-}" ]]; then
+        checkout_pythonpath+=":$PYTHONPATH"
+    fi
+    printf 'MAM proactive wakeup: running checkout tests with %s\n' "$SOURCE_PYTHON"
+    if ! (
+        cd -- "$CHECKOUT_ROOT"
+        export PYTHONPATH="$checkout_pythonpath"
+        "$SOURCE_PYTHON" -B -m unittest discover -s tests -v
+    ); then
+        incomplete 'checkout tests failed; pipx and the existing scheduler were left untouched'
+        return 1
+    fi
+}
+
+prepare_local_bin() {
+    if [[ -z "${HOME:-}" || "$HOME" != /* || "$HOME" == *$'\n'* || "$HOME" == *$'\r'* ]]; then
+        incomplete 'HOME must be a single-line absolute path'
+        return 1
+    fi
+    LOCAL_BIN="$HOME/.local/bin"
+    if ! mkdir -p -- "$LOCAL_BIN"; then
+        incomplete 'cannot create ~/.local/bin for the pipx launcher'
+        return 1
+    fi
+    export PATH="$LOCAL_BIN:$PATH"
+    MAM_BIN="$LOCAL_BIN/mam"
+}
+
+install_with_pipx() {
+    if ! command -v pipx >/dev/null 2>&1; then
+        incomplete 'pipx is required; install it first with: sudo apt install -y pipx'
+        return 1
+    fi
+    printf 'MAM proactive wakeup: installing current checkout through pipx\n'
+    if ! PIPX_BIN_DIR="$LOCAL_BIN" pipx install --force "$CHECKOUT_ROOT"; then
+        incomplete 'pipx could not install the current checkout; the existing scheduler was not stopped'
+        return 1
+    fi
+    if [[ ! -x "$MAM_BIN" ]]; then
+        incomplete 'pipx completed without creating ~/.local/bin/mam'
+        return 1
+    fi
+    if ! env -u CODEX_THREAD_ID "$MAM_BIN" --help >/dev/null 2>&1; then
+        incomplete '~/.local/bin/mam is not runnable after the pipx installation'
+        return 1
+    fi
+}
+
+wait_incomplete() {
+    printf 'Installation/verification incomplete: %s\n' "$*" >&2
+    return 1
+}
+
+# Optional mam wait retains the stable trace setup and restart recovery path.
+# These helpers only ever inspect or restart the verified app-managed listener
+# after an exact interactive confirmation; the proactive service remains owned
+# by mam service below.
 update_bashrc() {
     local bashrc="${MAM_INSTALL_BASHRC:-$HOME/.bashrc}" directory temporary backup
     if [[ "$bashrc" != /* || ! -d "$(dirname -- "$bashrc")" ]]; then
-        incomplete "the .bashrc path must be in an existing absolute directory: $bashrc"
+        wait_incomplete "the .bashrc path must be in an existing absolute directory: $bashrc"
         return 1
     fi
     if [[ ! -e "$bashrc" ]]; then
         (umask 077; : > "$bashrc")
     elif [[ ! -f "$bashrc" || -L "$bashrc" ]]; then
-        incomplete "refusing to replace a non-regular .bashrc: $bashrc"
+        wait_incomplete "refusing to replace a non-regular .bashrc: $bashrc"
         return 1
     fi
     directory="$(dirname -- "$bashrc")"
     if ! temporary="$(mktemp -- "$directory/.${bashrc##*/}.mam-install.XXXXXX")"; then
-        incomplete 'could not create a temporary .bashrc update'
+        wait_incomplete 'could not create a temporary .bashrc update'
         return 1
     fi
     if ! python3 - "$bashrc" "$temporary" "$TRACE_BEGIN" "$TRACE_END" "$RUST_LOG_VALUE" <<'PY'
@@ -112,10 +266,6 @@ import sys
 
 source, destination = map(Path, sys.argv[1:3])
 begin, end, rust_log = sys.argv[3:]
-legacy = {
-    'export RUST_LOG="off,codex_app_server::message_processor=trace,codex_app_server::app_server_tracing=info"',
-    "export LOG_FORMAT=json",
-}
 try:
     raw = source.read_bytes()
     text = raw.decode("utf-8")
@@ -124,24 +274,31 @@ except (OSError, UnicodeDecodeError) as exc:
     raise SystemExit(1)
 
 newline = "\r\n" if b"\r\n" in raw else "\n"
-kept, inside = [], False
-for line in text.splitlines(keepends=True):
-    value = line.rstrip("\r\n")
-    if value == begin:
-        if inside:
-            print("refusing nested MAM trace markers in .bashrc", file=sys.stderr)
-            raise SystemExit(1)
-        inside = True
-    elif value == end:
-        if not inside:
-            print("refusing an unmatched MAM trace end marker in .bashrc", file=sys.stderr)
-            raise SystemExit(1)
-        inside = False
-    elif not inside and value not in legacy:
-        kept.append(line)
-if inside:
-    print("refusing an unmatched MAM trace start marker in .bashrc", file=sys.stderr)
-    raise SystemExit(1)
+lines = text.splitlines(keepends=True)
+starts = [index for index, line in enumerate(lines) if line.rstrip("\r\n") == begin]
+ends = [index for index, line in enumerate(lines) if line.rstrip("\r\n") == end]
+# Unmarked exports may belong to user shell logic.  Only this exact marker
+# block proves installer ownership and may be replaced.
+if starts or ends:
+    if len(starts) != 1 or len(ends) != 1 or ends[0] <= starts[0]:
+        print("refusing incomplete or multiple MAM trace markers in .bashrc; it was left unchanged", file=sys.stderr)
+        raise SystemExit(1)
+    expected = [
+        begin,
+        'if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then',
+        '    export PATH="$HOME/.local/bin:$PATH"',
+        'fi',
+        f'export RUST_LOG="{rust_log}"',
+        'export LOG_FORMAT=json',
+        end,
+    ]
+    observed = [line.rstrip("\r\n") for line in lines[starts[0] : ends[0] + 1]]
+    if observed != expected:
+        print("refusing an unrecognized MAM trace block in .bashrc; it was left unchanged", file=sys.stderr)
+        raise SystemExit(1)
+    kept = lines[: starts[0]] + lines[ends[0] + 1 :]
+else:
+    kept = list(lines)
 
 block = [
     begin + newline,
@@ -185,7 +342,7 @@ except OSError as exc:
 PY
     then
         rm -f -- "$temporary"
-        incomplete 'the .bashrc contains incomplete MAM trace markers; it was left unchanged'
+        wait_incomplete 'the .bashrc contains an incomplete, multiple, or unrecognized MAM trace block; it was left unchanged'
         return 1
     fi
     if cmp -s -- "$bashrc" "$temporary"; then
@@ -196,12 +353,12 @@ PY
     backup="${bashrc}.mam-install.$(date -u +%Y%m%dT%H%M%SZ).$$.bak"
     if ! cp -p -- "$bashrc" "$backup"; then
         rm -f -- "$temporary"
-        incomplete 'could not create a reversible .bashrc backup'
+        wait_incomplete 'could not create a reversible .bashrc backup'
         return 1
     fi
     if ! mv -f -- "$temporary" "$bashrc"; then
         rm -f -- "$temporary"
-        incomplete "could not update .bashrc; restore it with: cp -p -- $backup $bashrc"
+        wait_incomplete "could not update .bashrc; restore it with: cp -p -- $backup $bashrc"
         return 1
     fi
     printf 'Updated %s; backup: %s\nRollback: cp -p -- %q %q\n' "$bashrc" "$backup" "$backup" "$bashrc"
@@ -747,7 +904,7 @@ post_term_failure() {
     local reason="$1"
     clear_post_term_guard
     release_startup_lock
-    incomplete "$reason" || true
+    wait_incomplete "$reason" || true
     printf 'The captured app-managed npm launch plan remains in a protected recovery artifact.\n' >&2
     if print_recovery_command; then
         :
@@ -806,7 +963,7 @@ finish_post_term_restart() {
     if discard_recovery_artifacts; then
         return 0
     fi
-    incomplete "the replacement listener was verified, but $RECOVERY_ERROR; remove them manually" || true
+    wait_incomplete "the replacement listener was verified, but $RECOVERY_ERROR; remove them manually" || true
     if print_recovery_command; then
         :
     fi
@@ -1242,7 +1399,7 @@ restart_app_server() {
     if discover_app_server "$socket"; then
         :
     else
-        incomplete "$DISCOVERY_ERROR; no standalone fallback was launched"
+        wait_incomplete "$DISCOVERY_ERROR; no standalone fallback was launched"
         return 1
     fi
     old_record="$TARGET_RECORD"
@@ -1254,19 +1411,19 @@ restart_app_server() {
     old_parent_start_ticks="$TARGET_PARENT_START_TICKS"
     old_parent_executable="$TARGET_PARENT_EXECUTABLE"
     if [[ -z "$old_parent_executable" ]]; then
-        incomplete 'could not retain the verified npm wrapper identity; no process was stopped'
+        wait_incomplete 'could not retain the verified npm wrapper identity; no process was stopped'
         return 1
     fi
     if confirm_restart "$old_pid" "$old_executable" "$TARGET_SOCKET"; then
         :
     else
-        incomplete 'the current App Server needs a restart before behavioral verification; no process was stopped'
+        wait_incomplete 'the current App Server needs a restart before behavioral verification; no process was stopped'
         return 1
     fi
     if acquire_startup_lock "$socket"; then
         :
     else
-        incomplete "$RESTART_ERROR"
+        wait_incomplete "$RESTART_ERROR"
         return 1
     fi
     if discover_app_server "$socket"; then
@@ -1276,26 +1433,26 @@ restart_app_server() {
                 release_startup_lock
                 return 0
             fi
-            incomplete "$RESTART_ERROR; no process was stopped"
+            wait_incomplete "$RESTART_ERROR; no process was stopped"
             release_startup_lock
             return 1
         fi
     else
-        incomplete "the confirmed App Server target disappeared before restart: $DISCOVERY_ERROR; no process was stopped"
+        wait_incomplete "the confirmed App Server target disappeared before restart: $DISCOVERY_ERROR; no process was stopped"
         release_startup_lock
         return 1
     fi
     if launch_same_style --preflight "$old_launch_plan"; then
         :
     else
-        incomplete "${LAUNCH_ERROR:-the captured app-managed npm launch plan could not be preflighted}; no process was stopped"
+        wait_incomplete "${LAUNCH_ERROR:-the captured app-managed npm launch plan could not be preflighted}; no process was stopped"
         release_startup_lock
         return 1
     fi
     if prepare_recovery_artifacts "$old_launch_plan" "$socket"; then
         :
     else
-        incomplete "${RECOVERY_ERROR:-could not prepare the protected App Server recovery command}; no process was stopped"
+        wait_incomplete "${RECOVERY_ERROR:-could not prepare the protected App Server recovery command}; no process was stopped"
         release_startup_lock
         return 1
     fi
@@ -1304,7 +1461,7 @@ restart_app_server() {
     else
         clear_post_term_guard
         discard_recovery_artifacts >/dev/null 2>&1 || true
-        incomplete "${RECOVERY_ERROR:-could not arm the protected App Server recovery command}; no process was stopped"
+        wait_incomplete "${RECOVERY_ERROR:-could not arm the protected App Server recovery command}; no process was stopped"
         release_startup_lock
         return 1
     fi
@@ -1313,7 +1470,7 @@ restart_app_server() {
     else
         clear_post_term_guard
         discard_recovery_artifacts >/dev/null 2>&1 || true
-        incomplete "${TERMINATION_ERROR:-could not terminate the verified listener}; no other process was targeted"
+        wait_incomplete "${TERMINATION_ERROR:-could not terminate the verified listener}; no other process was targeted"
         release_startup_lock
         return 1
     fi
@@ -1349,13 +1506,13 @@ ensure_runtime_logging() {
     if discover_app_server "$socket"; then
         :
     else
-        incomplete "$DISCOVERY_ERROR; no standalone fallback was launched"
+        wait_incomplete "$DISCOVERY_ERROR; no standalone fallback was launched"
         return 1
     fi
     if log_is_regular "$TARGET_LOG_PATH"; then
         :
     else
-        incomplete "$LOG_ERROR; no process was stopped"
+        wait_incomplete "$LOG_ERROR; no process was stopped"
         return 1
     fi
     if runtime_logging_ready "$TARGET_PID"; then
@@ -1365,77 +1522,498 @@ ensure_runtime_logging() {
         status=$?
     fi
     if ((status == 2)); then
-        incomplete "$RUNTIME_ENV_ERROR; no process was stopped"
+        wait_incomplete "$RUNTIME_ENV_ERROR; no process was stopped"
         return 1
     fi
     if ((status != 1)); then
-        incomplete "${RUNTIME_ENV_ERROR:-could not inspect the listener environment}; no process was stopped"
+        wait_incomplete "${RUNTIME_ENV_ERROR:-could not inspect the listener environment}; no process was stopped"
         return 1
     fi
     printf 'The current verified listener needs a restart to receive the .bashrc trace settings.\n'
     restart_app_server "$socket"
 }
 
-install_mam() {
-    local checkout="$1" bin_dir mam_bin mam_python
-    if ! command -v pipx >/dev/null 2>&1; then
-        incomplete 'pipx is required; run sudo apt install pipx before bash scripts/install.sh'
+
+update_startup_file() {
+    local target="$1" kind="$2" directory temporary backup changed
+    if [[ -e "$target" && (! -f "$target" || -L "$target") ]]; then
+        incomplete "refusing to modify non-regular shell startup file: $target"
         return 1
     fi
-    printf 'Installing MAM from %s\n' "$checkout"
-    if ! pipx install --force "$checkout"; then
-        incomplete 'pipx could not install MAM from this checkout'
+    directory="$(dirname -- "$target")"
+    if ! mkdir -p -- "$directory"; then
+        incomplete "cannot create shell startup directory: $directory"
         return 1
     fi
-    bin_dir="$(pipx environment --value PIPX_BIN_DIR 2>/dev/null || true)"
-    bin_dir="${bin_dir:-${PIPX_BIN_DIR:-$HOME/.local/bin}}"
-    mam_bin="$bin_dir/mam"
-    mam_python="$(sed -n '1{s/^#!//;p;}' "$mam_bin" 2>/dev/null || true)"
-    if [[ ! -x "$mam_bin" || ! -x "$mam_python" ]] || ! "$mam_bin" --help >/dev/null; then
-        incomplete "pipx did not produce a working mam entry point at $mam_bin"
+    if [[ ! -e "$target" ]]; then
+        (umask 077; : > "$target") || {
+            incomplete "cannot create shell startup file: $target"
+            return 1
+        }
+    fi
+    if ! temporary="$(mktemp -- "$directory/.${target##*/}.mam-path.XXXXXX")"; then
+        incomplete "cannot prepare a PATH update for $target"
         return 1
     fi
-    export PATH="$bin_dir:$PATH"
-    INSTALLED_MAM_PYTHON="$mam_python"
+    if ! changed="$(python3 - "$target" "$temporary" "$kind" "$PATH_BEGIN" "$PATH_END" <<'PY'
+from pathlib import Path
+import os
+import stat
+import sys
+
+source, destination = map(Path, sys.argv[1:3])
+kind, path_begin, path_end = sys.argv[3:]
+path_block = (
+    [
+        path_begin,
+        'if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then',
+        '    export PATH="$HOME/.local/bin:$PATH"',
+        'fi',
+        path_end,
+    ]
+    if kind == "bash"
+    else [
+        path_begin,
+        'case ":$PATH:" in',
+        '    *":$HOME/.local/bin:"*) ;;',
+        '    *) export PATH="$HOME/.local/bin:$PATH" ;;',
+        'esac',
+        path_end,
+    ]
+)
+try:
+    raw = source.read_bytes()
+    text = raw.decode("utf-8")
+except (OSError, UnicodeDecodeError) as exc:
+    print(f"cannot read {source}: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+newline = "\r\n" if b"\r\n" in raw else "\n"
+lines = text.splitlines(keepends=True)
+
+def value(line):
+    return line.rstrip("\r\n")
+
+def remove_exact(items, begin, end, expected, label):
+    starts = [index for index, line in enumerate(items) if value(line) == begin]
+    ends = [index for index, line in enumerate(items) if value(line) == end]
+    if not starts and not ends:
+        return items
+    if len(starts) != 1 or len(ends) != 1 or starts[0] > ends[0]:
+        raise ValueError(f"incomplete or duplicate MAM {label} marker block in {source}")
+    start, finish = starts[0], ends[0]
+    actual = [value(line) for line in items[start : finish + 1]]
+    if actual != expected:
+        raise ValueError(f"refusing to replace a non-exact MAM-owned {label} block in {source}")
+    return items[:start] + items[finish + 1 :]
+
+try:
+    lines = remove_exact(lines, path_begin, path_end, path_block, "PATH")
+except ValueError as exc:
+    print(str(exc), file=sys.stderr)
+    raise SystemExit(1)
+
+insert_at = len(lines)
+if kind == "bash":
+    for index, line in enumerate(lines):
+        stripped = value(line).strip()
+        if stripped in {
+            '[ -z "$PS1" ] && return',
+            '[[ -z "$PS1" ]] && return',
+            '[[ $- != *i* ]] && return',
+            '[ "$-" != "${-#*i}" ] || return',
+        } or stripped.startswith(("case $- in", 'case "$-" in')):
+            insert_at = index
+            break
+block = [line + newline for line in path_block]
+if insert_at and not lines[insert_at - 1].endswith(("\n", "\r")):
+    lines[insert_at - 1] += newline
+updated = "".join(lines[:insert_at] + block + lines[insert_at:])
+try:
+    metadata = source.stat()
+    with destination.open("w", encoding="utf-8", newline="") as handle:
+        handle.write(updated)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.chmod(destination, stat.S_IMODE(metadata.st_mode))
+    try:
+        os.chown(destination, metadata.st_uid, metadata.st_gid)
+    except PermissionError:
+        pass
+except OSError as exc:
+    print(f"cannot prepare {source}: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+print("unchanged" if updated == text else "changed")
+PY
+)"; then
+        rm -f -- "$temporary"
+        incomplete "cannot safely update shell PATH setup in $target"
+        return 1
+    fi
+    if [[ "$changed" == unchanged ]]; then
+        rm -f -- "$temporary"
+        return 0
+    fi
+    backup="${target}.mam-path.$(date -u +%Y%m%dT%H%M%SZ).$$.bak"
+    if ! cp -p -- "$target" "$backup"; then
+        rm -f -- "$temporary"
+        incomplete "cannot create a backup before updating $target"
+        return 1
+    fi
+    if ! mv -f -- "$temporary" "$target"; then
+        rm -f -- "$temporary"
+        incomplete "cannot update $target; restore with: cp -p -- $backup $target"
+        return 1
+    fi
+    printf 'MAM proactive wakeup: persistent PATH updated in %s (backup: %s)\n' "$target" "$backup"
 }
 
-run_checks() {
-    local checkout="$1" python="$2" socket="$3" log_path="$4"
-    printf 'Running MAM unit tests from the installed environment.\n'
-    if ! "$python" -B -m unittest discover -s "$checkout/tests" -v; then
-        incomplete 'MAM unit tests failed'
+persist_local_bin_path() {
+    local login_file
+    update_startup_file "$HOME/.bashrc" bash || return 1
+    if [[ -e "$HOME/.bash_profile" ]]; then
+        login_file="$HOME/.bash_profile"
+    elif [[ -e "$HOME/.bash_login" ]]; then
+        login_file="$HOME/.bash_login"
+    else
+        login_file="$HOME/.profile"
+    fi
+    update_startup_file "$login_file" login
+}
+
+resolve_installed_python() {
+    local pipx_home
+    if ! pipx_home="$(pipx environment --value PIPX_HOME 2>/dev/null)"; then
+        incomplete 'cannot identify the pipx environment for the installed MAM interpreter'
         return 1
     fi
-    printf 'Running live behavioral App Server compatibility checks.\n'
-    if ! MAM_APP_SERVER_SOCKET="$socket" MAM_APP_SERVER_LOG="$log_path" "$python" -m multi_agent_manager.wait_compat; then
-        incomplete 'behavioral App Server compatibility tests failed'
+    if [[ -z "$pipx_home" || "$pipx_home" != /* || "$pipx_home" == *$'\n'* || "$pipx_home" == *$'\r'* ]]; then
+        incomplete 'pipx returned an invalid PIPX_HOME path'
         return 1
     fi
+    INSTALLED_PYTHON="$pipx_home/venvs/multi-agent-manager/bin/python"
+    if [[ ! -x "$INSTALLED_PYTHON" ]]; then
+        incomplete 'pipx did not provide the MAM virtual-environment interpreter'
+        return 1
+    fi
+}
+
+validate_explicit_manager() {
+    if [[ -z "${MAM_SERVICE_MANAGER:-}" ]]; then
+        return 0
+    fi
+    if ! "$INSTALLED_PYTHON" - "$MAM_SERVICE_MANAGER" <<'PY'
+import sys
+import uuid
+try:
+    value = sys.argv[1]
+    if str(uuid.UUID(value)) != value:
+        raise ValueError
+except (IndexError, ValueError):
+    raise SystemExit(1)
+PY
+    then
+        incomplete 'MAM_SERVICE_MANAGER must be a canonical AGENT-ID'
+        return 1
+    fi
+    SERVICE_MANAGER_ARGS=(--manager "$MAM_SERVICE_MANAGER")
+}
+
+create_install_tmp() {
+    if ! INSTALL_TMP="$(mktemp -d "${TMPDIR:-/tmp}/mam-install.XXXXXX")"; then
+        incomplete 'cannot create a private directory for installation acceptance'
+        return 1
+    fi
+    chmod 700 -- "$INSTALL_TMP" || true
+    trap cleanup_install_tmp EXIT
+}
+
+cleanup_install_tmp() {
+    if [[ -n "$INSTALL_TMP" && -d "$INSTALL_TMP" && ! -L "$INSTALL_TMP" ]]; then
+        rm -rf -- "$INSTALL_TMP"
+    fi
+}
+
+bounded_diagnostic() {
+    python3 - "$@" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+parts = []
+for raw in sys.argv[1:]:
+    path = Path(raw)
+    try:
+        if path.is_file() and not path.is_symlink():
+            parts.append(path.read_text(encoding="utf-8", errors="replace"))
+    except OSError:
+        pass
+text = " ".join(" ".join(parts).split())[:1400]
+text = re.sub(r"(?i)\b(token|secret|password|api[_-]?key)\s*=\s*[^\s,;]+", r"\1=<redacted>", text)
+print(text)
+PY
+}
+
+validate_compatibility_json() {
+    "$INSTALLED_PYTHON" - "$1" <<'PY'
+import json
+from pathlib import Path
+import sys
+try:
+    data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+except (OSError, UnicodeDecodeError, ValueError):
+    raise SystemExit(1)
+if not isinstance(data, dict) or not isinstance(data.get("socket_path"), str):
+    raise SystemExit(1)
+if not Path(data["socket_path"]).is_absolute() or not isinstance(data.get("capabilities"), dict):
+    raise SystemExit(1)
+if data["capabilities"].get("model_requests") != 0:
+    raise SystemExit(1)
+PY
+}
+
+run_lightweight_probe() {
+    local output="$INSTALL_TMP/compatibility.json" errors="$INSTALL_TMP/compatibility.stderr" detail
+    printf 'MAM proactive wakeup: running non-model App Server API compatibility probe\n'
+    if ! (cd -- "$PROJECT_ROOT" && env -u CODEX_THREAD_ID "$INSTALLED_PYTHON" -B -m multi_agent_manager.wake_compat --json >"$output" 2>"$errors"); then
+        detail="$(bounded_diagnostic "$output" "$errors")"
+        incomplete "the App Server API compatibility probe failed${detail:+: $detail}"
+        return 1
+    fi
+    if ! validate_compatibility_json "$output"; then
+        detail="$(bounded_diagnostic "$output" "$errors")"
+        incomplete "the App Server API compatibility probe returned invalid evidence${detail:+: $detail}"
+        return 1
+    fi
+    COMPATIBILITY_JSON="$output"
+    printf 'MAM proactive wakeup: non-model App Server API compatibility PASS\n'
+}
+
+prepare_wait_trace() {
+    local socket="${MAM_APP_SERVER_SOCKET:-$HOME/.codex/app-server-control/app-server-control.sock}"
+    if ! update_bashrc; then
+        return 1
+    fi
+    if ! ensure_runtime_logging "$socket"; then
+        return 1
+    fi
+    WAIT_SOCKET="$TARGET_SOCKET"
+    WAIT_LOG_PATH="$TARGET_LOG_PATH"
+    if [[ -z "$WAIT_SOCKET" || -z "$WAIT_LOG_PATH" ]]; then
+        wait_incomplete 'the verified App Server did not retain socket and trace-log paths'
+        return 1
+    fi
+}
+
+run_wait_compatibility() {
+    local output="$INSTALL_TMP/wait-compat.out" errors="$INSTALL_TMP/wait-compat.stderr" detail
+    printf 'MAM optional wait: running live App Server trace compatibility probe\n'
+    if ! (
+        cd -- "$PROJECT_ROOT"
+        env -u CODEX_THREAD_ID MAM_APP_SERVER_SOCKET="$WAIT_SOCKET" MAM_APP_SERVER_LOG="$WAIT_LOG_PATH" \
+            "$INSTALLED_PYTHON" -B -m multi_agent_manager.wait_compat >"$output" 2>"$errors"
+    ); then
+        detail="$(bounded_diagnostic "$output" "$errors")"
+        incomplete "the optional wait compatibility probe failed${detail:+: $detail}"
+        return 1
+    fi
+    printf 'MAM optional wait: live App Server trace compatibility PASS\n'
+}
+
+validate_liveprobe_evidence() {
+    "$INSTALLED_PYTHON" - "$1" <<'PY'
+import json
+from pathlib import Path
+import sys
+try:
+    data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+except (OSError, UnicodeDecodeError, ValueError):
+    raise SystemExit(1)
+checks = data.get("checks") if isinstance(data, dict) else None
+if data.get("status") != "passed" or data.get("model_turns") != 6 or not isinstance(checks, dict):
+    raise SystemExit(1)
+if not all(checks.get(key) is True for key in ("all_roles_baselined_before_service", "baseline_history_read_after_idle", "job_delivery", "manager_delivery", "manager_is_fixture_only", "turn_budget", "quiet_window_no_duplicate_starts", "idle_executors_received_no_turn")):
+    raise SystemExit(1)
+PY
+}
+
+run_live_delivery_probe() {
+    local output="$INSTALL_TMP/liveprobe.out" errors="$INSTALL_TMP/liveprobe.stderr"
+    local evidence="$INSTALL_TMP/liveprobe-evidence.json" detail
+    printf 'MAM proactive wakeup: running isolated real delivery acceptance\n'
+    if ! (cd -- "$PROJECT_ROOT" && env -u CODEX_THREAD_ID "$INSTALLED_PYTHON" -B -m multi_agent_manager.liveprobe \
+        --compatibility "$COMPATIBILITY_JSON" --root "$INSTALL_TMP/liveprobe" --evidence "$evidence" >"$output" 2>"$errors"); then
+        detail="$(bounded_diagnostic "$output" "$errors" "$evidence")"
+        incomplete "isolated real delivery acceptance failed${detail:+: $detail}"
+        return 1
+    fi
+    if ! validate_liveprobe_evidence "$evidence"; then
+        detail="$(bounded_diagnostic "$output" "$errors" "$evidence")"
+        incomplete "isolated real delivery acceptance returned invalid evidence${detail:+: $detail}"
+        return 1
+    fi
+    printf 'MAM proactive wakeup: isolated real delivery PASS (6 model turns)\n'
+}
+
+service_command() {
+    local action="$1" output="$2" errors="$3"
+    local -a command=("$MAM_BIN" service "$action")
+    SERVICE_ERROR=''
+    if [[ "$action" == start ]] && ((${#SERVICE_MANAGER_ARGS[@]})); then
+        command+=("${SERVICE_MANAGER_ARGS[@]}")
+    fi
+    # The installer process is never implicitly selected as Manager.
+    if ! (cd -- "$PROJECT_ROOT" && env -u CODEX_THREAD_ID "${command[@]}" >"$output" 2>"$errors"); then
+        SERVICE_ERROR="$(bounded_diagnostic "$output" "$errors")"
+        return 1
+    fi
+}
+
+status_running() {
+    "$INSTALLED_PYTHON" - "$1" <<'PY'
+import json
+from pathlib import Path
+import sys
+try:
+    value = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+    raise SystemExit(2)
+if not isinstance(value, dict) or not isinstance(value.get("running"), bool):
+    raise SystemExit(2)
+raise SystemExit(0 if value["running"] else 1)
+PY
+}
+
+validated_service_state() {
+    (cd -- "$PROJECT_ROOT" && "$INSTALLED_PYTHON" -B -m multi_agent_manager.wake_compat \
+        --service-status "$1" --quiet)
+}
+
+readiness_may_arrive() {
+    "$INSTALLED_PYTHON" - "$1" <<'PY'
+import json
+from pathlib import Path
+import sys
+try:
+    status = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+    raise SystemExit(2)
+if not isinstance(status, dict):
+    raise SystemExit(2)
+if status.get("running") is True and status.get("status") in {"healthy", "pending"}:
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+wait_for_service_readiness() {
+    local status_path="$1" errors="$2" attempt validation
+    for ((attempt = 1; attempt <= STARTUP_WAIT_ATTEMPTS; attempt++)); do
+        if ! service_command status "$status_path" "$errors"; then
+            return 1
+        fi
+        if validation="$(validated_service_state "$status_path" 2>&1)"; then
+            SERVICE_STATE="$validation"
+            return 0
+        fi
+        if readiness_may_arrive "$status_path"; then
+            sleep "$STARTUP_WAIT_SECONDS"
+            continue
+        fi
+        SERVICE_ERROR="$validation"
+        return 1
+    done
+    SERVICE_ERROR="scheduler did not become healthy within $((STARTUP_WAIT_ATTEMPTS / 2)) seconds"
+    return 1
+}
+
+start_project_service() {
+    local before="$INSTALL_TMP/status-before.json" after="$INSTALL_TMP/status-after.json" result
+    if ! service_command status "$before" "$INSTALL_TMP/status-before.stderr"; then
+        incomplete "mam service status failed before activation${SERVICE_ERROR:+: $SERVICE_ERROR}"
+        return 1
+    fi
+    if status_running "$before"; then
+        if ! service_command stop "$INSTALL_TMP/stop.json" "$INSTALL_TMP/stop.stderr"; then
+            incomplete "the existing project scheduler could not be stopped safely${SERVICE_ERROR:+: $SERVICE_ERROR}"
+            return 1
+        fi
+    else
+        result=$?
+        if ((result != 1)); then
+            incomplete 'mam service status returned an invalid running flag'
+            return 1
+        fi
+    fi
+    if ! service_command start "$INSTALL_TMP/start.json" "$INSTALL_TMP/start.stderr"; then
+        incomplete "mam service start failed${SERVICE_ERROR:+: $SERVICE_ERROR}"
+        return 1
+    fi
+    if ! wait_for_service_readiness "$after" "$INSTALL_TMP/status-after.stderr"; then
+        incomplete "mam service did not acknowledge readiness${SERVICE_ERROR:+: $SERVICE_ERROR}"
+        return 1
+    fi
+    case "$SERVICE_STATE" in
+        healthy)
+            printf 'MAM proactive wakeup installation: PASS (scheduler healthy)\n'
+            ;;
+        pending)
+            printf 'MAM proactive wakeup installation: PASS (scheduler healthy; pending delivery retained)\n'
+            ;;
+        awaiting_manager)
+            printf 'MAM proactive wakeup installation: PASS (scheduler awaiting first Manager binding)\n'
+            ;;
+        *)
+            incomplete 'mam service returned an unknown validated lifecycle status'
+            return 1
+            ;;
+    esac
 }
 
 main() {
-    local checkout config socket
     if (($#)); then
         printf 'usage: bash scripts/install.sh\n' >&2
         return 64
     fi
-    if ! checkout="$(repository_root)" || [[ ! -f "$checkout/pyproject.toml" || ! -d "$checkout/tests" ]]; then
+    CHECKOUT_ROOT="$(repository_root)" || {
+        incomplete 'cannot resolve the MAM checkout containing this installer'
+        return 1
+    }
+    if [[ ! -f "$CHECKOUT_ROOT/pyproject.toml" || ! -d "$CHECKOUT_ROOT/tests" ]]; then
         incomplete 'scripts/install.sh must be run from a multi-agent-manager checkout'
         return 1
     fi
-    if ! config="$(find_project_config "$checkout")" || ! validate_project_config "$config"; then
-        incomplete 'create a valid .mam/env.json above this checkout before installing'
+    local config_path
+    if ! config_path="$(find_project_config "$CHECKOUT_ROOT")"; then
+        incomplete 'no .mam/env.json was found above this MAM checkout'
         return 1
     fi
-    printf 'Using project configuration %s\n' "$config"
-    update_bashrc || return 1
-    export PATH="$HOME/.local/bin:$PATH"
-    install_mam "$checkout" || return 1
-
-    socket="${MAM_APP_SERVER_SOCKET:-$HOME/.codex/app-server-control/app-server-control.sock}"
-    ensure_runtime_logging "$socket" || return 1
-    run_checks "$checkout" "$INSTALLED_MAM_PYTHON" "$socket" "$TARGET_LOG_PATH"
-    printf 'MAM installation and behavioral compatibility: PASS\n'
+    local -a config_values=()
+    if ! mapfile -t config_values < <(validate_project_config "$config_path"); then
+        incomplete 'project configuration is invalid for this MAM checkout'
+        return 1
+    fi
+    if ((${#config_values[@]} != 2)); then
+        incomplete 'project configuration is invalid for this MAM checkout'
+        return 1
+    fi
+    MAM_ROOT="${config_values[0]}"
+    PROJECT_ROOT="${config_values[1]}"
+    same_git_repository
+    choose_source_python
+    run_tests
+    prepare_local_bin
+    install_with_pipx
+    prepare_wait_trace
+    persist_local_bin_path
+    resolve_installed_python
+    validate_explicit_manager
+    create_install_tmp
+    # Both optional-wait and proactive compatibility paths must pass before
+    # this installer can stop or replace the current project scheduler.
+    run_wait_compatibility
+    run_lightweight_probe
+    run_live_delivery_probe
+    start_project_service
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

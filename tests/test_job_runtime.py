@@ -220,6 +220,80 @@ class AgentProbeTests(unittest.TestCase):
 
 
 class EventStreamTests(unittest.TestCase):
+    def test_start_turn_uses_existing_thread_without_runtime_overrides(self) -> None:
+        def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
+            initialize = fixture.read_json(connection)
+            fixture.send_json(connection, {"id": initialize["id"], "result": {}})
+            self.assertEqual(fixture.read_json(connection)["method"], "initialized")
+            started = fixture.read_json(connection)
+            self.assertEqual(started["method"], "turn/start")
+            self.assertEqual(
+                started["params"],
+                {"threadId": "existing-agent", "input": [{"type": "text", "text": "JOB-ID job-1 stopped"}]},
+            )
+            fixture.send_json(connection, {"id": started["id"], "result": {"turn": {"id": "new-turn"}}})
+
+        with AppServerFixture(handler) as fixture:
+            stream = runtime.AppServerEventStream.connect(fixture.path)
+            try:
+                result = stream.start_turn("existing-agent", "JOB-ID job-1 stopped")
+            finally:
+                stream.close()
+        self.assertEqual(result, {"turn": {"id": "new-turn"}})
+
+    def test_explicit_rpc_rejection_has_a_distinct_compatible_error_type(self) -> None:
+        def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
+            initialize = fixture.read_json(connection)
+            fixture.send_json(connection, {"id": initialize["id"], "result": {}})
+            self.assertEqual(fixture.read_json(connection)["method"], "initialized")
+            started = fixture.read_json(connection)
+            self.assertEqual(started["method"], "turn/start")
+            fixture.send_json(connection, {"id": started["id"], "error": {"code": -32000, "message": "explicitly rejected"}})
+
+        with AppServerFixture(handler) as fixture:
+            stream = runtime.AppServerEventStream.connect(fixture.path)
+            try:
+                with self.assertRaises(runtime.AppServerRpcError) as caught:
+                    stream.start_turn("existing-agent", "wake this task")
+            finally:
+                stream.close()
+        self.assertIsInstance(caught.exception, runtime.AppServerEventError)
+        self.assertIn("explicitly rejected", str(caught.exception))
+
+    def test_targeted_not_loaded_resume_can_be_rechecked_without_hydrating_history(self) -> None:
+        def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
+            initialize = fixture.read_json(connection)
+            fixture.send_json(connection, {"id": initialize["id"], "result": {}})
+            self.assertEqual(fixture.read_json(connection)["method"], "initialized")
+            resume = fixture.read_json(connection)
+            self.assertEqual(resume["method"], "thread/resume")
+            fixture.send_json(connection, {
+                "id": resume["id"],
+                "result": {"thread": {"id": "existing-agent", "status": {"type": "notLoaded"}, "turns": []}},
+            })
+            read = fixture.read_json(connection)
+            self.assertEqual(read["method"], "thread/read")
+            self.assertEqual(read["params"], {"threadId": "existing-agent", "includeTurns": False})
+            fixture.send_json(connection, {
+                "id": read["id"],
+                "result": {"thread": {"id": "existing-agent", "status": {"type": "idle"}, "turns": []}},
+            })
+            turns = fixture.read_json(connection)
+            self.assertEqual(
+                turns["params"],
+                {"threadId": "existing-agent", "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded"},
+            )
+            fixture.send_json(connection, {"id": turns["id"], "result": {"data": [{"id": "previous", "status": "completed"}]}})
+
+        with AppServerFixture(handler) as fixture:
+            stream = runtime.AppServerEventStream.connect(fixture.path)
+            try:
+                self.assertEqual(stream.resume("existing-agent")["thread"]["status"], {"type": "notLoaded"})
+                self.assertEqual(stream.read("existing-agent")["thread"]["status"], {"type": "idle"})
+                self.assertEqual(stream.latest_turn("existing-agent"), {"id": "previous", "status": "completed"})
+            finally:
+                stream.close()
+
     def test_idle_resume_does_not_page_turn_history(self) -> None:
         def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
             initialize = fixture.read_json(connection)

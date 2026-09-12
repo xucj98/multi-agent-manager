@@ -116,6 +116,7 @@ printf env > "$target/.venv/marker"
                 "token": token, "kind": "jobs", "task": task, "timeout": None,
                 "started_at": "test", "cancelled": None}
 
+
     def test_parallel_publications_preserve_drafts_and_index(self):
         first, second, draft = self.task(), self.task(), self.task()
         (self.root / "code.py").write_text("staged = True\n")
@@ -876,6 +877,7 @@ base=$(git rev-parse --verify "$1^{commit}")
             cli.job_archive(self.store, types.SimpleNamespace(job="unarchived-job", note="results copied"))
             cli.archive(self.store, types.SimpleNamespace(task=task, note="complete"))
         self.assertEqual(self.store.read(task)["status"], "archived")
+
 
     def test_wait_list_and_manual_stop_preserve_the_wait_process(self):
         observation = cli.runtime().probe_process("local", os.getpid())

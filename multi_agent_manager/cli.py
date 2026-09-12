@@ -168,6 +168,7 @@ class Store:
     def __init__(self, config):
         if not isinstance(config, ProjectConfig):
             raise Error("Store requires a project configuration")
+        self.config = config
         self.root = config.mam_root
         self.project_root = config.project_root
         self.branch = config.branch
@@ -319,7 +320,12 @@ def create(store, args):
     data = {"id": task, "title": args.title, "agent": None, "status": "working", "created_at": now(),
             "workspace": str(store.workspaces / task), "repos": {}, "jobs": [], "report": None,
             "review": review, "archive": None, "error": None}
-    with store.lock(task):
+    with store.lock("bindings"), store.lock(task):
+        try:
+            from . import wake_runtime
+            wake_runtime.capture_manager_for_task(store)
+        except RuntimeError as exc:
+            raise Error(str(exc)) from exc
         store.write(data)  # record intent before allocating directories
         try:
             safe_path(data["workspace"]).mkdir(parents=True)
@@ -340,6 +346,11 @@ def create(store, args):
 
 def bind(store, args):
     with store.lock("bindings"), store.lock(args.task):
+        try:
+            from . import wake_runtime
+            wake_runtime.capture_manager_for_task(store, excluded_agent=args.agent)
+        except RuntimeError as exc:
+            raise Error(str(exc)) from exc
         data = store.read(args.task, writable=True)
         if data["agent"] and data["agent"] != args.agent:
             raise Error("task already has another agent")
@@ -968,6 +979,35 @@ def wait_stop(store, args):
     return cancel_wait(store, wait_agent(args))
 
 
+def service_module():
+    try:
+        from . import wake_runtime
+    except ImportError as exc:
+        raise Error("multi_agent_manager.wake_runtime is required for service commands") from exc
+    return wake_runtime
+
+
+def service_start(store, args):
+    try:
+        return service_module().start_service(store.config, manager=args.manager)
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
+
+
+def service_stop(store, args):
+    try:
+        return service_module().stop_service(store.config)
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
+
+
+def service_status(store, args):
+    try:
+        return service_module().service_status(store.config)
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
+
+
 def task_list(store, args):
     tasks = [data for data in store.all() if args.all or (data["status"] == "archived") == args.archived]
     agents = agent_observations(data["agent"] for data in tasks if data["agent"])
@@ -1208,6 +1248,14 @@ def parser():
     p.add_argument("manager", nargs="?", choices=("manager",), help="stop the unique unbound manager wait")
     p.add_argument("--agent", metavar="AGENT-ID", help="waiter AGENT-ID")
     p.set_defaults(func=wait_stop)
+    service = command(commands, "service", "manage the project-local proactive wakeup scheduler").add_subparsers(required=True)
+    p = command(service, "start", "start the detached project-local scheduler")
+    p.add_argument("--manager", metavar="AGENT-ID", help="explicit Manager identity for an existing project")
+    p.set_defaults(func=service_start)
+    p = command(service, "stop", "gracefully stop this project's scheduler")
+    p.set_defaults(func=service_stop)
+    p = command(service, "status", "show scheduler health, pending items and diagnostics")
+    p.set_defaults(func=service_status)
     w = command(commands, "workspace", "manage repository worktrees and their environments").add_subparsers(required=True)
     p = command(w, "add", "create a repository worktree using its local environment entry")
     p.add_argument("task", metavar="TASK-ID", help="registered task")

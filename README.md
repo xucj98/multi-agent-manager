@@ -2,7 +2,7 @@
 
 ## 核心原则
 
-MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job`、`mam wait`。本集群的信息查看[本地说明](.local/README.md)，所有 `mam` 命令以及 agent 均在本机运行。
+MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job` 和可选的 `mam wait`，并自动唤醒需要处理后续工作的负责人。本集群的信息查看[本地说明](.local/README.md)，所有 `mam` 命令以及 agent 均在本机运行。
 
 使用细节可用 `mam --help` 查询，语法中的大写词需要替换为实际值，方括号表示可选参数。
 
@@ -43,12 +43,11 @@ mam task archive TASK-ID --note NOTE
 - 途中追加要求时，先更新 `task.md` 并发布，再通知执行者读取新版本。
 - Review 任务使用 `--review` 接收源任务的 `TASK-ID`。
 
-先用这些可执行命令查看已有任务和等待：
+查看已有任务和进程：
 
 ```bash
 mam task list
 mam job list
-mam wait list
 ```
 
 针对一个任务读取登记信息和已发布要求：
@@ -90,29 +89,36 @@ mam job archive JOB-ID --note NOTE
 - HOST 可以使用 ssh 别名或 username@hostname。
 - list 不提供 TASK-ID 时显示所有任务中未归档的 job。
 
-job 状态包括 `running`、`stopped`、`archived`。`mam job archive` 可归档任意已登记 job，只停止 MAM 对它的跟踪并保留身份、最后观测和归档原因；它不探测或停止进程。已归档 job 不再进入 `mam wait`，`mam task archive` 要求其所有 job 已归档。Manager 可用 `mam job list --attention` 查找负责人 inactive 且 job 状态为 `stopped` 的 job。
+job 状态包括 `running`、`stopped`、`archived`。进程停止后，由执行者检查结果、完成收尾，再归档 job。`mam job archive` 可归档任意已登记 job，只结束 MAM 对它的跟踪并保留记录，不停止进程。`mam task archive` 要求其所有 job 已归档。
 
-## 休眠管理
+## 自动跟进
 
-当前工作已处理完、需要保持 active turn 等待时，直接运行：
+当前可执行的工作处理完后，正常结束 turn。已登记的长进程可以继续运行，MAM 会在需要处理后续工作时唤醒负责人，无需调用等待命令或定时查询状态。
 
-```bash
-mam wait
-```
+- 有未归档的 stopped job：由执行者处理，即使同一任务还有其他 running job。
+- 只有 running job：MAM 继续监控，执行者可以结束 turn。
+- 没有 job 或所有 job 都已归档，且执行者已结束 turn：由 Manager 检查成果，决定归档、委派 review 或追加要求。源任务已交给未归档的 review 任务时，等待 reviewer 的结果。
 
-MAM 从 `CODEX_THREAD_ID` 识别调用者。执行者等待自己任务的 jobs；Manager 等待 active 的执行者，并负责非 active 执行者留下的 jobs 和未归档任务。源任务已交给未归档的 review 任务时，Manager 等待 reviewer。
+唤醒消息包含待处理 job 的 `JOB-ID` 和用途，或任务的 `AGENT-ID`、`TASK-ID` 和标题。进程停止不代表实验成功，结束 turn 不代表任务已完成；仍需按任务要求检查和交付成果。
 
-`mam wait` 退出时说明原因，并附上对应 job 或任务的信息。用户的 steer 和 Manager 发来的消息会解除对应等待，queue 消息保持排队。等待结束不会停止 job，也不会归档任务。
-
-有待处理事项时 `mam wait` 会立即返回，并提供信息，此时无法进入休眠状态，应该立刻处理相关事项。 `mam wait` 最长等待 1 小时，若依然没有待办事项，可继续调用 `mam wait` 休眠。
-
-查看或手动解除等待：
+负责人正在工作时，MAM 保留待办，避免打断当前 turn。服务的启动、停止和故障处理见[安装说明](docs/install.md)，查看当前服务状态使用：
 
 ```text
+mam service status
+```
+
+## 可选等待
+
+需要在当前 turn 等待执行者或 job 时，运行 `mam wait`。MAM 自动识别调用者和待处理事项，最多等待一小时；有待办时直接返回。默认仍按[自动跟进](#自动跟进)结束 turn，由 MAM 后续唤醒。
+
+```text
+mam wait
 mam wait list
 mam wait stop manager
 mam wait stop --agent AGENT-ID
 ```
+
+等待返回时会说明原因及相关 job 或任务。用户的 steer 或 Manager 发来的消息可以解除对应等待，也可通过 `wait stop` 手动解除；这些操作不停止 job。收到返回结果后，按其中的待办继续工作。
 
 ## MAM 开发指南
 
@@ -120,4 +126,4 @@ MAM 自身的开发 worktree、环境、验证和合并步骤见[MAM 开发指�
 
 ## MAM 设计细节
 
-详细接口、状态语义和归档保护见[MAM 设计细节](docs/task-management-design.zh-CN.md)，日常使用无需翻阅；参数以 `mam task --help`、`mam workspace --help`、`mam job --help`、`mam wait --help` 及相应子命令的帮助为准。
+详细接口、状态语义和归档保护见[MAM 设计细节](docs/task-management-design.zh-CN.md)，日常使用无需翻阅；参数以 `mam --help` 及相应子命令的帮助为准。
