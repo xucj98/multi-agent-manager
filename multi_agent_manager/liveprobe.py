@@ -476,12 +476,17 @@ class _LiveFixture:
         return self._read_status(thread_id)
 
     def _subscribe_to_turn_events(self, role: str) -> None:
-        """Subscribe before a baseline so its completion cannot race history reads."""
+        """Subscribe immediately after an accepted baseline turn starts.
+
+        A new persisted thread deliberately has no rollout to resume before its
+        first user turn.  ``turn/start`` materializes that rollout, after which
+        this metadata-only resume subscribes before the turn can be inspected.
+        """
 
         result = self._request("thread/resume", {"threadId": self.threads[role], "excludeTurns": True})
         status = _thread_status(result)
-        if status not in {"idle", "notLoaded"}:
-            raise LiveProbeError(f"fixture {role} could not subscribe from its initial {status} state")
+        if _status_is_interrupted(status) or status not in {"active", "idle", "notLoaded"}:
+            raise LiveProbeError(f"fixture {role} could not subscribe from its {status} state")
 
     def _event_completed_turn_id(self, event: Any, thread_id: str) -> str | None:
         if not isinstance(event, Mapping) or event.get("method") != "turn/completed":
@@ -500,8 +505,8 @@ class _LiveFixture:
 
         Some App Server builds can publish idle metadata before a just-accepted
         turn is reflected as completed in paged history.  A subscription made
-        before ``turn/start`` gives this fixture a completion fact without
-        polling history while that turn is still active.
+        immediately after ``turn/start`` gives this fixture a completion fact
+        without polling history while that turn is still active.
         """
 
         deadline = self._deadline() if deadline is None else deadline
@@ -619,7 +624,6 @@ class _LiveFixture:
         if role != "manager" and not self.evidence["checks"]["executor_bound_before_first_model_turn"]:
             raise LiveProbeError("fixture executor was not bound before its first model turn")
         marker = _BASELINE_MARKERS[role]
-        self._subscribe_to_turn_events(role)
         result = self._request(
             "turn/start",
             {
@@ -641,6 +645,7 @@ class _LiveFixture:
             raise LiveProbeError("fixture attempted more direct baseline turns than its fixed role set")
         self.active_direct_turns[role] = turn_id
         self.evidence["resources"]["turns"][f"{role}_baseline_started"] = turn_id
+        self._subscribe_to_turn_events(role)
         self._wait_for_completion_event(
             role, f"fixture {role} baseline completion", "baseline", expected_turn_id=turn_id
         )

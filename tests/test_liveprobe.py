@@ -197,6 +197,8 @@ class FakeStream:
         if method == "thread/turns/list":
             if self.active_reads_remaining.get(thread_id, 0):
                 raise AssertionError("paged history was requested before metadata became idle")
+            if thread_id not in self.subscribed_threads:
+                raise AssertionError("paged history was requested before completion-event subscription")
             if any(turn["status"] == "inProgress" for turn in self.turns[thread_id]):
                 raise AssertionError("paged history was requested before turn/completed")
             if thread_id in self.history_unsupported:
@@ -206,8 +208,6 @@ class FakeStream:
             role = liveprobe._ROLE_ORDER[self.direct_baseline_starts]
             if thread_id != THREAD_IDS[role]:
                 raise AssertionError("direct baseline turns must use the four dedicated roles in order")
-            if thread_id not in self.subscribed_threads:
-                raise AssertionError("baseline turn started before its completion-event subscription")
             if params.get("model") != liveprobe.MODEL or params.get("effort") != liveprobe.EFFORT:
                 raise AssertionError("baseline turn did not select gpt-5.6-terra/max")
             marker = liveprobe._BASELINE_MARKERS[role]
@@ -369,6 +369,23 @@ class LiveProbeTests(unittest.TestCase):
             self.assertEqual(
                 params["input"], [{"type": "text", "text": f"Reply exactly {liveprobe._BASELINE_MARKERS[role]}."}]
             )
+            start_index = next(
+                index
+                for index, (method, request) in enumerate(self.state["requests"])
+                if method == "turn/start" and request["threadId"] == THREAD_IDS[role]
+            )
+            resume_index = next(
+                index
+                for index, (method, request) in enumerate(self.state["requests"])
+                if index > start_index and method == "thread/resume" and request["threadId"] == THREAD_IDS[role]
+            )
+            history_index = next(
+                index
+                for index, (method, request) in enumerate(self.state["requests"])
+                if index > resume_index and method == "thread/turns/list" and request["threadId"] == THREAD_IDS[role]
+            )
+            self.assertLess(start_index, resume_index)
+            self.assertLess(resume_index, history_index)
 
         service_start = self.state["timeline"].index(("service-start", THREAD_IDS["manager"]))
         direct_starts = [index for index, event in enumerate(self.state["timeline"]) if event[0] == "turn/start"]
