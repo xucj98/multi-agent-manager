@@ -918,3 +918,48 @@ GPU7 回到 1 MiB/0%，19470/19472 无监听，formal leaf 不存在。smoke 已
 C3 GPU0 的 `10cfe400-13ee-483f-ba5f-00e6a094a1e3` 仍在新 2e9677c runtime 中执行
 40-reset gate，尚未写出 receipt；目前仅见 SAPIEN 的弃用警告，没有将运行中状态写成
 C3 gate PASS。
+
+
+## C1/C2/C3 当前评测快照与 C2 门禁启动（2026-09-13 00:53 CST）
+
+按 Manager 最新资源核查，只复核并使用 C2 GPU6/7；没有触碰 C2 其它卡、没有修改 C1
+`c-eval-renderer-r3`。下表的完成数只计
+`episode_diagnostics.jsonl` 中 `diagnostics.episode_status.terminal=true` 的记录；
+“最近终端记录”是该 JSONL 的最后一次写入时间（记录本身不含逐 episode 时间戳），不是 PID
+存活判断。
+
+| host / GPU | run | completed terminal / 100 | 最近终端记录（CST） |
+| --- | --- | ---: | --- |
+| C1 GPU1 | `c_rearrange_serial_lag30_trainseed1_evalseed1_100ep_r3` | 52 | episode51 / seed200051, 00:52:47 |
+| C1 GPU2 | `c_rearrange_serial_lag30_trainseed1_evalseed2_100ep_r3` | 49 | episode48 / seed300048, 00:53:11 |
+| C1 GPU3 | `c_rearrange_serial_lag30_trainseed2_evalseed0_100ep_r3` | 39 | episode38 / seed100038, 00:52:03 |
+| C1 GPU4 | `c_rearrange_serial_lag30_trainseed2_evalseed1_100ep_r3` | 36 | episode35 / seed200035, 00:53:16 |
+| C1 GPU5 | `c_rearrange_serial_lag30_trainseed2_evalseed2_100ep_r3` | 28 | episode27 / seed300027, 00:52:37 |
+| C1 GPU6 | `c_rearrange_serial_lag30_trainseed0_evalseed1_100ep_r3` | 19 | episode18 / seed200018, 00:52:16 |
+| C1 GPU7 | `c_rearrange_serial_lag30_trainseed0_evalseed2_100ep_r3` | 11 | episode10 / seed300010, 00:53:06 |
+| C2 GPU6 | `renderer_reset_gate_c2_gpu6_r3_2e9677c` | receipt pending | terminal reset count unavailable until receipt |
+| C2 GPU7 | no run | — | reserved for post-gate matching smoke/formal |
+| C3 GPU0 | `renderer_reset_gate_c3_gpu0_r3_2e9677c` | receipt pending | terminal reset count unavailable until receipt |
+
+C1 GPU1 已到 50 条并由既有 recorder 写入
+`.../c_rearrange_serial_lag30_trainseed1_evalseed1_100ep_r3/midpoint_checks.jsonl`：
+21/50 成功（42%），前50个 accepted seed 200000–200049 连续，视频检查 5 video/45 no-video
+均 `ok=true`，无基础设施 marker。该项只有不完整历史基线，recorder 明确标为不可作主要比较，
+因此没有捏造 10pp 结论；固定 seed/config/队列继续不变。
+
+C2 GPU6/7 复测为各 4 MiB used、24,207 MiB free、0% util，C2 无本 task 进程；新 runtime
+`c-eval-renderer-r3-2e9677c` 仍 clean 且冻结 RMBench `2e9677c`、bridge `f962663`、OpenPI
+`a869498`。已在 C2 GPU6 启动并登记 MAM job
+`546b6d60-f038-4924-b60d-ece5d9489309`，固定 device6→cuda:0、system ICD、seeds
+100000–100039。receipt/worker/outer 证据路径为：
+
+```text
+.../c-eval-renderer-r3-2e9677c/records/renderer_reset_gate_c2_gpu6_r3_2e9677c.{json,worker.stderr.log,outer.log}
+```
+
+C3 GPU0 的同版本 host gate job `10cfe400-13ee-483f-ba5f-00e6a094a1e3` 仍在运行；其
+receipt 路径为 `.../records/renderer_reset_gate_c3_gpu0_r3_2e9677c.json`。C2 与 C3 都尚未
+生成 receipt，所以均是**未完成门禁**，不根据 warning/PID 推断 reset 进度或 PASS。任一
+host receipt 仅在 40/40、exit0、零 marker 后，才在同一 frozen runtime 接对应未完成或
+not-reportable r2 item 的 fresh matching smoke2→formal100；不重跑 C1 进行中的七项，也不
+拼接旧 partial。
