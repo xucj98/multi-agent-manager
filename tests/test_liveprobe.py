@@ -108,45 +108,58 @@ class FakeStream:
         self.job_delivery_added = False
         self.history_unsupported: set[str] = set()
         self.active_reads_remaining: dict[str, int] = {}
+        self.active_after_turn_start: dict[str, int] = {}
+        self.completion_polls_remaining: dict[str, int] = {}
+        self.subscribed_threads: set[str] = set()
+        self.completed_turn_ids: set[str] = set()
+        self.events: list[dict] = []
 
     def _all_roles_have_baseline(self):
-        return all(self.turns[thread_id] for thread_id in THREAD_IDS.values())
+        return all(f"turn-{role}-baseline" in self.completed_turn_ids for role in liveprobe._ROLE_ORDER)
+
+    def _append_turn(self, thread_id, turn_id, text):
+        self.turns[thread_id].append({"id": turn_id, "status": "inProgress", "input": {"text": text}})
+        self.events.append({"method": "turn/completed", "params": {"threadId": thread_id, "turn": {"id": turn_id}}})
+
+    def _complete_turn(self, thread_id, turn_id):
+        for turn in self.turns[thread_id]:
+            if turn["id"] == turn_id:
+                turn["status"] = "completed"
+                self.completed_turn_ids.add(turn_id)
+                return
+        raise AssertionError(f"completion event referenced unknown turn {turn_id}")
 
     def _add_manager_delivery_after_baselines(self):
         if self.manager_delivery_added or not self.state.get("running") or not self._all_roles_have_baseline():
             return
         self.manager_delivery_added = True
-        self.turns[THREAD_IDS["manager"]].append(
-            {
-                "id": "turn-manager-delivery",
-                "status": "completed",
-                "input": {
-                    "text": (
-                        f"Executor AGENT-ID {THREAD_IDS['idle_executor']} has no unarchived jobs for "
-                        f"TASK-ID {TASK_IDS['idle']}: MAM liveprobe no-job Manager delivery.\n"
-                        f"Executor AGENT-ID {THREAD_IDS['archived_executor']} has no unarchived jobs for "
-                        f"TASK-ID {TASK_IDS['archived']}: MAM liveprobe archived-job Manager delivery."
-                    )
-                },
-            }
+        self._append_turn(
+            THREAD_IDS["manager"],
+            "turn-manager-delivery",
+            (
+                f"Executor AGENT-ID {THREAD_IDS['idle_executor']} has no unarchived jobs for "
+                f"TASK-ID {TASK_IDS['idle']}: MAM liveprobe no-job Manager delivery.\n"
+                f"Executor AGENT-ID {THREAD_IDS['archived_executor']} has no unarchived jobs for "
+                f"TASK-ID {TASK_IDS['archived']}: MAM liveprobe archived-job Manager delivery."
+            ),
         )
 
     def _add_job_delivery_if_released(self):
         if self.job_delivery_added or self.state.get("stopped_pid") not in self.state["released_processes"]:
             return
         self.job_delivery_added = True
-        self.turns[THREAD_IDS["job_executor"]].append(
-            {
-                "id": "turn-job-delivery",
-                "status": "completed",
-                "input": {
-                    "text": (
-                        f"Stopped registered job: JOB-ID {JOB_ID} (liveprobe-short-job-stop); "
-                        f"TASK-ID {TASK_IDS['job']}: MAM liveprobe stopped-job delivery."
-                    )
-                },
-            }
+        self._append_turn(
+            THREAD_IDS["job_executor"],
+            "turn-job-delivery",
+            (
+                f"Stopped registered job: JOB-ID {JOB_ID} (liveprobe-short-job-stop); "
+                f"TASK-ID {TASK_IDS['job']}: MAM liveprobe stopped-job delivery."
+            ),
         )
+
+    def _maybe_schedule_deliveries(self):
+        self._add_manager_delivery_after_baselines()
+        self._add_job_delivery_if_released()
 
     def _thread_snapshot(self, thread_id, *, include_turns):
         remaining = self.active_reads_remaining.get(thread_id, 0)
@@ -179,21 +192,22 @@ class FakeStream:
         if method == "thread/read":
             return self._thread_snapshot(thread_id, include_turns=params.get("includeTurns") is True)
         if method == "thread/resume":
+            self.subscribed_threads.add(thread_id)
             return self._thread_snapshot(thread_id, include_turns=False)
         if method == "thread/turns/list":
             if self.active_reads_remaining.get(thread_id, 0):
                 raise AssertionError("paged history was requested before metadata became idle")
+            if any(turn["status"] == "inProgress" for turn in self.turns[thread_id]):
+                raise AssertionError("paged history was requested before turn/completed")
             if thread_id in self.history_unsupported:
                 raise RuntimeError("list_turns is not supported yet")
-            if thread_id == THREAD_IDS["manager"]:
-                self._add_manager_delivery_after_baselines()
-            if thread_id == THREAD_IDS["job_executor"]:
-                self._add_job_delivery_if_released()
             return {"data": list(reversed(self.turns[thread_id]))}
         if method == "turn/start":
             role = liveprobe._ROLE_ORDER[self.direct_baseline_starts]
             if thread_id != THREAD_IDS[role]:
                 raise AssertionError("direct baseline turns must use the four dedicated roles in order")
+            if thread_id not in self.subscribed_threads:
+                raise AssertionError("baseline turn started before its completion-event subscription")
             if params.get("model") != liveprobe.MODEL or params.get("effort") != liveprobe.EFFORT:
                 raise AssertionError("baseline turn did not select gpt-5.6-terra/max")
             marker = liveprobe._BASELINE_MARKERS[role]
@@ -201,18 +215,26 @@ class FakeStream:
                 raise AssertionError("baseline turn did not use its deterministic marker")
             turn_id = f"turn-{role}-baseline"
             self.direct_baseline_starts += 1
-            self.turns[thread_id].append(
-                {
-                    "id": turn_id,
-                    "status": "completed",
-                    "input": {"text": f"Reply exactly {marker}."},
-                    "output": {"text": marker},
-                }
-            )
+            self._append_turn(thread_id, turn_id, f"Reply exactly {marker}.")
+            self.active_reads_remaining[thread_id] = self.active_after_turn_start.get(thread_id, 0)
             return {"turn": {"id": turn_id}}
         if method in {"thread/archive", "turn/interrupt"}:
             return {}
         raise AssertionError(f"unexpected App Server request: {method}")
+
+    def poll(self, timeout):
+        self._maybe_schedule_deliveries()
+        if not self.events:
+            return None
+        event = self.events[0]
+        turn_id = event["params"]["turn"]["id"]
+        remaining = self.completion_polls_remaining.get(turn_id, 0)
+        if remaining:
+            self.completion_polls_remaining[turn_id] = remaining - 1
+            return None
+        self.events.pop(0)
+        self._complete_turn(event["params"]["threadId"], turn_id)
+        return event
 
     def close(self):
         self.closed = True
@@ -379,11 +401,18 @@ class LiveProbeTests(unittest.TestCase):
 
     def test_active_baseline_waits_for_metadata_idle_before_paged_history(self):
         root = self.base / "fixture-active-baseline"
-        self.stream.active_reads_remaining[THREAD_IDS["manager"]] = 1
+        self.stream.active_after_turn_start[THREAD_IDS["manager"]] = 1
         result = self._run_fixture(root)
         self.assertEqual(result["status"], "passed")
         self.assertIn((THREAD_IDS["manager"], "active"), self.state["metadata_statuses"])
         self.assertEqual(result["calls"]["direct_turn_start"], 4)
+
+    def test_idle_metadata_does_not_replace_the_baseline_completion_event(self):
+        root = self.base / "fixture-completion-event"
+        self.stream.completion_polls_remaining["turn-manager-baseline"] = 1
+        result = self._run_fixture(root)
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(result["completion_events"]["manager:baseline"]["turn_id"], "turn-manager-baseline")
 
     def test_idle_paging_unsupported_compares_include_turns_on_same_fixture_without_extra_baseline(self):
         root = self.base / "fixture-history-unsupported"

@@ -254,6 +254,7 @@ class _LiveFixture:
             },
             "resources": {"tasks": {}, "threads": {}, "jobs": {}, "turns": {}},
             "history": {},
+            "completion_events": {},
             "turn_counts": {},
             "cleanup": {
                 "service": "not_started",
@@ -474,6 +475,59 @@ class _LiveFixture:
         self._request("thread/resume", {"threadId": thread_id, "excludeTurns": True})
         return self._read_status(thread_id)
 
+    def _subscribe_to_turn_events(self, role: str) -> None:
+        """Subscribe before a baseline so its completion cannot race history reads."""
+
+        result = self._request("thread/resume", {"threadId": self.threads[role], "excludeTurns": True})
+        status = _thread_status(result)
+        if status not in {"idle", "notLoaded"}:
+            raise LiveProbeError(f"fixture {role} could not subscribe from its initial {status} state")
+
+    def _event_completed_turn_id(self, event: Any, thread_id: str) -> str | None:
+        if not isinstance(event, Mapping) or event.get("method") != "turn/completed":
+            return None
+        params = event.get("params")
+        if not isinstance(params, Mapping) or params.get("threadId") != thread_id:
+            return None
+        turn = params.get("turn")
+        turn_id = turn.get("id") if isinstance(turn, Mapping) else None
+        return turn_id if isinstance(turn_id, str) and turn_id else None
+
+    def _wait_for_completion_event(
+        self, role: str, label: str, phase: str, *, expected_turn_id: str | None = None, deadline: float | None = None
+    ) -> str:
+        """Wait for the App Server's actual completion notification.
+
+        Some App Server builds can publish idle metadata before a just-accepted
+        turn is reflected as completed in paged history.  A subscription made
+        before ``turn/start`` gives this fixture a completion fact without
+        polling history while that turn is still active.
+        """
+
+        deadline = self._deadline() if deadline is None else deadline
+        poll = getattr(self.stream, "poll", None)
+        if not callable(poll):
+            raise LiveProbeError("App Server control stream cannot await turn/completed notifications")
+        thread_id = self.threads[role]
+        while True:
+            try:
+                event = poll(min(POLL_SECONDS, max(0.0, deadline - self.clock())))
+            except Exception as exc:
+                raise LiveProbeError(f"App Server turn/completed wait failed: {_redact(exc)}") from exc
+            completed_id = self._event_completed_turn_id(event, thread_id)
+            if completed_id is not None:
+                if expected_turn_id is not None and completed_id != expected_turn_id:
+                    raise LiveProbeError(
+                        f"fixture {label} completed unexpected turn {completed_id}; expected {expected_turn_id}"
+                    )
+                self.evidence["completion_events"][self._history_key(role, phase)] = {
+                    "method": "turn/completed",
+                    "thread_id": thread_id,
+                    "turn_id": completed_id,
+                }
+                return completed_id
+            self._expired(deadline, label)
+
     def _wait_for_idle(self, role: str, label: str, *, deadline: float | None = None) -> None:
         """Wait on metadata only; paging an active baseline is not valid evidence."""
 
@@ -549,23 +603,23 @@ class _LiveFixture:
         self, role: str, expected: list[str], minimum_turns: int, label: str, phase: str
     ) -> Mapping[str, Any]:
         deadline = self._deadline()
-        while True:
-            self._wait_for_idle(role, label, deadline=deadline)
-            turns = self._thread_turns_after_idle(role, phase)
-            if len(turns) >= minimum_turns:
-                for turn in turns:
-                    text = _turn_text(turn)
-                    if all(item in text for item in expected) and turn.get("status") == "completed":
-                        self._record_paged_history(role, phase, turns)
-                        return turn
-            self._expired(deadline, label)
-            self.sleeper(min(POLL_SECONDS, max(0.0, deadline - self.clock())))
+        completed_id = self._wait_for_completion_event(role, label, phase, deadline=deadline)
+        self._wait_for_idle(role, label, deadline=deadline)
+        turns = self._thread_turns_after_idle(role, phase)
+        if len(turns) >= minimum_turns:
+            for turn in turns:
+                text = _turn_text(turn)
+                if all(item in text for item in expected) and turn.get("status") == "completed":
+                    self._record_paged_history(role, phase, turns)
+                    return turn
+        raise LiveProbeError(f"fixture {label} completed turn {completed_id} without the expected delivery text")
 
     def _start_baseline_turn(self, role: str) -> None:
         self.stage = f"start fixture {role} baseline turn"
         if role != "manager" and not self.evidence["checks"]["executor_bound_before_first_model_turn"]:
             raise LiveProbeError("fixture executor was not bound before its first model turn")
         marker = _BASELINE_MARKERS[role]
+        self._subscribe_to_turn_events(role)
         result = self._request(
             "turn/start",
             {
@@ -587,6 +641,9 @@ class _LiveFixture:
             raise LiveProbeError("fixture attempted more direct baseline turns than its fixed role set")
         self.active_direct_turns[role] = turn_id
         self.evidence["resources"]["turns"][f"{role}_baseline_started"] = turn_id
+        self._wait_for_completion_event(
+            role, f"fixture {role} baseline completion", "baseline", expected_turn_id=turn_id
+        )
         self._wait_for_idle(role, f"fixture {role} baseline completion")
         turns = self._thread_turns_after_idle(role, "baseline")
         completed = next((item for item in turns if item.get("id") == turn_id), None)
