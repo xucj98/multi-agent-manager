@@ -158,7 +158,7 @@ GPU4 的 MAM wait 停止事件对应 job d4ccc2ca-d37a-4d13-89eb-cb4c3ea1598a。
 - 最终保存已原子提交：checkpoint metadata 含 commit timestamp，父目录仅含 20000；item 仅 params、assets、metadata，无 train_state 或 optimizer。
 - checkpoint metadata 中 config、dataset、command 和 norm 证据均可解析：数据为 50 episodes 的 rearrange_blocks_demo_clean_state_shared_memory，norm SHA-256 为 5d84df27e9fce3c6ec28585319ed293fa59fc1822063ecfa0e95c5bf4478606b；9 个 JSON、6 个 JSONL、5 个普通 YAML 与带标签 train config 均通过解析。
 - 显式 CPU-only 核验（CUDA_VISIBLE_DEVICES 空、JAX cpu）实际读回 51 个参数叶、3,353,433,872 个元素，全部 BF16、全部有限，路径和 shape 与注册模型逐项一致；checkpoint-only standalone Policy 恢复成功。
-- 完整审计 JSON：/mnt/public/xcj/Projects/workspace/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_no_memory_s1.json。
+- 完整审计 JSON：/mnt/public/xcj/Projects/multi-agent-manager/.tasks/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_no_memory_s1.json。
 - MAM 复查为 stopped，原 PID 3956476 已不存在且不再占用本任务 GPU4；对应 job 已归档。
 
 同一轮 MAM 实时刷新时 GPU2 serial seed1、GPU3 serial seed2、GPU5 no-memory seed2 仍为 running；它们保持原训练，继续等待各自结束事件。
@@ -187,7 +187,7 @@ GPU5 的 MAM job `b13b2fbd-ce10-4fac-87d0-62761879e057` 已自然停止。最终
 - 最终保存已原子提交：checkpoint metadata 含 commit timestamp，父目录仅含 20000；item 仅 params、assets、metadata，无 train_state 或 optimizer。
 - checkpoint metadata 中 config、dataset、command 和 norm 证据均可解析：数据为 50 episodes 的 rearrange_blocks_demo_clean_state_shared_memory，norm SHA-256 为 5d84df27e9fce3c6ec28585319ed293fa59fc1822063ecfa0e95c5bf4478606b；9 个 JSON、6 个 JSONL、5 个普通 YAML 与带标签 train config 均通过解析。
 - 显式 CPU-only 核验（CUDA_VISIBLE_DEVICES 空、JAX cpu）实际读回 51 个参数叶、3,353,433,872 个元素，全部 BF16、全部有限，路径和 shape 与注册模型逐项一致；checkpoint-only standalone Policy 恢复成功。
-- 完整审计 JSON：/mnt/public/xcj/Projects/workspace/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_no_memory_s2.json。
+- 完整审计 JSON：/mnt/public/xcj/Projects/multi-agent-manager/.tasks/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_no_memory_s2.json。
 - MAM 复查为 stopped，原 PID 3957417 已不存在且不再占用本任务 GPU5；对应 job 已归档。
 
 
@@ -214,7 +214,7 @@ GPU3 的 MAM wait 停止事件对应 job `68ecba3b-e570-4dd4-8cd1-4a82249a515d`�
 - 最终保存已原子提交：checkpoint metadata 含 commit timestamp，父目录仅含 20000；item 仅 params、assets、metadata，无 train_state 或 optimizer。
 - checkpoint metadata 中 config、dataset、command 和 norm 证据均可解析：数据为 50 episodes 的 rearrange_blocks_demo_clean_state_shared_memory，norm SHA-256 为 5d84df27e9fce3c6ec28585319ed293fa59fc1822063ecfa0e95c5bf4478606b；9 个 JSON、6 个 JSONL、5 个普通 YAML 与带标签 train config 均通过解析。
 - 显式 CPU-only 核验（CUDA_VISIBLE_DEVICES 空、JAX cpu）实际读回 56 个参数叶、3,353,474,844 个元素，全部 BF16、全部有限，路径和 shape 与注册 serial 模型逐项一致；checkpoint-only standalone Policy 恢复成功。
-- 完整审计 JSON：/mnt/public/xcj/Projects/workspace/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_serial_lag30_s2.json。
+- 完整审计 JSON：/mnt/public/xcj/Projects/multi-agent-manager/.tasks/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_serial_lag30_s2.json。
 - MAM 复查为 stopped，原 PID 3956200 已不存在且不再占用本任务 GPU3；对应 job 已归档。
 
 
@@ -241,7 +241,7 @@ GPU2 的 MAM wait 停止事件对应 job `aa6d7690-dbb1-4b6d-8eb2-46ca63059400`�
 - 最终保存已原子提交：checkpoint metadata 含 commit timestamp，父目录仅含 20000；item 仅 params、assets、metadata，无 train_state 或 optimizer。
 - checkpoint metadata 中 config、dataset、command 和 norm 证据均可解析：数据为 50 episodes 的 rearrange_blocks_demo_clean_state_shared_memory，norm SHA-256 为 5d84df27e9fce3c6ec28585319ed293fa59fc1822063ecfa0e95c5bf4478606b；9 个 JSON、6 个 JSONL、5 个普通 YAML 与带标签 train config 均通过解析。
 - 显式 CPU-only 核验（CUDA_VISIBLE_DEVICES 空、JAX cpu）实际读回 56 个参数叶、3,353,474,844 个元素，全部 BF16、全部有限，路径和 shape 与注册 serial 模型逐项一致；checkpoint-only standalone Policy 恢复成功。
-- 完整审计 JSON：/mnt/public/xcj/Projects/workspace/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_serial_lag30_s1.json。
+- 完整审计 JSON：/mnt/public/xcj/Projects/multi-agent-manager/.tasks/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_serial_lag30_s1.json。
 - MAM 复查为 stopped，原 PID 3955954 已不存在且不再占用本任务 GPU2；对应 job 已归档。
 
 
@@ -251,9 +251,14 @@ GPU2 的 MAM wait 停止事件对应 job `aa6d7690-dbb1-4b6d-8eb2-46ca63059400`�
 
 | config / schema | seed | 已归档 MAM job | 可评 checkpoint | 审计 |
 | --- | --- | --- | --- | --- |
-| no-memory / rearrange_blocks_no_memory v1 | 1 | d4ccc2ca-d37a-4d13-89eb-cb4c3ea1598a | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_no_memory/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_no_memory_s1/20000 | /mnt/public/xcj/Projects/workspace/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_no_memory_s1.json |
-| no-memory / rearrange_blocks_no_memory v1 | 2 | b13b2fbd-ce10-4fac-87d0-62761879e057 | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_no_memory/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_no_memory_s2/20000 | /mnt/public/xcj/Projects/workspace/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_no_memory_s2.json |
-| serial-lag30 / rearrange_blocks_serial_lag30 v1 | 1 | aa6d7690-dbb1-4b6d-8eb2-46ca63059400 | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_serial_lag30_s1/20000 | /mnt/public/xcj/Projects/workspace/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_serial_lag30_s1.json |
-| serial-lag30 / rearrange_blocks_serial_lag30 v1 | 2 | 68ecba3b-e570-4dd4-8cd1-4a82249a515d | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_serial_lag30_s2/20000 | /mnt/public/xcj/Projects/workspace/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_serial_lag30_s2.json |
+| no-memory / rearrange_blocks_no_memory v1 | 1 | d4ccc2ca-d37a-4d13-89eb-cb4c3ea1598a | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_no_memory/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_no_memory_s1/20000 | /mnt/public/xcj/Projects/multi-agent-manager/.tasks/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_no_memory_s1.json |
+| no-memory / rearrange_blocks_no_memory v1 | 2 | b13b2fbd-ce10-4fac-87d0-62761879e057 | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_no_memory/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_no_memory_s2/20000 | /mnt/public/xcj/Projects/multi-agent-manager/.tasks/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_no_memory_s2.json |
+| serial-lag30 / rearrange_blocks_serial_lag30 v1 | 1 | aa6d7690-dbb1-4b6d-8eb2-46ca63059400 | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_serial_lag30_s1/20000 | /mnt/public/xcj/Projects/multi-agent-manager/.tasks/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_serial_lag30_s1.json |
+| serial-lag30 / rearrange_blocks_serial_lag30 v1 | 2 | 68ecba3b-e570-4dd4-8cd1-4a82249a515d | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_serial_lag30_s2/20000 | /mnt/public/xcj/Projects/multi-agent-manager/.tasks/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_serial_lag30_s2.json |
 
 这组训练的研究目的为补齐同一 Pi0.5 骨干、数据、batch 和 20k protocol 下的 serial-lag30/no-memory 独立重复，以在 e690 评测中分离 seed 方差与 memory 表示差异；训练 loss 仅作为完整性证据，不预判评测成功率。训练过程中未更改训练配置、数据、batch、loss、机器人或现场 PM 服务，也未重跑旧 GPU 门禁。
+
+
+## Manager final cleanup handoff
+
+四份简洁 closure JSON 已从本任务 workspace 移至持久目录 `/mnt/public/xcj/Projects/multi-agent-manager/.tasks/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/`，上表及各项验收链接均已改为该目录。原 workspace 的 `closure/` 临时目录已移除；共享 checkpoints、数据和缓存保持原位。OpenPI worktree 保持 clean，固定在 `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`，可由 Manager 归档。
