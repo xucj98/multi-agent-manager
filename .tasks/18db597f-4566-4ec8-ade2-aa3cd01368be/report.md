@@ -1,46 +1,47 @@
-# 独立 review：r3 40-reset gate 与整合文档
+# 独立 review 更正：r3 40-reset gate 与整合文档
 
-## 范围与审阅树
+## 结论
 
-- RMBench：`/mnt/public/xcj/Projects/workspace/18db597f-4566-4ec8-ade2-aa3cd01368be/RMBench`，独立分支 `task/18db597f-4566-4ec8-ade2-aa3cd01368be`，HEAD `bf34743334efc98440fa9b05e3f2f05e8303846a`，基线 `77477931bee18c2476bea36b400ab45dc67d9ebe`。
-- robot-bridge：同一 task 的独立 worktree，HEAD `f9626636c4776d8eb15f9c556775cb2d12c000e5`，用于真实 API 对照。
-- 文档按精确提交 `291d6d8017d11baf65aafca3805fe20a61619fa2` 相对 `295effbbab8347b1ba43dca051740cbfde82089a` 只读审阅。
+- 代码：**PASS**（bf34743334efc98440fa9b05e3f2f05e8303846a；此前已接受）。
+- 文档：**PASS**（291d6d8017d11baf65aafca3805fe20a61619fa2）。
 
-未运行 GPU、SAPIEN/native worker、远端命令或正式评测；两个审阅树均 clean，临时 `py_compile` cache 已清理并保留 worktree 供 Manager 验收。
+本报告取代先前报告的三项文档 blocker。它们错误地把文档当作在 291d6d8 自身旧工作树中执行；README 实际明确指定另一个固定的 C r3 runtime，因此该比较不适用。
 
-## 代码：PASS（仅限 `bf3474`）
+## 审阅对象与边界
 
-`script/renderer_reset_gate.py` 保持为有界工具：固定 `put_back_block/demo_clean_eval`、episode `0..39`、seed `100000..100039`、无 policy/action/recorder/result leaf，receipt 与 worker log 均拒绝写入 `eval_result`。它把物理 `--device` 映射成 worker 的 `CUDA_VISIBLE_DEVICES=<GPU>` 与 `SAPIEN_RENDER_DEVICE=cuda:0`，并记录系统 ICD、两个 git state、metadata、每条 reset、marker 和原子 receipt。
+- 独立 RMBench worktree：/mnt/public/xcj/Projects/workspace/18db597f-4566-4ec8-ade2-aa3cd01368be/RMBench，HEAD bf3474，其基线为 7747793。
+- 独立 robot-bridge worktree：同 task 路径，HEAD f9626636，仅用于真实 controller API 对照。
+- 文档按精确提交 291d6d8 只读审阅。
+- 未运行 GPU、SAPIEN/native worker、远端命令或正式评测，也未改动运行时或源代码。
 
-我没有只接受候选自身的 fake proxy。冻结 bridge 的真实 API 是：`RMBenchSimulationController(config)` 在构造时启动 worker，`reset(**request)` 直接转发 RPC；真实 worker 的 `_reset_response()` 返回 `accepted` 与 `episode_status`。gate 提供的 `task/config/seed/episode_id/video` 与该签名一致，且仅在 `accepted=true`、`state=ready`、`terminal=false` 时继续。`shutdown()` 使用真实 controller 的进程内回收路径；冻结 bridge 的现有测试证明 stuck worker 会被 reaped，seed reject 与 accepted 后 setup failure 可区分。
+## 文档更正依据
 
-CPU 验证均在 `CUDA_VISIBLE_DEVICES=''` 下完成：
+README 第 8–12 行明确要求在 c-eval-renderer-r3/RMBench 的 C r3 checkout 运行，并固定 RMBench 7747793、robot-bridge f9626636、OpenPI a869498。因此文档是给该命名 checkout 的操作指南，并未声称其命令应在 291d6d8 的旧本地 parent 执行。
 
-```text
-python3 tests/test_renderer_reset_gate.py                 # 2 passed
-python3 tests/test_renderer_lifecycle.py                  # 2 passed
-/root/.local/bin/python3.10 上重复上述两项              # 4 passed
-python3 -m py_compile script/renderer_reset_gate.py
-python3 script/renderer_reset_gate.py --help
-robot-bridge pytest 5 selected                             # 5 passed
-```
+静态核对该命名 runtime：
 
-选取的 bridge 测试覆盖真实 proxy 的 request id/卡死 worker 回收、worker 的 seed rejection 与 reset failure、scheduler reset wire contract 和 controller handler 路径。另以临时 CPU fixture 直接调用候选 `run_gate()`：40 条 accepted 且 stderr 含 `ErrorIncompatibleDriver` 时 receipt `passed=false`；episode 22 抛 proxy error 时 `completed_count=22`、`passed=false`、保留 error。故 native marker 或 EOF 不会被误报为 PASS，且不会跳过 seed。
+- 7747793 是 bf3474 的祖先；两者间的 run_memory_schema_eval.py 与 memory_schema_eval.yaml 没有差异。
+- runner 第 218、220 行定义 --training-seed 和 --eval-seed，第 245–246 行要求普通 20k audit/smoke/formal 显式提供二者；README 第 115、120、126 行与此一致。
+- runner 第 230–233 行要求 formal 提供 --smoke-run，README 第 123–128 行按同一 train/eval 前缀提供 matching smoke；第 267–274 行实际生成 train<N>--eval<M> 审计后缀，与 README 第 137–141 行一致。
+- YAML 第 7–9 行固定 robot_bridge_commit: f9626636…；rmbench_base: f022… 是 r3 基线的祖先。此前声称 bridge SHA 不匹配的结论不成立。
+- README 第 94–103 行的 gate 命令与 bf3474/script/renderer_reset_gate.py 的实际 CLI 参数一致，且文档正确要求工具先经 review、同步到 r3 tree、目标卡空闲后才运行。
 
-这不是 native/GPU 验证；gate 仍应保持 pending，待独立 review 结果同步后才可在获授权的空闲目标卡运行。
+没有发现需要改写 selector、命令或文档的实际歧义。
 
-## 文档：BLOCKER（`291d6d8`）
+## 代码与 CPU 证据
 
-`README_memory_schema.zh-CN.md` 的 r3 smoke/formal 三条示例不可执行，不能合入为当前使用说明。
+gate 仍是有界的 40-reset 工具：固定 episode 0..39 和 seed 100000..100039，不启动 policy、不写 rollout/result leaf，receipt 与 worker log 均拒绝写入 eval_result。真实 bridge 对照确认 RMBenchSimulationController 的 reset RPC、accepted/episode_status 响应和 shutdown 回收路径与 gate 调用相符。
 
-1. 第 115、120、126 行传入 `--training-seed` 与 `--eval-seed`。同一精确提交的 `commands/run_memory_schema_eval.py:185-205` 只定义 `variant/checkpoint/run-name/gpu/mode/smoke-run/technical-smoke/prepare-audit/dry-run`，没有这两个参数；argparse 会在 audit、smoke 或 formal 前拒绝命令。
-2. README 第 10–12 行指定 r3 bridge `f9626636`，但同提交的 `configs/memory_schema_eval.yaml` 固定 `robot_bridge_commit: 8ea6078`，脚本第 212–215 行要求当前 bridge HEAD 与该旧 SHA 相等。因此即使删去无效参数，r3 路径也会在运行前被该断言拒绝。
-3. README 第 138 行声称审计输入目录有 `--train<N>--eval<M>` 后缀；实际脚本第 226–228 行只使用 `variant--<checkpoint-hash>`。这会误导清理和并发留痕判断。
+此前在 CPU-only 条件完成：
 
-修复应先让实际 r3 runner/config 的冻结 SHA 与已部署三树一致，再只记录入口实际支持的 seed 选择方式；若确实需要这两个 selector，应先作为代码变更实现并测试。随后把审计目录说明同步到真实实现。完成前，文档命令不能作为 C r3 启动依据。
+    tests/test_renderer_reset_gate.py    2 passed
+    tests/test_renderer_lifecycle.py     2 passed
+    Python 3.10 重复上述两项            4 passed
+    selected robot-bridge pytest         5 passed
+    AST/YAML static-doc-contract          PASS
 
-其余状态陈述经 targeted 证据核对没有发现矛盾：两个新 r2 `final_review.json` 的 SHA 与文档一致，均为 `completed100_verified`、33/100、100 terminal、0 runtime errors/worker markers；put-back B 六项 C-ready 与训练 owner `695bc51f` 的最终报告一致。e690 已发布证据也保持六份 EOF partial 为 22 terminal + episode 22 的 reset-error，均不计分；文档没有把 gate、smoke 或 r3 formal 误写成已完成。
+临时 CPU fixture 还确认 native marker 会令 receipt passed=false，episode 22 proxy error 会保留错误、completed_count=22 且 passed=false。
 
-## 交接
+gate 尚未实际部署或运行；r3 GPU gate、matching smoke 和 r3 formal 仍为 pending。六份 r2 EOF partial 仍按“22 条 accepted terminal 加 episode 22 reset-error”处理，不计分、不自动重试；put-back B 六项仍是 C-ready，尚待各自 smoke/formal。
 
-代码候选可独立进入下一步 review；文档提交须先修复上述三项一致性 blocker。没有部署、合入或改动活跃 runtime。
+两个独立审阅树均为 clean；没有留下临时产物。
