@@ -37,7 +37,7 @@
 用户工作区与清理：
 
 - 合并前后，`docs/wash-cup-shared-memory-token-usage-audit.zh-CN.md` 的 SHA-256 均为 `cd1c95f9d0b66c0c66b7232210d6d359a0eca2050bda42acdffef5548276e038`；其 index 仍为 stage 0 的 blob `19f394ecd26de6c9aaa56ecf3ff3a686f59ef4cc`，未进入暂存区。
-- 初始以及合并/安装后的校验中，两个原有未跟踪文件 `.tasks/2f6ec567-e628-46ba-94ff-ac97daa009cb/report.md` 与 `.tasks/838bfe79-ab08-4c58-9843-f8e84423f0e1/report.md` 都为空（SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`）。首次发布本报告后的最终核对发现前者被并发的用户工作更新为 SHA-256 `34a691ce943d55d22f632226299b19def7a590967ace3bf0e9221b528b5a3e3d`；它仍未跟踪、未暂存，且不是本次集成或安装写入。后者仍为空。没有 stash、reset、force 或全树暂存。
+- 初始以及合并/安装后的校验中，两个原有未跟踪文件 `.tasks/2f6ec567-e628-46ba-94ff-ac97daa009cb/report.md` 与 `.tasks/838bfe79-ab08-4c58-9843-f8e84423f0e1/report.md` 都为空（SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`）。首次发布本报告后的核对发现前者被并发的用户工作更新为 SHA-256 `34a691ce943d55d22f632226299b19def7a590967ace3bf0e9221b528b5a3e3d`；随后其所属任务将该报告发布为管理分支 commit `9de0262f149fc6446edf3d2dc35c368374f1ece3`，当时工作区内容 SHA-256 为 `9227e80cb281c4323f25f2da1fd404af023c7acd46945699d2198f1cf106ae88`，故它不再显示为未跟踪。上述并发更新均非本次集成或安装写入/暂存；后者仍为空且未跟踪。没有 stash、reset、force 或全树暂存。
 - 安装器的 `/tmp/mam-install.rpXWFG` fixture 根已由其 trap 删除；短期 installer/main worktree 与本次安装日志已删除。原实现 worktree `/mnt/public/xcj/Projects/workspace/d5cb66d7-36d9-4bfc-9d01-d56befd32de4/multi-agent-manager` 保留且仍在候选 commit。
 
 没有执行任何实际 `mam task rebind`：仅调用了 `--help`。本任务 status 仍保持 executor `01a09671-2851-7763-bb23-a1201043c3cc`，且未出现 handoff 审计记录；实际换绑继续由 Manager 决定并执行。
