@@ -14,7 +14,7 @@ import types
 import unittest
 from unittest.mock import patch
 
-from multi_agent_manager import cli
+from multi_agent_manager import cli, wake_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 _CLI_BOOTSTRAP = (
@@ -104,6 +104,24 @@ printf env > "$target/.venv/marker"
     def report(self, task):
         self.store.doc(task, "report").write_text("Completed the task; tests passed.\n")
         return self.publish(task, "report")
+
+    def prepare_rebind(self, task, current="old-executor", replacement="new-executor", manager="manager-agent"):
+        data = self.store.read(task)
+        data["agent"] = current
+        self.store.write(data)
+        manager = wake_runtime.recorded_manager(self.store) or manager
+        wake_runtime._record_manager(self.store, manager, source="test")
+        states = {
+            current: {"status": "idle", "checked_at": "test", "error": None},
+            replacement: {"status": "idle", "checked_at": "test", "error": None},
+        }
+        args = types.SimpleNamespace(task=task, agent=replacement, note="handoff after old executor completed")
+        return args, states, manager
+
+    def rebind_direct(self, args, states, manager):
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": manager}, clear=False), \
+                patch.object(cli, "agent_observations", return_value=states):
+            return cli.rebind(self.store, args)
 
     def task_output(self, *args):
         with patch("sys.stdout", new_callable=io.StringIO) as output:
@@ -466,6 +484,142 @@ printf env > "$target/.venv/marker"
         self.assertEqual(len(self.task_command_output("list", "--archived").splitlines()), 2)
         self.assertTrue(self.store.doc(first, "task").exists())
         self.assertEqual(self.call("status", first)["status"], "archived")
+
+    def test_rebind_preserves_workspace_jobs_publications_and_audits_handoff(self):
+        task = self.task()
+        workspace = self.add(task)
+        task_revision = self.publish(task)
+        report_revision = self.report(task)
+        data = self.store.read(task)
+        data["jobs"] = [{
+            "id": "handoff-job", "note": "formal evaluation", "host": "remote", "pid": 42,
+            "identity": {"host": "remote", "boot_id": "boot", "start_ticks": 42},
+            "status": "running", "checked_at": "before", "started_at": "before",
+            "probe": {"status": "running", "checked_at": "before", "error": None}, "archive": None,
+        }]
+        data["review"] = {"task": "source-task", "commits": {"multi-agent-manager": "source-commit"}}
+        self.store.write(data)
+        args, states, manager = self.prepare_rebind(task)
+        before = self.store.read(task)
+        result = self.rebind_direct(args, states, manager)
+        after = self.store.read(task)
+
+        self.assertEqual(result["agent"], "new-executor")
+        self.assertEqual(after["workspace"], before["workspace"])
+        self.assertEqual(after["repos"], before["repos"])
+        self.assertEqual(after["jobs"], before["jobs"])
+        self.assertEqual(after["report"], before["report"])
+        self.assertEqual(after["review"], before["review"])
+        self.assertEqual(self.call("status", task)["publications"], {"task": task_revision, "report": report_revision})
+        self.assertEqual(after["repos"]["multi-agent-manager"]["path"], workspace["path"])
+        self.assertEqual(after["handoffs"], [{
+            "from_agent": "old-executor", "to_agent": "new-executor", "at": after["handoffs"][0]["at"],
+            "note": args.note, "manager": manager,
+        }])
+        self.assertEqual(self.call("status", task)["handoffs"], after["handoffs"])
+
+    def test_rebind_accepts_readonly_not_loaded_threads(self):
+        task = self.task()
+        args, states, manager = self.prepare_rebind(task)
+        states["old-executor"]["status"] = "notLoaded"
+        states["new-executor"]["status"] = "notLoaded"
+        result = self.rebind_direct(args, states, manager)
+        self.assertEqual(result["agent"], "new-executor")
+
+    def test_rebind_rejects_busy_or_unverifiable_executor_or_replacement(self):
+        cases = (
+            ("old-executor", "active", "current executor is active"),
+            ("old-executor", "unknown", "cannot verify current executor state"),
+            ("new-executor", "active", "replacement agent is active"),
+            ("new-executor", "unknown", "cannot verify replacement agent state"),
+            ("new-executor", "idle", "cannot verify replacement agent state"),
+        )
+        for agent, state, message in cases:
+            with self.subTest(agent=agent, state=state):
+                task = self.task()
+                args, states, manager = self.prepare_rebind(task)
+                states[agent] = {"status": state, "checked_at": "test", "error": "App Server unavailable"}
+                with self.assertRaisesRegex(cli.Error, message):
+                    self.rebind_direct(args, states, manager)
+                self.assertEqual(self.store.read(task)["agent"], "old-executor")
+                self.assertNotIn("handoffs", self.store.read(task))
+
+    def test_rebind_rejects_conflicts_manager_invalid_archived_and_unbound_tasks(self):
+        task = self.task()
+        args, states, manager = self.prepare_rebind(task)
+        other = self.task()
+        other_data = self.store.read(other)
+        other_data["agent"] = args.agent
+        self.store.write(other_data)
+        with self.assertRaisesRegex(cli.Error, "already bound to another task"):
+            self.rebind_direct(args, states, manager)
+
+        other_data["status"] = "archived"
+        self.store.write(other_data)
+        manager_args = types.SimpleNamespace(task=task, agent=manager, note=args.note)
+        with self.assertRaisesRegex(cli.Error, "recorded Manager"):
+            self.rebind_direct(manager_args, states, manager)
+        invalid_args = types.SimpleNamespace(task=task, agent="bad\nagent", note=args.note)
+        with self.assertRaisesRegex(cli.Error, "single-line AGENT-ID"):
+            self.rebind_direct(invalid_args, states, manager)
+
+        unbound = self.task()
+        unbound_args = types.SimpleNamespace(task=unbound, agent="new-unbound", note=args.note)
+        unbound_states = {"new-unbound": {"status": "idle", "checked_at": "test", "error": None}}
+        with self.assertRaisesRegex(cli.Error, "no current executor"):
+            self.rebind_direct(unbound_args, unbound_states, manager)
+
+        archived = self.task()
+        archived_data = self.store.read(archived)
+        archived_data.update({"agent": "old-archived", "status": "archived"})
+        self.store.write(archived_data)
+        archived_args = types.SimpleNamespace(task=archived, agent="new-archived", note=args.note)
+        archived_states = {
+            "old-archived": {"status": "idle", "checked_at": "test", "error": None},
+            "new-archived": {"status": "idle", "checked_at": "test", "error": None},
+        }
+        with self.assertRaisesRegex(cli.Error, "is archived"):
+            self.rebind_direct(archived_args, archived_states, manager)
+
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": "another-manager"}, clear=False), \
+                patch.object(cli, "agent_observations", return_value=states):
+            with self.assertRaisesRegex(cli.Error, "must be called by the recorded Manager"):
+                cli.rebind(self.store, args)
+
+    def test_rebind_same_target_is_a_non_mutating_retry(self):
+        task = self.task()
+        args, states, manager = self.prepare_rebind(task)
+        self.rebind_direct(args, states, manager)
+        path = self.store.state / f"{task}.json"
+        before = path.read_bytes()
+        repeated = types.SimpleNamespace(task=task, agent=args.agent, note="lost CLI response retry")
+        result = self.rebind_direct(repeated, {args.agent: {"status": "active", "checked_at": "later", "error": None}}, manager)
+        self.assertTrue(result["unchanged"])
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(len(self.store.read(task)["handoffs"]), 1)
+
+    def test_rebind_rejects_active_optional_wait_even_with_idle_thread_metadata(self):
+        cases = (
+            ("old-executor", "running", "current executor has an active optional wait"),
+            ("old-executor", "unknown", "cannot verify current executor optional-wait identity"),
+            ("new-executor", "running", "replacement agent has an active optional wait"),
+        )
+        for waiter, wait_state, message in cases:
+            with self.subTest(waiter=waiter, wait_state=wait_state):
+                self.store.remove_wait("old-executor")
+                self.store.remove_wait("new-executor")
+                task = self.task()
+                args, states, manager = self.prepare_rebind(task)
+                self.store.write_wait(self.wait_record(waiter, 77, "agent-wait", task=task))
+                fake = types.SimpleNamespace(probe_process=lambda host, pid, identity, timeout=None: {
+                    "status": wait_state, "identity": identity, "checked_at": "test", "error": "identity query unavailable",
+                })
+                with patch.dict(os.environ, {"CODEX_THREAD_ID": manager}, clear=False), \
+                        patch.object(cli, "agent_observations", return_value=states), \
+                        patch.object(cli, "runtime", return_value=fake):
+                    with self.assertRaisesRegex(cli.Error, message):
+                        cli.rebind(self.store, args)
+                self.assertEqual(self.store.read(task)["agent"], "old-executor")
 
     def test_partial_creation_retry_and_no_foreign_branch_adoption(self):
         source = self.source("robot-bridge")

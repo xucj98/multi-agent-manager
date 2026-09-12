@@ -630,6 +630,206 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(self.starts, [])
         self.assertEqual(self.store.read(TASK_ONE)["jobs"][0]["status"], "archived")
 
+    def test_rebind_waits_for_scheduler_cycle_then_routes_stopped_job_to_replacement(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        scheduler_entered = threading.Event()
+        allow_scheduler = threading.Event()
+        scheduler_errors, rebind_errors, rebind_results = [], [], []
+
+        def blocked_agent_probe(agents, socket_path):
+            self.assertEqual(socket_path, "/tmp/fake-app-server.sock")
+            scheduler_entered.set()
+            if not allow_scheduler.wait(5):
+                raise AssertionError("scheduler was not released")
+            return {
+                agent: {"status": "active" if agent == EXECUTOR else "idle", "error": None}
+                for agent in agents
+            }
+
+        scheduler = self.scheduler(agent_probe=blocked_agent_probe)
+
+        def run_scheduler():
+            try:
+                scheduler.run_once()
+            except BaseException as exc:  # Preserve errors raised in the helper thread.
+                scheduler_errors.append(exc)
+
+        cycle = threading.Thread(target=run_scheduler)
+        cycle.start()
+        self.assertTrue(scheduler_entered.wait(2))
+
+        def run_rebind():
+            args = types.SimpleNamespace(task=TASK_ONE, agent=EXECUTOR_TWO, note="old executor completed")
+            states = {
+                EXECUTOR: {"status": "idle", "checked_at": "rebind", "error": None},
+                EXECUTOR_TWO: {"status": "idle", "checked_at": "rebind", "error": None},
+            }
+            try:
+                with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": MANAGER}, clear=False), \
+                     mock.patch.object(cli, "agent_observations", return_value=states):
+                    rebind_results.append(cli.rebind(self.store, args))
+            except BaseException as exc:  # Preserve errors raised in the helper thread.
+                rebind_errors.append(exc)
+
+        handoff = threading.Thread(target=run_rebind)
+        handoff.start()
+        self.assertEqual(self.store.read(TASK_ONE)["agent"], EXECUTOR)
+        self.assertFalse(rebind_results, "rebind must wait for the in-flight service cycle")
+
+        allow_scheduler.set()
+        cycle.join(5)
+        handoff.join(5)
+        self.assertFalse(cycle.is_alive())
+        self.assertFalse(handoff.is_alive())
+        self.assertFalse(scheduler_errors)
+        self.assertFalse(rebind_errors)
+        self.assertEqual(rebind_results[0]["agent"], EXECUTOR_TWO)
+        self.assertEqual(self.starts, [], "the old active recipient was never awakened")
+
+        # The first cycle retained an old-recipient stopped-job event.  The
+        # next cycle must use task.agent, archive that stale event, and deliver
+        # the same job to the replacement without recreating its process data.
+        scheduler.agent_probe = self.agent_probe
+        self.statuses[EXECUTOR_TWO] = "idle"
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR_TWO])
+        state = self.state()
+        self.assertTrue(any(event.get("recipient") == EXECUTOR for event in state["history"]))
+        self.assertTrue(any(event.get("recipient") == EXECUTOR_TWO for event in state["events"].values()))
+        self.assertEqual(self.store.read(TASK_ONE)["jobs"][0]["id"], "stopped")
+
+    def test_rebind_invalidates_accepted_old_stopped_job_delivery_before_new_delivery(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        self.scheduler().run_once()
+        old_event = next(iter(self.state()["events"].values()))
+        self.assertEqual((old_event["recipient"], old_event["delivery"]), (EXECUTOR, "accepted"))
+
+        args = types.SimpleNamespace(task=TASK_ONE, agent=EXECUTOR_TWO, note="old executor completed")
+        states = {
+            EXECUTOR: {"status": "idle", "checked_at": "rebind", "error": None},
+            EXECUTOR_TWO: {"status": "idle", "checked_at": "rebind", "error": None},
+        }
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": MANAGER}, clear=False), \
+             mock.patch.object(cli, "agent_observations", return_value=states):
+            cli.rebind(self.store, args)
+
+        self.scheduler().run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR, EXECUTOR_TWO])
+        state = self.state()
+        self.assertTrue(any(
+            event.get("task") == TASK_ONE and event.get("recipient") == EXECUTOR
+            for event in state["history"]
+        ))
+        self.assertTrue(any(
+            event.get("task") == TASK_ONE and event.get("recipient") == EXECUTOR_TWO and event.get("delivery") == "accepted"
+            for event in state["events"].values()
+        ))
+
+    def test_rebind_invalidates_uncertain_old_stopped_job_delivery_before_new_delivery(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        self.stream_failure = AcceptedThenLost(RuntimeError("lost turn/start response"))
+        self.scheduler().run_once()
+        old_event = next(iter(self.state()["events"].values()))
+        self.assertEqual((old_event["recipient"], old_event["delivery"]), (EXECUTOR, "uncertain"))
+
+        args = types.SimpleNamespace(task=TASK_ONE, agent=EXECUTOR_TWO, note="old executor completed")
+        states = {
+            EXECUTOR: {"status": "idle", "checked_at": "rebind", "error": None},
+            EXECUTOR_TWO: {"status": "idle", "checked_at": "rebind", "error": None},
+        }
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": MANAGER}, clear=False), \
+             mock.patch.object(cli, "agent_observations", return_value=states):
+            cli.rebind(self.store, args)
+
+        self.scheduler().run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR, EXECUTOR_TWO])
+        state = self.state()
+        self.assertTrue(any(
+            event.get("task") == TASK_ONE and event.get("recipient") == EXECUTOR
+            for event in state["history"]
+        ))
+        self.assertTrue(any(
+            event.get("task") == TASK_ONE and event.get("recipient") == EXECUTOR_TWO and event.get("delivery") == "accepted"
+            for event in state["events"].values()
+        ))
+
+    def test_rebind_and_wait_stop_manager_share_the_bindings_boundary_without_deadlock(self):
+        self.task(TASK_ONE)
+        old_wait = {
+            "agent": EXECUTOR,
+            "pid": 71,
+            "identity": {"host": "local", "boot_id": "boot", "start_ticks": 71},
+            "token": "old-wait", "kind": "unified", "role": "executor", "task": TASK_ONE,
+            "turn_id": "old-turn", "timeout": 3600, "started_at": "test", "cancelled": None,
+        }
+        manager_wait = {
+            "agent": MANAGER,
+            "pid": 72,
+            "identity": {"host": "local", "boot_id": "boot", "start_ticks": 72},
+            "token": "manager-wait", "kind": "unified", "role": "manager", "task": None,
+            "turn_id": "manager-turn", "timeout": 3600, "started_at": "test", "cancelled": None,
+        }
+        self.store.write_wait(old_wait)
+        self.store.write_wait(manager_wait)
+        selected = threading.Event()
+        release_selection = threading.Event()
+        stop_result, stop_errors, rebind_result, rebind_errors = [], [], [], []
+        original_target = cli.manager_wait_target
+
+        def fake_active_wait(store, agent):
+            record = store.read_wait(agent)
+            return (record, "running") if record else (None, "empty")
+
+        def gated_target(store):
+            selected.set()
+            if not release_selection.wait(5):
+                raise AssertionError("wait-stop selection was not released")
+            target = original_target(store)
+            self.assertEqual(target["agent"], MANAGER)
+            # The old executor's wait has just finished.  It was still bound
+            # for the selection, so it could not be mistaken for the Manager.
+            self.store.remove_wait(EXECUTOR)
+            return target
+
+        def run_wait_stop():
+            try:
+                stop_result.append(cli.wait_stop_manager(self.store))
+            except BaseException as exc:
+                stop_errors.append(exc)
+
+        def run_rebind():
+            args = types.SimpleNamespace(task=TASK_ONE, agent=EXECUTOR_TWO, note="wait completed before handoff")
+            states = {
+                EXECUTOR: {"status": "idle", "checked_at": "rebind", "error": None},
+                EXECUTOR_TWO: {"status": "idle", "checked_at": "rebind", "error": None},
+            }
+            try:
+                with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": MANAGER}, clear=False), \
+                     mock.patch.object(cli, "agent_observations", return_value=states):
+                    rebind_result.append(cli.rebind(self.store, args))
+            except BaseException as exc:
+                rebind_errors.append(exc)
+
+        with mock.patch.object(cli, "active_wait", side_effect=fake_active_wait), \
+             mock.patch.object(cli, "manager_wait_target", side_effect=gated_target):
+            stopper = threading.Thread(target=run_wait_stop)
+            stopper.start()
+            self.assertTrue(selected.wait(2))
+            handoff = threading.Thread(target=run_rebind)
+            handoff.start()
+            self.assertEqual(self.store.read(TASK_ONE)["agent"], EXECUTOR)
+            self.assertFalse(rebind_result, "rebind must wait for wait-stop's binding snapshot")
+            release_selection.set()
+            stopper.join(5)
+            handoff.join(5)
+
+        self.assertFalse(stopper.is_alive())
+        self.assertFalse(handoff.is_alive())
+        self.assertFalse(stop_errors)
+        self.assertFalse(rebind_errors)
+        self.assertEqual(stop_result, [{"status": "cancelled", "agent": MANAGER}])
+        self.assertEqual(rebind_result[0]["agent"], EXECUTOR_TWO)
+
     def test_review_cycle_and_unknown_executor_are_visible_without_turn_start(self):
         self.task(TASK_ONE, agent=EXECUTOR, review={"task": TASK_TWO, "commits": {}})
         self.task(TASK_TWO, agent=REVIEWER, review={"task": TASK_ONE, "commits": {}})
