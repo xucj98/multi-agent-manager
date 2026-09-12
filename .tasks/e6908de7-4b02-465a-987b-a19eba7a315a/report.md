@@ -589,3 +589,17 @@ C2 GPU6 (`1c64c244-3c1b-462b-baec-34f3a3ba7264`) 和 GPU7 (`c98c5377-3fc2-4c9f-b
 该树干净，`git diff --check`通过。台账主概述和覆盖表同步列出7个 formal、2个 smoke、C2两个不可计分 partial 和稳定结果链接；没有碰冻结 eval tree 或把缺失 eval 写为0。
 
 下一次停止事件由 MAM 主动唤醒后，先完成对应 formal 的50/100收尾或短 smoke→formal 门禁，再接续当时实际空闲卡；不重复 C2 这两个未知 EOF leaf。
+
+
+### 19:25 CST 增量：继续填充 C1/C3 空卡
+
+上节19:20快照之后，两个短 smoke 已自然完成并通过同一门禁，直接转为新增正式100：
+
+- C1 GPU5，rearrange no-memory / train2 / eval1，accepted `200000,200001`，MAM `2ec2a132-8913-495b-a4fc-774984ec8009`；
+- C3 GPU0，put-back full t+1 / train1 / eval1，accepted `200000,200001`，MAM `e7bbf18a-b5e3-4c85-b893-cd04570680aa`。
+
+二者均有 completed、0 runtime error、video/no-video、metadata lineage 和正常 child 收尾；任务成功数未用作门禁。C1 GPU6 已在其 audit/metadata（train2/eval2 → environment seeds `300000+`）和显存/端口复核后启动 matching smoke `c_rearrange_no_memory_trainseed2_evalseed2_smoke2_r2`；C1 GPU7 需等该 smoke 首个 infer 后才可按同主机错开规则继续。C3 四张卡均有 formal，C2 因已记录的重复 EOF 仍不接续。
+
+因此截至该快照共有 **9 个已登记 formal**：C1 GPU1–5 的 no-memory train1 eval0/1/2 与 train2 eval0/1，C3 GPU0–3 的 put-back t+1/train1/eval1、t+1/train0/eval2、t+30/train0/eval1/2。C1 GPU6 仅为短 smoke，尚无 formal 分数或 MAM job。安全 docs tree 追加 `e6405ae`（父 `d380508`），并保持干净、`git diff --check` 通过；覆盖表已同步为9 formal/1 smoke。此更新取代上节的“7 formal、2 smoke”瞬时状态。
+
+本轮不再主动等待或轮询。已登记的 formal 停止时由 MAM 主动唤醒；届时先收尾/归档，再按实际 GPU 与同主机冷启动门接续。
