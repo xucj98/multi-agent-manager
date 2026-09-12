@@ -22,3 +22,12 @@
 
 ## 用户追加范围：C2 / C3 同样异常
 用户确认 wuwen-4090-2 和 wuwen-4090-3 也存在相同 nvidia-smi/nvitop 显示问题。修复范围扩展为 C1/C2/C3，分别验证hostname、驱动/NVML/nvitop来源与PID可见性、可用映射入口，不把C1结论直接当作三台同根因。C1已有正式评估、C2 GPU6和C3 GPU0已有40-reset gate，所有活跃进程保持。先在一台独立用户态环境验证，再提出适用另外两台的具体方案；共享/mnt/public意味着不能以不同SSH主机当作不同文件树。报告提供三台的对照及各自是否修复/限制。其余约束不变。
+
+## Manager复核与C3可执行收尾
+Manager已读9de0262报告/源码/证据，接受C1/C2暂无可靠在线映射候选；不把补充探针当修复部署。C3 Manager独立SSH复核当前GPU0约16142MiB，nvidia-smi正确显示PID1032416/1032527等及完整评估runtime路径，command -v nvitop为空。现在有真实活跃负载，可完成此前缺失的live nvitop验证。
+
+请在C3独立用户态venv固定nvitop1.7.1及已验证依赖，核验compute和graphics的nvitop command/user/CPU字段可读且与/proc真实进程一致。不要新启GPU负载或干扰评估。若通过，授权提供持久独立工具入口：优先使用C3本机 /root/.local/share/venvs/nvitop-c3 及 /root/.local/bin/nvitop（仅在该路径不存在、无用户现有命令被覆盖时创建链接；否则用独立明确命名入口）。不要改全局site-packages、shell profile、驱动或C共享runtime。确认SSH login shell能找到命令，否则报告已验证的绝对入口即可。
+
+C1/C2暂不部署猜测性wrapper；将最小平台支持复现说明准备为简短文本，含主机名/driver版本、默认命令、实测异常和C3对照、希望平台提供的实例内PID可见性支持，不发送给平台（用户尚未授权对外联系）。如果平台官方文档无法直接核实，不把该平台架构限制写成绝对事实。
+
+发布增量report：C3真实nvitop显示样本/入口/版本/卸载方式、C1/C2未修复边界、平台复现文本位置。删除无部署用途的重复临时probe/cache，保留最小证据即可。当前任务在这一步后再由Manager收尾。
