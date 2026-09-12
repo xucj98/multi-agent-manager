@@ -1,0 +1,5 @@
+# Review optional wait ownership correction
+
+Read AGENTS/development instructions and source task900b7f3c. Create independent MAM worktree at3c88cf6a3772631f0bc252fef82e11315a9524b5. Review small runtime diff: idle owner with unarchived running jobs must not produce Manager agent_completed, both on initial snapshot and observed turn completion; stopped jobs remain actionable owner handoffs; no-job/all-archived idle task requires Manager; review suppression, unknown process state, active-owner no-probe, message cancellation and hour timeout remain intact. Check the new event-path _refresh/_reconcile does not introduce stale completion, reentrant subscription or unbounded polling. Run relevant CPU tests and inspect test coverage against these behaviors. No production changes, installation, new test threads/model turns, or liveprobe. UI diagnosis must remain undisturbed.
+
+Publish concise PASS or actionable blocker with candidate/workspace/tests, clean transient files, end turn. Do not change implementation. Current main91b6f3f adds only user docs after candidate base21e27c7; Manager will preserve those docs when integrating.
