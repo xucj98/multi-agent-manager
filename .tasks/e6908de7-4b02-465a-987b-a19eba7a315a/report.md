@@ -662,3 +662,13 @@ MAM 主动唤醒后，C3 GPU3 的 `c_put_back_full_t_plus_30_trainseed0_evalseed
 实时 MAM job 表确认，当前仅 C1 GPU1–7 的七项 formal 运行：rearrange no-memory train1/train2 的六项及 serial-lag30 train1/eval0。它们未被停止或修改。
 
 安全台账树 `task/e6908de7-r2-running-ledger` 已追加 `020d4ee89a41d4a0e15e2c40902cc01c612a06cf`（父 `77dbfcc3f37f90dadd42225ee7ce4fab056fd448`），同步主概述、C3 四个 failure review、eval_seed 覆盖表与当前七项 formal；`git diff --check` 通过且树干净。
+
+## 2026-09-12 20:48 CST：C1 GPU1 no-memory seed1/eval0 完整收尾
+
+MAM `c492ec19-772d-403b-a7d0-052c2b5c9c42`（C1 GPU1，`c_rearrange_no_memory_trainseed1_evalseed0_100ep_r2`）已自然完成并归档。固定环境 seed 为连续 `100000–100099`；100 条均 terminal，100 个 scheduler 均为 `episode_terminal` / exit 0，0 runtime error，所有自有子进程已退出。结果为 **24/100（24%）**，前50为12/50。不存在完整且同 checkpoint 的历史100条基线，故未强行做10pp比较。
+
+正常失败为 `button_not_pressed` 42、`block1_disturbed_after_valid_press` 26、`button_press_insufficient` 6、`button_pressed_multiple_times` 2。正式产物在 `/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/c_rearrange_no_memory_trainseed1_evalseed0_100ep_r2/`；[final review](/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/c_rearrange_no_memory_trainseed1_evalseed0_100ep_r2/final_review.json) SHA-256 为 `350b677a2450e8bc6be03cbd7fa0cce0344db3e161a04df8a1efeb1eec4aa0d5`。formal 保留命令、metadata 与 audit/manifest 继承副本；matching smoke 已按协议清理，Warp shared cache 未清理。该24/100属于独立 train seed1 checkpoint，不能同 seed0 的23/100写成同 checkpoint 复现误差。
+
+安全台账树 `/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r2-running-ledger` 的 `task/e6908de7-r2-running-ledger` 已提交 `6c496ee`（`docs: record no-memory seed1 eval0 result`）。它同步主概述、B组实际状态、能力基线失败分类、覆盖表的 eval0 结果和稳定链接，并更正已部署 RMBench 完整 SHA 为 `9d8f47887a50ea691e5624de139f10bfcfb54412`；`git diff --check` 通过，树干净。冻结 C runtime 仍为 RMBench `9d8f47887a50ea691e5624de139f10bfcfb54412`、bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，未改动活跃树。
+
+实时 MAM 表仍只有六项 C1 formal：GPU2 `5261ee5a`、GPU4 `7888aa9f`、GPU3 `ce4244c2`、GPU5 `2ec2a132`、GPU6 `378e4cd7`、GPU7 `504fc975`。没有新的 stopped job。下一项仍是已完成 audit/dry-run 的 serial-lag30 / train seed1 / eval seed1，但 C1 GPU1 有外部 VM 的 `[Not Found]` PID 占约3793 MiB，尽管19410/19412无监听，不能视为可用或抢占；C3 四卡也无空卡且 C3 GPU0–3 保持既有 EOF 暂停。故本轮未启动新 smoke/formal。自有 `/tmp` 收尾脚本已清理；不停止健康作业，后续由 MAM stopped 事件唤醒处理。
