@@ -36,3 +36,6 @@
 
 ## 恢复完成事件监控
 临时释放名额安排已结束，U组已交另一执行者。恢复本任务原4训练的完成事件监控与验收交接；不用重新扫描无变化日志。mam wait实际await，使用工具可用的长等待，不做无变化心跳或每窗口report。全部真实工作交付后结束turn。
+
+## Manager final cleanup handoff (2026-09-12)
+All four checkpoints and archived jobs are accepted for transfer to e690's three-seed eval queue; GPU2/3 handed to wash repeat owner. Do final workspace cleanup now: retain concise closure JSON evidence in this task's durable .tasks/TASK-ID directory, update report links and publish; remove your own temporary smoke/cache/closure leftovers that would block mam task archive, without removing shared checkpoints, data, caches or evidence needed by eval. Leave registered clean worktree for Manager archive. No training/eval/recheck of already-verified BF16 required. After publication finish turn.
