@@ -8,4 +8,12 @@
 
 验证通过：`uv lock --check`、稳定和独立 worktree 的 `uv pip check`（74 packages）、稳定和独立 worktree 的 CPU `scripts/worktree_env_smoke.py`、editable 源路径/解释器 realpath、以及 cache-to-venv hardlink probe。未运行 GPU、机器人或评测服务。
 
-最终清理完成：本任务 worktree 的旧 `eval_result` 链接已删除，回滚备份和入口门禁临时目录均不存在。最终检查时稳定 `eval_result` 为空目录，已用 `rmdir` 移除；`/mnt/public/xcj/Projects/robot-bridge/eval_result` 和 `/root/Projects/robot-bridge/eval_result` 均不存在。另有两个现存 worktree 的旧链接按用户要求保持未触碰，未删除任何结果文件。稳定源中既有未跟踪文件 `docs/design/low-dimensional-memory-design-space.zh-CN.md` 保持不变。没有远端写入、推送或其他活跃树改动；无 blocker。
+最终清理完成：本任务 worktree 的旧 `eval_result` 链接已删除，回滚备份和入口门禁临时目录均不存在。最终检查时稳定 `eval_result` 为空目录，已用 `rmdir` 移除；`/mnt/public/xcj/Projects/robot-bridge/eval_result` 和 `/root/Projects/robot-bridge/eval_result` 均不存在。另有两个现存 worktree 的旧链接按用户要求保持未触碰，未删除任何结果文件。稳定源中既有未跟踪文件 `docs/design/low-dimensional-memory-design-space.zh-CN.md` 保持不变。没有远端写入、推送或其他活跃树改动；此前环境范围无 blocker。
+
+## 最终文档与 CPU 测试补充
+
+文档 refinement 已单独提交为 `8b1ba04e61b51051b9d418e8af4b6ffbffbcfaa4` (`docs: simplify worktree environment guide`)。`docs/worktree_env/README.zh-CN.md` 现只保留三参数创建命令、参数含义、worktree/.venv 位置、CPU smoke 命令和开发指南链接；已移除共享实体表、稳定源提取、路径检查以及结果目录等维护实现说明。
+
+按仓库约定，在独立 worktree 的 CPython 3.11.14 环境运行 `.venv/bin/python -m pytest tests/`。结果为 `541 passed, 2 skipped, 1 failed in 69.11s`（进程退出码 1；外层记录 70 秒），未使用 GPU、真实机器人或服务。失败为 `tests/scheduler/test_openpi_simulation.py::test_real_controller_images_through_scheduler_loop`：测试以 `object.__new__` 构造 `RMBenchSimulationController` 后，`_handle` 读取未初始化的 `_trace_enabled`，触发 `AttributeError`。本任务两个 commit 均未修改该控制器或该测试；未在文档任务中加入无关修复。
+
+限制与门禁：完整 CPU pytest 因此不是绿灯，以上单一失败须由后续控制器/测试修复后再满足合并门禁。pytest cache、29 个本任务生成的 `__pycache__` 目录和临时日志已清除。按最新要求未重复环境重建或进程扫描。
