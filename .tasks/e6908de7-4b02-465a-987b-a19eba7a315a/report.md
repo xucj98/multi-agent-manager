@@ -384,7 +384,7 @@ leaf 不重跑、不覆盖；训练 seed 与环境条件组分列，不能把三
 `--training-seed`、`--eval-seed`，从 checkpoint `exp_name` 的 `_sN` 核验训练 seed，派生 manifest
 把 eval seed 写入既有 profile 的固定 `seed`，并把训练/评测 seed、环境候选起点、policy RNG key和
 scope 写入 recorder 会保存的运行配置。普通 run 名也必须同时含 `trainseedN`、`evalseedN`；audit/manifest
-和 Warp cache 均按 train/eval/run 分开。没有新 runner、队列或调度框架。
+按 train/eval/run 分开，命令模板中的 `WARP_CACHE_PATH` 也含该身份。没有新 runner、队列或调度框架。
 
 真实 runner 的环境映射已经核对：`robot_bridge/benchmark/runner.py:489` 从
 `100000 * (1 + int(settings["seed"]))` 开始，accepted rollout 后递增。因此三组为：
@@ -456,7 +456,7 @@ manifest/smoke hash隔离及 run-cache 隔离；review通过前不会同步或�
 安全 docs worktree 提交 `295effbbab8347b1ba43dca051740cbfde82089a`（`task/e6908de7-serial-ledger-20260912`），只更新 `EXPERIMENT_LEDGER.zh-CN.md`：消除所有过期运行中状态、记录三项收尾与hash，并按checkpoint列eval0/1/2。未完成 eval seed明确为待review而非0分。
 
 `f5087496a0f7c892bd322708e4ac0bbdeb74e523` 仍只在本机独立树
-`RMBench-eval-seed-runtime`；普通20k运行强制训练seed和eval seed，runner实际使用 profile `fixed.seed`，所以 eval0/1/2 分别从 `100000`、`200000`、`300000` 起。训练seed由checkpoint `exp_name` 的 `_sN`核验；每个新run独立manifest、smoke hash和Warp cache。CPU复核为 `py_compile`、`git diff --check`及 bridge `tests/benchmark/test_runner.py` **9 passed**。C 的活跃 `c-eval` 三树没有改动。
+`RMBench-eval-seed-runtime`；普通20k运行强制训练seed和eval seed，runner实际使用 profile `fixed.seed`，所以 eval0/1/2 分别从 `100000`、`200000`、`300000` 起。训练seed由checkpoint `exp_name` 的 `_sN`核验；每个新run独立manifest、smoke hash和 `WARP_CACHE_PATH` 命令值。CPU复核为 `py_compile`、`git diff --check`及 bridge `tests/benchmark/test_runner.py` **9 passed**。C 的活跃 `c-eval` 三树没有改动。
 
 13:54 CST 的只读资源快照与上表首波计划一致：C1 GPU1/2/4/5/6/7可用，C1 GPU0被占用、GPU3有外部1.2GiB使用而排除；C2 GPU2–7可用（首波使用4–7，2/3留给后续队列）；C3 GPU0–3可用。表列14组 robot/policy端口均无监听。独立review通过后，仍先错开 C1/GPU1、C2/GPU4、C3/GPU0 的冷启动；各自首个infer成功后才扩至同表其余卡，一卡完成自身smoke2再formal100。review通过前不部署、不启动GPU。
 
@@ -474,10 +474,10 @@ C 稳定目标在启动前均不存在，`/mnt/public` 有4.6TiB可用。复用�
 `a5c39be1-dcfe-41f2-9041-879b2ff781a1`；s2 于14:13:57 CST启动、MAM
 `a6561ab9-c3d3-4f42-b0bc-b0948ea9196c`，相隔101秒，均在 `wuwen-nx-aic` 运行。此时两项均为实际 running，尚未把部分目录当作C-ready；等待 checksum 和 metadata 收尾后才归档。未部署运行时，未启动GPU评测。
 
-C资源审计确认旧命令按共享 `.local/warp-cache/.../schema/gpuN` 构造路径，跨C主机的同号GPU会碰撞。
+C资源审计确认旧命令按共享 `.local/warp-cache/.../schema/gpuN` 构造 `WARP_CACHE_PATH` 字符串；这只能说明命令路径会在跨 C 主机同号 GPU 碰撞，不能证明 Warp 实际缓存碰撞。
 本机独立树 `f5087496a0f7c892bd322708e4ac0bbdeb74e523` 的入口改为
 `.../schema/runs/<run_name>/{robot,policy}`；普通20k run强制带 `trainseedN` 和 `evalseedN`，当前队列表对每个
-checkpoint/评测seed采用唯一结果leaf/run名。因此它在该唯一性前提下覆盖了跨主机同号GPU的冲突；hostname没有单独进入路径，
+checkpoint/评测seed采用唯一结果leaf/run名。因此它只解决命令字符串的唯一性，不能说明 Warp 实际缓存已隔离；hostname没有单独进入路径，
 不在本轮扩展实现。独立review `300c4873-f12a-4d15-9d79-2ccf9df5e749` 仍为 working，review准入前不将该代码同步C或扩容GPU队列。
 
 安全文档树 `RMBench-serial-ledger` 提交 `efbabe4`：更新四份B checkpoint状态，并为serial s1/s2加入eval_seed0/1/2覆盖行；
@@ -496,8 +496,7 @@ checkpoint/评测seed采用唯一结果leaf/run名。因此它在该唯一性前
 工作树清洁核对通过。本 task 无未归档 job。
 
 刚读取独立review `300c4873-f12a-4d15-9d79-2ccf9df5e749`：仍为 working，尚未发布准入结论。因此保持
-`f508749` 只在本机独立树，C active eval tree和GPU队列均不扩容；C审计中 Warp cache 的跨host隔离结论仍仅依赖每个
-run leaf/run-name全局唯一，等待review裁定。
+`f508749` 只在本机独立树，C active eval tree和GPU队列均不扩容；C审计中所谓 Warp cache 的跨host结论当时仅是 run leaf/run-name 的命令路径唯一性，等待review裁定实际 runtime 选择。
 
 ## 2026-09-12 15:17 CST：C 首项 formal 门禁发现与最小修复（待独立 review）
 
@@ -517,7 +516,7 @@ robot/policy均由 runner 收尾；其任务表现为0/2仅是正常任务失败
 本机独立 runtime tree 的最小修复为 RMBench `9d8f47887a50ea691e5624de139f10bfcfb54412`
 （父 `f508749`）：只将该 cache 根改为公共 `BenchmarkRunner` 已有的`{result_run}` child-command 占位符。runner
 在实际启动时才展开它，所以 smoke/formal 保存的 launch template 一致，同时每个具体 result run仍有独立
-robot/policy Warp cache；不改 public runner、端口、模型、seed、manifest、scheduler或 checkpoint。
+robot/policy `WARP_CACHE_PATH` 值；实际 Warp cache 选择需另行核验。不改 public runner、端口、模型、seed、manifest、scheduler或 checkpoint。
 
 CPU 验证：直接构造同一 pair 的 smoke/formal `launch()`，确认二者 robot/policy command byte-identical且均含
 `runs/{result_run}/`，而 `--result-run` 保持不同；`py_compile`、`git diff --check`通过；冻结 bridge 的
@@ -527,3 +526,20 @@ CPU 验证：直接构造同一 pair 的 smoke/formal `launch()`，确认二者 
 由于已完成 smoke 保存的是旧 literal command，不能拿它跨版本给新入口做 formal 门禁。独立 review通过后将创建新的
 `..._smoke2_r2` → `..._100ep_r2` matching pair，保留已完成 smoke和失败 formal作为证据，不覆盖结果目录。当前本task无
 active MAM job；C runtime仍停在已部署的 `f508749`，没有将未审 `9d8f478` 同步到C或扩展GPU队列。
+
+## 2026-09-12 17:40 CST：Warp 实际 cache 路径核查与表述更正
+
+本节更正此前把 `WARP_CACHE_PATH` 命令模板当作实际 Warp cache 隔离的表述。没有升级 Warp、清理 cache、修改任何活跃命令或停止健康评测。
+
+C1 当前 r2 smoke 的 `processes.jsonl` 和当前 formal 的 `/proc/1037750/environ` 均证明 robot 子进程收到各自的 `WARP_CACHE_PATH=.../schema/runs/<result_run>/robot`；policy 子进程同理。两者 `HOME=/root`、`CUDA_VISIBLE_DEVICES=1`。但实际 simulator worker 使用的是 RMBench `.venv`（worker stderr 的 SAPIEN 路径），不是 OpenPI 或 bridge `.venv`；该解释器中的 Warp 为 **0.15.1**，模块位于 `/mnt/public/xcj/cache/uv/archive-v0/RAZBf65xLsHwUZrZGl_Ob/warp/__init__.py`。
+
+启动日志没有可用的 `kernel_cache_dir` 输出：smoke 的 robot server log `robot-bridge/logs/robot_server/20260912-172129-1031015.log` 和 `processes/rmbench_sim_worker.stderr.log`，以及 formal 当前 `processes/`，均无 `kernel_cache_dir`、`Kernel cache:` 或 Warp greeting 行。因此日志不能证明环境变量被实际采用。
+
+源码和同一 worker 解释器的只读 bootstrap 检查给出确定路径：在传入实际 smoke `WARP_CACHE_PATH` 时，`warp.config.kernel_cache_dir` 初始化前仍为 `None`；`warp/build.py:57–86` 只接受 `warp.config.kernel_cache_dir` 的显式 Python 赋值，`None` 时在第69行调用 `appdirs.user_cache_dir(appname="warp", appauthor="NVIDIA", version=warp.config.version)`。Warp `context.py:2881` 以该值调用 `init_kernel_cache`，故此 C1 进程的实际默认选择为 **`/root/.cache/warp/0.15.1`**；该目录已存在，而活跃 smoke 的传入 `.../runs/c_rearrange_no_memory_trainseed1_evalseed0_smoke2_r2/robot` 目录不存在。`context.py:2962–2963` 仅定义可打印 greeting，不改变选择。安装的 cuRobo 源码没有 `WARP_CACHE_PATH` 或 `kernel_cache_dir` 引用；本任务 robot bootstrap 也没有在 Warp 初始化前显式设置该 config。因此环境变量在 Warp 0.15.1 中被忽略，`runs/<result_run>` 只隔离命令、结果/audit 和 smoke/formal template，不隔离实际 kernel cache。
+
+用户说明已在独立 docs worktree（不触碰 C r2 运行树）提交 `99b7d38`：`README_memory_schema.zh-CN.md` 改为 run 名隔离结果、审计输入和端口，并明确 `WARP_CACHE_PATH` 不能推断实际 Warp cache 按 run/GPU 隔离。该文档 commit 基于批准的 RMBench `9d8f47887a50ea691e5624de139f10bfcfb54412`，待集成；技术证据保留在本报告而非操作指南。
+
+最小的**下一 run**方案是停止把 GPU 编号或 `WARP_CACHE_PATH` 当作 Warp cache 隔离机制。若保持 Warp 0.15.1 的默认 host-local `/root/.cache/warp/0.15.1`，应在同一 host 错开/串行首次 Warp 编译，以保留已编译 kernel 复用并避开该版本共享 cache 的并发写入风险。若调度必须允许同 host 并发冷启动，则只在实际 simulator worker 的 Warp/curobo bootstrap、且在 `warp.init()` 前，显式设定 `warp.config.kernel_cache_dir` 为 host+run 的可写目录；代价是失去跨 run reuse、增加首次编译。两者都需要独立 review 后才实施，本轮不静默添加 per-run cache。
+
+健康队列继续：matching `c_rearrange_no_memory_trainseed1_evalseed0_smoke2_r2` 已完成两条 accepted rollout、video/no-video、0 runtime error和正常退出；其0/2任务表现不阻断门禁。formal `c_rearrange_no_memory_trainseed1_evalseed0_100ep_r2` 已在 C1 GPU1 启动，MAM job `c492ec19-772d-403b-a7d0-052c2b5c9c42` 为 running；checkpoint/metadata 已恢复，首个 infer 仍按既定90秒/后续30秒规则。首次 MAM 登记遇到一次 SSH 身份查询超时，未改变进程；重试后已成功登记。后续不因上述 cache 结论停止或改动该 run。
+
