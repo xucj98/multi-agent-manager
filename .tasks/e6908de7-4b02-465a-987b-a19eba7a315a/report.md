@@ -652,3 +652,13 @@ MAM 主动唤醒后，C3 GPU3 的 `c_put_back_full_t_plus_30_trainseed0_evalseed
 这使 C2 GPU6/7 和 C3 GPU1/2/3 的 episode-22 accepted-reset worker EOF 共五项；C3 GPU1/2/3 不自动重试或接续，等待具体诊断裁定。当前余下8项 formal 仍运行：C1 GPU1–7 的 rearrange no-memory train1/train2 六项与 serial-lag30 train1/eval0，以及 C3 GPU0 的 put-back full t+1/train1/eval1。本轮未修改这些运行树、checkpoint、机器人或 Warp 配置。
 
 安全文档树 `task/e6908de7-r2-running-ledger` 已提交 `77dbfcc3f37f90dadd42225ee7ce4fab056fd448`（`docs: record C3 GPU3 EOF partial`）：主概述、B 组状态、eval_seed 覆盖表和 C3 EOF 摘要已同步；`git diff --check` 通过且工作树干净。
+
+## 2026-09-12 20:04 CST：C3 GPU0 r2 formal 不完整收尾与当前队列
+
+在上一节19:56快照之后，C3 GPU0 的 `c_put_back_full_t_plus_1_trainseed1_evalseed1_100ep_r2`（MAM `e7bbf18a-b5e3-4c85-b893-cd04570680aa`）也在 episode 22 / environment seed `200022` 的 accepted reset 遇到 `worker closed the RPC stream (EOFError)` 并停止。matching smoke 已通过；formal 只有连续 `200000–200022` 的23条 episode、其中14成功，且没有 `final_review.json`，因此正式成绩为 **not reportable**，不将14/23计分，也不自动重试。
+
+已写 [failure review](/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/c_put_back_full_t_plus_1_trainseed1_evalseed1_100ep_r2/failure_review.json)（SHA-256 `ec387ec9…394a36a`），保留 diagnostics、episode/proc records、worker stderr 与 outer log，并按“不完整基础设施证据、不自动重试”归档 MAM job。此后 C2 GPU6/7 和 C3 GPU0/1/2/3 共六项同型 episode-22 accepted-reset EOF；C3 所有 GPU 暂不接续或重试，待诊断裁定。stderr 中的 renderer 初始化信息仍只作观察，不作为根因结论。
+
+实时 MAM job 表确认，当前仅 C1 GPU1–7 的七项 formal 运行：rearrange no-memory train1/train2 的六项及 serial-lag30 train1/eval0。它们未被停止或修改。
+
+安全台账树 `task/e6908de7-r2-running-ledger` 已追加 `020d4ee89a41d4a0e15e2c40902cc01c612a06cf`（父 `77dbfcc3f37f90dadd42225ee7ce4fab056fd448`），同步主概述、C3 四个 failure review、eval_seed 覆盖表与当前七项 formal；`git diff --check` 通过且树干净。
