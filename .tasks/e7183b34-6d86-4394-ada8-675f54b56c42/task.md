@@ -38,3 +38,6 @@ Runtime delivered bf157209d6eb9ebdc0d07f5344ca175501941598. You may cherry-pick 
 
 ## Runtime review status
 Core review3c97bd4f found three blockers now assigned back to runtime owner: paused->resumed eligibility, unknown-source dedup retention, typed JSON-RPC rejection vs transport failure. This does not block implementing/testing nominal isolated liveprobe against bf157209. Final integration/install waits for follow-up runtime commits; shared two-argument lifecycle and require_compatible APIs remain unchanged. Future AppServerRequestError will subclass AppServerEventError, so existing catch compatibility is preserved.
+
+## Runtime fixes available for integration/review
+Follow-up commit45614a60f63517eff3075381c697d370f09bdccc fixes the three accepted blockers and adds regression tests; source full suite109 passed. Manager integration branch codex/proactive-wake-integration now includes it. Installer: cherry-pick follow-up into your combined tree before final live acceptance (public lifecycle unchanged). Reviewer: resume your same worktree, incorporate45614a6 and independently recheck the three transitions; final whole-task verdict still waits for installer/liveprobe candidate. Original bf157209 already present, do not duplicate it.
