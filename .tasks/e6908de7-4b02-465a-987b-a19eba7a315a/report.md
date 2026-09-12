@@ -963,3 +963,38 @@ receipt 路径为 `.../records/renderer_reset_gate_c3_gpu0_r3_2e9677c.json`。C2
 host receipt 仅在 40/40、exit0、零 marker 后，才在同一 frozen runtime 接对应未完成或
 not-reportable r2 item 的 fresh matching smoke2→formal100；不重跑 C1 进行中的七项，也不
 拼接旧 partial。
+
+## 2026-09-13 01:17 CST：C3 2e9677c 门禁 PASS 与 fresh smoke 接续
+
+已处理 stopped MAM job `10cfe400-13ee-483f-ba5f-00e6a094a1e3` 并归档。C3 GPU0 的新
+`2e9677c` runtime 生命周期门禁为实际 GPU PASS，不是 CPU 结论：
+
+- receipt：`/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c-eval-renderer-r3-2e9677c/records/renderer_reset_gate_c3_gpu0_r3_2e9677c.json`；
+- `passed=true`、`completed_count=requested_count=40`，固定 seed `100000..100039` 的每条 reset 都为 `accepted=true`、`state=ready`、`terminal=false`；`error=null`；
+- worker 的 `ConnectionResetError`、`EOFError`、renderer/native/driver、segfault 与 traceback marker 均为 0；结束后 GPU0 为 1 MiB/0%，19400/19402 无监听；
+- 独立 runtime 保持 clean：RMBench `2e9677ce8ec9f623395184f63f32ddafa66e5e44`、bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。C1 正在使用的 `c-eval-renderer-r3` 未修改。
+
+门禁通过后，C3 GPU0 已接续一个历史 r2 incomplete/not-reportable 项的 fresh matching smoke：
+`c_rearrange_full_t_plus_30_trainseed0_evalseed1_smoke2_r3`，checkpoint
+`/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s0/20000`，eval seed1 的 smoke seed 为 `200000,200001`，端口 19400/19402。其 audit 和 dry-run 已完成并保存于新 runtime 的
+`records/c_rearrange_full_t_plus_30_trainseed0_evalseed1_smoke2_r3/{prepare-audit,dry-run}.log`，输入为
+`RMBench/.local/memory_schema_eval/inputs/rearrange_full_t_plus_30--700143d20a84645f--train0--eval1/`。MAM job 为 `d7437ff4-4dbc-48c6-8c44-6ebb77a494a7`。当前 policy 已从该只读20k checkpoint恢复 metadata、params 和 norm stats，worker 已启动；尚无 terminal episode，因而尚无 smoke verdict 或 formal100。仅在完成两条 accepted video/no-video、scheduler/worker退出和零基础设施 marker 的核验后，才启动同名配对 fresh formal100。
+
+01:17 CST 只读快照如下。C1 的数字严格计自各自 `episode_diagnostics.jsonl` 中 `diagnostics.episode_status.terminal=true`；“最近”是该记录文件的最后写入时间，非 PID 存活推断。
+
+| host / GPU | run | terminal / target | 最近记录（CST） | 实际状态 |
+| --- | --- | ---: | --- | --- |
+| C1 GPU1 | `c_rearrange_serial_lag30_trainseed1_evalseed1_100ep_r3` | 65 / 100 | 01:12:59 | formal running |
+| C1 GPU2 | `c_rearrange_serial_lag30_trainseed1_evalseed2_100ep_r3` | 62 / 100 | 01:13:15 | formal running |
+| C1 GPU3 | `c_rearrange_serial_lag30_trainseed2_evalseed0_100ep_r3` | 52 / 100 | 01:13:48 | formal running |
+| C1 GPU4 | `c_rearrange_serial_lag30_trainseed2_evalseed1_100ep_r3` | 48 / 100 | 01:13:14 | formal running |
+| C1 GPU5 | `c_rearrange_serial_lag30_trainseed2_evalseed2_100ep_r3` | 40 / 100 | 01:12:36 | formal running |
+| C1 GPU6 | `c_rearrange_serial_lag30_trainseed0_evalseed1_100ep_r3` | 32 / 100 | 01:13:37 | formal running |
+| C1 GPU7 | `c_rearrange_serial_lag30_trainseed0_evalseed2_100ep_r3` | 23 / 100 | 01:12:35 | formal running |
+| C2 GPU6 | `renderer_reset_gate_c2_gpu6_r3_2e9677c` | receipt pending | — | MAM `546b6d60-f038-4924-b60d-ece5d9489309` running; JSON receipt still absent, so no reset-progress or PASS claim |
+| C2 GPU7 | — | — | — | reserved for post-gate matching work |
+| C3 GPU0 | `renderer_reset_gate_c3_gpu0_r3_2e9677c` | 40 / 40 accepted resets | receipt finished 01:02:21 | PASS; archived after verification |
+| C3 GPU0 | `c_rearrange_full_t_plus_30_trainseed0_evalseed1_smoke2_r3` | 0 / 2 | — | fresh smoke running, no score/formal claim |
+
+C2 receipt path remains
+`/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c-eval-renderer-r3-2e9677c/records/renderer_reset_gate_c2_gpu6_r3_2e9677c.json`。
