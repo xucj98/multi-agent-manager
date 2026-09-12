@@ -92,3 +92,21 @@ seed、动作协议和路径均未改动，未启动任何 eval。
 停止。上述成功的 MAM 状态查询已将对应四条远端训练以及两条本地训练均确认回 `running`。按新机制，
 此处结束 active turn；MAM 会在任一已登记且未归档的训练停止时重新唤醒执行者，届时再执行最终 checkpoint
 验收、资源释放/job 归档和 e690 可评清单交接。
+
+## 当前执行者交接后的单次运行快照（2026-09-13 01:35 +0800）
+
+Manager 已将任务换绑到 `01a096ab-e5f3-7672-8ff3-36328d3fcfb7`，原 workspace、三库提交和六个
+MAM job 均原样继承。本次只读实际检查确认六个登记 PID 均仍存在并占用预定 GPU，末尾日志均为有限
+loss；六个预期的最终 `/20000` checkpoint 目录目前均不存在。
+
+| run | 实际最新日志 | 最终 checkpoint |
+| --- | --- | --- |
+| rearrange s0 / local GPU1 | step 18500, loss 0.0008 | 未就绪 |
+| rearrange s1 / local GPU7 | step 18400, loss 0.0008 | 未就绪 |
+| rearrange s2 / wuwen-1 GPU4 | step 18000, loss 0.0006 | 未就绪 |
+| put-back s0 / wuwen-1 GPU5 | step 18500, loss 0.0010 | 未就绪 |
+| put-back s1 / wuwen-1 GPU6 | step 18700, loss 0.0009 | 未就绪 |
+| put-back s2 / wuwen-1 GPU7 | step 18000, loss 0.0008 | 未就绪 |
+
+没有 stopped job，故本次没有 checkpoint 验收、job 归档、重启、重复登记或 C eval。后续由 MAM 在任一
+登记 job 停止时唤醒当前执行者，再进行最终产物验收和 e690 可评清单交接。
