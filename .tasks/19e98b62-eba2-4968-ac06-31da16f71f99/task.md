@@ -25,3 +25,7 @@ The installed version now passed all191 source tests, optional wait compatibilit
 Finish currently executable work and publish actual results/status, then end turn normally while registered long jobs continue. MAM wakes a dormant executor for any stopped unarchived job, even when other jobs are running. Handle results/cleanup/archive according to this task, and end again when no immediate work remains. A running-only task does not need a standing active turn. Do not stop experiments or archive running training/eval jobs merely to end your turn. Manager receives completed/no-job task follow-up after review routing.
 
 Optional `mam wait`, `mam wait list`, and `mam wait stop` are retained for a concrete need to wait within a turn. Do not produce unchanged waiting updates or start a custom loop to keep the turn alive. Existing experiment protocol, rollout checks, artifact paths and resource authorizations are unchanged. If a queued next run can be started now, continue that work before ending; automatic wake does not replace executing the queue.
+
+
+## 当前Manager执行者交接（2026-09-13）
+Manager 01a09657-e0f3-7352-b726-aba5bbd5d498 将用 mam task rebind 将本任务交给当前对话新建的 terra/max 执行者。以 mam task status 的当前 agent 为执行权限依据；旧执行者若发现已换绑，停止执行本任务，不再写workspace/report或处理job。新执行者换绑前仅只读准备并结束turn，待Manager明确接续消息后开始工作。换绑后直接继承原TASK-ID、全部现有workspace/worktree/分支/已发布报告与运行job，不再次workspace add，不复制或重启/重复登记job。既有任务目标、数据与评估协议、冻结runtime、独立review门禁和资源授权均不变。完成可执行事项正常结束turn，由MAM唤醒；不得高频轮询。
