@@ -35,3 +35,6 @@ Do NOT add the proposed fixture compatibility mapping/keyword-only start_service
 
 ## Runtime integration available
 Runtime delivered bf157209d6eb9ebdc0d07f5344ca175501941598. You may cherry-pick this exact commit into your installer worktree (disjoint files) to run combined tests and build liveprobe against real APIs; keep your owned modifications separate. Manager integration branch currently f114fd6 includes runtime+entry docs. First isolated live test may now be run by you under the authorized fixture constraints, with bounded evidence in your report; production activation remains Manager. Source runtime is in independent review, any runtime bug goes to Manager/runtime owner rather than you editing their module.
+
+## Runtime review status
+Core review3c97bd4f found three blockers now assigned back to runtime owner: paused->resumed eligibility, unknown-source dedup retention, typed JSON-RPC rejection vs transport failure. This does not block implementing/testing nominal isolated liveprobe against bf157209. Final integration/install waits for follow-up runtime commits; shared two-argument lifecycle and require_compatible APIs remain unchanged. Future AppServerRequestError will subclass AppServerEventError, so existing catch compatibility is preserved.
