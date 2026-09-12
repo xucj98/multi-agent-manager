@@ -24,3 +24,7 @@
 ## 裁定更正
 
 前一版中关于 fresh `awaiting_manager` 可以推迟 App Server 检查，以及建议 `initial_compatibility` fixture bootstrap 参数的两处表述均已撤回。当前实现遵循最新合同：每次安装在接触生产 scheduler 前，无条件运行无模型 `wake_compat.require_compatible()` 和隔离真实 delivery liveprobe；没有 App Server 时即以非零退出，即使生产项目仍处于 `awaiting_manager`。liveprobe 直接调用既有 `start_service(config, manager=fixture_manager)`，允许 parent/child 重复轻量检查，不增加绕过、证书或公共 API。
+
+## 真实 App Server API 对齐
+
+在开始 fixture 前执行的无模型实测发现，当前 App Server 对同一随机、未登记 UUID 的四个 API 依次返回：`thread/read` 为 `thread not loaded`，`thread/resume` 为 `no rollout found for thread id`，`thread/turns/list` 为 `thread not loaded`，`turn/start` 为 `thread not found`。四项均为明确的空/未知 thread 拒绝，且没有创建 thread 或模型请求；原实现只识别 `not found` 等文字，因而保守地失败。现已把这两个实际空-thread 拒绝形式纳入同一受限分类，同时仍拒绝 `method not found` 等 unsupported-method 响应。此项不是 runtime 公共接口变更，也不需要 bypass。
