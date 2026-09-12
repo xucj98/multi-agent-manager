@@ -369,3 +369,77 @@ C2 GPU3 的 rearrange no-memory/s0 已按释放槽位接续。prepare-audit确�
 formal100 已于11:10 CST 在 C2 GPU3 启动并登记为 MAM `ff4d1718-ab99-45fd-a310-f843ce458c37`，冻结 RMBench `7933426`、bridge `f962663`、OpenPI `a869498`，H50/K30、seed `100000–100099`、首个 infer90秒/后续30秒不变。启动后 MAM 为 running，GPU3已加载约10.1 GiB。当前 C 12 项均处于“8项正式完成，rearrange full t+1/s0、t+1/s1、serial-lag30/s0、no-memory/s0 formal运行中”；没有未登记或待启动模型。
 
 台账提交 `44aee09`，直接更新总览、能力基线表、C checkpoint 清单和队列历史；`git diff --check`通过，C三库、checkpoint和其它 active job未修改。继续使用裸 `mam wait` 等待真实完成事件；第50条仅按既有阈值检查，不以中途成绩改变参数、队列或分母。
+
+## 2026-09-12 eval_seed 三组入口与 C 首波计划（待独立 review）
+
+用户在已有 eval seed0 结果之后扩大样本：每个已验收 checkpoint 固定独立执行
+`eval_seed=0/1/2`，每组各自 matching smoke2 → 单卡串行 formal100。已有完整或运行中的 eval0
+leaf 不重跑、不覆盖；训练 seed 与环境条件组分列，不能把三个训练 seed 当作三个 eval seed。
+
+本机独立实现树
+`/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-eval-seed-runtime`
+的提交为 `f5087496a0f7c892bd322708e4ac0bbdeb74e523`
+（分支 `task/e6908de7-eval-seed-runtime`，父提交 `3775d4a`）。仅改
+`run_memory_schema_eval.py` 和 `README_memory_schema.zh-CN.md`：普通20k入口强制显式
+`--training-seed`、`--eval-seed`，从 checkpoint `exp_name` 的 `_sN` 核验训练 seed，派生 manifest
+把 eval seed 写入既有 profile 的固定 `seed`，并把训练/评测 seed、环境候选起点、policy RNG key和
+scope 写入 recorder 会保存的运行配置。普通 run 名也必须同时含 `trainseedN`、`evalseedN`；audit/manifest
+和 Warp cache 均按 train/eval/run 分开。没有新 runner、队列或调度框架。
+
+真实 runner 的环境映射已经核对：`robot_bridge/benchmark/runner.py:489` 从
+`100000 * (1 + int(settings["seed"]))` 开始，accepted rollout 后递增。因此三组为：
+
+| eval seed | manifest/profile 固定 `seed` | 环境候选起点 | 候选命名空间 |
+| ---: | ---: | ---: | --- |
+| 0 | 0 | 100000 | `[100000, 200000)` |
+| 1 | 1 | 200000 | `[200000, 300000)` |
+| 2 | 2 | 300000 | `[300000, 400000)` |
+
+同任务、同 eval seed 的模型会使用相同候选序列；preflight 拒绝仍由既有 runner 留在
+`seed_preflight.jsonl`，不换到另一个 eval seed。每个 run 新起 policy server；冻结 OpenPI
+`src/openpi/policies/policy.py:69` 的初始 JAX key 是0，作为固定 policy RNG 记录，并不替代环境 seed。
+不同 eval seed 的 manifest hash 不同，既有 formal smoke-compatibility gate 因而不能交叉引用。
+
+CPU 验证均不加载 GPU：对真实
+`rearrange_no_memory` train seed1 20k checkpoint 分别执行 eval0/1/2 的 audit/manifest 和 dry-run，
+实际读取到的 runner settings seed 为 `0/1/2`、起点为`100000/200000/300000`；`--training-seed 0`
+配该 `_s1` checkpoint 被入口拒绝。`py_compile`、`git diff --check` 通过，bridge
+`tests/benchmark/test_runner.py` 为 **9 passed**。任务自有 `.local/memory_schema_eval`、脚本 pycache
+和 `/tmp/e6908_eval_seed_*` CPU 输入均已清理；checkpoint 未写入任何文件。
+
+13:15 CST 的 C 只读资源快照如下。C2 GPU2/3 的既有 eval0 formal（MAM
+`162b998d-e6c2-4f8f-80ec-dc239f63f765`、`ff4d1718-ab99-45fd-a310-f843ce458c37`）及其端口
+19420/19422、19430/19432 保持原样。C1 GPU0及GPU3有其他占用，未纳入计划。其余下列14张卡
+均为空闲，计划一张卡一个完整 smoke2→formal100，且每项独立端口/cache/run leaf；启动前仍须再核对。
+
+| host | GPU | robot / policy port | 首波 checkpoint / eval seed | leaf 前缀（`_smoke2` → `_100ep`） |
+| --- | ---: | --- | --- | --- |
+| C1 `wuwen-4090-1` | 1 | 19410 / 19412 | rearrange no-memory train1 / eval0 | `c_rearrange_no_memory_trainseed1_evalseed0` |
+| C1 `wuwen-4090-1` | 2 | 19420 / 19422 | rearrange no-memory train1 / eval1 | `c_rearrange_no_memory_trainseed1_evalseed1` |
+| C1 `wuwen-4090-1` | 4 | 19440 / 19442 | rearrange no-memory train1 / eval2 | `c_rearrange_no_memory_trainseed1_evalseed2` |
+| C1 `wuwen-4090-1` | 5 | 19450 / 19452 | rearrange no-memory train2 / eval0 | `c_rearrange_no_memory_trainseed2_evalseed0` |
+| C1 `wuwen-4090-1` | 6 | 19460 / 19462 | rearrange no-memory train2 / eval1 | `c_rearrange_no_memory_trainseed2_evalseed1` |
+| C1 `wuwen-4090-1` | 7 | 19470 / 19472 | rearrange no-memory train2 / eval2 | `c_rearrange_no_memory_trainseed2_evalseed2` |
+| C2 `wuwen-4090-2` | 4 | 19440 / 19442 | rearrange full t+1 train0 / eval1 | `c_rearrange_full_t_plus_1_trainseed0_evalseed1` |
+| C2 `wuwen-4090-2` | 5 | 19450 / 19452 | rearrange full t+1 train0 / eval2 | `c_rearrange_full_t_plus_1_trainseed0_evalseed2` |
+| C2 `wuwen-4090-2` | 6 | 19460 / 19462 | rearrange full t+30 train0 / eval1 | `c_rearrange_full_t_plus_30_trainseed0_evalseed1` |
+| C2 `wuwen-4090-2` | 7 | 19470 / 19472 | rearrange full t+30 train0 / eval2 | `c_rearrange_full_t_plus_30_trainseed0_evalseed2` |
+| C3 `wuwen-4090-3` | 0 | 19400 / 19402 | put-back full t+1 train0 / eval1 | `c_put_back_full_t_plus_1_trainseed0_evalseed1` |
+| C3 `wuwen-4090-3` | 1 | 19410 / 19412 | put-back full t+1 train0 / eval2 | `c_put_back_full_t_plus_1_trainseed0_evalseed2` |
+| C3 `wuwen-4090-3` | 2 | 19420 / 19422 | put-back full t+30 train0 / eval1 | `c_put_back_full_t_plus_30_trainseed0_evalseed1` |
+| C3 `wuwen-4090-3` | 3 | 19430 / 19432 | put-back full t+30 train0 / eval2 | `c_put_back_full_t_plus_30_trainseed0_evalseed2` |
+
+前六行是新到达且已验收传输的 B no-memory train1/train2；它们没有有效的 eval0 formal，故各补全
+0/1/2，不会覆盖任何旧 leaf。后八行只补已有 Q2 eval0 的 eval1/2。两份 B checkpoint 已实读 C
+稳定路径的 `_CHECKPOINT_METADATA`、`params/assets/metadata`；其 metadata SHA-256 与本机源分别为
+`eb437733…ba201`（train1）和`f379c34d…1111bd`（train2）。首波之后继续补其余 Q2 train1/train2和
+serial/no-memory train0的 eval1/2；后续 B/U 训练只在其20k和CPU验收完成后加入。
+
+冷启动仍不同时堆叠：review通过、C独立部署树完成后，先依次启动 C1/GPU1、C2/GPU4、C3/GPU0；每个
+scheduler 的首个 infer 已返回或有明确失败证据后才继续对应主机下一槽。每项失败只保留 leaf 并先分类，
+不把并发扩容当作重复未知原因 smoke。新 runtime 仍未部署到 C，C 的活跃 `c-eval` 三树没有修改，未启动
+任何新 GPU 进程或 MAM job。
+
+请 Manager 按最新要求安排独立 review，重点检查 profile `seed` 是否确实进入 runner、训练 seed约束、
+manifest/smoke hash隔离及 run-cache 隔离；review通过前不会同步或启用 `f508749`。
+
