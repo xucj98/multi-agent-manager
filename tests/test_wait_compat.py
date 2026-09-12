@@ -269,9 +269,14 @@ class InstallerScriptTests(unittest.TestCase):
             json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("ascii")
         ).decode("ascii")
 
-    def test_bashrc_update_is_minimal_idempotent_and_reversible(self):
+    def test_bashrc_update_preserves_unmarked_conditional_config_and_is_idempotent(self):
         legacy_rust_log = 'export RUST_LOG="off,codex_app_server::message_processor=trace,codex_app_server::app_server_tracing=info"\n'
-        original = legacy_rust_log + "export LOG_FORMAT=json\nexport KEEP_ME=1\n[ -z \"$PS1\" ] && return\nalias ll='ls -alF'\n"
+        user_conditional = (
+            'if [[ "$USER_TOOL_TRACE" == 1 ]]; then\n'
+            + legacy_rust_log
+            + "export LOG_FORMAT=json\nfi\n"
+        )
+        original = user_conditional + "export KEEP_ME=1\n[ -z \"$PS1\" ] && return\nalias ll='ls -alF'\n"
         with tempfile.TemporaryDirectory() as directory:
             bashrc = Path(directory) / ".bashrc"
             bashrc.write_text(original, encoding="utf-8")
@@ -283,11 +288,13 @@ class InstallerScriptTests(unittest.TestCase):
             updated = bashrc.read_text(encoding="utf-8")
             self.assertEqual(updated.count("# >>> MAM Codex App Server trace >>>"), 1)
             self.assertLess(updated.index("# >>> MAM Codex App Server trace >>>"), updated.index('[ -z "$PS1" ] && return'))
-            self.assertEqual(updated.count(legacy_rust_log), 1)
-            self.assertGreater(updated.index(legacy_rust_log), updated.index("# >>> MAM Codex App Server trace >>>"))
-            self.assertNotIn("export LOG_FORMAT=json\nexport KEEP_ME", updated)
+            self.assertIn(user_conditional, updated)
+            self.assertEqual(updated.count(legacy_rust_log), 2)
+            self.assertEqual(updated.count("export LOG_FORMAT=json\n"), 2)
             self.assertIn("export KEEP_ME=1", updated)
             self.assertIn("alias ll='ls -alF'", updated)
+            syntax = subprocess.run(["bash", "-n", str(bashrc)], text=True, capture_output=True, check=False)
+            self.assertEqual(syntax.returncode, 0, syntax.stderr)
             self.assertEqual(bashrc.stat().st_mode & 0o777, 0o640)
             backups = list(Path(directory).glob(".bashrc.mam-install.*.bak"))
             self.assertEqual(len(backups), 1)
@@ -300,6 +307,24 @@ class InstallerScriptTests(unittest.TestCase):
             self.assertEqual(len(list(Path(directory).glob(".bashrc.mam-install.*.bak"))), 1)
             self.assertIn("already up to date", second.stdout)
 
+    def test_unrecognized_complete_marker_block_leaves_bashrc_unchanged(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bashrc = Path(directory) / ".bashrc"
+            original = (
+                "keep=1\n"
+                "# >>> MAM Codex App Server trace >>>\n"
+                'export RUST_LOG="custom"\n'
+                "export LOG_FORMAT=json\n"
+                "# <<< MAM Codex App Server trace <<<\n"
+            )
+            bashrc.write_text(original, encoding="utf-8")
+            result = self.run_sourced(
+                "if update_bashrc; then exit 0; else exit 7; fi", env={"MAM_INSTALL_BASHRC": str(bashrc)}
+            )
+            self.assertEqual(result.returncode, 7)
+            self.assertEqual(bashrc.read_text(encoding="utf-8"), original)
+            self.assertIn("unrecognized MAM trace block", result.stderr)
+
     def test_incomplete_markers_leave_bashrc_unchanged(self):
         with tempfile.TemporaryDirectory() as directory:
             bashrc = Path(directory) / ".bashrc"
@@ -310,7 +335,7 @@ class InstallerScriptTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 7)
             self.assertEqual(bashrc.read_text(encoding="utf-8"), original)
-            self.assertIn("incomplete MAM trace markers", result.stderr)
+            self.assertIn("incomplete or multiple MAM trace markers", result.stderr)
 
     def test_runtime_logging_missing_environment_returns_one(self):
         environment = {**os.environ, "RUST_LOG": "off", "LOG_FORMAT": "text"}

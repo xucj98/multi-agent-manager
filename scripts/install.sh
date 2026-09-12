@@ -266,10 +266,6 @@ import sys
 
 source, destination = map(Path, sys.argv[1:3])
 begin, end, rust_log = sys.argv[3:]
-legacy = {
-    'export RUST_LOG="off,codex_app_server::message_processor=trace,codex_app_server::app_server_tracing=info"',
-    "export LOG_FORMAT=json",
-}
 try:
     raw = source.read_bytes()
     text = raw.decode("utf-8")
@@ -278,24 +274,31 @@ except (OSError, UnicodeDecodeError) as exc:
     raise SystemExit(1)
 
 newline = "\r\n" if b"\r\n" in raw else "\n"
-kept, inside = [], False
-for line in text.splitlines(keepends=True):
-    value = line.rstrip("\r\n")
-    if value == begin:
-        if inside:
-            print("refusing nested MAM trace markers in .bashrc", file=sys.stderr)
-            raise SystemExit(1)
-        inside = True
-    elif value == end:
-        if not inside:
-            print("refusing an unmatched MAM trace end marker in .bashrc", file=sys.stderr)
-            raise SystemExit(1)
-        inside = False
-    elif not inside and value not in legacy:
-        kept.append(line)
-if inside:
-    print("refusing an unmatched MAM trace start marker in .bashrc", file=sys.stderr)
-    raise SystemExit(1)
+lines = text.splitlines(keepends=True)
+starts = [index for index, line in enumerate(lines) if line.rstrip("\r\n") == begin]
+ends = [index for index, line in enumerate(lines) if line.rstrip("\r\n") == end]
+# Unmarked exports may belong to user shell logic.  Only this exact marker
+# block proves installer ownership and may be replaced.
+if starts or ends:
+    if len(starts) != 1 or len(ends) != 1 or ends[0] <= starts[0]:
+        print("refusing incomplete or multiple MAM trace markers in .bashrc; it was left unchanged", file=sys.stderr)
+        raise SystemExit(1)
+    expected = [
+        begin,
+        'if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then',
+        '    export PATH="$HOME/.local/bin:$PATH"',
+        'fi',
+        f'export RUST_LOG="{rust_log}"',
+        'export LOG_FORMAT=json',
+        end,
+    ]
+    observed = [line.rstrip("\r\n") for line in lines[starts[0] : ends[0] + 1]]
+    if observed != expected:
+        print("refusing an unrecognized MAM trace block in .bashrc; it was left unchanged", file=sys.stderr)
+        raise SystemExit(1)
+    kept = lines[: starts[0]] + lines[ends[0] + 1 :]
+else:
+    kept = list(lines)
 
 block = [
     begin + newline,
@@ -339,7 +342,7 @@ except OSError as exc:
 PY
     then
         rm -f -- "$temporary"
-        wait_incomplete 'the .bashrc contains incomplete MAM trace markers; it was left unchanged'
+        wait_incomplete 'the .bashrc contains an incomplete, multiple, or unrecognized MAM trace block; it was left unchanged'
         return 1
     fi
     if cmp -s -- "$bashrc" "$temporary"; then

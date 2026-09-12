@@ -765,17 +765,15 @@ run_live_delivery_probe() {
         self.assertIn("TOKEN=<redacted>", result.stdout)
         self.assertNotIn("TOKEN=do-not-log", result.stdout + result.stderr)
 
-    def test_trace_block_is_retained_and_normalized_with_path_update(self):
+    def test_unrecognized_trace_block_stops_install_without_mutating_user_content(self):
         path = self.home / ".bashrc"
         content = path.read_text().replace("export LOG_FORMAT=json", "export LOG_FORMAT=custom")
         path.write_text(content, encoding="utf-8")
         result = self.run_installer()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        updated = path.read_text()
-        self.assertEqual(updated.count("# >>> MAM Codex App Server trace >>>"), 1)
-        self.assertIn("export LOG_FORMAT=json", updated)
-        self.assertNotIn("LOG_FORMAT=custom", updated)
-        self.assertEqual(updated.count("# >>> MAM PATH >>>"), 1)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unrecognized MAM trace block", result.stderr)
+        self.assertEqual(path.read_text(), content)
+        self.assertEqual(self.service_commands(), [])
 
     def test_installer_does_not_implement_a_background_shell_supervisor(self):
         source = (self.source_root / "scripts" / "install.sh").read_text(encoding="utf-8")
