@@ -543,3 +543,11 @@ C1 当前 r2 smoke 的 `processes.jsonl` 和当前 formal 的 `/proc/1037750/env
 
 健康队列继续：matching `c_rearrange_no_memory_trainseed1_evalseed0_smoke2_r2` 已完成两条 accepted rollout、video/no-video、0 runtime error和正常退出；其0/2任务表现不阻断门禁。formal `c_rearrange_no_memory_trainseed1_evalseed0_100ep_r2` 已在 C1 GPU1 启动，MAM job `c492ec19-772d-403b-a7d0-052c2b5c9c42` 为 running；checkpoint/metadata 已恢复，首个 infer 仍按既定90秒/后续30秒规则。首次 MAM 登记遇到一次 SSH 身份查询超时，未改变进程；重试后已成功登记。后续不因上述 cache 结论停止或改动该 run。
 
+## 2026-09-12 17:55 CST：r2 队列实际接续
+
+C1 GPU1 的 `c_rearrange_no_memory_trainseed1_evalseed0_100ep_r2` 已完成首个90秒预算内 infer 并连续完成前5个 accepted rollout，MAM `c492ec19-772d-403b-a7d0-052c2b5c9c42` 仍为 running。C3 GPU0 在确认 r2 三库 clean、GPU 1MiB、19400/19402 无监听及 formal leaf 不存在后，完成 `c_put_back_full_t_plus_1_trainseed0_evalseed1_smoke2_r2`：accepted seed `200000,200001`，episode0 video 361帧、episode1 no-video，0 runtime error，两个 scheduler `episode_terminal`/0，robot/policy由 runner 正常收尾。它的任务成功数不作为门禁条件。
+
+因此 C3 同 checkpoint 的 `c_put_back_full_t_plus_1_trainseed0_evalseed1_100ep_r2` 已在同卡启动，MAM `6f11a3b5-9b18-460a-af9f-6afeb290ea25` 为 running。两项 formal 都保持批准的 r2 `9d8f478`、bridge `f962663`、OpenPI `a869498` 和90秒首次 infer/后续30秒规则；没有改动现有命令或 Warp cache。
+
+安全 docs worktree 的台账提交 `82e51e7`（`task/e6908de7-r2-running-ledger`）将主状态、eval_seed 覆盖表的“待 review”更新为已准入的“待排队”，并准确标出上述 C1/C3 formal 运行中；没有把运行项写成分数或把缺失 eval 填0。`git diff --check`通过，两个 docs worktree均干净，C运行树未修改。
+
