@@ -249,19 +249,55 @@ class WaitRuntimeTests(unittest.TestCase):
         self.assertEqual(record, {})
         self.assertEqual(finished, [])
 
-    def test_manager_excludes_stopped_job_owned_by_active_agent(self):
+    def test_manager_all_archived_jobs_for_inactive_owner_returns_completion(self):
+        result, _, _, record, finished, _ = self.run_wait(
+            [task(jobs=[job("archived", status="archived")])],
+            {CALLER: snapshot(CALLER, turn="caller-turn"), AGENT: snapshot(AGENT, "idle")},
+        )
+        self.assert_exit(result, "agent_completed", "subagent completed its turn")
+        self.assertEqual((result["agent"], result["task"]), (AGENT, TASK))
+        self.assertEqual(record, {})
+        self.assertEqual(finished, [])
+
+    def test_manager_running_only_inactive_owner_waits_until_cancelled(self):
+        checks, probes = [], []
+
+        def cancelled(_record):
+            checks.append(1)
+            return len(checks) >= 2
+
+        result, _, _, record, finished, _ = self.run_wait(
+            [task(jobs=[job("running-job", "keep monitoring")])],
+            {CALLER: snapshot(CALLER, turn="caller-turn"), AGENT: snapshot(AGENT, "idle")},
+            cancelled=cancelled,
+            probe=lambda *args: probes.append(args) or {"status": "running"},
+        )
+        self.assert_exit(result, "cancelled", "manual mam wait stop")
+        self.assertEqual(record["task"], None)
+        self.assertEqual(len(finished), 1)
+        self.assertEqual(len(probes), 2)
+
+    def test_completed_owner_hands_stopped_job_to_executor_without_probe(self):
+        probes = []
         result, _, _, _, finished, _ = self.run_wait(
             [task(jobs=[job("owned-job", "keep owner", status="stopped")])],
             {CALLER: snapshot(CALLER, turn="caller-turn"), AGENT: snapshot(AGENT, turn="worker-turn")},
             queued=[event("turn/completed", AGENT, turn="worker-turn")],
+            probe=lambda *args: probes.append(args) or {"status": "stopped"},
         )
-        self.assert_exit(result, "agent_completed", "subagent completed its turn")
-        self.assertNotEqual(result["reason"], "job_stopped")
-        self.assertEqual(result["agent"], AGENT)
+        self.assert_exit(result, "job_stopped", "registered job stopped; process exit does not prove experimental success")
+        self.assertEqual((result["agent"], result["task"], result["job"], result["note"]),
+                         (AGENT, TASK, "owned-job", "keep owner"))
+        self.assertEqual(probes, [])
         self.assertEqual(len(finished), 0)
 
-    def test_verified_active_wait_owner_keeps_its_stopped_job_out_of_manager_scope(self):
+    def test_verified_active_wait_owner_keeps_stopped_job_out_of_manager_scope_after_completion(self):
         probes = []
+        checks = []
+
+        def cancelled(_record):
+            checks.append(1)
+            return len(checks) >= 4
 
         result, _, _, _, finished, _ = self.run_wait(
             [task(jobs=[job("owned-job", "owner handles it", status="stopped")])],
@@ -272,12 +308,13 @@ class WaitRuntimeTests(unittest.TestCase):
                 event("turn/completed", AGENT, turn="wait-turn"),
             ],
             probe=lambda *args: probes.append(args) or {"status": "stopped"},
+            cancelled=cancelled,
+            clock=[0.0],
             control=10.0,
             state_refresh=10.0,
             job_refresh=10.0,
         )
-        self.assert_exit(result, "agent_completed", "subagent completed its turn")
-        self.assertEqual(result["agent"], AGENT)
+        self.assert_exit(result, "cancelled", "manual mam wait stop")
         self.assertEqual(probes, [])
         self.assertEqual(len(finished), 1)
 
@@ -292,6 +329,18 @@ class WaitRuntimeTests(unittest.TestCase):
                          (TASK, "worker task", "done-job", "save artifacts"))
         self.assertEqual(record, {})
         self.assertEqual(finished, [])
+
+    def test_manager_mixed_running_and_stopped_jobs_returns_stopped_handoff(self):
+        probes = []
+        result, _, _, _, _, _ = self.run_wait(
+            [task(jobs=[job("still-running", status="running"), job("stopped", "inspect output", status="stopped")])],
+            {CALLER: snapshot(CALLER, turn="caller-turn"), AGENT: snapshot(AGENT, "idle")},
+            probe=lambda *args: probes.append(args) or {"status": "running"},
+        )
+        self.assert_exit(result, "job_stopped", "registered job stopped; process exit does not prove experimental success")
+        self.assertEqual((result["agent"], result["task"], result["job"], result["note"]),
+                         (AGENT, TASK, "stopped", "inspect output"))
+        self.assertEqual(probes, [])
 
     def test_review_delegates_source_to_active_reviewer(self):
         source = task(jobs=[])
@@ -381,12 +430,17 @@ class WaitRuntimeTests(unittest.TestCase):
         self.assertGreaterEqual(store.calls, 3)
         self.assertEqual(len(finished), 1)
 
-    def test_active_to_inactive_handoff_returns_completion_and_never_probes_while_active(self):
+    def test_completed_owner_with_running_job_keeps_waiting(self):
         probes = []
+        checks = []
 
         def probe(*args):
             probes.append(args)
-            return {"status": "stopped"}
+            return {"status": "running"}
+
+        def cancelled(_record):
+            checks.append(1)
+            return len(checks) >= 4
 
         result, _, _, _, finished, _ = self.run_wait(
             [task(jobs=[job("job-after-turn")])],
@@ -396,12 +450,36 @@ class WaitRuntimeTests(unittest.TestCase):
                 event("turn/completed", AGENT, turn="worker-turn"),
             ],
             probe=probe,
+            cancelled=cancelled,
+            clock=[0.0],
             control=10.0,
             state_refresh=10.0,
             job_refresh=10.0,
         )
-        self.assert_exit(result, "agent_completed", "subagent completed its turn")
-        self.assertEqual(probes, [])
+        self.assert_exit(result, "cancelled", "manual mam wait stop")
+        self.assertEqual(len(probes), 1, "the running job was not probed while its owner was active")
+        self.assertEqual(len(finished), 1)
+
+    def test_completed_owner_probes_live_job_stop_and_returns_handoff(self):
+        probes = []
+
+        result, _, _, _, finished, _ = self.run_wait(
+            [task(jobs=[job("job-after-turn", "collect result")])],
+            {CALLER: snapshot(CALLER, turn="caller-turn"), AGENT: snapshot(AGENT, turn="worker-turn")},
+            events=[
+                event("thread/status/changed", AGENT, status="idle"),
+                event("turn/completed", AGENT, turn="worker-turn"),
+            ],
+            probe=lambda *args: probes.append(args) or {"status": "stopped"},
+            clock=[0.0],
+            control=10.0,
+            state_refresh=10.0,
+            job_refresh=10.0,
+        )
+        self.assert_exit(result, "job_stopped", "registered job stopped; process exit does not prove experimental success")
+        self.assertEqual((result["agent"], result["task"], result["job"], result["note"]),
+                         (AGENT, TASK, "job-after-turn", "collect result"))
+        self.assertEqual(len(probes), 1)
         self.assertEqual(len(finished), 1)
 
     def test_targeted_user_steer_wakes_only_matching_current_wait(self):

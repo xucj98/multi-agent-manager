@@ -109,6 +109,8 @@ job archive 只记录归档结论，不删除 workspace，也不要求进程已�
 | `mam wait stop --agent AGENT-ID` | 解除该 agent 的等待登记，不停止 job、不归档任务。 |
 | `mam wait stop manager` | 解除当前项目唯一未绑定任务的 Manager 等待；无法唯一确认时明确报错。 |
 
+Manager 的 wait 只在 inactive 执行者没有未归档 job 时返回 `agent_completed`；running job 保持等待，stopped job 始终作为含 `JOB-ID` 和 note 的执行者交接返回，即使源任务有活动 review。
+
 每次 wait 用调用进程身份和本次 token 登记，旧登记不能取消后续等待。服务在最终 `turn/start` 前持有同一 agent 的 wait 登记锁：发现可验证的等待者或无法核验其身份时保留待办，不并行启动新 turn；wait 返回后，服务按最新 task/job 状态重新判断，已归档的 job 或任务不会产生冗余唤醒。
 
 `start` 在返回前会等待子进程确认已读取本项目的 token、PID 和身份记录；已存活但尚未完成首个调度周期的 active 服务显示为 `pending`，不会提前报告为 `healthy`。无法核验已有 PID/身份时拒绝启动第二个 daemon，保留可见错误供人工处理。
