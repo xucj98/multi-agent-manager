@@ -2,7 +2,7 @@
 
 ## 核心原则
 
-MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job`，并自动唤醒需要处理后续工作的负责人。本集群的信息查看[本地说明](.local/README.md)，所有 `mam` 命令以及 agent 均在本机运行。
+MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job` 和可选的 `mam wait`，并自动唤醒需要处理后续工作的负责人。本集群的信息查看[本地说明](.local/README.md)，所有 `mam` 命令以及 agent 均在本机运行。
 
 使用细节可用 `mam --help` 查询，语法中的大写词需要替换为实际值，方括号表示可选参数。
 
@@ -106,6 +106,19 @@ job 状态包括 `running`、`stopped`、`archived`。进程停止后，由执�
 ```text
 mam service status
 ```
+
+## 可选等待
+
+需要在当前 turn 等待执行者或 job 时，运行 `mam wait`。MAM 自动识别调用者和待处理事项，最多等待一小时；有待办时直接返回。默认仍按[自动跟进](#自动跟进)结束 turn，由 MAM 后续唤醒。
+
+```text
+mam wait
+mam wait list
+mam wait stop manager
+mam wait stop --agent AGENT-ID
+```
+
+等待返回时会说明原因及相关 job 或任务。用户的 steer 或 Manager 发来的消息可以解除对应等待，也可通过 `wait stop` 手动解除；这些操作不停止 job。收到返回结果后，按其中的待办继续工作。
 
 ## MAM 开发指南
 
