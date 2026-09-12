@@ -229,3 +229,7 @@ Proceed with the existing authorized queue: deploy exact 2e9677c into a NEW owne
 On an eligible C3 card, run the fixed fresh 40-reset gate (100000..100039, mapped cuda:0, system ICD) with new receipt/log paths. Keep the failed bf3474 zero-reset receipt and stderr. Only after this host's 40/40, exit0 and zero infrastructure markers may its per-run matching video/no-video smoke2 lead to fresh formal100. Existing resource authorization, including low-resident-memory cards with enough measured headroom, remains effective. Keep model/train-seed/eval-seed/protocol fixed, freeze each new runtime, preserve valid results and never concatenate old partials. No further per-run Manager permission is needed when those gates pass. C1 existing work continues on its current frozen version.
 
 Publish exact new runtime paths/commits, gate receipt and outcome, jobs and current queue/ledger state. Any new runtime code change outside this accepted candidate needs focused review before deployment; CPU PASS must never be reported as C3 40-reset PASS. Keep long jobs registered (>30 minutes) and finish actionable work before ending turn for MAM wakeup.
+
+
+## 当前Manager执行者交接（2026-09-13）
+Manager 01a09657-e0f3-7352-b726-aba5bbd5d498 将用 mam task rebind 将本任务交给当前对话新建的 terra/max 执行者。以 mam task status 的当前 agent 为执行权限依据；旧执行者若发现已换绑，停止执行本任务，不再写workspace/report或处理job。新执行者换绑前仅只读准备并结束turn，待Manager明确接续消息后开始工作。换绑后直接继承原TASK-ID、全部现有workspace/worktree/分支/已发布报告与运行job，不再次workspace add，不复制或重启/重复登记job。既有任务目标、数据与评估协议、冻结runtime、独立review门禁和资源授权均不变。完成可执行事项正常结束turn，由MAM唤醒；不得高频轮询。
