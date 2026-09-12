@@ -1,6 +1,6 @@
 # 当前 MAM 项目 state-vla 资源与 worktree 创建独立审计
 
-审计时点：2026-09-12。范围严格限于 `/mnt/public/xcj/Projects` 当前 MAM 项目，以及该项目脚本、运行入口或软链接实际引用的外部路径。全程只读：未安装、未重建 worktree/venv、未运行 GPU/renderer、未读取活跃进程环境或停止任务。精简查询证据位于 `/mnt/public/xcj/Projects/workspace/48a1f57c-1978-466f-b41e-763b2acf72b8/evidence/observations.md`。
+审计时点：2026-09-12。范围严格限于 `/mnt/public/xcj/Projects` 当前 MAM 项目，以及该项目脚本、运行入口或软链接实际引用的外部路径。全程只读：未安装、未重建 worktree/venv、未运行 GPU/renderer、未读取活跃进程环境或停止任务。精简查询证据位于 `/mnt/public/xcj/Projects/multi-agent-manager/.tasks/48a1f57c-1978-466f-b41e-763b2acf72b8/evidence/observations.md`。
 
 三个核心库的标准入口和抽样 worktree 基本符合“代码/venv 独立、数据与输出回链稳定源库”的设计。已证实两项运行边界问题：RMBench 历史 manifest 的 `policy/pi05/.venv` 在新 worktree 与 `wuwen-1` 都不可用；WARP cache 因 `.local` 回链而在所有 worktree 间共享。另有一个 OpenPI 数据根的显式传参缺口和一个 source-root Python 版本分歧，应在下次启动前补足 preflight。
 
