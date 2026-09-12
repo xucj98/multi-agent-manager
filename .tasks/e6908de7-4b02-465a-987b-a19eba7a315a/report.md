@@ -672,3 +672,18 @@ MAM `c492ec19-772d-403b-a7d0-052c2b5c9c42`（C1 GPU1，`c_rearrange_no_memory_tr
 安全台账树 `/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r2-running-ledger` 的 `task/e6908de7-r2-running-ledger` 已提交 `6c496ee`（`docs: record no-memory seed1 eval0 result`）。它同步主概述、B组实际状态、能力基线失败分类、覆盖表的 eval0 结果和稳定链接，并更正已部署 RMBench 完整 SHA 为 `9d8f47887a50ea691e5624de139f10bfcfb54412`；`git diff --check` 通过，树干净。冻结 C runtime 仍为 RMBench `9d8f47887a50ea691e5624de139f10bfcfb54412`、bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，未改动活跃树。
 
 实时 MAM 表仍只有六项 C1 formal：GPU2 `5261ee5a`、GPU4 `7888aa9f`、GPU3 `ce4244c2`、GPU5 `2ec2a132`、GPU6 `378e4cd7`、GPU7 `504fc975`。没有新的 stopped job。下一项仍是已完成 audit/dry-run 的 serial-lag30 / train seed1 / eval seed1，但 C1 GPU1 有外部 VM 的 `[Not Found]` PID 占约3793 MiB，尽管19410/19412无监听，不能视为可用或抢占；C3 四卡也无空卡且 C3 GPU0–3 保持既有 EOF 暂停。故本轮未启动新 smoke/formal。自有 `/tmp` 收尾脚本已清理；不停止健康作业，后续由 MAM stopped 事件唤醒处理。
+
+## 2026-09-12 21:01 CST：put-back B 六项交接、传输与三 eval-seed 队列
+
+已按 `695bc51f` 最终报告 `f317c3d64b535e13fe2b8489df6bdc01c448eac9` 接入 put-back serial-lag30/no-memory 的 train seed0/1/2。六个 checkpoint 均来自固定训练 commit `a7f3e07346cee7260cdc3a618eedc38c0702da61`，各自完成20k、最终保存、checkpoint-only恢复和真实 policy 推理门禁，训练 job均归档；这只构成评测准入，不能替代每个 eval seed 的 matching smoke2→formal100。
+
+六个源 `20000` 目录均预检为含 `_CHECKPOINT_METADATA`、`params`、`assets`、`metadata`，C稳定目标在启动前均不存在。优先配对的 serial-lag30/train0 和 no-memory/train0 已通过既有 `wuwen-nx-aic → wuwen-4090-aic` 路径启动，使用 `rsync -a --partial --append-verify --bwlimit=10m`：
+
+- serial-lag30 s0：MAM `c7123658-ee6f-43fb-97d5-d6b8be0dee52`，20:55:11 CST；
+- no-memory s0：MAM `350a4c91-88b3-4e66-8571-3bb30f7ab0c1`，20:56:45 CST。
+
+两项启动间隔94秒，当前为实际运行的两路传输；完成后必须用既有 `rsync -aicn --delete --omit-dir-times` 零差异校验并核对目标 metadata hash，才归档并写 C-ready。serial/no-memory 的 seed1/2 共四项均为 READY 待传，未写成运行中，也没有启动GPU smoke/formal。
+
+安全 docs tree `task/e6908de7-r2-running-ledger` 提交 `db4fd88661ca0bf804b33c9e9c4d96cbff32205e`（`docs: queue put-back B checkpoints for C eval`）：将第二批 B 从过时的6项训练快照更新为10项，列出六个精确 checkpoint、传输状态和每 checkpoint eval0/1/2 smoke2→formal100 队列；顶层概述和覆盖表均不把未传/未评项填0。`git diff --check`通过，docs tree干净；活跃 C runtime 未变。
+
+C2/C3 的六项 episode-22 EOF partial继续保留为 not reportable、不自动重试，诊断已交 task `923ea224` / agent `01a09231`；本轮不从 renderer/Warp stderr推断根因或改活跃命令。实时MAM表中的健康 C1 六项 formal保持运行，未被传输或台账工作影响。后续 transfer/formal stopped 事件由 MAM 主动唤醒处理。
