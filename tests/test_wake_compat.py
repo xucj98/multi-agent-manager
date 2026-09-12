@@ -357,6 +357,7 @@ class InstallerScriptTests(unittest.TestCase):
             "multi_agent_manager/job_runtime.py",
             "multi_agent_manager/wake_compat.py",
             "multi_agent_manager/liveprobe.py",
+            "multi_agent_manager/wake_runtime.py",
             "multi_agent_manager/cli.py",
         ):
             target = root / relative
@@ -521,6 +522,32 @@ run_live_delivery_probe() {
             check=False,
         )
 
+    def run_checkout_tests(self, **overrides: str) -> subprocess.CompletedProcess[str]:
+        """Run the installer's pre-pipx test phase against the fixture checkout."""
+
+        environment = {
+            **os.environ,
+            "HOME": str(self.home),
+            "PIPX_HOME": str(self.pipx_home),
+            "PATH": f"{self.fake_bin}:{os.environ['PATH']}",
+            "FAKE_LOG": str(self.log),
+            "FAKE_STATE": str(self.state),
+            "FAKE_MAM": str(self.fake_mam),
+            "FAKE_EXPECT_PROJECT": str(self.project),
+            "FAKE_MANAGER": MANAGER,
+            **overrides,
+        }
+        command = 'source "$1"\nCHECKOUT_ROOT="$2"\nchoose_source_python\nrun_tests\n'
+        return subprocess.run(
+            ["bash", "-c", command, "bash", str(self.checkout / "scripts" / "install.sh"), str(self.checkout)],
+            cwd=self.checkout,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
     def service_commands(self) -> list[str]:
         if not self.log.exists():
             return []
@@ -580,6 +607,84 @@ run_live_delivery_probe() {
         again = self.run_installer()
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual((self.home / ".bashrc").read_text().count("# >>> MAM PATH >>>"), 1)
+
+    def test_checkout_test_environment_reaches_current_source_in_detached_daemon(self):
+        """A fresh checkout must outrank an older package for the daemon child.
+
+        The test interpreter deliberately has an old ``multi_agent_manager``
+        in its site-packages.  The checkout has no editable environment.  The
+        fixture test starts the real detached fresh-project daemon, whose cwd
+        is the separate MAM state root just like ``_spawn_service`` uses.
+        """
+
+        self.assertFalse((self.checkout / ".venv").exists())
+        source_environment = self.root / "old-installed-python"
+        subprocess.run([sys.executable, "-m", "venv", str(source_environment)], check=True)
+        source_python = source_environment / "bin" / "python"
+        site_packages = Path(
+            subprocess.check_output([str(source_python), "-c", "import site; print(site.getsitepackages()[0])"], text=True).strip()
+        )
+        stale_package = site_packages / "multi_agent_manager"
+        stale_package.mkdir()
+        (stale_package / "__init__.py").write_text('"""Old installed package fixture."""\n', encoding="utf-8")
+        stale_marker = self.root / "old-package-daemon-ran"
+        (stale_package / "wake_runtime.py").write_text(
+            "from pathlib import Path\n"
+            "import os\n"
+            "Path(os.environ['MAM_STALE_DAEMON_MARKER']).write_text('old package ran\\n', encoding='utf-8')\n"
+            "raise SystemExit(91)\n",
+            encoding="utf-8",
+        )
+        daemon_root = self.root / "daemon-state"
+        daemon_projects = self.root / "daemon-projects"
+        daemon_root.mkdir()
+        daemon_projects.mkdir()
+        (self.checkout / "tests" / "test_detached_source_import.py").write_text(
+            "from pathlib import Path\n"
+            "import os\n"
+            "import time\n"
+            "import unittest\n"
+            "\n"
+            "from multi_agent_manager import cli, job_runtime, wake_runtime\n"
+            "\n"
+            "\n"
+            "class DetachedSourceImportTests(unittest.TestCase):\n"
+            "    def test_daemon_uses_checkout_runtime_after_cwd_changes(self):\n"
+            "        checkout = Path(os.environ['MAM_CHECKOUT_ROOT']).resolve()\n"
+            "        self.assertEqual(Path(wake_runtime.__file__).resolve(), checkout / 'multi_agent_manager' / 'wake_runtime.py')\n"
+            "        config = cli.ProjectConfig(Path(os.environ['MAM_TEST_DAEMON_ROOT']), Path(os.environ['MAM_TEST_DAEMON_PROJECTS']), 'project/daemon')\n"
+            "        store = cli.Store(config)\n"
+            "        started = False\n"
+            "        try:\n"
+            "            result = wake_runtime.start_service(config)\n"
+            "            started = True\n"
+            "            self.assertEqual(result['status'], 'awaiting_manager')\n"
+            "            self.assertTrue(result['healthy'])\n"
+            "            self.assertFalse(Path(os.environ['MAM_STALE_DAEMON_MARKER']).exists())\n"
+            "        finally:\n"
+            "            if started:\n"
+            "                wake_runtime.stop_service(config)\n"
+            "                deadline = time.monotonic() + 5.0\n"
+            "                while time.monotonic() < deadline:\n"
+            "                    state = wake_runtime._load_state(store)\n"
+            "                    observed = job_runtime.probe_process('local', state['pid'], state['identity'])\n"
+            "                    if observed['status'] == 'stopped':\n"
+            "                        break\n"
+            "                    time.sleep(0.05)\n"
+            "                else:\n"
+            "                    self.fail('fresh detached daemon did not stop')\n",
+            encoding="utf-8",
+        )
+        result = self.run_checkout_tests(
+            PATH=f"{source_python.parent}:{self.fake_bin}:{os.environ['PATH']}",
+            PYTHONPATH="",
+            MAM_CHECKOUT_ROOT=str(self.checkout),
+            MAM_TEST_DAEMON_ROOT=str(daemon_root),
+            MAM_TEST_DAEMON_PROJECTS=str(daemon_projects),
+            MAM_STALE_DAEMON_MARKER=str(stale_marker),
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(stale_marker.exists())
 
     def test_fresh_project_still_requires_live_app_server_before_service_status(self):
         missing = self.root / "missing.sock"

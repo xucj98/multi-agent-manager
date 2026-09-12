@@ -143,8 +143,19 @@ choose_source_python() {
 }
 
 run_tests() {
+    # A clean checkout is tested before pipx has installed it.  Test code can
+    # start a detached service from MAM_ROOT, where cwd no longer identifies
+    # this checkout, so keep the checkout first in every test subprocess.
+    local checkout_pythonpath="$CHECKOUT_ROOT"
+    if [[ -n "${PYTHONPATH:-}" ]]; then
+        checkout_pythonpath+=":$PYTHONPATH"
+    fi
     printf 'MAM proactive wakeup: running checkout tests with %s\n' "$SOURCE_PYTHON"
-    if ! (cd -- "$CHECKOUT_ROOT" && "$SOURCE_PYTHON" -B -m unittest discover -s tests -v); then
+    if ! (
+        cd -- "$CHECKOUT_ROOT"
+        export PYTHONPATH="$checkout_pythonpath"
+        "$SOURCE_PYTHON" -B -m unittest discover -s tests -v
+    ); then
         incomplete 'checkout tests failed; pipx and the existing scheduler were left untouched'
         return 1
     fi
