@@ -1,6 +1,6 @@
 # Diagnose repeated cluster C simulator worker EOF
 
-Your prior put-back training task695bc51f is accepted and archived. This is a new independent task. Read MAM AGENTS/README and this published task. Create independent worktrees using mam workspace add: robot-bridge base f9626636c4776d8eb15f9c556775cb2d12c000e5 and RMBench base 9d8f47887a50ea691e5624de139f10bfcfb54412; then read each repo AGENTS and robot-bridge docs/design/conventions.md. Do not reuse the archived workspace. Only create another repo worktree if the evidence actually requires its code.
+This is a new independent diagnosis task; your prior environment task is archived. Read MAM AGENTS/README and this published task. Create independent worktrees using mam workspace add: robot-bridge base f9626636c4776d8eb15f9c556775cb2d12c000e5 and RMBench base 9d8f47887a50ea691e5624de139f10bfcfb54412; then read each repo AGENTS and robot-bridge docs/design/conventions.md. Do not reuse the archived workspace. Only create another repo worktree if the evidence actually requires its code.
 
 ## Problem and scope
 
