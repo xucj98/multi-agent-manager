@@ -854,3 +854,9 @@ GPU5 / ports 19450,19452 / seed sequence 300000..300099
 启动后 GPU5 使用约16.2 GiB，首个 reset accepted 且 worker 已进入实际 700-step rollout；尚未形成正式分数或50条快照。C1 GPU6 的 rearrange serial-lag30 trainseed0/evalseed1 只读 checkpoint 已完成 audit 与 smoke dry-run，随后启动 matching smoke2；GPU7 的同 checkpoint evalseed2 audit/dry-run 已就绪，按同机冷启动错开接续。
 
 C3 GPU0–3 当前各约24,080 MiB free、0% util，bf3474/f962663/a869498 runtime clean 且 renderer process-reuse patch 存在。此前 C3 gate 的 `RMBench/.venv/bin/python` symlink 被 bf3474 的 `Path.resolve()` 跟随到 base interpreter，导致 `ModuleNotFoundError: numpy`，未完成任何 reset；原 receipt/log 保留。窄修复 `2e9677ce8ec9f623395184f63f32ddafa66e5e44` 由独立 review `e755c753-4acf-4958-85f4-7595fba739a0` 审阅中，尚未获当前 Manager 最终放行。因此不部署该提交、不重跑 C3 gate；这是当前唯一待 Manager 裁决的事项。
+
+### C1 GPU6/GPU7 队列接续
+
+GPU6 的 `c_rearrange_serial_lag30_trainseed0_evalseed1_smoke2_r3` 已登记 MAM `1d1b376f-5698-489d-a377-b80c3957a452`。它使用同一只读 trainseed0 20k checkpoint、eval seed `200000..`、端口19460/19462；首个 reset 已 accepted，GPU 使用约16.2 GiB，第一条 rollout 正在执行。
+
+GPU7 的 `c_rearrange_serial_lag30_trainseed0_evalseed2_smoke2_r3` 已在 GPU6 首个 infer/reset 后错峰启动并登记 MAM `58def05d-7340-437f-8c3f-2d63312a0f7f`，使用 eval seed `300000..`、端口19470/19472。两项均只在自身 completed video/no-video smoke 验证后接续各自 fresh formal100；当前没有把 smoke 任务表现记为正式结果。
