@@ -77,7 +77,7 @@ mam task publish TASK-ID --file report
 
 ## 进程管理
 
-预计运行超过一小时的正式数据生成、训练或评估需要登记；短 smoke 不需要。登记、查询和收尾使用：
+预计运行超过 30 分钟的程序（如正式数据生成、训练、评估、传输拷贝）需要登记；短 smoke 不需要。登记、查询和收尾使用：
 
 ```text
 mam job add TASK-ID --note NOTE --host HOST --pid PID
@@ -91,15 +91,13 @@ mam job archive JOB-ID --note NOTE
 
 job 状态包括 `running`、`stopped`、`archived`。进程停止后，由执行者检查结果、完成收尾，再归档 job。`mam job archive` 可归档任意已登记 job，只结束 MAM 对它的跟踪并保留记录，不停止进程。`mam task archive` 要求其所有 job 已归档。
 
-## 自动跟进
+## 自动唤醒
 
 当前可执行的工作处理完后，正常结束 turn。已登记的长进程可以继续运行，MAM 会在需要处理后续工作时唤醒负责人，无需调用等待命令或定时查询状态。
 
-- 有未归档的 stopped job：由执行者处理，即使同一任务还有其他 running job。
+- 有未归档的 stopped job：由执行者按任务要求处理并归档。
 - 只有 running job：MAM 继续监控，执行者可以结束 turn。
 - 没有 job 或所有 job 都已归档，且执行者已结束 turn：由 Manager 检查成果，决定归档、委派 review 或追加要求。源任务已交给未归档的 review 任务时，等待 reviewer 的结果。
-
-唤醒消息包含待处理 job 的 `JOB-ID` 和用途，或任务的 `AGENT-ID`、`TASK-ID` 和标题。进程停止不代表实验成功，结束 turn 不代表任务已完成；仍需按任务要求检查和交付成果。
 
 负责人正在工作时，MAM 保留待办，避免打断当前 turn。服务的启动、停止和故障处理见[安装说明](docs/install.md)，查看当前服务状态使用：
 
@@ -109,7 +107,7 @@ mam service status
 
 ## 可选等待
 
-需要在当前 turn 等待执行者或 job 时，运行 `mam wait`。MAM 自动识别调用者和待处理事项，最多等待一小时；有待办时直接返回。默认仍按[自动跟进](#自动跟进)结束 turn，由 MAM 后续唤醒。
+需要在当前 turn 等待执行者或 job 时，运行 `mam wait`。MAM 自动识别调用者和待处理事项，最多等待一小时；有待办时直接返回。默认仍按[自动唤醒](#自动唤醒)结束 turn，由 MAM 后续唤醒。
 
 ```text
 mam wait
