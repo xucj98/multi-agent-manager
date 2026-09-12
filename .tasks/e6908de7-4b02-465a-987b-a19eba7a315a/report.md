@@ -459,3 +459,26 @@ manifest/smoke hash隔离及 run-cache 隔离；review通过前不会同步或�
 `RMBench-eval-seed-runtime`；普通20k运行强制训练seed和eval seed，runner实际使用 profile `fixed.seed`，所以 eval0/1/2 分别从 `100000`、`200000`、`300000` 起。训练seed由checkpoint `exp_name` 的 `_sN`核验；每个新run独立manifest、smoke hash和Warp cache。CPU复核为 `py_compile`、`git diff --check`及 bridge `tests/benchmark/test_runner.py` **9 passed**。C 的活跃 `c-eval` 三树没有改动。
 
 13:54 CST 的只读资源快照与上表首波计划一致：C1 GPU1/2/4/5/6/7可用，C1 GPU0被占用、GPU3有外部1.2GiB使用而排除；C2 GPU2–7可用（首波使用4–7，2/3留给后续队列）；C3 GPU0–3可用。表列14组 robot/policy端口均无监听。独立review通过后，仍先错开 C1/GPU1、C2/GPU4、C3/GPU0 的冷启动；各自首个infer成功后才扩至同表其余卡，一卡完成自身smoke2再formal100。review通过前不部署、不启动GPU。
+
+## 2026-09-12 14:16 CST：B serial 交接、传输与 cache 审计核对
+
+`7ae41311` 已发布 rearrange serial-lag30 train seed1/2 的最终20k交接；两份均固定训练
+commit `d10cc01d44c10e5ed0cd8c228d9409dd6cabac50`，并完成 BF16/metadata、有限参数和 CPU checkpoint-only
+Policy 恢复验收。源 checkpoint 均有 `params/assets/metadata/_CHECKPOINT_METADATA`：s1 为61个普通文件、4.9GiB、
+metadata SHA-256 `813e498e0f4f6ffd44e708d84f4f592591a063f1fc29af235278fe78c8c34949`；s2 为63个普通文件、4.9GiB、
+metadata SHA-256 `07de6b2dfac14c0a2742a759ee0005deec91380a76741668eb34aee62ee301ae`。
+
+C 稳定目标在启动前均不存在，`/mnt/public` 有4.6TiB可用。复用本任务已有
+`c_checkpoint_transfer/transfer_checkpoint.sh`，仅传checkpoint，执行 `rsync -a --partial --append-verify --bwlimit=10m`
+及完成后的 `rsync -aicn --delete --omit-dir-times` 零差异校验。s1 于14:12:16 CST启动、MAM
+`a5c39be1-dcfe-41f2-9041-879b2ff781a1`；s2 于14:13:57 CST启动、MAM
+`a6561ab9-c3d3-4f42-b0bc-b0948ea9196c`，相隔101秒，均在 `wuwen-nx-aic` 运行。此时两项均为实际 running，尚未把部分目录当作C-ready；等待 checksum 和 metadata 收尾后才归档。未部署运行时，未启动GPU评测。
+
+C资源审计确认旧命令按共享 `.local/warp-cache/.../schema/gpuN` 构造路径，跨C主机的同号GPU会碰撞。
+本机独立树 `f5087496a0f7c892bd322708e4ac0bbdeb74e523` 的入口改为
+`.../schema/runs/<run_name>/{robot,policy}`；普通20k run强制带 `trainseedN` 和 `evalseedN`，当前队列表对每个
+checkpoint/评测seed采用唯一结果leaf/run名。因此它在该唯一性前提下覆盖了跨主机同号GPU的冲突；hostname没有单独进入路径，
+不在本轮扩展实现。独立review `300c4873-f12a-4d15-9d79-2ccf9df5e749` 仍为 working，review准入前不将该代码同步C或扩容GPU队列。
+
+安全文档树 `RMBench-serial-ledger` 提交 `efbabe4`：更新四份B checkpoint状态，并为serial s1/s2加入eval_seed0/1/2覆盖行；
+`git diff --check`通过，文档树干净。
