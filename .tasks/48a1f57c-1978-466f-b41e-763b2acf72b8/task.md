@@ -1,4 +1,4 @@
-# 本集群 state-vla 资源位置与 worktree 创建审计
+# 当前 MAM 项目 /mnt/public/xcj/Projects 资源与 worktree 创建审计
 
 ## 目标与只读边界
 用户要求与集群C并行另一个独立审计。本任务审计当前训练服务器、wuwen-1及wuwen-nx-aic（仅有相关引用时）的state-vla资源位置，识别不合理布局。只读，不修复、不删除、不安装、不重建worktree/venv、不跑GPU、不停止或修改活跃训练/评估。不要输出密钥、认证令牌或完整私密环境。
@@ -23,3 +23,6 @@
 ## 判断与交付
 确认问题、维护成本、待核实项分开。重点查：悬空/跨节点私有依赖、旧已删task/临时目录依赖、结果保存错库或目录层级混乱、重复大模型/资产、共享可写cache冲突、未登记的遗留workspace、入口/README与实际不一致。集群固定绝对路径本身不是问题，不提出可迁移性大改造或新provenance系统。每个问题给实际路径/触发条件/影响与最小建议，不凭目录名推断可删除。
 完整报告写本任务MAM .tasks/<TASK-ID>/report.md，章节为资源总览、worktree创建审计（逐库）、发现与建议、未覆盖/未确认。精简证据放.tasks下或本task workspace，最终有价值证据留.tasks；清理自有临时查询文件，无代码修改无需建业务库worktree。报告mam task publish后结束turn，交Manager裁定，不自动实施任何建议。
+
+## 用户明确的项目边界（最高优先）
+本次审计对象是/mnt/public/xcj/Projects下当前MAM项目，而不是整个集群。先读取该根.mam/env.json确定MAM_ROOT/PROJECT_ROOT/MAM_BRANCH，以本项目仓库/workspace/实际引用资源为范围。只有本项目脚本/环境/软链接实际引用的外部路径（如cache/shared-python或节点私有解释器）才继续追踪。wuwen-1仅用于验证同一共享项目的运行依赖；不审计其其他项目、账号或无关目录。不得把范围扩成整个/mnt/public、所有机器/home或其他MAM项目。
