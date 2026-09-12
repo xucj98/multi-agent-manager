@@ -625,3 +625,20 @@ C2 GPU6 (`1c64c244-3c1b-462b-baec-34f3a3ba7264`) 和 GPU7 (`c98c5377-3fc2-4c9f-b
 安全文档树 `/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r2-running-ledger` 的分支 `task/e6908de7-r2-running-ledger` 已提交：`60db08e`、`64a09a6`、`7b7670b`。它同步主概述、覆盖表、MAM ID、两条 failure review 和 audit-before-retry 事实；`git diff --check` 通过，工作树干净。短期本地 JSON 临时文件已清理。
 
 当前可执行接续已完成；结束 turn 后由 MAM 对未归档的 formal/smoke 停止事件唤醒处理。
+
+## 2026-09-12 19:50 CST：C1 serial-lag30 s1/eval0 smoke 门禁与 formal 接续
+
+MAM `23d046b3-c3b2-43bd-b59f-6965143accc7` 的 retry smoke 已自然结束并通过门禁：
+
+- `c_rearrange_serial_lag30_trainseed1_evalseed0_smoke2_r2_retry1` 的 benchmark 为 `completed`、2/2 accepted reset，环境 seed 为连续 `100000,100001`；episode0 有 700 帧可读 video，episode1 为 no-video。
+- `processes.jsonl` 记录两个 scheduler `episode_terminal`/0，robot/policy 由 runner 正常收尾；`checkpoint_metadata/inheritance.json` 同时保留 `checkpoint_metadata` 和 `config_source`，后者指向已准备的 `Audit/rearrange_serial_lag30--a2793487ccf1bfd4--train1--eval0`。smoke 的 1/2 任务成功率不参与门禁判定。
+- 原 audit 缺失的 smoke outer log 仍保留；retry 使用新的 smoke leaf，未覆盖任何失败证据。MAM smoke job 已按门禁通过归档。
+
+已在同一 C1 GPU7、相同冻结 runtime 和端口映射启动 matching formal100：
+
+- run：`c_rearrange_serial_lag30_trainseed1_evalseed0_100ep_r2`
+- MAM：`504fc975-be9d-4307-9685-e0b967b23a76`，启动时已核验 running；当前仅处于服务启动阶段，未报告中间或正式成绩。
+
+安全台账树追加 `6bc7637`（父 `7b7670b`），将 B 组主概述、checkpoint 行和 eval 覆盖表的 GPU7 项统一为 formal运行中，记录 matching smoke MAM 已归档。`git diff --check` 通过且树干净。
+
+此刻共有9个已登记 formal running；C3 GPU1/2 仍按此前四项同型 accepted-reset EOF 结论暂停接续。当前没有未归档 stopped job，结束 turn 后由 MAM 对下一停止事件唤醒。
