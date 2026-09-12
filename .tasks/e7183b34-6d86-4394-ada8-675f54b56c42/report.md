@@ -38,3 +38,9 @@
 cleanup 已 stop fixture service、archive 两个 fixture job 和三项 fixture task、关闭 control stream、删除 marker-owned fixture 根。App Server 同时拒绝对 ephemeral thread 的 archive/delete（`thread is not persisted and cannot be deleted`），所以该次 evidence 的 thread cleanup 标为 failed；stream close 后 ephemeral 生命周期未由可用 cleanup API 再确认。外层临时 evidence 仅用于本报告，随后会清理。
 
 需要 runtime/Manager 决定后续真实验收边界：在保持 ephemeral 专用 thread 的前提下，runtime 必须提供不依赖 `thread/turns/list` 且仍能安全做 delivery 前边界的实际路径；若只能用 persisted 专用 probe thread，则需要用户/Manager 明确改变 ephemeral 约束及其 archive/delete 清理方案。我未修改 runtime，也没有把这项阻断降级为 handshake 或 mock PASS。
+
+## 45614a60 组合验证
+
+已在含 `bf157209` 的 installer worktree 上 cherry-pick `45614a60f63517eff3075381c697d370f09bdccc`，无冲突。组合后独立执行 `tests/test_job_runtime.py` 与 `tests/test_wake_runtime.py`，47 tests passed。该提交的 paused/resumed、unknown-source retention、typed RPC rejection 转换均在其回归测试中通过。
+
+我也核对了 follow-up 后实际 delivery 路径：`WakeScheduler` 仍在发送前调用 `stream.latest_turn(recipient)`，而其实现仍请求 `thread/turns/list`。因此它没有改变首次真实 fixture 遇到的 App Server ephemeral-thread 限制；在同一外部 API 与相同代码路径下重跑只会再次启动 baseline model turn 后于相同位置失败，不满足“不得无界重复消耗模型”的边界。已不重试，等待针对该具体 ephemeral API 阻断的 runtime/Manager 决定。
