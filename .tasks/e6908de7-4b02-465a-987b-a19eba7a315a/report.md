@@ -603,3 +603,25 @@ C2 GPU6 (`1c64c244-3c1b-462b-baec-34f3a3ba7264`) 和 GPU7 (`c98c5377-3fc2-4c9f-b
 因此截至该快照共有 **9 个已登记 formal**：C1 GPU1–5 的 no-memory train1 eval0/1/2 与 train2 eval0/1，C3 GPU0–3 的 put-back t+1/train1/eval1、t+1/train0/eval2、t+30/train0/eval1/2。C1 GPU6 仅为短 smoke，尚无 formal 分数或 MAM job。安全 docs tree 追加 `e6405ae`（父 `d380508`），并保持干净、`git diff --check` 通过；覆盖表已同步为9 formal/1 smoke。此更新取代上节的“7 formal、2 smoke”瞬时状态。
 
 本轮不再主动等待或轮询。已登记的 formal 停止时由 MAM 主动唤醒；届时先收尾/归档，再按实际 GPU 与同主机冷启动门接续。
+
+## 2026-09-12 19:45 CST：r2 stopped formal 收尾、C1 接续与重复 EOF 暂停
+
+本轮按 18:35 主动唤醒规则处理两个已停止 formal，完成证据收尾后归档；未重跑任何不完整 leaf，也没有修改活跃 runtime、checkpoint、机器人或 Warp 配置。
+
+### C3 不完整 formal
+
+- C3 GPU1、put-back full t+1 / train0 / eval2（MAM `d0728059-eecf-444b-a4c0-0a3f9e5e9c43`）在 episode 22 的 accepted reset 遇到 `worker closed the RPC stream (EOFError)`。23 条 partial 有 17 成功，accepted 环境 seed 为 `300000–300022`，无 `final_review.json`。已写 [failure review](/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/c_put_back_full_t_plus_1_trainseed0_evalseed2_100ep_r2/failure_review.json)（SHA-256 `809fe642…90ef37f4`）并按“不计分、不可自动重试”归档。
+- C3 GPU2、put-back full t+30 / train0 / eval1（MAM `3d9a4ea3-abf4-4b7e-bbfe-40a27785c3d0`）同样在 episode 22 accepted reset 发生 EOF。23 条 partial 有 16 成功，accepted 环境 seed 为 `200000–200022`，无 `final_review.json`。已写 [failure review](/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/c_put_back_full_t_plus_30_trainseed0_evalseed1_100ep_r2/failure_review.json)（SHA-256 `cec7cb89…b2a6038`）并归档。
+
+两项的完整 `diagnostics_summary.json`、episode/proc records、worker stderr 和 outer log 都保留。GPU1 的 stderr 含 renderer 初始化错误，但当前只将其记为观察，不据此认定 EOF 根因。它们与此前 C2 GPU6/7 的两项 episode-22 EOF 构成四项跨卡/跨主机同型基础设施不完整结果；C3 GPU1/2 暂不再自动重试或接续，待具体诊断裁定。
+
+### 健康 C1 接续
+
+- C1 GPU6 的 rearrange no-memory / train2 / eval2 matching smoke 已完成：accepted `300000,300001`、一条 video 与一条 no-video、metadata/config_source lineage、两个 scheduler `episode_terminal`/0 和 runner child 收尾均已核对。其任务表现为 1/2，不作为门禁。匹配 formal100 已登记为 `378e4cd7-cfdb-4d8b-9e5f-6da6694a5641`，当前运行中。
+- C1 GPU7 的 rearrange serial-lag30 / train1 / eval0 第一次短 smoke 在尚未生成该 checkpoint 输入 audit 时于 backend 前退出；旧 outer log 保留，没有模型或仿真产物。已用入口现有 `--prepare-audit` 写入 checkpoint metadata→scheduler 的审计/manifest，再以新 leaf `c_rearrange_serial_lag30_trainseed1_evalseed0_smoke2_r2_retry1` 启动。为使完成时自动唤醒并接 formal，这一短 smoke 额外登记为 MAM `23d046b3-c3b2-43bd-b59f-6965143accc7`，当前运行中。
+
+本快照有 8 个已登记 formal 仍在运行（C1 GPU1–6 的 no-memory s1/s2 六项，以及 C3 GPU0/GPU3 两项 put-back），另有 C1 GPU7 的 matching smoke。C3 GPU1/2 空闲但按上段暂停；未停止任何健康进程。
+
+安全文档树 `/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r2-running-ledger` 的分支 `task/e6908de7-r2-running-ledger` 已提交：`60db08e`、`64a09a6`、`7b7670b`。它同步主概述、覆盖表、MAM ID、两条 failure review 和 audit-before-retry 事实；`git diff --check` 通过，工作树干净。短期本地 JSON 临时文件已清理。
+
+当前可执行接续已完成；结束 turn 后由 MAM 对未归档的 formal/smoke 停止事件唤醒处理。
