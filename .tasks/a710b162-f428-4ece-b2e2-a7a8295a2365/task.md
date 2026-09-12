@@ -1,0 +1,5 @@
+# Label automated wake messages
+
+User requests a visible distinction between MAM-generated wake prompts and human messages: automated prompts should begin with `[MAM Message]`.
+
+Read MAM AGENTS/development instructions and create your own registered MAM worktree from current main. Modify only the proactive wake prompt formatting so every outgoing automated wake message starts with literal `[MAM Message]` on its first line, followed by existing actionable content. Cover both job_stopped and task_ready, including batches; do not label actual human messages, change routing/deduplication/event state, or add new options. Update relevant existing prompt tests and a concise design-document sentence if necessary. Do not put implementation detail in README/AGENTS. Run relevant CPU tests; no live model probes or production installation/service restart from your task. Commit, publish concise report with worktree/candidate/checks, clean transient files and end turn. Manager handles review/integration/installed update. This is a small presentation change, not another wake redesign.
