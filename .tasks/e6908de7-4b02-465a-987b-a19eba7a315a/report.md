@@ -823,3 +823,14 @@ git diff --check
 ```
 
 这是 bf3474 已获通过后的新运行时发现，原独立 review 不覆盖它。按任务要求，**尚未将2e9677c同步到C3，未重跑 gate**；请安排该窄修复的独立复核。复核通过后，C3 GPU0 仍有约24 GiB free，可先运行新的固定40-reset，再按已有授权接续 matching smoke→fresh formal100。原失败 receipt、worker stderr 和 outer log 原位保留。
+
+### 23:45 CST 队列/台账增量
+
+安全 docs tree `task/e6908de7-c-eval-docs-consolidated` 已提交
+`f251d71f9951802ac00ff16d5d0ec7e412d22fd3`（父 `291d6d8`）：主状态、r3 SHA、serial-lag30 s1
+覆盖行均改为实际 C1 formal，s2/eval0 改为实际 smoke，并保留 C3 gate 的启动前失败/待复核边界；
+不把运行或 smoke 写作成功率。C1 GPU4 又已在 GPU3 首次 rollout 后错峰启动
+`c_rearrange_serial_lag30_trainseed2_evalseed1_smoke2_r3`，MAM
+`ab03f43e-07f7-4ff7-a16c-03cef1dff15e`，端口19440/19442；GPU3 smoke MAM为
+`1415096f-8cf5-4ece-a751-00a3fd3eea9e`。GPU5/6 的下一批已有CPU audit/dry-run，等前一同主机
+smoke 的首次 infer/停止事件后继续，未并发抢启动。
