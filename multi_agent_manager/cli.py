@@ -6,6 +6,7 @@ import contextlib
 import datetime as dt
 from dataclasses import dataclass
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 
 ENV_FILE = Path(".mam") / "env.json"
@@ -158,6 +160,10 @@ def project_config(cwd=None):
     return ProjectConfig(mam_root=mam_root, project_root=project_root, branch=branch)
 
 
+def wait_key(agent):
+    return hashlib.sha256(agent.encode("utf-8")).hexdigest()
+
+
 class Store:
     def __init__(self, config):
         if not isinstance(config, ProjectConfig):
@@ -167,9 +173,11 @@ class Store:
         self.project_root = config.project_root
         self.branch = config.branch
         self.state = safe_path(self.root / ".local" / "tasks")
+        self.waits = safe_path(self.root / ".local" / "waits")
         self.logs = safe_path(self.root / ".tasks")
         self.workspaces = safe_path(self.project_root / "workspace")
         self.state.mkdir(parents=True, exist_ok=True)
+        self.waits.mkdir(parents=True, exist_ok=True)
 
     @contextlib.contextmanager
     def lock(self, name):
@@ -206,6 +214,41 @@ class Store:
         finally:
             if temporary and temporary.exists():
                 temporary.unlink()
+
+    def wait_path(self, agent):
+        return safe_path(self.waits / f"{wait_key(agent)}.json")
+
+    def read_wait(self, agent):
+        path = self.wait_path(agent)
+        if not path.is_file():
+            return None
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, ValueError):
+            path.unlink(missing_ok=True)
+            return None
+        if not isinstance(data, dict) or data.get("agent") != agent or wait_key(agent) != path.stem:
+            path.unlink(missing_ok=True)
+            return None
+        return data
+
+    def write_wait(self, data):
+        target = self.wait_path(data["agent"])
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", dir=self.waits, delete=False) as handle:
+                temporary = Path(handle.name)
+                json.dump(data, handle, ensure_ascii=False, indent=2)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, target)
+        finally:
+            if temporary and temporary.exists():
+                temporary.unlink()
+
+    def remove_wait(self, agent):
+        self.wait_path(agent).unlink(missing_ok=True)
 
     def doc(self, task, kind):
         return safe_path(self.logs / identifier(task) / f"{kind}.md")
@@ -669,6 +712,273 @@ def status(store, args):
     return render_task_status(data, docs, drafts)
 
 
+def wait_agent(args):
+    agent = getattr(args, "agent", None)
+    if not isinstance(agent, str) or not agent or agent != agent.strip() or any(char in agent for char in "\r\n\t"):
+        raise Error("--agent must be a non-empty single-line AGENT-ID")
+    return agent
+
+
+def wait_caller():
+    agent = os.environ.get("CODEX_THREAD_ID")
+    if not isinstance(agent, str) or not agent or agent != agent.strip() or any(char in agent for char in "\r\n\t"):
+        raise Error("CODEX_THREAD_ID must be a non-empty canonical AGENT-ID")
+    try:
+        if str(uuid.UUID(agent)) != agent:
+            raise ValueError()
+    except ValueError:
+        raise Error("CODEX_THREAD_ID must be a canonical AGENT-ID") from None
+    return agent
+
+
+def wait_compat_module():
+    try:
+        from . import wait_compat
+    except ImportError as exc:
+        raise Error("multi_agent_manager.wait_compat is required for mam wait") from exc
+    return wait_compat
+
+
+def wait_compatibility(module=None):
+    wait_compat = module or wait_compat_module()
+    try:
+        result = wait_compat.require_compatible()
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
+    if not isinstance(result, dict):
+        raise Error("wait compatibility check returned no runtime paths")
+    socket_path, log_path = result.get("socket_path"), result.get("log_path")
+    if not isinstance(socket_path, str) or not socket_path or not isinstance(log_path, str) or not log_path:
+        raise Error("wait compatibility check returned invalid runtime paths")
+    return result
+
+
+def wait_trace_path(wait_compat):
+    # The compatibility module is the authority for configured runtime paths.
+    # Discover its trace path before the intentionally thorough probe, so an
+    # input received during that probe remains in this wait's trace tail.
+    discover = getattr(wait_compat, "configured_paths", None)
+    if not callable(discover):
+        discover = getattr(wait_compat, "_configured_paths", None)
+    if not callable(discover):
+        raise Error("wait compatibility module cannot discover its configured trace path")
+    try:
+        _, log_path = discover()
+        path = Path(log_path)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise Error(f"cannot discover App Server trace path: {exc}") from exc
+    if not path.is_absolute():
+        raise Error("wait compatibility module returned a non-absolute trace path")
+    return str(path)
+
+
+def wait_session_messages(wait_runtime, caller, started_at):
+    try:
+        return wait_runtime.SessionMessages.from_environment(caller, started_at=started_at)
+    except (wait_runtime.WaitRuntimeError, OSError, ValueError) as exc:
+        raise Error(str(exc)) from exc
+
+
+def wait_lock(agent):
+    return f"wait-{wait_key(agent)}"
+
+
+def valid_wait_record(record, agent):
+    identity = record.get("identity") if isinstance(record, dict) else None
+    return (isinstance(record, dict) and record.get("agent") == agent and isinstance(record.get("token"), str)
+            and bool(record["token"]) and isinstance(record.get("pid"), int) and not isinstance(record["pid"], bool)
+            and record["pid"] > 0 and isinstance(identity, dict)
+            and isinstance(identity.get("host"), str) and isinstance(identity.get("boot_id"), str)
+            and isinstance(identity.get("start_ticks"), int) and not isinstance(identity["start_ticks"], bool))
+
+
+def active_wait(store, agent):
+    record = store.read_wait(agent)
+    if record is None:
+        return None, "empty"
+    if not valid_wait_record(record, agent):
+        store.remove_wait(agent)
+        return None, "stale"
+    observation = runtime().probe_process("local", record["pid"], record["identity"])
+    if observation["status"] == "stopped":
+        store.remove_wait(agent)
+        return None, "stale"
+    return record, observation["status"]
+
+
+def active_wait_records(store):
+    records = []
+    for path in sorted(store.waits.glob("*.json")):
+        if path.is_symlink() or not re.fullmatch(r"[0-9a-f]{64}", path.stem):
+            continue
+        with store.lock(f"wait-{path.stem}"):
+            try:
+                raw = json.loads(path.read_text())
+            except (OSError, ValueError):
+                path.unlink(missing_ok=True)
+                continue
+            agent = raw.get("agent") if isinstance(raw, dict) else None
+            if not isinstance(agent, str) or wait_key(agent) != path.stem:
+                path.unlink(missing_ok=True)
+                continue
+            record, state = active_wait(store, agent)
+            if record:
+                records.append((record, state))
+    return records
+
+
+def bound_wait_agents(store):
+    return {data["agent"] for data in store.all()
+            if data["status"] != "archived" and isinstance(data.get("agent"), str)}
+
+
+def same_wait_record(record, expected):
+    return all(record.get(key) == expected.get(key) for key in ("agent", "pid", "identity", "token"))
+
+
+def cancel_wait(store, agent, expected=None):
+    with store.lock(wait_lock(agent)):
+        record, state = active_wait(store, agent)
+        if not record or (expected is not None and not same_wait_record(record, expected)):
+            return {"status": "not_waiting", "agent": agent}
+        if state != "running":
+            raise Error("waiter identity cannot be verified")
+        record["cancelled"] = now()
+        store.write_wait(record)
+    return {"status": "cancelled", "agent": agent}
+
+
+def manager_wait_target(store):
+    bindings = bound_wait_agents(store)
+    candidates, unverifiable = [], []
+    for record, state in active_wait_records(store):
+        if record["agent"] in bindings:
+            continue
+        if state != "running":
+            unverifiable.append(record["agent"])
+        else:
+            candidates.append(record)
+    if unverifiable:
+        raise Error("cannot verify unbound manager wait identity: " + ", ".join(sorted(unverifiable)))
+    if not candidates:
+        raise Error("no unbound active wait found for manager")
+    if len(candidates) != 1:
+        raise Error("multiple unbound active waits found for manager: "
+                    + ", ".join(sorted(record["agent"] for record in candidates)))
+    return candidates[0]
+
+
+def wait_stop_manager(store):
+    # Keep a task binding from changing while the selected unbound wait is cancelled.
+    with store.lock("bindings"):
+        target = manager_wait_target(store)
+        return cancel_wait(store, target["agent"], expected=target)
+
+
+def begin_wait(store, agent, role, task, turn_id):
+    observation = runtime().probe_process("local", os.getpid())
+    if observation["status"] != "running" or not isinstance(observation.get("identity"), dict):
+        raise Error("cannot confirm this wait process identity")
+    record = {"agent": agent, "pid": os.getpid(), "identity": observation["identity"], "token": str(uuid.uuid4()),
+              "kind": "unified", "role": role, "task": task, "turn_id": turn_id, "timeout": 3600,
+              "started_at": now(), "cancelled": None}
+    with store.lock(wait_lock(agent)):
+        existing, state = active_wait(store, agent)
+        if existing:
+            if state == "unknown":
+                raise Error("existing wait cannot be verified")
+            raise Error("AGENT-ID is already waiting")
+        store.write_wait(record)
+    return record
+
+
+def wait_cancelled(store, record):
+    with store.lock(wait_lock(record["agent"])):
+        current = store.read_wait(record["agent"])
+        if not current or current.get("token") != record["token"] or current.get("identity") != record["identity"]:
+            raise Error("current wait registration changed unexpectedly")
+        return bool(current.get("cancelled"))
+
+
+def finish_wait(store, record):
+    with store.lock(wait_lock(record["agent"])):
+        current = store.read_wait(record["agent"])
+        if current and current.get("token") == record["token"] and current.get("identity") == record["identity"]:
+            store.remove_wait(record["agent"])
+
+
+def wait_description(record):
+    if record.get("kind") == "unified":
+        role = record.get("role", "unknown")
+        return f"unified {role} TASK-ID={record['task']}" if record.get("task") else f"unified {role}"
+    return "legacy jobs wait"
+
+
+def active_wait_states(store):
+    return {record["agent"]: state for record, state in active_wait_records(store)}
+
+
+def wait_unified(store, args):
+    caller = wait_caller()
+    try:
+        from . import wait_runtime
+    except ImportError as exc:
+        raise Error("multi_agent_manager.wait_runtime is required for mam wait") from exc
+    started_at = time.time()
+    wait_compat = wait_compat_module()
+    trace_path = wait_trace_path(wait_compat)
+    trace = None
+    messages = None
+    try:
+        trace = wait_runtime.TraceMessages(trace_path, started_at=started_at)
+        messages = wait_session_messages(wait_runtime, caller, started_at)
+        compatible = wait_compatibility(wait_compat)
+        if compatible["log_path"] != trace_path:
+            raise Error("App Server trace path changed while validating compatibility")
+
+        def begin(role, task, turn_id):
+            return begin_wait(store, caller, role, task, turn_id)
+
+        return wait_runtime.wait(
+            store,
+            caller,
+            socket_path=compatible["socket_path"],
+            log_path=compatible["log_path"],
+            begin_wait=begin,
+            cancelled=lambda record: wait_cancelled(store, record),
+            finish_wait=lambda record: finish_wait(store, record),
+            active_wait_states=lambda: active_wait_states(store),
+            process_probe=runtime().probe_process,
+            trace=trace,
+            messages=messages,
+            message_floor_ms=int(started_at * 1000),
+        )
+    except wait_runtime.WaitRuntimeError as exc:
+        raise Error(str(exc)) from exc
+    finally:
+        if trace is not None:
+            trace.close()
+        if messages is not None:
+            messages.close()
+
+
+def wait_list(store, args):
+    records = [record for record, state in active_wait_records(store) if state == "running"]
+    bindings = {data["agent"]: data for data in store.all() if data["status"] != "archived" and data["agent"]}
+    return [{"agent": record["agent"], "task_title": bindings[record["agent"]]["title"] if record["agent"] in bindings else "未绑定",
+             "task": bindings[record["agent"]]["id"] if record["agent"] in bindings else "未绑定",
+             "waiting": wait_description(record), "started_at": record["started_at"]} for record in records]
+
+
+def wait_stop(store, args):
+    agent, manager = getattr(args, "agent", None), getattr(args, "manager", None)
+    if (agent is None) == (manager is None):
+        raise Error("choose exactly one wait stop target: manager or --agent AGENT-ID")
+    if manager is not None:
+        return wait_stop_manager(store)
+    return cancel_wait(store, wait_agent(args))
+
+
 def service_module():
     try:
         from . import wake_runtime
@@ -696,7 +1006,6 @@ def service_status(store, args):
         return service_module().service_status(store.config)
     except RuntimeError as exc:
         raise Error(str(exc)) from exc
-
 
 
 def task_list(store, args):
@@ -751,6 +1060,11 @@ def print_job_list(result):
             rows.append((job["note"], state, job_started_at(job), job["id"], job["task_title"], job["task"]))
     print_table(("描述", "job状态", "开始时间", "JOB-ID", "任务描述", "TASK-ID"), rows)
 
+
+def print_wait_list(records):
+    print_table(("AGENT-ID", "绑定任务标题", "TASK-ID", "等待内容", "等待开始时间"),
+                ((record["agent"], record["task_title"], record["task"], record["waiting"], record["started_at"])
+                 for record in records))
 
 
 def print_published(document):
@@ -925,6 +1239,15 @@ def parser():
     p.add_argument("job", metavar="JOB-ID", help="registered job")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
     p.set_defaults(func=job_archive)
+    wait = command(commands, "wait", "wait for this agent's MAM work and manage wakeups")
+    wait.set_defaults(func=wait_unified)
+    waits = wait.add_subparsers(dest="wait_command")
+    p = command(waits, "list", "list current waits")
+    p.set_defaults(func=wait_list, renderer="wait_list")
+    p = command(waits, "stop", "wake one waiter without changing its monitored jobs")
+    p.add_argument("manager", nargs="?", choices=("manager",), help="stop the unique unbound manager wait")
+    p.add_argument("--agent", metavar="AGENT-ID", help="waiter AGENT-ID")
+    p.set_defaults(func=wait_stop)
     service = command(commands, "service", "manage the project-local proactive wakeup scheduler").add_subparsers(required=True)
     p = command(service, "start", "start the detached project-local scheduler")
     p.add_argument("--manager", metavar="AGENT-ID", help="explicit Manager identity for an existing project")
@@ -952,6 +1275,8 @@ def main(argv=None, *, cwd=None):
             print_task_list(result)
         elif getattr(args, "renderer", None) == "job_list":
             print_job_list(result)
+        elif getattr(args, "renderer", None) == "wait_list":
+            print_wait_list(result)
         elif getattr(args, "renderer", None) == "published" and not args.json:
             print_published(result)
         else:

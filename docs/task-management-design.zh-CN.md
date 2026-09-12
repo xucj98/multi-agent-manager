@@ -1,6 +1,6 @@
 # MAM 设计细节
 
-本文档提供 MAM 设计细节，开发 MAM 请参考并同步本文档；日常使用参考[README](../README.md)，安装见[安装说明](install.md)。MAM 顶层命令为 `mam task`、`mam job`、`mam service`、`mam workspace`。默认项目结构如下：
+本文档提供 MAM 设计细节，开发 MAM 请参考并同步本文档；日常使用参考[README](../README.md)，安装见[安装说明](install.md)。MAM 顶层命令为 `mam task`、`mam job`、`mam wait`、`mam service`、`mam workspace`。默认项目结构如下：
 
 ```text
 PROJECT_ROOT/
@@ -23,7 +23,7 @@ PROJECT_ROOT/
 }
 ```
 
-`MAM_ROOT` 是保存任务、结果简报、job、服务状态、锁和归档登记的根目录。`PROJECT_ROOT` 包含业务仓库和 workspace。`MAM_BRANCH`
+`MAM_ROOT` 是保存任务、结果简报、job、可选 wait、服务状态、锁和归档登记的根目录。`PROJECT_ROOT` 包含业务仓库和 workspace。`MAM_BRANCH`
 用于记录该项目的任务和结果简报，所有 `MAM_ROOT/.tasks` 的内容只保存在该分支，不进入 `main`。
 
 使用者分为 Manager 和执行者。Manager 为 subagent 登记任务，自己的工作无需创建任务。代码实现、review、实验等是不同的任务内容，负责完成任务的 agent 统一称为执行者。
@@ -90,7 +90,7 @@ job archive 只记录归档结论，不删除 workspace，也不要求进程已�
 
 ## 主动唤醒服务
 
-Agent 做完可执行工作时直接结束当前 turn，不再调用 `mam wait`，也没有心跳、等待超时、取消等待或“收到消息”事件。普通用户和 Manager 输入由 Codex 原生处理。turn 结束不表示任务或 job 已归档。
+默认流程是 Agent 做完可执行工作后直接结束当前 turn，由服务按 task/job 状态主动跟进；turn 结束不表示任务或 job 已归档。`mam wait` 仍是可选的当前 turn 内等待方式，可替代原生 `wait_agent`；它的等待超时、手动取消和“收到新消息”结果仅属于该可选命令，daemon 不产生这些事件。普通用户和 Manager 输入仍由 Codex 原生处理。
 
 服务是每个 MAM 项目一个的 detached daemon，不依赖 systemd。状态、待投递事项、投递回执、job 探测计划和日志均位于未纳入 Git 的 `MAM_ROOT/.local/service/`；每条状态都带项目根、项目根目录和管理分支，不能被另一项目复用。服务的唯一生命周期接口如下：
 
@@ -99,6 +99,17 @@ Agent 做完可执行工作时直接结束当前 turn，不再调用 `mam wait`�
 | `mam service start [--manager AGENT-ID]` | 身份安全地启动或复用本项目 daemon。已有 Manager 时先运行安装方提供的 App Server 兼容性检查；返回 JSON 状态。 |
 | `mam service stop` | 只向已核验身份的本项目 daemon 请求优雅退出；不停止 job、不归档任务、不删除 workspace。 |
 | `mam service status` | 返回 `running`、`healthy`、Manager、`pending`、计数、诊断和错误。状态可为 `healthy`、`pending`、`awaiting_manager`、`disabled` 或 `error`。 |
+
+可选 wait 的登记位于 `MAM_ROOT/.local/waits/`，与服务状态隔离：
+
+| 接口 | 具体操作 |
+| --- | --- |
+| `mam wait` | 以 `CODEX_THREAD_ID` 的当前 active turn 识别调用者，先检查当前 task/job 待办；有待办立即返回，否则最多等待 3600 秒。保留 stopped job 的 `JOB-ID`、note 和 task 上下文；原生输入返回 `message`，兼容性或身份无法确认明确返回错误。 |
+| `mam wait list` | 显示当前项目可验证的等待者、绑定任务、等待内容和开始时间。 |
+| `mam wait stop --agent AGENT-ID` | 解除该 agent 的等待登记，不停止 job、不归档任务。 |
+| `mam wait stop manager` | 解除当前项目唯一未绑定任务的 Manager 等待；无法唯一确认时明确报错。 |
+
+每次 wait 用调用进程身份和本次 token 登记，旧登记不能取消后续等待。服务在最终 `turn/start` 前持有同一 agent 的 wait 登记锁：发现可验证的等待者或无法核验其身份时保留待办，不并行启动新 turn；wait 返回后，服务按最新 task/job 状态重新判断，已归档的 job 或任务不会产生冗余唤醒。
 
 `start` 在返回前会等待子进程确认已读取本项目的 token、PID 和身份记录；已存活但尚未完成首个调度周期的 active 服务显示为 `pending`，不会提前报告为 `healthy`。无法核验已有 PID/身份时拒绝启动第二个 daemon，保留可见错误供人工处理。
 

@@ -100,6 +100,22 @@ printf env > "$target/.venv/marker"
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
+    def wait_call(self, *args, env=None, ok=True):
+        result = subprocess.run([str(MAM), "wait", *args], capture_output=True, text=True, env=env, cwd=self.projects)
+        self.assertEqual(result.returncode, 0 if ok else 2, result.stdout + result.stderr)
+        return json.loads(result.stdout if ok else result.stderr)
+
+    def wait_list_lines(self):
+        result = subprocess.run([str(MAM), "wait", "list"], capture_output=True, text=True, cwd=self.projects)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result.stdout.splitlines()
+
+    def wait_record(self, agent, pid, token, task=None):
+        return {"agent": agent, "pid": pid,
+                "identity": {"host": "local", "boot_id": "test-boot", "start_ticks": pid},
+                "token": token, "kind": "jobs", "task": task, "timeout": None,
+                "started_at": "test", "cancelled": None}
+
 
     def test_parallel_publications_preserve_drafts_and_index(self):
         first, second, draft = self.task(), self.task(), self.task()
@@ -862,6 +878,116 @@ base=$(git rev-parse --verify "$1^{commit}")
             cli.archive(self.store, types.SimpleNamespace(task=task, note="complete"))
         self.assertEqual(self.store.read(task)["status"], "archived")
 
+
+    def test_wait_list_and_manual_stop_preserve_the_wait_process(self):
+        observation = cli.runtime().probe_process("local", os.getpid())
+        self.assertEqual(observation["status"], "running")
+        record = {
+            "agent": "manager-agent",
+            "pid": os.getpid(),
+            "identity": observation["identity"],
+            "token": "manager-token",
+            "kind": "unified",
+            "role": "manager",
+            "task": None,
+            "turn_id": "turn-id",
+            "timeout": 3600,
+            "started_at": "test",
+            "cancelled": None,
+        }
+        self.store.write_wait(record)
+        rows = cli.wait_list(self.store, types.SimpleNamespace())
+        self.assertEqual(rows, [{"agent": "manager-agent", "task_title": "未绑定", "task": "未绑定",
+                                 "waiting": "unified manager", "started_at": "test"}])
+        stopped = cli.wait_stop(self.store, types.SimpleNamespace(agent="manager-agent", manager=None))
+        self.assertEqual(stopped, {"status": "cancelled", "agent": "manager-agent"})
+        self.assertEqual(self.store.read_wait("manager-agent")["cancelled"] is not None, True)
+        self.assertEqual(cli.runtime().probe_process("local", os.getpid(), observation["identity"])["status"], "running")
+
+    def test_wait_stop_manager_requires_unique_verifiable_unbound_waiter(self):
+        states = {1: "running", 2: "running", 3: "unknown", 4: "running", 5: "running", 6: "running"}
+        fake = types.SimpleNamespace(probe_process=lambda host, pid, identity, timeout=None:
+                                     {"status": states[pid], "identity": identity})
+        args = types.SimpleNamespace(agent=None, manager="manager")
+        with patch.object(cli, "runtime", return_value=fake):
+            with self.assertRaisesRegex(cli.Error, "no unbound active wait"):
+                cli.wait_stop(self.store, args)
+
+            self.store.write_wait(self.wait_record("first-manager", 1, "first"))
+            self.store.write_wait(self.wait_record("second-manager", 2, "second"))
+            with self.assertRaisesRegex(cli.Error, "multiple unbound active waits"):
+                cli.wait_stop(self.store, args)
+            self.store.remove_wait("first-manager")
+            self.store.remove_wait("second-manager")
+
+            bound_task = self.task()
+            self.call("bind", bound_task, "--agent", "bound-executor")
+            self.store.write_wait(self.wait_record("bound-executor", 1, "bound"))
+            self.store.write_wait(self.wait_record("manager-agent", 2, "manager", task=bound_task))
+            self.assertEqual(cli.wait_stop(self.store, args), {"status": "cancelled", "agent": "manager-agent"})
+            self.assertIsNone(self.store.read_wait("bound-executor")["cancelled"])
+            self.store.remove_wait("bound-executor")
+            self.store.remove_wait("manager-agent")
+
+            self.store.write_wait(self.wait_record("unverified-manager", 3, "unknown"))
+            self.store.write_wait(self.wait_record("other-manager", 4, "other"))
+            with self.assertRaisesRegex(cli.Error, "cannot verify unbound manager wait identity"):
+                cli.wait_stop(self.store, args)
+            self.assertIsNone(self.store.read_wait("other-manager")["cancelled"])
+            self.store.remove_wait("unverified-manager")
+            self.store.remove_wait("other-manager")
+
+            selected = self.wait_record("racing-manager", 5, "old")
+            replacement = self.wait_record("racing-manager", 6, "new")
+            self.store.write_wait(selected)
+
+            def replace_selected(_store):
+                self.store.write_wait(replacement)
+                return selected
+
+            with patch.object(cli, "manager_wait_target", side_effect=replace_selected):
+                self.assertEqual(cli.wait_stop_manager(self.store), {"status": "not_waiting", "agent": "racing-manager"})
+            self.assertIsNone(self.store.read_wait("racing-manager")["cancelled"])
+
+            self.store.write_wait(selected)
+
+            def finish_selected(_store):
+                self.store.remove_wait("racing-manager")
+                return selected
+
+            with patch.object(cli, "manager_wait_target", side_effect=finish_selected):
+                self.assertEqual(cli.wait_stop_manager(self.store), {"status": "not_waiting", "agent": "racing-manager"})
+
+    def test_wait_stop_manager_isolated_by_project_configuration(self):
+        other_projects = Path(self.temp.name) / "Other Projects"
+        other_root = self.source("multi-agent-manager", other_projects)
+        other_store = cli.Store(self.configure(other_projects, other_root))
+        observation = cli.runtime().probe_process("local", os.getpid())
+        self.assertEqual(observation["status"], "running")
+        first = self.wait_record("first-manager", os.getpid(), "first")
+        first["identity"] = observation["identity"]
+        second = self.wait_record("second-manager", os.getpid(), "second")
+        second["identity"] = observation["identity"]
+        self.store.write_wait(first)
+        other_store.write_wait(second)
+
+        self.assertEqual(self.wait_call("stop", "manager"), {"status": "cancelled", "agent": "first-manager"})
+        self.assertTrue(self.store.read_wait("first-manager")["cancelled"])
+        self.assertIsNone(other_store.read_wait("second-manager")["cancelled"])
+
+    def test_two_manual_wait_records_are_independent(self):
+        observation = cli.runtime().probe_process("local", os.getpid())
+        for agent, token in (("waiter-left", "left"), ("waiter-right", "right")):
+            record = self.wait_record(agent, os.getpid(), token)
+            record.update({"kind": "unified", "role": "manager", "turn_id": f"{agent}-turn", "timeout": 3600})
+            record["identity"] = observation["identity"]
+            self.store.write_wait(record)
+        self.assertEqual(cli.wait_stop(self.store, types.SimpleNamespace(agent="waiter-left", manager=None)),
+                         {"status": "cancelled", "agent": "waiter-left"})
+        self.assertTrue(self.store.read_wait("waiter-left")["cancelled"])
+        self.assertIsNone(self.store.read_wait("waiter-right")["cancelled"])
+        self.assertEqual(cli.wait_stop(self.store, types.SimpleNamespace(agent="waiter-right", manager=None)),
+                         {"status": "cancelled", "agent": "waiter-right"})
 
     def test_attention_marks_stopped_job_with_unknown_agent(self):
         task = self.task()

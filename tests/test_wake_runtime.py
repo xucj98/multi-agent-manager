@@ -270,6 +270,59 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(len(self.starts), 1)
         self.assertEqual(self.starts[0][0], EXECUTOR)
 
+    def test_active_optional_wait_holds_delivery_then_archived_task_prevents_redundant_wake(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        observation = job_runtime.probe_process("local", os.getpid())
+        self.assertEqual(observation["status"], "running")
+        self.store.write_wait({
+            "agent": EXECUTOR,
+            "pid": os.getpid(),
+            "identity": observation["identity"],
+            "token": "optional-wait",
+            "kind": "unified",
+            "role": "executor",
+            "task": TASK_ONE,
+            "turn_id": "waiting-turn",
+            "timeout": 3600,
+            "started_at": "test",
+            "cancelled": None,
+        })
+        scheduler = self.scheduler()
+
+        scheduler.run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "pending")
+        self.assertEqual(event["last_recipient_state"], "waiting")
+        self.assertEqual(self.starts, [])
+        self.assertEqual(self.stream_connections, 0)
+
+        self.store.remove_wait(EXECUTOR)
+        handled = self.store.read(TASK_ONE)
+        handled["status"] = "archived"
+        self.store.write(handled)
+        scheduler.run_once()
+        self.assertEqual(self.starts, [])
+        self.assertFalse(self.state()["events"])
+
+    def test_optional_wait_appearing_during_preflight_blocks_final_turn_start(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        calls = []
+
+        def staged_wait_state(_store, agent):
+            self.assertEqual(agent, EXECUTOR)
+            calls.append(agent)
+            return (None, "empty") if len(calls) == 1 else ({"agent": agent}, "running")
+
+        with mock.patch.object(cli, "active_wait", side_effect=staged_wait_state):
+            self.scheduler().run_once()
+
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(calls, [EXECUTOR, EXECUTOR])
+        self.assertEqual(event["delivery"], "pending")
+        self.assertEqual(event["last_recipient_state"], "waiting")
+        self.assertEqual(self.stream_connections, 1)
+        self.assertEqual(self.starts, [])
+
     def test_not_loaded_stopped_owner_is_targetedly_resumed_then_started(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
         self.statuses[EXECUTOR] = "notLoaded"

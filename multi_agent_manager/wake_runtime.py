@@ -1137,6 +1137,44 @@ class WakeScheduler:
     def _eligible_recipient(status: Any) -> bool:
         return status in {"idle", "notLoaded"}
 
+    @contextlib.contextmanager
+    def _wait_delivery_guard(self, recipient: str):
+        """Hold one optional-wait registration lock through a delivery edge.
+
+        The optional ``mam wait`` path owns the registration format.  It and
+        the proactive daemon share the registration lock so a waiter cannot
+        appear between the final check and ``turn/start``.
+        """
+
+        try:
+            from . import cli
+            lock_name = cli.wait_lock(recipient)
+        except Exception as exc:
+            yield "unknown", f"cannot load optional wait state: {exc}"
+            return
+        with self.store.lock(lock_name):
+            try:
+                record, status = cli.active_wait(self.store, recipient)
+            except Exception as exc:
+                yield "unknown", f"cannot inspect optional wait state: {exc}"
+                return
+            if record is None:
+                yield None, None
+            elif status == "running":
+                yield "waiting", None
+            else:
+                yield "unknown", f"cannot verify optional wait identity: {status}"
+
+    @staticmethod
+    def _retain_for_wait(events: list[dict[str, Any]], wait_status: str, detail: str | None) -> None:
+        for event in events:
+            event["last_recipient_state"] = "waiting" if wait_status == "waiting" else "wait_unknown"
+            event["last_wait_checked_at"] = _timestamp()
+            if detail:
+                event["last_wait_error"] = detail
+            else:
+                event.pop("last_wait_error", None)
+
     def _reconcile_uncertain_boundary(
         self, events: list[dict[str, Any]], latest: Mapping[str, Any] | None
     ) -> list[dict[str, Any]]:
@@ -1188,6 +1226,10 @@ class WakeScheduler:
                     self._retain_unverifiable_event(event, detail)
             if not current:
                 continue
+            with self._wait_delivery_guard(recipient) as (wait_status, wait_error):
+                if wait_status is not None:
+                    self._retain_for_wait(current, wait_status, wait_error)
+                    continue
             recipient_state = self._agent_states({recipient}).get(recipient, {}).get("status")
             if not self._eligible_recipient(recipient_state):
                 for event in current:
@@ -1267,23 +1309,27 @@ class WakeScheduler:
                 # Persist the attempt and its exact before-turn boundary
                 # before the RPC.  A missing response can then be reconciled
                 # after a crash/restart without pretending exactly-once.
-                for event in current:
-                    event.update({
-                        "delivery": "attempting",
-                        "attempts": int(event.get("attempts", 0)) + 1,
-                        "last_attempt_at": _timestamp(),
-                        "before_turn_observed": True,
-                        "before_turn_id": before_turn_id,
-                        "before_turn_status": before_turn_status,
-                    })
-                counters = state.setdefault("counters", {})
-                counters["turn_start_attempts"] = int(counters.get("turn_start_attempts", 0)) + 1
-                _save_state(self.store, state)
-                sent = True
-                if hasattr(stream, "start_turn"):
-                    stream.start_turn(recipient, payload)
-                else:
-                    stream.request("turn/start", {"threadId": recipient, "input": [{"type": "text", "text": payload}]})
+                with self._wait_delivery_guard(recipient) as (wait_status, wait_error):
+                    if wait_status is not None:
+                        self._retain_for_wait(current, wait_status, wait_error)
+                        continue
+                    for event in current:
+                        event.update({
+                            "delivery": "attempting",
+                            "attempts": int(event.get("attempts", 0)) + 1,
+                            "last_attempt_at": _timestamp(),
+                            "before_turn_observed": True,
+                            "before_turn_id": before_turn_id,
+                            "before_turn_status": before_turn_status,
+                        })
+                    counters = state.setdefault("counters", {})
+                    counters["turn_start_attempts"] = int(counters.get("turn_start_attempts", 0)) + 1
+                    _save_state(self.store, state)
+                    sent = True
+                    if hasattr(stream, "start_turn"):
+                        stream.start_turn(recipient, payload)
+                    else:
+                        stream.request("turn/start", {"threadId": recipient, "input": [{"type": "text", "text": payload}]})
             except Exception as exc:
                 if sent:
                     self._delivery_failure(current, exc)
