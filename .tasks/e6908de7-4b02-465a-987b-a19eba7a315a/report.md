@@ -1069,3 +1069,35 @@ serial-lag30，以及 C3 GPU0 的 full-t+30 trainseed0/eval seed1
 修改或归档任何仍需后继 owner 核验的 job；新 owner 应从这些登记 job 和既有 raw
 artifact 继续处理。
 
+## 2026-09-13 用户预算重排：新增调度已冻结
+
+已读取发布 task revision `09addf80035e128be29f29c6861a40f5669e8142` 的最后一节。它覆盖此前
+三训练 seed / 三 eval seed 的自动扩展授权：不再启动任何新的训练、smoke、formal 或追加 eval seed；已训练但
+未评的 checkpoint 只保留为可复用清单，等待新的论文最小实验排期。九条此前已登记的 formal 不停止、不重启，
+只自然收尾、核验、记录和归档。
+
+本轮收尾了两条已停止的 put-back full t+1 / trainseed0 r3 matching smoke，均只作为基础设施
+证据，均不产生正式分数，且不会接续配对 formal：
+
+- C2 GPU6 / eval1：MAM `db874c5e-13dc-48a0-b98d-c1ca3bc400bf` 已归档。run
+  `c_put_back_full_t_plus_1_trainseed0_evalseed1_smoke2_r3` 为 `completed`，固定 seed
+  `200000/200001` 均 accepted terminal，episode0 视频 363 帧可读、episode1 no-video，两个
+  scheduler 均 exit 0；worker/outer/process logs 对 EOF、renderer/native、traceback 和
+  runtime-error marker 均为零。
+- C3 GPU1 / eval2：MAM `1151b5e9-2ac0-43f7-8d20-c72bc8320d4c` 已归档。run
+  `c_put_back_full_t_plus_1_trainseed0_evalseed2_smoke2_r3` 为 `completed`，固定 seed
+  `300000/300001` 均 accepted terminal，episode0 视频 332 帧可读、episode1 no-video，两个
+  scheduler 均 exit 0；同一组基础设施 marker 为零。
+
+两项结果位于
+`/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/` 的对应 r3 leaf；
+均冻结在 RMBench `2e9677ce8ec9f623395184f63f32ddafa66e5e44`、bridge
+`f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI
+`a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。其现有 checkpoint、audit/manifest 继承副本、
+video/no-video 和进程记录均保留，供新排期复用。
+
+安全文档树
+`/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-c-eval-docs-consolidated`
+已在 `task/e6908de7-c-eval-docs-consolidated` 提交 `a3566f7`（父 `f251d71`）。该提交同步当前
+r3 队列、两条 smoke 的验收/暂停 formal 状态，并说明旧“无运行中 formal”行只是历史快照；`git diff --check`
+通过，树已干净。该文档分支未合入或改写任何活跃 runtime。
