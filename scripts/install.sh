@@ -191,6 +191,10 @@ run_tests() {
     if ! (
         cd -- "$CHECKOUT_ROOT"
         export PYTHONPATH="$checkout_pythonpath"
+        # This installer control value is consumed only after the source suite
+        # passes.  Keeping it out of the suite makes fixture expectations
+        # independent of a production service-start choice.
+        unset MAM_SERVICE_MANAGER
         "$SOURCE_PYTHON" -B -m unittest discover -s tests -v
     ); then
         incomplete 'checkout tests failed; pipx and the existing scheduler were left untouched'
