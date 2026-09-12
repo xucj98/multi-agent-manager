@@ -101,3 +101,6 @@ Final review must include coexistence: active waiter cannot receive an extra dae
 # Daemon import fix available for independent reproduction
 
 Runtime source23f9024 is integrated as a6c02b1 atop7074917 and Manager optional-wait docs289d2c9. Merge current integrationa6c02b1 into your registered worktree for source-vs-state import reproduction. Optional wait restoration by both owners is still in progress, so final whole-candidate verdict waits for later SHA. Do not cherry-pick old review branches containing project .tasks. New README/AGENTS wording is now also available to check: default normal turn end, optional wait usage only; concise user-facing usage, implementation details kept out.
+# Optional wait runtime restoration committed
+
+Runtime9ee6300 (after23f9024) is committed and integrated into codex/proactive-wake-integration. Restore includes wait storage/CLI/runtime/tests and explicit wait-record final lock guarding daemon turn/start. Inspect the current integration head for source/wait coexistence now; installer wait_compat/setup changes still pending. Source reports153 CPU tests passed; final combined count includes installer restore. Installer final SHA will follow. Do not add new model tests; independently verify the wait-start race/lock and handled-event suppression as final requirements.
