@@ -339,3 +339,17 @@ checkpoint metadata 经 `load_train_config → _runtime_metadata → MemoryConte
 2/2（video/no-video、连续 seed、0 runtime error、90秒首推理、服务退出和资源释放均通过）。formal100
 已登记为 MAM `37098e1a-aa94-4047-83d2-395c44edaa80`，固定 C RMBench `7933426`、bridge `f962663`、
 OpenPI `a869498`；现与 C3 GPU1 put-back t+30/s2、C2 GPU2/3 rearrange t+1/t+30 s2 共四项运行。
+
+## 2026-09-12 10:54 C 台账一致性、seed2收尾与 serial 接续
+
+台账一致性已直接修正队列表和概述，未只追加时间日志：
+
+- `4ce7e47` 将首批四项 C formal 的原“运行中”行改为最终 70/100、90/100、47/100、63/100，并保留各自稳定结果链接和历史基础设施 leaf；
+- `8b4e2a2` 收尾 put-back t+30/s2 为 74/100；`137ce32` 收尾 rearrange full t+1/s2 为 **96/100**，使主表、已完成结果表、C checkpoint 清单和总览一致为九份完整100（本机两份、C七份）；
+- `01dfe18` 只登记实际已启动的 rearrange serial-lag30/s0 formal。no-memory/s0 仍明确为已传输、待空位，不写成运行中。
+
+rearrange full t+1/s2 的 C formal 已完成 100 个连续 seed `100000–100099`，全部 terminal、0 runtime error，结果为 **96/100**。四条正常任务失败分别为 `block1_disturbed_after_valid_press`、`block2_not_moved_to_middle`、`button_not_pressed`、`button_press_insufficient` 各1。前五视频 ffprobe 可读，scheduler 均以 `episode_terminal` / 0 退出，robot/policy 按 runner shutdown 退出；C2 GPU2 和 19420/19422 已释放，三库 clean。raw 已 SSH tar 回传到主 RMBench 同组目录，C/本机规范整树 hash 均为 `09da8bd3617c19cc6013ed0530c7be58e76653f64446aa78c786729769daa397`，稳定结果为 `c_rearrange_full_t_plus_1_s2_20k_100ep_seed0_first90_20260912/diagnostics_summary.json`。MAM `f677b217-4817-4ff2-bfd3-ecd2d64a0e12` 已归档。
+
+释放的 C2 GPU2 已按既定队列接续 rearrange serial-lag30/s0。它的 prepare-audit/dry-run确认 checkpoint metadata 经 `load_train_config → _runtime_metadata → MemoryContext` 进入 serial `query_selected/query` 反馈；matching smoke2 固定 seed `100000,100001`，video/no-video 各一条、0 runtime error、服务/端口退出门通过。两条为正常 `button_not_pressed`，不以 smoke 成绩筛选。formal100 已于10:54 CST 在 C2 GPU2 启动，MAM job `162b998d-e6c2-4f8f-80ec-dc239f63f765`，冻结 RMBench `7933426`、bridge `f962663`、OpenPI `a869498`，固定 H50/K30、seed `100000–100099`、首个 infer 90秒且后续30秒。启动后 MAM 核对为 running，GPU2 已加载约10.6 GiB；其余 active formal 为 rearrange full t+1/s0、t+1/s1、t+30/s2。no-memory/s0 是下一空位队列。
+
+验证：三个 docs commits 均仅改 `EXPERIMENT_LEDGER.zh-CN.md`，`git diff --check` 通过，所有已完成项的稳定结果链接已实读存在；C 运行三库、checkpoint 和其他 active job 均未修改。继续用新版裸 `mam wait` 等待真实 job 事件；不因阶段报告结束任务，也不重复 smoke 或已完成 formal。
