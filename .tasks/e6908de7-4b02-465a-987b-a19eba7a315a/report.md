@@ -318,3 +318,24 @@ checkpoint 的数值差异不是同 checkpoint 复现误差；仅同任务、同
 `/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/` 下存在的原始结果文件。docs worktree
 提交后干净；未修改 C 冻结 eval tree、checkpoint、GPU job 或机器人。四个 seed2 formal 保持原样，下一步直接
 以 `mam wait` 等待其完成事件。
+
+## 2026-09-12 10:23 put-back s2 收尾与 rearrange s0 接续
+
+`mam wait` 收到 C3 GPU0 job `d8f6e15c-255a-4b86-9ab4-0c6bb87671f6` 停止事件。该 job 的
+put-back full t+1 / train seed2 formal 已验收为 **67/100**：100 个 episode / 连续 seed
+`100000–100099`、100 个 terminal、0 runtime error；33 条均为正常任务终态，分类为
+`button_not_pressed_after_center` 17、`button_press_insufficient` 10、`block_not_moved_to_center` 2、
+`pressed_before_block_centered` 2、`block_not_returned_to_origin_mat` 1、`block_held_above_origin_mat` 1。
+前五条视频均以 ffprobe 可读，100 个 scheduler 均以 `episode_terminal:0` 退出，robot/policy 按
+runner shutdown 回收；C3 GPU0 为1 MiB/0%、19400/19402无监听、三库干净。
+
+raw leaf 已以 SSH tar 流回传到主 RMBench 同组目录；C 与本机的规范整树 SHA-256 都是
+`c0c36a83a94324e610f79bc08370ba48513f2b915a712d22b1fa7fc853223794`。job 已按上述验收证据归档。
+安全 docs tree 提交 `873cc721d35d3eb38470dd7117eb351b23176fda`：主表、C 队列和概述统一为
+7份完整100、4份 formal 运行、3份待接续，并加入稳定结果链接与完整失败分类。
+
+C3 GPU0 随即按同任务/训练 seed 配对接续 rearrange full t+1/s0：其 `prepare-audit` 确认
+checkpoint metadata 经 `load_train_config → _runtime_metadata → MemoryContext`，matching smoke2 为
+2/2（video/no-video、连续 seed、0 runtime error、90秒首推理、服务退出和资源释放均通过）。formal100
+已登记为 MAM `37098e1a-aa94-4047-83d2-395c44edaa80`，固定 C RMBench `7933426`、bridge `f962663`、
+OpenPI `a869498`；现与 C3 GPU1 put-back t+30/s2、C2 GPU2/3 rearrange t+1/t+30 s2 共四项运行。
