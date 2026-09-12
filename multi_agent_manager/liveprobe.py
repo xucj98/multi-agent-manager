@@ -670,6 +670,7 @@ class _LiveFixture:
     def _wait_for_manager_delivery(self) -> None:
         self.stage = "verify fixture Manager delivery"
         manager_payloads = [
+            "[MAM Message]",
             (
                 f"Executor AGENT-ID {self.threads['idle_executor']} has no unarchived jobs for "
                 f"TASK-ID {self.tasks['idle']}: MAM liveprobe no-job Manager delivery."
@@ -714,7 +715,7 @@ class _LiveFixture:
             f"TASK-ID {self.tasks['job']}: MAM liveprobe stopped-job delivery."
         )
         job_turn = self._wait_for_turn_text(
-            "job_executor", [job_payload], 2, "stopped-job scheduler turn", "stopped_job_delivery"
+            "job_executor", ["[MAM Message]", job_payload], 2, "stopped-job scheduler turn", "stopped_job_delivery"
         )
         job_turn_id = job_turn.get("id")
         if not isinstance(job_turn_id, str) or not job_turn_id:

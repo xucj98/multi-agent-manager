@@ -977,7 +977,9 @@ class WakeScheduler:
                 )
             elif event.get("kind") == "task_unbound":
                 lines.append(f"TASK-ID {event['task']}: {event['task_title']} has no bound executor.")
-        return "\n".join(lines)
+        if not lines:
+            return ""
+        return "[MAM Message]\n" + "\n".join(lines)
 
     @staticmethod
     def _turn_boundary(turn: Mapping[str, Any] | None) -> tuple[bool, str | None, str | None]:

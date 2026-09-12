@@ -137,6 +137,7 @@ class FakeStream:
             THREAD_IDS["manager"],
             "turn-manager-delivery",
             (
+                "[MAM Message]\n"
                 f"Executor AGENT-ID {THREAD_IDS['idle_executor']} has no unarchived jobs for "
                 f"TASK-ID {TASK_IDS['idle']}: MAM liveprobe no-job Manager delivery.\n"
                 f"Executor AGENT-ID {THREAD_IDS['archived_executor']} has no unarchived jobs for "
@@ -152,6 +153,7 @@ class FakeStream:
             THREAD_IDS["job_executor"],
             "turn-job-delivery",
             (
+                "[MAM Message]\n"
                 f"Stopped registered job: JOB-ID {JOB_ID} (liveprobe-short-job-stop); "
                 f"TASK-ID {TASK_IDS['job']}: MAM liveprobe stopped-job delivery."
             ),
