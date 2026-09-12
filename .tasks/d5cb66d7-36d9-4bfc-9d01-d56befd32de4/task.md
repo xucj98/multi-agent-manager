@@ -18,3 +18,14 @@
 有意义的单元/集成测试应覆盖：成功换绑且 workspace/jobs/publications不变、旧active/unknown拒绝、目标重复绑定/Manager/无效拒绝、归档/未绑定任务拒绝、重试幂等、调度旧收件人失效及新执行者 stopped-job投递、与 optional wait 的边界、并发/锁相关行为。可按实际设计调整测试组织，避免仅镜像实现。
 运行 .venv/bin/python -B -m unittest discover -s tests -v 全套，通过后提交独立分支，git diff --check/clean，report 写准确commit、行为、命令结果和风险。README 只加操作命令与必要交接步骤/限制；详细协议、锁和状态语义写设计文档，顺手将设计文档仍过时的 >1h 长job阈值与当前 >30min 规范一致，不扩展其他无关文档。
 发布 mam task publish d5cb66d7-36d9-4bfc-9d01-d56befd32de4 --file report。保留 worktree 待独立review，无可执行事项正常结束turn，不轮询。
+
+## Manager裁决：独立review通过，授权集成与安装
+Manager已阅读review492c83a2（report77dce45aa36305866269012777f8ba87165b6590）、独立核对候选diff、wait注册/取消及Manager锁路径、scheduler currentness和测试内容。接受精确候选bc8726f3e2f13351c52650f03bc88bd76a68ed25（base2cb730944dc7574feaff92253ef09644ae06c1da）上线；review的206全套和7定向测试通过，先前疑似锁ABBA因active_wait_records每次仅持有单锁已排除。
+
+授权你执行具体集成/安装，实际task rebind仍由Manager执行，不冒用Manager CODEX_THREAD_ID。先读docs/install.md。核对/fetch最新origin/main，候选基线若无变化，可安全更新本地main包含候选，再将main合入project/state-vla管理分支；禁止force/reset覆盖用户改动。可用短期独立main checkout完成常规ff merge；不要让.tasks进main。不推送远端（本阶段仅本机集成安装）。
+
+生产根 /mnt/public/xcj/Projects/multi-agent-manager 有用户dirty docs/wash-cup-shared-memory-token-usage-audit.zh-CN.md，以及未跟踪.task报告；逐路径保留，不stash、不git add全树。记录这些文件前后hash/index，合并只含已review候选。不要改变正在进行的实验runtime。
+
+按安装器bash scripts/install.sh正常运行，从包含验收候选的checkout安装；安装器要求的source tests、真实兼容/投递fixture验收不可跳过（6个预定terra/max模型turn是既定验收）。先确认当前AppServer的trace环境已满足，不能重启或替换Windows正在使用的AppServer/proxy；若安装器要求AppServer TERM则停止该步并报告具体原因，保持现有连接。允许安装器按文档替换本项目MAM daemon，保留原Manager绑定、队列/历史，不清.local/service，不伪造healthy。
+
+验收必须给出：main/项目分支SHA、已安装rebind --help和包代码路径、安装receipt及兼容/live delivery结果、service healthy和原Manager UUID、user dirty文件hash保持、工作树及installer临时产物清理情况。报告新增上线结果并publish；如失败给准确阶段/错误，不盲重装多次。完成后正常结束turn用MAM唤醒。原实现worktree先保留待最终归档。
