@@ -8,4 +8,4 @@
 
 验证通过：`uv lock --check`、稳定和独立 worktree 的 `uv pip check`（74 packages）、稳定和独立 worktree 的 CPU `scripts/worktree_env_smoke.py`、editable 源路径/解释器 realpath、以及 cache-to-venv hardlink probe。未运行 GPU、机器人或评测服务。
 
-清理完成：本任务 worktree 的旧 `eval_result` 链接已删除，回滚备份和入口门禁临时目录均不存在。稳定 `eval_result` 是空的 ignored 目录，但另有两个现存 worktree 链接到它，因此为避免影响这些树而保留；没有删除任何结果内容。稳定源中既有未跟踪文件 `docs/design/low-dimensional-memory-design-space.zh-CN.md` 保持不变。没有远端写入、推送或其他活跃树改动；无 blocker。
+最终清理完成：本任务 worktree 的旧 `eval_result` 链接已删除，回滚备份和入口门禁临时目录均不存在。最终检查时稳定 `eval_result` 为空目录，已用 `rmdir` 移除；`/mnt/public/xcj/Projects/robot-bridge/eval_result` 和 `/root/Projects/robot-bridge/eval_result` 均不存在。另有两个现存 worktree 的旧链接按用户要求保持未触碰，未删除任何结果文件。稳定源中既有未跟踪文件 `docs/design/low-dimensional-memory-design-space.zh-CN.md` 保持不变。没有远端写入、推送或其他活跃树改动；无 blocker。
