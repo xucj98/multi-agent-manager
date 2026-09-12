@@ -498,3 +498,32 @@ checkpoint/评测seed采用唯一结果leaf/run名。因此它在该唯一性前
 刚读取独立review `300c4873-f12a-4d15-9d79-2ccf9df5e749`：仍为 working，尚未发布准入结论。因此保持
 `f508749` 只在本机独立树，C active eval tree和GPU队列均不扩容；C审计中 Warp cache 的跨host隔离结论仍仅依赖每个
 run leaf/run-name全局唯一，等待review裁定。
+
+## 2026-09-12 15:17 CST：C 首项 formal 门禁发现与最小修复（待独立 review）
+
+已在新的 C 本任务 runtime 部署批准的 `f508749` / `f962663` / `a869498`，未触碰旧 `c-eval` 树。C1 GPU1 的
+`c_rearrange_no_memory_trainseed1_evalseed0_smoke2` 自然完成：两个 accepted reset 是连续
+`100000,100001`，video/no-video 证据齐全、`episode_diagnostics.jsonl` 为两条正常 terminal、0 runtime error，
+robot/policy均由 runner 收尾；其任务表现为0/2仅是正常任务失败，未用作性能筛选。
+
+同 checkpoint 的 formal100 随后登记为 MAM `7ef23083-70b6-4a6e-88e9-384ad857af4d`，但在第一个 reset 前自然退出，
+已归档。失败 leaf 和 outer log 均保留在 C runtime 的
+`RMBench/eval_result/memory_chunk_20260910/c_rearrange_no_memory_trainseed1_evalseed0_100ep/` 与
+`records/c_rearrange_no_memory_trainseed1_evalseed0_100ep.outer.log`。明确首因不是模型、infer、renderer 或 GPU：
+`BenchmarkRunner` 的 `assert_smoke_compatible` 拒绝了 literal launch 差异；原入口把
+`WARP_CACHE_PATH=.../runs/<run_name>/{robot,policy}` 直接写入 command，故 smoke 与 formal 的不同 result run
+名产生不同字符串。GPU1已恢复1 MiB/0%，端口19410/19412无监听；未启动 C2/C3 的后续 smoke。
+
+本机独立 runtime tree 的最小修复为 RMBench `9d8f478b4e76db79a7eab26a0433bf616418ce7d`
+（父 `f508749`）：只将该 cache 根改为公共 `BenchmarkRunner` 已有的`{result_run}` child-command 占位符。runner
+在实际启动时才展开它，所以 smoke/formal 保存的 launch template 一致，同时每个具体 result run仍有独立
+robot/policy Warp cache；不改 public runner、端口、模型、seed、manifest、scheduler或 checkpoint。
+
+CPU 验证：直接构造同一 pair 的 smoke/formal `launch()`，确认二者 robot/policy command byte-identical且均含
+`runs/{result_run}/`，而 `--result-run` 保持不同；`py_compile`、`git diff --check`通过；冻结 bridge 的
+`tests/benchmark/test_runner.py` 为 **9 passed**。现有 bridge 测试也明确覆盖该既有占位符的严格 smoke/formal
+兼容语义。
+
+由于已完成 smoke 保存的是旧 literal command，不能拿它跨版本给新入口做 formal 门禁。独立 review通过后将创建新的
+`..._smoke2_r2` → `..._100ep_r2` matching pair，保留已完成 smoke和失败 formal作为证据，不覆盖结果目录。当前本task无
+active MAM job；C runtime仍停在已部署的 `f508749`，没有将未审 `9d8f478` 同步到C或扩展GPU队列。
