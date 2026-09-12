@@ -38,6 +38,9 @@ COMPATIBILITY_RETRY_SECONDS = 30.0
 HISTORY_LIMIT = 256
 STARTUP_TIMEOUT_SECONDS = 5.0
 STARTUP_POLL_SECONDS = 0.05
+_EVENT_CURRENT = "current"
+_EVENT_STALE = "stale"
+_EVENT_UNVERIFIABLE = "unverifiable"
 _LOCAL_START_LOCKS: dict[str, threading.Lock] = {}
 _LOCAL_START_LOCKS_GUARD = threading.Lock()
 _DETACHED_CHILDREN: list[subprocess.Popen[bytes]] = []
@@ -729,10 +732,25 @@ class WakeScheduler:
         payload = {"kind": kind, "recipient": recipient, **fields}
         return {"signature": _event_signature(payload), **payload}
 
+    def _task_ready_event(self, task: Mapping[str, Any], task_id: str, title: str, executor: str) -> dict[str, Any] | None:
+        if self.manager is None:
+            return None
+        report = task.get("report") if isinstance(task.get("report"), Mapping) else {}
+        return self._make_event(
+            "task_ready",
+            self.manager,
+            task=task_id,
+            task_title=title,
+            executor=executor,
+            task_status=task.get("status"),
+            report_revision=report.get("revision"),
+        )
+
     def _desired_events(
         self, tasks: list[dict[str, Any]], states: Mapping[str, Mapping[str, Any]]
-    ) -> tuple[dict[str, dict[str, Any]], list[dict[str, str]]]:
+    ) -> tuple[dict[str, dict[str, Any]], set[str], list[dict[str, str]]]:
         desired: dict[str, dict[str, Any]] = {}
+        inconclusive: set[str] = set()
         suppressed, diagnostics = self._review_graph(tasks)
         for task in tasks:
             task_id, title = task.get("id"), task.get("title")
@@ -781,25 +799,27 @@ class WakeScheduler:
             agent_state = states.get(agent, {}).get("status")
             if agent_state in {"idle", "notLoaded"}:
                 if task_id not in suppressed:
-                    if self.manager is None:
+                    event = self._task_ready_event(task, task_id, title, agent)
+                    if event is None:
                         diagnostics.append({"kind": "missing_manager", "task": task_id, "message": "ready executor has no recorded Manager"})
                     else:
-                        report = task.get("report") if isinstance(task.get("report"), Mapping) else {}
-                        event = self._make_event(
-                            "task_ready",
-                            self.manager,
-                            task=task_id,
-                            task_title=title,
-                            executor=agent,
-                            task_status=task.get("status"),
-                            report_revision=report.get("revision"),
-                        )
                         desired[event["signature"]] = event
             elif agent_state != "active":
+                if task_id not in suppressed:
+                    event = self._task_ready_event(task, task_id, title, agent)
+                    if event is None:
+                        diagnostics.append({"kind": "missing_manager", "task": task_id, "message": "unverifiable executor has no recorded Manager"})
+                    else:
+                        # A failed or unknown source metadata read says nothing
+                        # about whether an already accepted Manager signal was
+                        # resolved.  Preserve an exact existing signature, but
+                        # never create a new signal without a positive idle
+                        # observation.
+                        inconclusive.add(event["signature"])
                 diagnostics.append(
                     {"kind": "unknown_executor", "task": task_id, "message": f"executor {agent} is {agent_state or 'unknown'}"}
                 )
-        return desired, diagnostics
+        return desired, inconclusive, diagnostics
 
     def _resolve_event(self, state: dict[str, Any], signature: str, *, reason: str) -> None:
         event = state.setdefault("events", {}).pop(signature, None)
@@ -810,11 +830,18 @@ class WakeScheduler:
         if len(history) > HISTORY_LIMIT:
             del history[:-HISTORY_LIMIT]
 
-    def _reconcile_events(self, state: dict[str, Any], desired: Mapping[str, Mapping[str, Any]]) -> None:
+    def _reconcile_events(
+        self, state: dict[str, Any], desired: Mapping[str, Mapping[str, Any]], inconclusive: set[str]
+    ) -> None:
         events = state.setdefault("events", {})
         counters = state.setdefault("counters", {})
         for signature in list(events):
-            if signature not in desired:
+            if signature in inconclusive:
+                existing = events.get(signature)
+                if isinstance(existing, dict):
+                    existing["last_condition_checked_at"] = _timestamp()
+                    existing["last_condition_error"] = "source thread metadata is unavailable"
+            elif signature not in desired:
                 self._resolve_event(state, signature, reason="condition changed or resolved")
         for signature, current in desired.items():
             existing = events.get(signature)
@@ -835,6 +862,7 @@ class WakeScheduler:
                 existing.update(dict(current))
                 existing["last_observed_at"] = _timestamp()
                 existing["observed_count"] = int(existing.get("observed_count", 0)) + 1
+                existing.pop("last_condition_error", None)
             counters["observed"] = int(counters.get("observed", 0)) + 1
 
     def _source_suppressed_now(self, task_id: str) -> bool:
@@ -842,35 +870,68 @@ class WakeScheduler:
         suppressed, _ = self._review_graph(tasks)
         return task_id in suppressed
 
-    def _event_is_current(self, event: Mapping[str, Any]) -> bool:
+    def _event_is_current(self, event: Mapping[str, Any]) -> tuple[str, str | None]:
+        """Classify an event without turning an unavailable read into resolution."""
+
         task_id = event.get("task")
         if not isinstance(task_id, str):
-            return False
+            return _EVENT_STALE, "event has no valid TASK-ID"
         try:
             with self.store.lock(task_id):
                 task = self.store.read(task_id)
-        except Exception:
-            return False
+        except Exception as exc:
+            return _EVENT_UNVERIFIABLE, f"cannot read TASK-ID {task_id}: {exc}"
         if task.get("status") == "archived":
-            return False
+            return _EVENT_STALE, "task is archived"
         kind = event.get("kind")
         if kind == "job_stopped":
             recipient = task.get("agent") if _valid_agent(task.get("agent")) else self.manager
             if recipient != event.get("recipient"):
-                return False
+                return _EVENT_STALE, "event recipient changed"
             job = next((item for item in self._unarchived_jobs(task) if item.get("id") == event.get("job")), None)
-            return bool(job and self._job_stopped(job) and job.get("note") == event.get("note") and task.get("title") == event.get("task_title"))
+            if job and self._job_stopped(job) and job.get("note") == event.get("note") and task.get("title") == event.get("task_title"):
+                return _EVENT_CURRENT, None
+            return _EVENT_STALE, "stopped job condition changed"
         if kind == "task_unbound":
-            return not _valid_agent(task.get("agent")) and not self._unarchived_jobs(task) and self.manager == event.get("recipient")
+            if (
+                not _valid_agent(task.get("agent"))
+                and not self._unarchived_jobs(task)
+                and self.manager == event.get("recipient")
+                and task.get("title") == event.get("task_title")
+            ):
+                return _EVENT_CURRENT, None
+            return _EVENT_STALE, "unbound task condition changed"
         if kind == "task_ready":
             executor = task.get("agent")
-            if executor != event.get("executor") or self.manager != event.get("recipient") or self._unarchived_jobs(task):
-                return False
-            if self._source_suppressed_now(task_id):
-                return False
-            state = self._agent_states({executor}).get(executor, {}).get("status")
-            return state in {"idle", "notLoaded"}
-        return False
+            report = task.get("report") if isinstance(task.get("report"), Mapping) else {}
+            if (
+                executor != event.get("executor")
+                or self.manager != event.get("recipient")
+                or self._unarchived_jobs(task)
+                or task.get("title") != event.get("task_title")
+                or task.get("status") != event.get("task_status")
+                or report.get("revision") != event.get("report_revision")
+            ):
+                return _EVENT_STALE, "task-ready condition changed"
+            try:
+                if self._source_suppressed_now(task_id):
+                    return _EVENT_STALE, "source task is under active review"
+            except Exception as exc:
+                return _EVENT_UNVERIFIABLE, f"cannot read review state for TASK-ID {task_id}: {exc}"
+            source = self._agent_states({executor}).get(executor, {})
+            source_state = source.get("status")
+            if source_state in {"idle", "notLoaded"}:
+                return _EVENT_CURRENT, None
+            if source_state == "active":
+                return _EVENT_STALE, "executor is active"
+            detail = source.get("error") if isinstance(source.get("error"), str) else None
+            return _EVENT_UNVERIFIABLE, f"executor metadata is {source_state or 'unknown'}{f': {detail}' if detail else ''}"
+        return _EVENT_STALE, "event kind is not recognized"
+
+    @staticmethod
+    def _retain_unverifiable_event(event: dict[str, Any], detail: str | None) -> None:
+        event["last_condition_checked_at"] = _timestamp()
+        event["last_condition_error"] = detail or "event condition could not be verified"
 
     @staticmethod
     def _payload(events: list[Mapping[str, Any]]) -> str:
@@ -900,6 +961,97 @@ class WakeScheduler:
     def _interrupted_turn(status: str | None) -> bool:
         return isinstance(status, str) and status.lower() in {"interrupted", "cancelled", "canceled", "paused", "suspended"}
 
+    @staticmethod
+    def _completed_turn(status: str | None) -> bool:
+        return isinstance(status, str) and status.lower() == "completed"
+
+    def _block_for_interruption(
+        self,
+        events: list[dict[str, Any]],
+        detail: str,
+        *,
+        latest: Mapping[str, Any] | None = None,
+        recipient_status: str | None = None,
+    ) -> None:
+        """Persist a paused boundary until a later completed turn proves recovery."""
+
+        _, turn_id, turn_status = self._turn_boundary(latest)
+        turn_status = turn_status or recipient_status
+        for event in events:
+            event.update({
+                "delivery": "blocked",
+                "block_kind": "interrupted_turn",
+                "interruption_turn_observed": True,
+                "interruption_turn_id": turn_id,
+                "interruption_turn_status": turn_status,
+                "interruption_observed_at": _timestamp(),
+                "last_error": detail,
+                "next_attempt_at": None,
+            })
+            event.pop("failure_kind", None)
+
+    def _reobserve_interrupted_events(
+        self, state: dict[str, Any], states: Mapping[str, Mapping[str, Any]]
+    ) -> None:
+        """Re-enable only a visibly recovered interruption, without resuming it.
+
+        These events intentionally have no ordinary retry deadline.  They are
+        revisited only through a metadata-only newest-turn read after the
+        normal bulk observation says the same recipient is idle or notLoaded.
+        """
+
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for event in state.get("events", {}).values():
+            if not isinstance(event, dict) or event.get("delivery") != "blocked":
+                continue
+            if event.get("block_kind") != "interrupted_turn":
+                continue
+            recipient = event.get("recipient")
+            if _valid_agent(recipient):
+                groups.setdefault(recipient, []).append(event)
+        for recipient, events in groups.items():
+            recipient_state = states.get(recipient, {}).get("status")
+            for event in events:
+                event["last_recipient_state"] = recipient_state or "unknown"
+            if not self._eligible_recipient(recipient_state):
+                continue
+            stream = None
+            try:
+                stream = self.stream_factory(self.socket_path)
+                if not hasattr(stream, "latest_turn"):
+                    raise WakeRuntimeError("App Server stream cannot inspect the recipient's latest turn")
+                latest = stream.latest_turn(recipient)
+            except Exception as exc:
+                for event in events:
+                    event["last_interruption_checked_at"] = _timestamp()
+                    event["last_interruption_error"] = str(exc)
+                continue
+            finally:
+                if stream is not None:
+                    with contextlib.suppress(Exception):
+                        stream.close()
+            _, latest_id, latest_status = self._turn_boundary(latest)
+            for event in events:
+                event["last_interruption_checked_at"] = _timestamp()
+                event["last_interruption_error"] = None
+                if self._interrupted_turn(latest_status):
+                    self._block_for_interruption(
+                        [event],
+                        f"recipient's newest turn is {latest_status}; waiting for explicit user or Manager action",
+                        latest=latest,
+                    )
+                    continue
+                if self._completed_turn(latest_status) and isinstance(latest_id, str) and latest_id != event.get("interruption_turn_id"):
+                    event.update({
+                        "delivery": "pending",
+                        "next_attempt_at": 0.0,
+                        "last_error": None,
+                        "interruption_recovered_at": _timestamp(),
+                        "interruption_recovery_turn_id": latest_id,
+                        "interruption_recovery_turn_status": latest_status,
+                    })
+                    event.pop("block_kind", None)
+
     def _recover_attempts_without_reply(self, state: dict[str, Any]) -> None:
         """Convert a persisted in-flight attempt after daemon loss to uncertain.
 
@@ -914,27 +1066,42 @@ class WakeScheduler:
                 continue
             event.update({
                 "delivery": "uncertain",
+                "failure_kind": "response_loss_or_daemon_exit",
                 "last_error": "daemon ended before turn/start acknowledgement",
                 "next_attempt_at": _retry_after(now, int(event.get("attempts", 1))),
             })
 
-    def _delivery_failure(self, state: dict[str, Any], events: list[dict[str, Any]], detail: str) -> None:
+    def _delivery_failure(self, events: list[dict[str, Any]], error: Exception) -> None:
         now = self.clock()
-        lowered = detail.lower()
-        blocked = any(token in lowered for token in ("capacity", "missing", "not found", "notloaded", "not loaded"))
+        detail = str(error)
         for event in events:
-            event["delivery"] = "blocked" if blocked else "uncertain"
-            event["last_error"] = detail
-            event["next_attempt_at"] = _retry_after(now, int(event.get("attempts", 1)))
-            event["last_attempt_at"] = _timestamp()
+            if isinstance(error, job_runtime.AppServerRpcError):
+                # A JSON-RPC error is an acknowledged rejection.  It is safe
+                # to retry later, and an unrelated later turn must not turn it
+                # into a response-loss ambiguity.
+                event.update({
+                    "delivery": "rejected",
+                    "failure_kind": "explicit_rpc_rejection",
+                    "last_error": detail,
+                    "next_attempt_at": _retry_after(now, int(event.get("attempts", 1))),
+                    "last_attempt_at": _timestamp(),
+                })
+            else:
+                event.update({
+                    "delivery": "uncertain",
+                    "failure_kind": "response_loss_or_transport",
+                    "last_error": detail,
+                    "next_attempt_at": _retry_after(now, int(event.get("attempts", 1))),
+                    "last_attempt_at": _timestamp(),
+                })
 
-    def _preflight_failure(self, events: list[dict[str, Any]], detail: str, *, retry: bool = True) -> None:
+    def _preflight_failure(self, events: list[dict[str, Any]], detail: str) -> None:
         now = self.clock()
         for event in events:
             event.update({
                 "delivery": "blocked",
                 "last_error": detail,
-                "next_attempt_at": _retry_after(now, int(event.get("attempts", 0) + 1)) if retry else None,
+                "next_attempt_at": _retry_after(now, int(event.get("attempts", 0) + 1)),
             })
 
     @staticmethod
@@ -982,10 +1149,14 @@ class WakeScheduler:
         for recipient, candidates in groups.items():
             current: list[dict[str, Any]] = []
             for event in candidates:
-                if self._event_is_current(event):
+                currentness, detail = self._event_is_current(event)
+                if currentness == _EVENT_CURRENT:
+                    event.pop("last_condition_error", None)
                     current.append(event)
-                else:
+                elif currentness == _EVENT_STALE:
                     self._resolve_event(state, event["signature"], reason="stale before delivery")
+                else:
+                    self._retain_unverifiable_event(event, detail)
             if not current:
                 continue
             recipient_state = self._agent_states({recipient}).get(recipient, {}).get("status")
@@ -1010,10 +1181,21 @@ class WakeScheduler:
                         self._preflight_failure(current, "recipient remains notLoaded after thread/resume recheck")
                         continue
                     if self._interrupted_turn(resumed_state):
-                        self._preflight_failure(
+                        latest = None
+                        latest_error = None
+                        if hasattr(stream, "latest_turn"):
+                            try:
+                                latest = stream.latest_turn(recipient)
+                            except Exception as exc:
+                                latest_error = str(exc)
+                        detail = f"recipient status is {resumed_state}; waiting for explicit user or Manager action"
+                        if latest_error:
+                            detail = f"{detail}; newest turn metadata could not be read: {latest_error}"
+                        self._block_for_interruption(
                             current,
-                            f"recipient status is {resumed_state}; waiting for explicit user or Manager action",
-                            retry=False,
+                            detail,
+                            latest=latest,
+                            recipient_status=resumed_state,
                         )
                         continue
                     for event in current:
@@ -1022,7 +1204,17 @@ class WakeScheduler:
                     continue
                 # Conditions can change after the first recheck or while the
                 # recipient is being resumed.  Do not start a stale turn.
-                current = [event for event in current if self._event_is_current(event)]
+                rechecked: list[dict[str, Any]] = []
+                for event in current:
+                    currentness, detail = self._event_is_current(event)
+                    if currentness == _EVENT_CURRENT:
+                        event.pop("last_condition_error", None)
+                        rechecked.append(event)
+                    elif currentness == _EVENT_STALE:
+                        self._resolve_event(state, event["signature"], reason="stale immediately before turn/start")
+                    else:
+                        self._retain_unverifiable_event(event, detail)
+                current = rechecked
                 if not current:
                     continue
                 if not hasattr(stream, "latest_turn"):
@@ -1034,10 +1226,10 @@ class WakeScheduler:
                     continue
                 _, before_turn_id, before_turn_status = self._turn_boundary(latest)
                 if self._interrupted_turn(before_turn_status):
-                    self._preflight_failure(
+                    self._block_for_interruption(
                         current,
                         f"recipient's newest turn is {before_turn_status}; waiting for explicit user or Manager action",
-                        retry=False,
+                        latest=latest,
                     )
                     continue
                 payload = self._payload(current)
@@ -1065,10 +1257,10 @@ class WakeScheduler:
                     stream.request("turn/start", {"threadId": recipient, "input": [{"type": "text", "text": payload}]})
             except Exception as exc:
                 if sent:
-                    self._delivery_failure(state, current, str(exc))
+                    self._delivery_failure(current, exc)
                 else:
                     self._preflight_failure(current, str(exc))
-                if sent and isinstance(exc, job_runtime.AppServerEventError):
+                if sent and isinstance(exc, job_runtime.AppServerEventError) and not isinstance(exc, job_runtime.AppServerRpcError):
                     # A new delivery connection cannot be trusted after a
                     # transport/protocol error.  Re-run the installer-owned
                     # behavioral check on the bounded reconnection path.
@@ -1082,6 +1274,7 @@ class WakeScheduler:
                         "acknowledgement": "turn/start RPC response",
                         "last_error": None,
                     })
+                    event.pop("failure_kind", None)
                 counters = state.setdefault("counters", {})
                 counters["accepted"] = int(counters.get("accepted", 0)) + len(current)
             finally:
@@ -1156,12 +1349,13 @@ class WakeScheduler:
                     state["error"] = "App Server metadata query is unavailable; compatibility will be retried"
                     _save_state(self.store, state)
                     return state
-            desired, diagnostics = self._desired_events(tasks, states)
+            desired, inconclusive, diagnostics = self._desired_events(tasks, states)
             state["diagnostics"] = diagnostics
             state["healthy"] = True
             state["error"] = None
-            self._reconcile_events(state, desired)
+            self._reconcile_events(state, desired, inconclusive)
             self._recover_attempts_without_reply(state)
+            self._reobserve_interrupted_events(state, states)
             _save_state(self.store, state)
             self._deliver(state)
             state["heartbeat_at"] = _timestamp()

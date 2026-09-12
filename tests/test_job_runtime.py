@@ -241,6 +241,25 @@ class EventStreamTests(unittest.TestCase):
                 stream.close()
         self.assertEqual(result, {"turn": {"id": "new-turn"}})
 
+    def test_explicit_rpc_rejection_has_a_distinct_compatible_error_type(self) -> None:
+        def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
+            initialize = fixture.read_json(connection)
+            fixture.send_json(connection, {"id": initialize["id"], "result": {}})
+            self.assertEqual(fixture.read_json(connection)["method"], "initialized")
+            started = fixture.read_json(connection)
+            self.assertEqual(started["method"], "turn/start")
+            fixture.send_json(connection, {"id": started["id"], "error": {"code": -32000, "message": "explicitly rejected"}})
+
+        with AppServerFixture(handler) as fixture:
+            stream = runtime.AppServerEventStream.connect(fixture.path)
+            try:
+                with self.assertRaises(runtime.AppServerRpcError) as caught:
+                    stream.start_turn("existing-agent", "wake this task")
+            finally:
+                stream.close()
+        self.assertIsInstance(caught.exception, runtime.AppServerEventError)
+        self.assertIn("explicitly rejected", str(caught.exception))
+
     def test_targeted_not_loaded_resume_can_be_rechecked_without_hydrating_history(self) -> None:
         def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
             initialize = fixture.read_json(connection)

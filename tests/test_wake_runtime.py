@@ -34,16 +34,19 @@ class Clock:
 
 
 class FakeStream:
-    def __init__(self, agent_statuses, calls, turns, resumed_statuses, resume_failures, *, failure=None):
+    def __init__(self, agent_statuses, calls, turns, resumed_statuses, resume_failures, *, failure=None, resumes=None):
         self.agent_statuses = agent_statuses
         self.calls = calls
         self.turns = turns
         self.resumed_statuses = resumed_statuses
         self.resume_failures = resume_failures
         self.failure = failure
+        self.resumes = resumes
         self.closed = False
 
     def resume(self, agent):
+        if self.resumes is not None:
+            self.resumes.append(agent)
         if agent in self.resume_failures:
             raise self.resume_failures[agent]
         return {"thread": {"id": agent, "status": {"type": self.agent_statuses[agent]}, "turns": []}}
@@ -92,6 +95,7 @@ class WakeRuntimeTests(unittest.TestCase):
         self.process_calls = []
         self.starts = []
         self.stream_connections = 0
+        self.resumes = []
         self.turns = {}
         self.resumed_statuses = {}
         self.resume_failures = {}
@@ -151,14 +155,23 @@ class WakeRuntimeTests(unittest.TestCase):
     def stream_factory(self, _socket_path):
         self.stream_connections += 1
         failure, self.stream_failure = self.stream_failure, None
-        return FakeStream(self.statuses, self.starts, self.turns, self.resumed_statuses, self.resume_failures, failure=failure)
+        return FakeStream(
+            self.statuses,
+            self.starts,
+            self.turns,
+            self.resumed_statuses,
+            self.resume_failures,
+            failure=failure,
+            resumes=self.resumes,
+        )
 
     def scheduler(self, **kwargs):
         process_probe = kwargs.pop("process_probe", self.process_probe)
+        agent_probe = kwargs.pop("agent_probe", self.agent_probe)
         return wake_runtime.WakeScheduler(
             self.store,
             compatibility=self.compatibility,
-            agent_probe=self.agent_probe,
+            agent_probe=agent_probe,
             process_probe=process_probe,
             stream_factory=self.stream_factory,
             clock=self.clock,
@@ -278,6 +291,7 @@ class WakeRuntimeTests(unittest.TestCase):
         self.scheduler().run_once()
         first = next(iter(self.state()["events"].values()))
         self.assertEqual(first["delivery"], "uncertain")
+        self.assertEqual(first["failure_kind"], "response_loss_or_transport")
         self.assertEqual(len(self.starts), 1)
         self.clock.advance(5)
         self.scheduler().run_once()  # daemon restart after the recipient completed its new turn
@@ -323,6 +337,149 @@ class WakeRuntimeTests(unittest.TestCase):
         event = next(iter(self.state()["events"].values()))
         self.assertEqual(event["delivery"], "blocked")
         self.assertIsNone(event["next_attempt_at"])
+
+    def test_interrupted_event_recovers_only_after_new_completed_turn_and_idle_recipient(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        self.turns[EXECUTOR] = {"id": "interrupted-turn", "status": "interrupted"}
+        scheduler = self.scheduler()
+
+        scheduler.run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["block_kind"], "interrupted_turn")
+        self.assertEqual(event["interruption_turn_id"], "interrupted-turn")
+
+        scheduler.run_once()  # An unchanged interrupted boundary remains blocked.
+        self.assertEqual(self.starts, [])
+        self.assertEqual(self.resumes, [EXECUTOR], "interruption re-observation must not resume the recipient")
+        self.assertEqual(next(iter(self.state()["events"].values()))["delivery"], "blocked")
+
+        self.turns[EXECUTOR] = {"id": "user-recovered-turn", "status": "completed"}
+        self.statuses[EXECUTOR] = "active"
+        scheduler.run_once()
+        self.assertEqual(self.starts, [])
+        self.assertEqual(next(iter(self.state()["events"].values()))["delivery"], "blocked")
+
+        self.statuses[EXECUTOR] = "idle"
+        scheduler.run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "accepted")
+        self.assertEqual(event["interruption_recovery_turn_id"], "user-recovered-turn")
+        self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR])
+
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR])
+
+    def test_accepted_task_ready_survives_unknown_source_without_duplicate_manager_turn(self):
+        self.task(TASK_ONE)
+        scheduler = self.scheduler()
+
+        scheduler.run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "accepted")
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+
+        self.statuses[EXECUTOR] = "unknown"
+        scheduler.run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "accepted")
+        self.assertIn("source thread metadata", event["last_condition_error"])
+
+        self.statuses[EXECUTOR] = "idle"
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+
+    def test_task_ready_pre_send_unknown_source_retains_pending_event(self):
+        self.task(TASK_ONE)
+        self.statuses[MANAGER] = "active"
+        probes = []
+
+        def staged_probe(agents, socket_path):
+            self.assertEqual(socket_path, "/tmp/fake-app-server.sock")
+            probes.append(tuple(agents))
+            if len(probes) == 1:
+                return {
+                    agent: {"status": "idle" if agent == EXECUTOR else "active", "error": None}
+                    for agent in agents
+                }
+            if len(probes) == 2:
+                return {agent: {"status": "unknown", "error": "temporary source query failure"} for agent in agents}
+            return {agent: {"status": self.statuses.get(agent, "unknown"), "error": None} for agent in agents}
+
+        scheduler = self.scheduler(agent_probe=staged_probe)
+        scheduler.run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "pending")
+        self.assertIn("temporary source query failure", event["last_condition_error"])
+        self.assertEqual(self.starts, [])
+
+        self.statuses[MANAGER] = "idle"
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+
+    def _accepted_task_ready(self):
+        self.task(TASK_ONE)
+        scheduler = self.scheduler()
+        scheduler.run_once()
+        self.assertEqual(next(iter(self.state()["events"].values()))["delivery"], "accepted")
+        return scheduler
+
+    def test_archived_task_invalidates_accepted_task_ready_event(self):
+        scheduler = self._accepted_task_ready()
+        task = self.store.read(TASK_ONE)
+        task["status"] = "archived"
+        self.store.write(task)
+
+        scheduler.run_once()
+        self.assertFalse(self.state()["events"])
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+
+    def test_review_suppression_invalidates_accepted_task_ready_event(self):
+        scheduler = self._accepted_task_ready()
+        self.task(TASK_TWO, agent=REVIEWER, review={"task": TASK_ONE, "commits": {}})
+        self.statuses[REVIEWER] = "active"
+
+        scheduler.run_once()
+        self.assertFalse(self.state()["events"])
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+
+    def test_agent_reassignment_invalidates_accepted_task_ready_event(self):
+        scheduler = self._accepted_task_ready()
+        task = self.store.read(TASK_ONE)
+        task["agent"] = EXECUTOR_TWO
+        self.store.write(task)
+        self.statuses[EXECUTOR_TWO] = "active"
+
+        scheduler.run_once()
+        self.assertFalse(self.state()["events"])
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+
+    def test_explicit_rpc_rejection_retries_without_response_loss_ambiguity(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        self.stream_failure = job_runtime.AppServerRpcError("turn/start explicitly rejected")
+        scheduler = self.scheduler()
+
+        scheduler.run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "rejected")
+        self.assertEqual(event["failure_kind"], "explicit_rpc_rejection")
+        self.assertTrue(scheduler.compatibility_ready)
+        self.assertEqual(self.starts, [])
+
+        self.turns[EXECUTOR] = {"id": "unrelated-completed-turn", "status": "completed"}
+        self.clock.advance(5)
+        self.statuses[EXECUTOR] = "active"
+        scheduler.run_once()
+        self.assertEqual(next(iter(self.state()["events"].values()))["delivery"], "rejected")
+        self.assertEqual(self.starts, [])
+
+        self.statuses[EXECUTOR] = "idle"
+        scheduler.run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "accepted")
+        self.assertNotIn("failure_kind", event)
+        self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR])
 
     def test_task_mutation_under_store_lock_wins_over_stale_probe(self):
         self.task(TASK_ONE, jobs=[self.job("race", pid=61)])
