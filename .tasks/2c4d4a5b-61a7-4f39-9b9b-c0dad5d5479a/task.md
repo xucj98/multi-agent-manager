@@ -14,3 +14,6 @@
 
 ## 交付
 用 report.md 保留一份紧凑清理账：实际删除/保留分类、数量/体积、外部配置/入口恢复结果、尚存依赖及精确路径、hook-probe/ui-probe 的通俗说明、验证service healthy和用户改动未变。必要原始临时凭证不写报告。清理结果经 Manager 验收，不自行归档 task/worktree。发布报告后结束turn，由MAM唤醒。
+
+## 用户与 Manager 后续裁决（2026-09-13）
+用户确认当前 Manager 新建 subagent 在 Windows App 显示正常，旧侧边栏问题不再追查；不要新增 UI/hook 诊断。基于执行者核验：/usr/local/bin/codex 是本次探针的精确324B wrapper，原npm目标存在且早于wrapper，Manager授权替换前重新核验身份/内容后原子恢复原 symlink ../lib/node_modules/@openai/codex/bin/codex.js。禁止kill/restart活跃Windows proxy或App Server。恢复入口后验证基本可用与MAM健康；当前proxy仍在写的最小日志/脚本可暂留，明确自然断开后才可收尾的依赖。没有既有无中断关闭日志接口时，不为清理再设计/注入新的运行时机制。
