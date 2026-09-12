@@ -125,7 +125,7 @@ Manager 身份只可由显式 `--manager` 或既有项目记录确定。首次�
 
 待办先持久化，再投递；每项记录 `created_at`、`last_observed_at`、观测次数、尝试次数、`accepted_at`、发送前最新 turn 边界和错误。相同未变化条件在获得 `turn/start` RPC 回应后标记为 accepted，因此安静期产生零次新的 `turn/start`。`task_ready` 的源 executor 元数据为 unknown、systemError 或发送前读取失败时，既有 pending/accepted 待办保留，不据此生成新待办；只有可确认的归档、review 抑制、执行者/收件人变更或 source active 才会使其失效。收到明确 JSON-RPC error 时记录为 rejected，可在收件人再次 idle 后按退避重试，不参与应答丢失的歧义判断。只有发送后无响应、连接/传输失败或 daemon 在应答前退出才记录 uncertain；重试前只读取该收件人的最新 turn，并与发送前边界比较。边界未变时才按退避重试；边界已变时标记 ambiguous，保留给人工核对而不声称 exactly-once 或盲目再启动模型。条件消失、job 被归档、任务被归档或收件人变更时，陈旧待办移入有限历史而不投递。
 
-唤醒文本保持事实且可批量：停止 job 使用 `JOB-ID`、note 和 `TASK-ID`/标题；Manager 待办使用执行者 `AGENT-ID`、`TASK-ID` 和标题。停止进程不被解释为实验成功或任务完成。
+每条由 daemon 发起的唤醒文本首行固定为 `[MAM Message]`，其余内容保持事实且可批量：停止 job 使用 `JOB-ID`、note 和 `TASK-ID`/标题；Manager 待办使用执行者 `AGENT-ID`、`TASK-ID` 和标题。停止进程不被解释为实验成功或任务完成。
 
 ## 归档
 

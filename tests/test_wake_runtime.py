@@ -251,11 +251,33 @@ class WakeRuntimeTests(unittest.TestCase):
 
         by_recipient = {recipient: text for recipient, text in self.starts}
         self.assertIn(EXECUTOR, by_recipient)
+        self.assertEqual(by_recipient[EXECUTOR].splitlines()[0], "[MAM Message]")
         self.assertIn("JOB-ID stopped (formal eval)", by_recipient[EXECUTOR])
         self.assertIn(MANAGER, by_recipient)
+        self.assertEqual(by_recipient[MANAGER].splitlines()[0], "[MAM Message]")
         self.assertIn(f"AGENT-ID {REVIEWER}", by_recipient[MANAGER])
         self.assertNotIn("running only", "\n".join(by_recipient.values()))
         self.assertEqual(len(self.process_calls), 2, "stopped jobs are never re-probed")
+
+    def test_automated_wake_payload_labels_batched_content_once(self):
+        payload = wake_runtime.WakeScheduler._payload([
+            {"kind": "job_stopped", "job": "job-one", "note": "first", "task": TASK_ONE, "task_title": "first task"},
+            {"kind": "job_stopped", "job": "job-two", "note": "second", "task": TASK_TWO, "task_title": "second task"},
+            {"kind": "task_ready", "executor": EXECUTOR_TWO, "task": TASK_TWO, "task_title": "second task"},
+            {"kind": "task_ready", "executor": REVIEWER, "task": TASK_THREE, "task_title": "third task"},
+            {"kind": "task_unbound", "task": TASK_THREE, "task_title": "third task"},
+        ])
+        self.assertEqual(
+            payload,
+            "\n".join([
+                "[MAM Message]",
+                f"Stopped registered job: JOB-ID job-one (first); TASK-ID {TASK_ONE}: first task.",
+                f"Stopped registered job: JOB-ID job-two (second); TASK-ID {TASK_TWO}: second task.",
+                f"Executor AGENT-ID {EXECUTOR_TWO} has no unarchived jobs for TASK-ID {TASK_TWO}: second task.",
+                f"Executor AGENT-ID {REVIEWER} has no unarchived jobs for TASK-ID {TASK_THREE}: third task.",
+                f"TASK-ID {TASK_THREE}: third task has no bound executor.",
+            ]),
+        )
 
     def test_busy_executor_retains_stopped_job_until_idle(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
