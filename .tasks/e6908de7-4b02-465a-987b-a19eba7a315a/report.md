@@ -716,3 +716,24 @@ receipt 保留的精确调用合同是固定物理卡映射到 `cuda:0`、系统
 `task/e6908de7-r2-running-ledger` 的可集成提交为
 `81e815d98d6a198b3f99d1b11bb847f681b6c191`：主表将 put-back s0/s1 四项改为实际 C-ready，保留六项 r2 partial 的
 not-reportable 原始证据，并标明各 host r3 gate 通过后以新 leaf 重跑。
+
+## 2026-09-12 22:04 CST：r2 两项完整收尾、结果回传与 r3 门禁复核
+
+C1 已停止的 r2 formal 已分别完成最终核验并归档：
+
+- MAM 5261ee5a-09bb-4734-bead-b95370f4ad5b，rearrange no-memory / train seed1 / eval seed1：连续环境 seed 200000–200099 全部 accepted，100 条 terminal、100 个 scheduler exit 0、0 runtime error，结果 24/100，前50为11/50。
+- MAM 7888aa9f-f4bb-4aca-847c-408edcebd7a5，rearrange no-memory / train seed1 / eval seed2：连续环境 seed 300000–300099 全部 accepted，100 条 terminal、100 个 scheduler exit 0、0 runtime error，结果 23/100，前50为12/50。
+
+两项均验证五条正式视频可解码、video/no-video策略、checkpoint metadata/config_source audit、worker 无 EOF/renderer/native traceback 标记、robot/policy runner_shutdown 和端口退出；matching smoke 已按协议清理，shared Warp cache 未清理。最终文件为本机 RMBench 的 eval_result/memory_chunk_20260910/c_rearrange_no_memory_trainseed1_evalseed1_100ep_r2/final_review.json（SHA-256 4257a0023ce66b216a1ee255d33cd658dab585294c739463a84fbd248e33664a）和相邻 evalseed2 leaf 的 final_review.json（SHA-256 22812eca9ba46edb685dbfa25196c24747a7fe149fb14d68c33e15252fe22eff）。二者使用冻结 RMBench 9d8f47887a50ea691e5624de139f10bfcfb54412、bridge f9626636c4776d8eb15f9c556775cb2d12c000e5、OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4。
+
+结果按既有 wuwen-nx-aic → wuwen-4090-aic 路径回传；各 leaf 的 rsync -aicn --delete --omit-dir-times 均为零差异。本机文件 manifest SHA-256 分别为 41ece194efbd502e23ec795f91a8a0f5ff67de18cc787f09c58e774dbb78d3c1 与 bbb5598fc961b62762f154528a8e71ddb20f294f5bbf48bb69b23c692c4c4496。train seed1 的三个独立 eval seed 现为 24/24/23，合计71/300；不能与其他 train checkpoint 当作同 checkpoint 复现误差。
+
+put-back serial-lag30/train seed2 的 MAM 8acbd36a-e597-4158-9349-fa52678b92ee，以及 put-back no-memory/train seed2 的 MAM 727cb400-e7b5-43db-9b56-eec75a9afc48，均已完成零差异验收并归档：前者 metadata SHA-256 为 b8798a992ff7017d8a7c87958cb85f12a9937185d2f7357613136c3194be5e47、62个普通文件；后者为 1ae4342011db2089fcc78e58e6c5eb68d0797340a3a6ce682b52592611174e65、59个普通文件。put-back 六个 checkpoint 现均 C-ready，尚未启动新的 GPU eval。
+
+r3 的 C2/C3 独立 runtime 再次核对为 RMBench 77477931bee18c2476bea36b400ab45dc67d9ebe、bridge f9626636c4776d8eb15f9c556775cb2d12c000e5、OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4。其 git 链为 9d8f478 → eba81b4 → 7747793；eba81b4 对 envs/_base_task.py 的唯一运行时改动是进程级 _PROCESS_RENDERER 单例，已在 C2/C3 源树逐行核对。C2 当前所有卡均有实际 compute-app 占用，不能接用。C3 当前可见零本机 compute-app 的候选卡，但历史 40-reset harness 本体仍缺失，故未占用或启动任何 gate；实际启动前仍须再核对分配与显存。
+
+缺失证据已复核：历史稳定归档的 renderer/40-reset 仅保留 driver.log、exit、gate-receipt.json、launch.json、result.json 和 retired-candidate.patch；原脚本 rmbench_renderer_reset_gate.py 随 2a879870 worktree 清理，C1/C2/C3/state-vla 当前树及 MAM 历史记录中均无可执行副本或公共替代入口。按“复用既有 harness、不得另造框架”的发布边界，我没有根据 receipt 重写脚本。恢复经批准的原 harness 前，C2/C3 的40-reset、matching smoke 和 r3 formal 均保持 pending；健康 C1 r2 不改动。
+
+六项旧 EOF leaf 的权威计数仍为 episode0–21 的22条 accepted terminal rollout，加 episode22 一条 accepted=null、status=error 的 reset-error record；不是23条 accepted。它们全部 not reportable，未拼接或重试。
+
+安全台账树 /mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r2-running-ledger 的分支 task/e6908de7-r2-running-ledger 已提交 1f91d189d755666e4fc668e65b7284b1e8dc09e3（docs: record no-memory seed1 eval coverage）。提交同步总览、两份最终结果链接和失败分类、覆盖表，以及 put-back s2 的 C-ready 状态；git diff --check 通过，树干净。活跃 r2 runtime 未修改。
