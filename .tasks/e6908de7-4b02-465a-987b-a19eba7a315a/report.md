@@ -737,3 +737,45 @@ r3 的 C2/C3 独立 runtime 再次核对为 RMBench 77477931bee18c2476bea36b400a
 六项旧 EOF leaf 的权威计数仍为 episode0–21 的22条 accepted terminal rollout，加 episode22 一条 accepted=null、status=error 的 reset-error record；不是23条 accepted。它们全部 not reportable，未拼接或重试。
 
 安全台账树 /mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r2-running-ledger 的分支 task/e6908de7-r2-running-ledger 已提交 1f91d189d755666e4fc668e65b7284b1e8dc09e3（docs: record no-memory seed1 eval coverage）。提交同步总览、两份最终结果链接和失败分类、覆盖表，以及 put-back s2 的 C-ready 状态；git diff --check 通过，树干净。活跃 r2 runtime 未修改。
+
+
+## 2026-09-12 22:52 CST：r3 门禁替代、两项 formal 收尾与可集成文档
+
+本节取代 22:04 节中“缺少 harness、待恢复”的**当前状态**；当时对历史脚本已丢失的记录保留为时间证据。新授权后再次检索 Git、保留归档、C1/C2/C3/runtime 与历史 receipt，仍未找到旧 `rmbench_renderer_reset_gate.py` 或公共等价入口，因此在独立 RMBench 树实现了最小、受版本管理的替代，尚未部署到 C。
+
+### r3 lifecycle gate：已提交、CPU 通过、待 focused independent review
+
+- 工作树/分支：`/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r3-lifecycle-gate` / `task/e6908de7-r3-lifecycle-gate`。
+- 提交：`bf34743334efc98440fa9b05e3f2f05e8303846a`，基于已部署 r3 RMBench `77477931bee18c2476bea36b400ab45dc67d9ebe`；新增 `script/renderer_reset_gate.py` 与 `tests/test_renderer_reset_gate.py`。
+- 工具仅通过既有 `RMBenchSimulationController` 启动/关闭既有 worker，固定 `put_back_block` / `demo_clean_eval`、seed `100000..100039`、物理 `--device` 到 worker `cuda:0`、系统 Vulkan ICD。它不启动 policy、不调用 recorder、不创建 `eval_result` leaf；receipt 与 worker log 均拒绝写进 `eval_result`。
+- 真实 controller 静态契约已核对：构造函数启动 worker 并保存 metadata，`reset(**request)` 和 `shutdown()` 与工具调用一致。工具保留的职责是冻结 RMBench/bridge git state、确认 renderer 修复存在、40条连续 reset 及不跳 seed、worker marker 扫描、退出与原子 receipt；未复制 benchmark 的 process/metadata/smoke 管理。
+- 规模：源码252物理行（223非空行），CPU mock测试140物理行（116非空行）。高于早期约150可执行行目标的部分是上述固定 receipt、前置条件和失败留痕；未压缩为难读代码，也没有形成通用 launcher/队列框架。
+- CPU 验证均通过，且树干净：
+
+  ```bash
+  python3 tests/test_renderer_reset_gate.py
+  python3 tests/test_renderer_lifecycle.py
+  /root/.local/bin/python3.10 tests/test_renderer_reset_gate.py
+  /root/.local/bin/python3.10 tests/test_renderer_lifecycle.py
+  /root/.local/bin/python3.10 -m py_compile script/renderer_reset_gate.py
+  /root/.local/bin/python3.10 script/renderer_reset_gate.py --help
+  ```
+
+  该提交现在只等待 focused independent review；review 通过后才可同步进 C r3 runtime。C2/C3 没有实际空卡，未启动40-reset、smoke或r3 formal。
+
+### r2 两项完整 formal 收尾与回传
+
+- C1 GPU6，`c_rearrange_no_memory_trainseed2_evalseed2_100ep_r2`（MAM `378e4cd7-cfdb-4d8b-9e5f-6da6694a5641`）完整完成：环境 seed `300000–300099`，**33/100**、前50 `13/50`、100 terminal、100 scheduler exit 0、worker基础设施标记全为0，前五视频可解码。最终 [review](/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/c_rearrange_no_memory_trainseed2_evalseed2_100ep_r2/final_review.json) SHA-256 `df019922757c7eca7f81c8db58b72c51c6995ae4e72ccaacc76505427bc7c613`；matching smoke 与该 run 临时 audit 已清理，MAM 已归档。
+- C1 GPU7，`c_rearrange_serial_lag30_trainseed1_evalseed0_100ep_r2`（MAM `504fc975-be9d-4307-9685-e0b967b23a76`）完整完成：环境 seed `100000–100099`，**33/100**、前50 `16/50`、100 terminal、100 scheduler exit 0、worker基础设施标记全为0，前五视频可解码。最终 [review](/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/c_rearrange_serial_lag30_trainseed1_evalseed0_100ep_r2/final_review.json) SHA-256 `4b4d084928281ee24d91bd005812964557206c01ee5c3c3cd124a926dd744efe`；matching smoke/audit 已清理，MAM 已归档。
+- 两个 formal leaf 均按既有 C → `wuwen-nx-aic` → 本机主 RMBench 路径回传；两段 `rsync -aicn --delete --omit-dir-times` 均零差异。no-memory/trainseed2 的三个独立 eval seed 现为 `37/49/33`，合计 `119/300`。它们是同一训练 checkpoint 的不同环境 eval seed；serial 33/100 来自另一训练 checkpoint，不混作同 checkpoint 复现误差。
+
+### 文档与当前完成边界
+
+安全文档树已提供可合入分支 `task/e6908de7-c-eval-docs-consolidated`，提交
+`291d6d8017d11baf65aafca3805fe20a61619fa2`（父 `295effbbab8347b1ba43dca051740cbfde82089a`）：
+
+- 台账主概述、B组训练表与三 eval-seed 覆盖表都从旧“formal运行中”改为稳定结果链接，保留六项 EOF 的“22 terminal accepted + episode22 reset-error”不计分证据。
+- 使用说明改为 r3 runtime 的实际路径、端口/leaf 规则和40-reset命令；仅说明使用条件和输出，不描述 Warp 实现细节。
+- `git diff --check`通过，分支/worktree干净；没有合入或修改活跃 runtime。
+
+当前状态必须区分：r3 三库环境已经部署且 renderer 静态/CPU检查通过；最小 gate 工具的 CPU验证已完成但尚待独立review和同步；C2/C3 GPU gate 仍因无实际空卡 pending；r2 的上述两项和既有完整 leaf 是有效正式结果，但整套三-seed队列及 r3 正式评测尚未完成。六项 C2/C3 EOF partial 仍 not reportable，未重试。本 task 当前没有未归档 job。
