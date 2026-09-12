@@ -860,3 +860,42 @@ C3 GPU0–3 当前各约24,080 MiB free、0% util，bf3474/f962663/a869498 runti
 GPU6 的 `c_rearrange_serial_lag30_trainseed0_evalseed1_smoke2_r3` 已登记 MAM `1d1b376f-5698-489d-a377-b80c3957a452`。它使用同一只读 trainseed0 20k checkpoint、eval seed `200000..`、端口19460/19462；首个 reset 已 accepted，GPU 使用约16.2 GiB，第一条 rollout 正在执行。
 
 GPU7 的 `c_rearrange_serial_lag30_trainseed0_evalseed2_smoke2_r3` 已在 GPU6 首个 infer/reset 后错峰启动并登记 MAM `58def05d-7340-437f-8c3f-2d63312a0f7f`，使用 eval seed `300000..`、端口19470/19472。两项均只在自身 completed video/no-video smoke 验证后接续各自 fresh formal100；当前没有把 smoke 任务表现记为正式结果。
+
+
+## C3 2e9677c 独立部署与当前队列（2026-09-13）
+
+按已发布 task revision `6ae23ef9fb3e16fe81f95da1d36417b851b80532` 和新 Manager
+`01a09657-e0f3-7352-b726-aba5bbd5d498` 的裁决，未更新 C1 正在运行的
+`c-eval-renderer-r3`。已将精确 RMBench commit
+`2e9677ce8ec9f623395184f63f32ddafa66e5e44` 作为 git bundle 导入 C 的稳定源库，
+并用 C 的既有 `.local/create_worktree.sh` 在共享文件系统创建独立 runtime：
+
+```text
+/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c-eval-renderer-r3-2e9677c
+```
+
+其冻结且 clean 的三库 HEAD 是 RMBench `2e9677c`、bridge
+`f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI
+`a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`；三份创建日志在该 runtime 的
+`records/{RMBench,robot-bridge,openpi}.create.log`。已核对 renderer reuse 源码和
+`renderer_reset_gate.py` 的虚拟环境 symlink 保留路径，且 gate CLI 可由新 bridge
+venv 导入。此为部署/CPU 验证，**不是** C3 gate 通过。
+
+旧 bf3474 的零-reset 失败证据保持不变：
+`c-eval-renderer-r3/records/renderer_reset_gate_c3_gpu0_r3_bf3474.json` 与同名
+worker stderr；其中 `completed_count=0`、`ModuleNotFoundError: numpy`。
+
+C3 GPU0 实测 24,080 MiB free、0% util 后，已用新路径启动固定
+100000–100039 的 40-reset gate，映射 `CUDA_VISIBLE_DEVICES=0` /
+`SAPIEN_RENDER_DEVICE=cuda:0` 和系统 ICD。MAM job
+`10cfe400-13ee-483f-ba5f-00e6a094a1e3` 正在运行；新 receipt、worker stderr 和
+outer log 均写入新 runtime 的 `records/renderer_reset_gate_c3_gpu0_r3_2e9677c.*`。
+仅在该 receipt 40/40 accepted、exit 0 且无基础设施 marker 后，才会在这个 runtime
+为受影响 C3 队列建立新的 matching video/no-video smoke2，再启动 fresh formal100。
+
+健康 C1 队列没有中断：已停止的 C1 GPU6 serial-lag30 trainseed0/eval seed1 smoke
+`1d1b376f-5698-489d-a377-b80c3957a452` 已核验 2/2 accepted、video/no-video、两个
+scheduler exit 0 与无基础设施错误并归档。其对应 fresh formal100 已在 C1 GPU6
+启动，MAM job `977e29ab-e527-4e65-bc84-9b5bb2c03f02`，使用现有冻结
+bf3474/f962663/a869498 runtime、端口19460/19462；启动后已有连续 terminal rollout，
+当前继续运行。C1 GPU7 matching smoke 和其余已登记 C1 formal 均保持原位。
