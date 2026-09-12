@@ -899,3 +899,22 @@ scheduler exit 0 与无基础设施错误并归档。其对应 fresh formal100 �
 启动，MAM job `977e29ab-e527-4e65-bc84-9b5bb2c03f02`，使用现有冻结
 bf3474/f962663/a869498 runtime、端口19460/19462；启动后已有连续 terminal rollout，
 当前继续运行。C1 GPU7 matching smoke 和其余已登记 C1 formal 均保持原位。
+
+
+### C1 GPU7 matching smoke 收尾与 formal 接续（2026-09-13）
+
+已处理 stopped job `58def05d-7340-437f-8c3f-2d63312a0f7f`。对应
+`c_rearrange_serial_lag30_trainseed0_evalseed2_smoke2_r3` 完整完成：固定
+seed 300000/300001 均 accepted 且 terminal，episode0 的 700 帧视频可读、episode1
+明确 no-video，两个 scheduler exit 0；无 traceback、EOF、segfault 或 runtime error。
+GPU7 回到 1 MiB/0%，19470/19472 无监听，formal leaf 不存在。smoke 已按上述证据归档。
+
+已在同一 clean C1 bf3474/f962663/a869498 runtime 的 GPU7 启动 matching fresh formal：
+`c_rearrange_serial_lag30_trainseed0_evalseed2_100ep_r3`，checkpoint 为
+`memory20k_e7e5ac54_rearrange_serial_lag30_s0/20000`，端口19470/19472。MAM job
+`a1453162-c880-45d0-b639-e3edf0db3494` 已登记；它与既有 GPU6 eval-seed1 formal
+`977e29ab-e527-4e65-bc84-9b5bb2c03f02` 保持独立运行。
+
+C3 GPU0 的 `10cfe400-13ee-483f-ba5f-00e6a094a1e3` 仍在新 2e9677c runtime 中执行
+40-reset gate，尚未写出 receipt；目前仅见 SAPIEN 的弃用警告，没有将运行中状态写成
+C3 gate PASS。
