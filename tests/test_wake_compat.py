@@ -490,7 +490,7 @@ run_live_delivery_probe() {
         incomplete 'simulated isolated delivery failure'
         return 1
     fi
-    printf 'MAM proactive wakeup: isolated real delivery PASS (3 model turns)\n'
+    printf 'MAM proactive wakeup: isolated real delivery PASS (6 model turns)\n'
 }
 '''
 

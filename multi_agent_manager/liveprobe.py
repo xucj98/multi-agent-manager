@@ -33,11 +33,18 @@ from . import cli, job_runtime
 
 MODEL = "gpt-5.6-terra"
 EFFORT = "max"
-MAX_MODEL_TURNS = 3
+MAX_MODEL_TURNS = 6
 DEFAULT_TIMEOUT_SECONDS = 180.0
 POLL_SECONDS = 0.5
 _MARKER = ".mam-liveprobe.json"
 _MARKER_KIND = "multi-agent-manager live delivery fixture v1"
+_ROLE_ORDER = ("manager", "job_executor", "idle_executor", "archived_executor")
+_BASELINE_MARKERS = {
+    "manager": "PROBE_MANAGER_BASELINE_READY",
+    "job_executor": "PROBE_JOB_EXECUTOR_BASELINE_READY",
+    "idle_executor": "PROBE_IDLE_EXECUTOR_BASELINE_READY",
+    "archived_executor": "PROBE_ARCHIVED_EXECUTOR_BASELINE_READY",
+}
 
 
 class LiveProbeError(RuntimeError):
@@ -126,6 +133,31 @@ def _turns(result: Any) -> list[Mapping[str, Any]]:
     return list(rows)
 
 
+def _included_turns(result: Any) -> list[Mapping[str, Any]]:
+    """Read the optional turn list returned by ``thread/read(includeTurns=true)``."""
+
+    data = _mapping(result, "App Server thread/read(includeTurns=true)")
+    thread = _mapping(data.get("thread"), "App Server thread/read(includeTurns=true)")
+    rows = thread.get("turns")
+    if not isinstance(rows, list) or not all(isinstance(row, Mapping) for row in rows):
+        raise LiveProbeError("App Server thread/read(includeTurns=true) returned no valid turns")
+    return list(rows)
+
+
+def _turn_summaries(turns: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Keep receipt history compact and limited to fixture-owned metadata."""
+
+    summaries: list[dict[str, Any]] = []
+    for turn in turns:
+        item: dict[str, Any] = {}
+        for key in ("id", "status", "completedAt", "createdAt"):
+            value = turn.get(key)
+            if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+                item[key] = value
+        summaries.append(item)
+    return summaries
+
+
 def _turn_text(turn: Mapping[str, Any]) -> str:
     """Return every textual field in a turn without assuming protocol variants."""
 
@@ -145,30 +177,12 @@ def _turn_text(turn: Mapping[str, Any]) -> str:
     return "\n".join(values)
 
 
-def _status_is_terminal(status: str) -> bool:
-    return status in {"idle", "notLoaded"}
-
-
 def _status_is_interrupted(status: str) -> bool:
     return status.lower() in {"interrupted", "cancelled", "canceled", "paused", "suspended"}
 
 
-def _is_unmaterialized_thread_error(error: Exception) -> bool:
-    """Recognize a persisted thread that has never received a user turn.
-
-    The current App Server deliberately keeps a normal persisted ``thread/start``
-    thread out of its rollout store until a first user turn.  It reports this
-    state as either ``not materialized yet`` on history reads or ``no rollout
-    found`` on archive.  This is useful fixture evidence: an idle executor that
-    must not receive a scheduler turn remains unmaterialized.
-    """
-
-    detail = str(error).lower()
-    return "not materialized yet" in detail or "no rollout found for thread id" in detail
-
-
-def _is_history_not_ready_error(error: Exception) -> bool:
-    """Return whether a just-started persisted turn has not reached history yet."""
+def _is_paged_history_unsupported(error: Exception) -> bool:
+    """Recognize the explicit current-App-Server pagination limitation."""
 
     return "list_turns is not supported yet" in str(error).lower()
 
@@ -212,10 +226,13 @@ class _LiveFixture:
         self.threads: dict[str, str] = {}
         self.jobs: list[tuple[str, str]] = []
         self.blockers: list[subprocess.Popen[bytes]] = []
-        self.materialized_roles: set[str] = set()
-        self.unmaterialized_roles: set[str] = set()
+        # Only direct baseline turn IDs are known before their history is
+        # available.  Cleanup may interrupt one of these IDs if it is still
+        # active; it never guesses an ID for a scheduler-started turn.
+        self.active_direct_turns: dict[str, str] = {}
         self.started_service = False
         self.service_start_attempted = False
+        self.deadline = self.clock() + self.timeout_seconds
         self.stage = "prepare fixture"
         self.evidence: dict[str, Any] = {
             "status": "running",
@@ -226,6 +243,8 @@ class _LiveFixture:
             "checks": {
                 "fixture_tasks_registered_before_threads": False,
                 "executor_bound_before_first_model_turn": False,
+                "all_roles_baselined_before_service": False,
+                "baseline_history_read_after_idle": False,
                 "job_delivery": False,
                 "manager_delivery": False,
                 "manager_is_fixture_only": False,
@@ -234,17 +253,20 @@ class _LiveFixture:
                 "idle_executors_received_no_turn": False,
             },
             "resources": {"tasks": {}, "threads": {}, "jobs": {}, "turns": {}},
+            "history": {},
+            "turn_counts": {},
             "cleanup": {
                 "service": "not_started",
                 "jobs": "not_started",
                 "tasks": "not_started",
                 "threads": "not_started",
+                "thread_interrupt": {},
                 "thread_archive": {},
             },
         }
 
     def _deadline(self) -> float:
-        return self.clock() + self.timeout_seconds
+        return self.deadline
 
     def _expired(self, deadline: float, waiting_for: str) -> None:
         if self.clock() >= deadline:
@@ -315,7 +337,7 @@ class _LiveFixture:
 
     def _create_and_bind_threads(self) -> None:
         self.stage = "create and bind dedicated fixture threads"
-        for role in ("manager", "job_executor", "idle_executor", "archived_executor"):
+        for role in _ROLE_ORDER:
             self.threads[role] = self._create_thread(role)
         bindings = {
             "job": "job_executor",
@@ -437,15 +459,36 @@ class _LiveFixture:
             self._expired(deadline, "isolated fixture scheduler readiness")
             self.sleeper(POLL_SECONDS)
 
+    def _read_thread(self, thread_id: str, *, include_turns: bool) -> Mapping[str, Any]:
+        return _mapping(
+            self._request("thread/read", {"threadId": thread_id, "includeTurns": include_turns}),
+            "App Server thread/read",
+        )
+
     def _read_status(self, thread_id: str) -> str:
-        result = self._request("thread/read", {"threadId": thread_id, "includeTurns": False})
-        return _thread_status(result)
+        return _thread_status(self._read_thread(thread_id, include_turns=False))
 
     def _resume_if_not_loaded(self, thread_id: str, status: str) -> str:
         if status != "notLoaded":
             return status
         self._request("thread/resume", {"threadId": thread_id, "excludeTurns": True})
         return self._read_status(thread_id)
+
+    def _wait_for_idle(self, role: str, label: str, *, deadline: float | None = None) -> None:
+        """Wait on metadata only; paging an active baseline is not valid evidence."""
+
+        deadline = self._deadline() if deadline is None else deadline
+        thread_id = self.threads[role]
+        while True:
+            status = self._resume_if_not_loaded(thread_id, self._read_status(thread_id))
+            if status == "idle":
+                return
+            if _status_is_interrupted(status):
+                raise LiveProbeError(f"fixture {label} thread entered {status}; it was not restarted")
+            if status != "active":
+                raise LiveProbeError(f"fixture {label} thread returned unexpected status {status!r}")
+            self._expired(deadline, label)
+            self.sleeper(min(POLL_SECONDS, max(0.0, deadline - self.clock())))
 
     def _thread_turns(self, thread_id: str) -> list[Mapping[str, Any]]:
         result = self._request(
@@ -454,66 +497,80 @@ class _LiveFixture:
         )
         return _turns(result)
 
-    def _turn_count(self) -> int:
-        count = 0
-        for role in self.materialized_roles:
-            try:
-                count += len(self._thread_turns(self.threads[role]))
-            except LiveProbeError as exc:
-                # A turn/start acknowledgement can precede materialization of
-                # its history by a short interval.  Waiting for that interval
-                # does not send a retry turn or consume another model call.
-                if not _is_history_not_ready_error(exc):
-                    raise
-        return count
+    def _history_key(self, role: str, phase: str) -> str:
+        return f"{role}:{phase}"
 
-    def _enforce_turn_limit(self) -> None:
-        count = self._turn_count()
-        if count > MAX_MODEL_TURNS:
+    def _record_paged_history(self, role: str, phase: str, turns: list[Mapping[str, Any]]) -> None:
+        self.evidence["history"][self._history_key(role, phase)] = {
+            "status_before_paged_history": "idle",
+            "thread_turns_list": {"result": "ok", "count": len(turns), "turns": _turn_summaries(turns)},
+        }
+
+    def _compare_include_turns_after_paging_failure(
+        self, role: str, phase: str, page_error: LiveProbeError
+    ) -> str:
+        """Record the required same-thread API comparison before failing once."""
+
+        record: dict[str, Any] = {
+            "status_before_paged_history": "idle",
+            "thread_turns_list": {"result": "unsupported", "error": _redact(page_error)},
+        }
+        try:
+            turns = _included_turns(self._read_thread(self.threads[role], include_turns=True))
+        except LiveProbeError as exc:
+            detail = _redact(exc)
+            record["thread_read_include_turns"] = {"result": "failed", "error": detail}
+            comparison = f"failed: {detail}"
+        else:
+            record["thread_read_include_turns"] = {
+                "result": "ok",
+                "count": len(turns),
+                "turns": _turn_summaries(turns),
+            }
+            comparison = f"returned {len(turns)} turns"
+        self.evidence["history"][self._history_key(role, phase)] = record
+        return comparison
+
+    def _thread_turns_after_idle(self, role: str, phase: str) -> list[Mapping[str, Any]]:
+        """Page only after metadata is idle, or produce the one required comparison."""
+
+        try:
+            return self._thread_turns(self.threads[role])
+        except LiveProbeError as exc:
+            if not _is_paged_history_unsupported(exc):
+                raise
+            comparison = self._compare_include_turns_after_paging_failure(role, phase, exc)
             raise LiveProbeError(
-                f"fixture observed {count} model turns, exceeding the fixed acceptance limit of {MAX_MODEL_TURNS}"
-            )
+                f"fixture {role} was idle but thread/turns/list is unsupported during {phase}; "
+                f"thread/read(includeTurns=true) {comparison}"
+            ) from exc
 
-    def _wait_for_turn_text(self, role: str, expected: list[str], minimum_turns: int, label: str) -> Mapping[str, Any]:
+    def _wait_for_turn_text(
+        self, role: str, expected: list[str], minimum_turns: int, label: str, phase: str
+    ) -> Mapping[str, Any]:
         deadline = self._deadline()
-        thread_id = self.threads[role]
         while True:
-            self._enforce_turn_limit()
-            status = self._resume_if_not_loaded(thread_id, self._read_status(thread_id))
-            if _status_is_interrupted(status):
-                raise LiveProbeError(f"fixture {label} thread entered {status}; it was not restarted")
-            if _status_is_terminal(status):
-                try:
-                    turns = self._thread_turns(thread_id)
-                except LiveProbeError as exc:
-                    if _is_unmaterialized_thread_error(exc):
-                        self.unmaterialized_roles.add(role)
-                        self._expired(deadline, label)
-                        self.sleeper(POLL_SECONDS)
-                        continue
-                    if _is_history_not_ready_error(exc):
-                        self._expired(deadline, label)
-                        self.sleeper(POLL_SECONDS)
-                        continue
-                    raise
-                self.materialized_roles.add(role)
-                if len(turns) >= minimum_turns:
-                    for turn in turns:
-                        text = _turn_text(turn)
-                        if all(item in text for item in expected) and turn.get("status") == "completed":
-                            return turn
+            self._wait_for_idle(role, label, deadline=deadline)
+            turns = self._thread_turns_after_idle(role, phase)
+            if len(turns) >= minimum_turns:
+                for turn in turns:
+                    text = _turn_text(turn)
+                    if all(item in text for item in expected) and turn.get("status") == "completed":
+                        self._record_paged_history(role, phase, turns)
+                        return turn
             self._expired(deadline, label)
-            self.sleeper(POLL_SECONDS)
+            self.sleeper(min(POLL_SECONDS, max(0.0, deadline - self.clock())))
 
-    def _start_initial_executor_turn(self) -> None:
-        self.stage = "start fixture executor baseline turn"
-        if not self.evidence["checks"]["executor_bound_before_first_model_turn"]:
+    def _start_baseline_turn(self, role: str) -> None:
+        self.stage = f"start fixture {role} baseline turn"
+        if role != "manager" and not self.evidence["checks"]["executor_bound_before_first_model_turn"]:
             raise LiveProbeError("fixture executor was not bound before its first model turn")
+        marker = _BASELINE_MARKERS[role]
         result = self._request(
             "turn/start",
             {
-                "threadId": self.threads["job_executor"],
-                "input": [{"type": "text", "text": "Reply exactly PROBE_EXECUTOR_READY."}],
+                "threadId": self.threads[role],
+                "input": [{"type": "text", "text": f"Reply exactly {marker}."}],
                 "model": MODEL,
                 "effort": EFFORT,
             },
@@ -521,20 +578,32 @@ class _LiveFixture:
         response = _mapping(result, "App Server turn/start")
         turn = response.get("turn")
         if not isinstance(turn, Mapping):
-            raise LiveProbeError("fixture executor baseline turn/start returned no turn")
+            raise LiveProbeError(f"fixture {role} baseline turn/start returned no turn")
         turn_id = turn.get("id")
         if not isinstance(turn_id, str) or not turn_id:
-            raise LiveProbeError("fixture executor baseline turn/start returned no turn id")
+            raise LiveProbeError(f"fixture {role} baseline turn/start returned no turn id")
         self.evidence["calls"]["direct_turn_start"] += 1
-        self.evidence["resources"]["turns"]["executor_baseline_started"] = turn_id
-        self.materialized_roles.add("job_executor")
-        completed = self._wait_for_turn_text(
-            "job_executor", ["PROBE_EXECUTOR_READY"], 1, "fixture executor baseline turn completion"
-        )
-        completed_id = completed.get("id")
-        if completed_id != turn_id:
-            raise LiveProbeError("fixture executor baseline completed under an unexpected turn id")
-        self.evidence["resources"]["turns"]["executor_baseline_completed"] = turn_id
+        if self.evidence["calls"]["direct_turn_start"] > len(_ROLE_ORDER):
+            raise LiveProbeError("fixture attempted more direct baseline turns than its fixed role set")
+        self.active_direct_turns[role] = turn_id
+        self.evidence["resources"]["turns"][f"{role}_baseline_started"] = turn_id
+        self._wait_for_idle(role, f"fixture {role} baseline completion")
+        turns = self._thread_turns_after_idle(role, "baseline")
+        completed = next((item for item in turns if item.get("id") == turn_id), None)
+        if not isinstance(completed, Mapping) or completed.get("status") != "completed":
+            raise LiveProbeError(f"fixture {role} baseline did not complete under its acknowledged turn id")
+        if marker not in _turn_text(completed):
+            raise LiveProbeError(f"fixture {role} baseline history lacks its requested marker")
+        self._record_paged_history(role, "baseline", turns)
+        self.active_direct_turns.pop(role, None)
+        self.evidence["resources"]["turns"][f"{role}_baseline_completed"] = turn_id
+
+    def _start_all_baseline_turns(self) -> None:
+        self.stage = "materialize all dedicated fixture roles"
+        for role in _ROLE_ORDER:
+            self._start_baseline_turn(role)
+        self.evidence["checks"]["all_roles_baselined_before_service"] = True
+        self.evidence["checks"]["baseline_history_read_after_idle"] = True
 
     def _wait_for_manager_delivery(self) -> None:
         self.stage = "verify fixture Manager delivery"
@@ -548,103 +617,118 @@ class _LiveFixture:
                 f"TASK-ID {self.tasks['archived']}: MAM liveprobe archived-job Manager delivery."
             ),
         ]
-        manager_turn = self._wait_for_turn_text("manager", manager_payloads, 1, "Manager-ready scheduler turn")
+        manager_turn = self._wait_for_turn_text(
+            "manager", manager_payloads, 2, "Manager-ready scheduler turn", "manager_delivery"
+        )
         manager_turn_id = manager_turn.get("id")
         if not isinstance(manager_turn_id, str) or not manager_turn_id:
             raise LiveProbeError("Manager-ready scheduler delivery returned no turn id")
         self.evidence["resources"]["turns"]["manager_ready_delivery"] = manager_turn_id
         self.evidence["checks"]["manager_delivery"] = True
 
-    def _verify_idle_executors_received_no_turn(self) -> None:
-        self.stage = "verify fixture idle executors received no scheduler turn"
-        for role in ("idle_executor", "archived_executor"):
-            deadline = self._deadline()
-            while True:
-                try:
-                    self._thread_turns(self.threads[role])
-                except LiveProbeError as exc:
-                    if _is_unmaterialized_thread_error(exc):
-                        self.unmaterialized_roles.add(role)
-                        break
-                    if _is_history_not_ready_error(exc):
-                        self._expired(deadline, f"fixture {role} history state")
-                        self.sleeper(POLL_SECONDS)
-                        continue
-                    raise
-                raise LiveProbeError(f"fixture {role} unexpectedly materialized a turn history")
+    def _turn_counts_after_idle(self, phase: str) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        deadline = self._deadline()
+        for role in _ROLE_ORDER:
+            self._wait_for_idle(role, f"fixture {role} {phase} count", deadline=deadline)
+            turns = self._thread_turns_after_idle(role, phase)
+            self._record_paged_history(role, phase, turns)
+            counts[role] = len(turns)
+        self.evidence["turn_counts"][phase] = counts
+        return counts
+
+    def _verify_baseline_only_executors(self) -> None:
+        self.stage = "verify fixture executors received no pre-stop scheduler turn"
+        expected = {"manager": 2, "job_executor": 1, "idle_executor": 1, "archived_executor": 1}
+        counts = self._turn_counts_after_idle("before_job_stop")
+        if counts != expected:
+            raise LiveProbeError(f"fixture pre-stop turn distribution is unexpected: {counts}")
         self.evidence["checks"]["idle_executors_received_no_turn"] = True
 
-    def _wait_for_stopped_job_delivery(self, job_id: str, note: str) -> None:
+    def _wait_for_stopped_job_delivery(self, job_id: str, note: str) -> dict[str, int]:
         self.stage = "verify stopped-job scheduler delivery"
         job_payload = (
             f"Stopped registered job: JOB-ID {job_id} ({note}); "
             f"TASK-ID {self.tasks['job']}: MAM liveprobe stopped-job delivery."
         )
-        job_turn = self._wait_for_turn_text("job_executor", [job_payload], 2, "stopped-job scheduler turn")
+        job_turn = self._wait_for_turn_text(
+            "job_executor", [job_payload], 2, "stopped-job scheduler turn", "stopped_job_delivery"
+        )
         job_turn_id = job_turn.get("id")
         if not isinstance(job_turn_id, str) or not job_turn_id:
             raise LiveProbeError("stopped-job scheduler delivery returned no turn id")
         self.evidence["resources"]["turns"]["stopped_job_delivery"] = job_turn_id
         self.evidence["checks"]["job_delivery"] = True
-
-        counts = {
-            "manager": len(self._thread_turns(self.threads["manager"])),
-            "job_executor": len(self._thread_turns(self.threads["job_executor"])),
-            "idle_executor": 0,
-            "archived_executor": 0,
-        }
-        if counts != {"manager": 1, "job_executor": 2, "idle_executor": 0, "archived_executor": 0}:
+        counts = self._turn_counts_after_idle("after_job_stop")
+        expected = {"manager": 2, "job_executor": 2, "idle_executor": 1, "archived_executor": 1}
+        if counts != expected:
             raise LiveProbeError(f"fixture model turn distribution is unexpected: {counts}")
-        # The fixture changes no records after the two deliveries.  Two fresh
-        # scheduler intervals must therefore leave the exact turn distribution
-        # unchanged, proving it did not start duplicate work for a quiet task.
-        for _ in range(2):
-            self.sleeper(POLL_SECONDS)
-            self._enforce_turn_limit()
-            observed = {
-                "manager": len(self._thread_turns(self.threads["manager"])),
-                "job_executor": len(self._thread_turns(self.threads["job_executor"])),
-                "idle_executor": 0,
-                "archived_executor": 0,
-            }
-            if observed != counts:
-                raise LiveProbeError(f"fixture quiet window started unexpected additional turns: {observed}")
+        observed = sum(counts.values())
+        if observed > MAX_MODEL_TURNS:
+            raise LiveProbeError(
+                f"fixture observed {observed} model turns, exceeding the fixed acceptance limit of {MAX_MODEL_TURNS}"
+            )
+        if observed != MAX_MODEL_TURNS:
+            raise LiveProbeError(f"fixture did not produce the required {MAX_MODEL_TURNS}-turn acceptance distribution: {counts}")
         self.evidence["checks"]["turn_budget"] = True
+        self.evidence["model_turns"] = observed
+        return counts
+
+    def _scheduler_interval(self) -> float:
+        raw = getattr(self.runtime, "POLL_SECONDS", POLL_SECONDS)
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)) or raw <= 0:
+            raw = POLL_SECONDS
+        return min(max(float(raw), POLL_SECONDS), 30.0) + POLL_SECONDS
+
+    def _verify_quiet_window(self, expected: Mapping[str, int]) -> None:
+        self.stage = "verify unchanged fixture quiet window"
+        # Check across two actual daemon polling windows.  No fixture records
+        # change after the stopped job has been delivered, so another start is
+        # an observable duplicate rather than a timing assumption.
+        for index in range(1, 3):
+            deadline = self._deadline()
+            self.sleeper(min(self._scheduler_interval(), max(0.0, deadline - self.clock())))
+            self._expired(deadline, "fixture quiet window")
+            observed = self._turn_counts_after_idle(f"quiet_window_{index}")
+            if observed != dict(expected):
+                raise LiveProbeError(f"fixture quiet window started unexpected additional turns: {observed}")
         self.evidence["checks"]["quiet_window_no_duplicate_starts"] = True
-        self.evidence["model_turns"] = sum(counts.values())
 
     def run(self) -> dict[str, Any]:
         self._create_tasks()
         self._connect()
         self._create_and_bind_threads()
+        self._start_all_baseline_turns()
         job_id, note = self._register_jobs()
         self._start_service()
         self._wait_for_service()
-        self._start_initial_executor_turn()
         self._wait_for_manager_delivery()
-        self._verify_idle_executors_received_no_turn()
+        self._verify_baseline_only_executors()
         # Releasing EOF makes this fixture-owned, already-registered local
         # process finish.  The detached scheduler must later observe the stop
         # itself; this module does not refresh the job record on its behalf.
         self._release_blocker(self.blockers[0])
-        self._wait_for_stopped_job_delivery(job_id, note)
+        counts = self._wait_for_stopped_job_delivery(job_id, note)
+        self._verify_quiet_window(counts)
         self.evidence["status"] = "passed"
         return self.evidence
 
-    def _interrupt_active_thread(self, thread_id: str) -> None:
-        try:
-            status = self._read_status(thread_id)
-            if status != "active":
-                return
-            turns = self._thread_turns(thread_id)
-            active = next((turn for turn in turns if turn.get("status") == "inProgress"), None)
-            turn_id = active.get("id") if isinstance(active, Mapping) else None
-            if isinstance(turn_id, str) and turn_id:
-                self._request("turn/interrupt", {"threadId": thread_id, "turnId": turn_id})
-        except Exception:
-            # Cleanup continues for the other dedicated threads and records the
-            # aggregate error below.  It never guesses an unrelated turn id.
-            raise
+    def _interrupt_known_direct_turn(self, role: str, thread_id: str) -> None:
+        """Interrupt only a direct baseline turn whose ID this fixture recorded."""
+
+        status = self._read_status(thread_id)
+        if status != "active":
+            self.evidence["cleanup"]["thread_interrupt"][role] = "not_needed"
+            return
+        turn_id = self.active_direct_turns.get(role)
+        if not turn_id:
+            # A scheduler delivery may be active, but it did not reply on this
+            # stream with an ID we can safely target.  Archive still remains
+            # limited to this fixture-owned thread and its result is recorded.
+            self.evidence["cleanup"]["thread_interrupt"][role] = "not_attempted_unknown_active_turn"
+            return
+        self._request("turn/interrupt", {"threadId": thread_id, "turnId": turn_id})
+        self.evidence["cleanup"]["thread_interrupt"][role] = "interrupted_known_direct_baseline"
 
     def cleanup(self) -> list[str]:
         errors: list[str] = []
@@ -694,22 +778,15 @@ class _LiveFixture:
             try:
                 for role, thread_id in reversed(list(self.threads.items())):
                     try:
-                        if role not in self.unmaterialized_roles:
-                            self._interrupt_active_thread(thread_id)
-                        try:
-                            self._request("thread/archive", {"threadId": thread_id})
-                        except LiveProbeError as exc:
-                            if role in self.unmaterialized_roles and _is_unmaterialized_thread_error(exc):
-                                self.evidence["cleanup"]["thread_archive"][role] = "not_materialized_no_rollout"
-                                continue
-                            raise
+                        self._interrupt_known_direct_turn(role, thread_id)
+                        self._request("thread/archive", {"threadId": thread_id})
                         self.evidence["cleanup"]["thread_archive"][role] = "archived"
                     except Exception as exc:
                         thread_errors = True
                         detail = _redact(exc)
                         self.evidence["cleanup"]["thread_archive"][role] = f"failed: {detail}"
                         errors.append(f"thread cleanup ({role}): {detail}")
-                self.evidence["cleanup"]["threads"] = "partial" if thread_errors else "archived_or_not_materialized"
+                self.evidence["cleanup"]["threads"] = "partial" if thread_errors else "archived"
             finally:
                 try:
                     self.stream.close()

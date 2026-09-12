@@ -460,9 +460,9 @@ try:
 except (OSError, UnicodeDecodeError, ValueError):
     raise SystemExit(1)
 checks = data.get("checks") if isinstance(data, dict) else None
-if data.get("status") != "passed" or data.get("model_turns") != 3 or not isinstance(checks, dict):
+if data.get("status") != "passed" or data.get("model_turns") != 6 or not isinstance(checks, dict):
     raise SystemExit(1)
-if not all(checks.get(key) is True for key in ("job_delivery", "manager_delivery", "manager_is_fixture_only", "turn_budget", "quiet_window_no_duplicate_starts", "idle_executors_received_no_turn")):
+if not all(checks.get(key) is True for key in ("all_roles_baselined_before_service", "baseline_history_read_after_idle", "job_delivery", "manager_delivery", "manager_is_fixture_only", "turn_budget", "quiet_window_no_duplicate_starts", "idle_executors_received_no_turn")):
     raise SystemExit(1)
 PY
 }
@@ -482,7 +482,7 @@ run_live_delivery_probe() {
         incomplete "isolated real delivery acceptance returned invalid evidence${detail:+: $detail}"
         return 1
     fi
-    printf 'MAM proactive wakeup: isolated real delivery PASS (3 model turns)\n'
+    printf 'MAM proactive wakeup: isolated real delivery PASS (6 model turns)\n'
 }
 
 service_command() {

@@ -27,20 +27,21 @@ SOCKET = "/tmp/mam-liveprobe-test.sock"
 
 
 class FakeStdin:
-    def __init__(self, state):
+    def __init__(self, state, pid):
         self.state = state
+        self.pid = pid
         self.closed = False
 
     def close(self):
         self.closed = True
-        self.state["released"] = True
+        self.state["released_processes"].add(self.pid)
 
 
 class FakeProcess:
     def __init__(self, state, pid):
         self.state = state
         self.pid = pid
-        self.stdin = FakeStdin(state)
+        self.stdin = FakeStdin(state, pid)
 
     def poll(self):
         return 0 if self.stdin.closed else None
@@ -62,6 +63,7 @@ class FakeRuntime:
 
     def start_service(self, config, manager=None):
         self.state["operations"].append(("service-start", manager))
+        self.state["timeline"].append(("service-start", manager))
         self.state["runtime_config"] = config
         self.state["manager"] = manager
         self.state["running"] = True
@@ -85,8 +87,14 @@ class FakeRuntime:
 
     def stop_service(self, config):
         self.state["operations"].append(("service-stop", self.state.get("manager")))
+        self.state["timeline"].append(("service-stop", self.state.get("manager")))
         self.state["running"] = False
-        return {"running": False, "healthy": False, "manager": self.state.get("manager"), "pending": {"count": 0, "events": []}}
+        return {
+            "running": False,
+            "healthy": False,
+            "manager": self.state.get("manager"),
+            "pending": {"count": 0, "events": []},
+        }
 
 
 class FakeStream:
@@ -95,12 +103,17 @@ class FakeStream:
         self.closed = False
         self.turns = {thread_id: [] for thread_id in THREAD_IDS.values()}
         self.thread_starts = 0
+        self.direct_baseline_starts = 0
         self.manager_delivery_added = False
         self.job_delivery_added = False
-        self.history_not_ready = set()
+        self.history_unsupported: set[str] = set()
+        self.active_reads_remaining: dict[str, int] = {}
 
-    def _add_manager_delivery_after_baseline(self):
-        if self.manager_delivery_added or not self.turns[THREAD_IDS["job_executor"]]:
+    def _all_roles_have_baseline(self):
+        return all(self.turns[thread_id] for thread_id in THREAD_IDS.values())
+
+    def _add_manager_delivery_after_baselines(self):
+        if self.manager_delivery_added or not self.state.get("running") or not self._all_roles_have_baseline():
             return
         self.manager_delivery_added = True
         self.turns[THREAD_IDS["manager"]].append(
@@ -119,7 +132,7 @@ class FakeStream:
         )
 
     def _add_job_delivery_if_released(self):
-        if not self.state.get("released") or self.job_delivery_added:
+        if self.job_delivery_added or self.state.get("stopped_pid") not in self.state["released_processes"]:
             return
         self.job_delivery_added = True
         self.turns[THREAD_IDS["job_executor"]].append(
@@ -135,8 +148,22 @@ class FakeStream:
             }
         )
 
+    def _thread_snapshot(self, thread_id, *, include_turns):
+        remaining = self.active_reads_remaining.get(thread_id, 0)
+        if remaining:
+            self.active_reads_remaining[thread_id] = remaining - 1
+            self.state["metadata_statuses"].append((thread_id, "active"))
+            return {"thread": {"id": thread_id, "status": {"type": "active"}}}
+        self.state["metadata_statuses"].append((thread_id, "idle"))
+        thread = {"id": thread_id, "status": {"type": "idle"}}
+        if include_turns:
+            thread["turns"] = list(reversed(self.turns[thread_id]))
+        return {"thread": thread}
+
     def request(self, method, params):
-        self.state["requests"].append((method, dict(params)))
+        params = dict(params)
+        self.state["requests"].append((method, params))
+        self.state["timeline"].append((method, params.get("threadId")))
         if method == "thread/start":
             if self.state["tasks_created"] != ["job", "idle", "archived"]:
                 raise AssertionError("fixture threads were created before all tasks were registered")
@@ -144,41 +171,45 @@ class FakeStream:
                 raise AssertionError("fixture threads must be persisted")
             if params.get("model") != liveprobe.MODEL or params.get("effort") != liveprobe.EFFORT:
                 raise AssertionError("fixture thread did not select gpt-5.6-terra/max")
-            role = ("manager", "job_executor", "idle_executor", "archived_executor")[self.thread_starts]
+            role = liveprobe._ROLE_ORDER[self.thread_starts]
             self.thread_starts += 1
             return {"thread": {"id": THREAD_IDS[role], "status": {"type": "idle"}}}
+
         thread_id = params.get("threadId")
         if method == "thread/read":
-            return {"thread": {"id": thread_id, "status": {"type": "idle"}}}
+            return self._thread_snapshot(thread_id, include_turns=params.get("includeTurns") is True)
         if method == "thread/resume":
-            return {"thread": {"id": thread_id, "status": {"type": "idle"}}}
+            return self._thread_snapshot(thread_id, include_turns=False)
         if method == "thread/turns/list":
-            if thread_id in self.history_not_ready:
-                self.history_not_ready.remove(thread_id)
+            if self.active_reads_remaining.get(thread_id, 0):
+                raise AssertionError("paged history was requested before metadata became idle")
+            if thread_id in self.history_unsupported:
                 raise RuntimeError("list_turns is not supported yet")
-            if thread_id in {THREAD_IDS["idle_executor"], THREAD_IDS["archived_executor"]}:
-                raise RuntimeError(f"thread {thread_id} is not materialized yet")
             if thread_id == THREAD_IDS["manager"]:
-                self._add_manager_delivery_after_baseline()
+                self._add_manager_delivery_after_baselines()
             if thread_id == THREAD_IDS["job_executor"]:
                 self._add_job_delivery_if_released()
             return {"data": list(reversed(self.turns[thread_id]))}
         if method == "turn/start":
-            if thread_id != THREAD_IDS["job_executor"]:
-                raise AssertionError("only the baseline executor turn is direct")
+            role = liveprobe._ROLE_ORDER[self.direct_baseline_starts]
+            if thread_id != THREAD_IDS[role]:
+                raise AssertionError("direct baseline turns must use the four dedicated roles in order")
             if params.get("model") != liveprobe.MODEL or params.get("effort") != liveprobe.EFFORT:
                 raise AssertionError("baseline turn did not select gpt-5.6-terra/max")
+            marker = liveprobe._BASELINE_MARKERS[role]
+            if params.get("input") != [{"type": "text", "text": f"Reply exactly {marker}."}]:
+                raise AssertionError("baseline turn did not use its deterministic marker")
+            turn_id = f"turn-{role}-baseline"
+            self.direct_baseline_starts += 1
             self.turns[thread_id].append(
                 {
-                    "id": "turn-executor-baseline",
+                    "id": turn_id,
                     "status": "completed",
-                    "input": {"text": "Reply exactly PROBE_EXECUTOR_READY."},
-                    "output": {"text": "PROBE_EXECUTOR_READY"},
+                    "input": {"text": f"Reply exactly {marker}."},
+                    "output": {"text": marker},
                 }
             )
-            return {"turn": {"id": "turn-executor-baseline"}}
-        if method == "thread/archive" and thread_id in {THREAD_IDS["idle_executor"], THREAD_IDS["archived_executor"]}:
-            raise RuntimeError(f"no rollout found for thread id {thread_id}")
+            return {"turn": {"id": turn_id}}
         if method in {"thread/archive", "turn/interrupt"}:
             return {}
         raise AssertionError(f"unexpected App Server request: {method}")
@@ -195,8 +226,10 @@ class LiveProbeTests(unittest.TestCase):
         self.state = {
             "tasks_created": [],
             "requests": [],
+            "timeline": [],
+            "metadata_statuses": [],
             "operations": [],
-            "released": False,
+            "released_processes": set(),
             "running": False,
             "job_adds": [],
             "job_archives": [],
@@ -207,6 +240,7 @@ class LiveProbeTests(unittest.TestCase):
         self.stream = FakeStream(self.state)
         self.task_roles = iter(("job", "idle", "archived"))
         self.job_roles = iter((JOB_ID, ARCHIVED_JOB_ID))
+        self.processes = 0
 
     def tearDown(self):
         self.temporary.cleanup()
@@ -223,6 +257,8 @@ class LiveProbeTests(unittest.TestCase):
     def _job_add(self, _store, args):
         job_id = next(self.job_roles)
         self.state["job_adds"].append((args.task, args.pid, args.note, job_id))
+        if job_id == JOB_ID:
+            self.state["stopped_pid"] = args.pid
         return {"id": job_id}
 
     def _job_archive(self, _store, args):
@@ -234,35 +270,42 @@ class LiveProbeTests(unittest.TestCase):
         return {"task": args.task}
 
     def _process_factory(self, *_args, **_kwargs):
-        return FakeProcess(self.state, 4000 + len(self.state["job_adds"]))
+        pid = 4000 + self.processes
+        self.processes += 1
+        return FakeProcess(self.state, pid)
 
-    def test_fixture_uses_real_contract_shape_and_cleans_its_own_resources(self):
-        root = self.base / "fixture"
-        evidence_path = self.base / "evidence.json"
+    def _run_fixture(self, root, **kwargs):
         with mock.patch.object(liveprobe.cli, "create", side_effect=self._create), mock.patch.object(
             liveprobe.cli, "bind", side_effect=self._bind
         ), mock.patch.object(liveprobe.cli, "job_add", side_effect=self._job_add), mock.patch.object(
             liveprobe.cli, "job_archive", side_effect=self._job_archive
         ), mock.patch.object(liveprobe.cli, "archive", side_effect=self._archive):
-            result = liveprobe.run_live_delivery(
+            return liveprobe.run_live_delivery(
                 {"socket_path": SOCKET, "capabilities": {"model_requests": 0}, "diagnostics": {}},
                 root,
-                evidence_path=evidence_path,
                 runtime_module=self.runtime,
                 stream_factory=lambda _socket: self.stream,
                 process_factory=self._process_factory,
                 timeout_seconds=2,
                 sleeper=lambda _seconds: None,
+                **kwargs,
             )
 
+    def test_fixture_materializes_all_roles_before_service_and_cleans_its_own_resources(self):
+        root = self.base / "fixture"
+        evidence_path = self.base / "evidence.json"
+        result = self._run_fixture(root, evidence_path=evidence_path)
+
         self.assertEqual(result["status"], "passed")
-        self.assertEqual(result["model_turns"], 3)
-        self.assertEqual(result["cleanup"]["threads"], "archived_or_not_materialized")
+        self.assertEqual(result["model_turns"], 6)
+        self.assertEqual(result["cleanup"]["threads"], "archived")
         self.assertEqual(
             result["checks"],
             {
                 "fixture_tasks_registered_before_threads": True,
                 "executor_bound_before_first_model_turn": True,
+                "all_roles_baselined_before_service": True,
+                "baseline_history_read_after_idle": True,
                 "job_delivery": True,
                 "manager_delivery": True,
                 "manager_is_fixture_only": True,
@@ -284,41 +327,86 @@ class LiveProbeTests(unittest.TestCase):
         )
         self.assertEqual(self.state["job_adds"][0][0], TASK_IDS["job"])
         self.assertEqual(self.state["job_adds"][0][2], "liveprobe-short-job-stop")
-        self.assertTrue(self.state["released"])
-        self.assertEqual(self.state["runtime_config"].mam_root, self.base / "fixture" / "mam-state")
+        self.assertIn(self.state["stopped_pid"], self.state["released_processes"])
+        self.assertEqual(self.state["runtime_config"].mam_root, root / "mam-state")
         self.assertEqual(self.state["manager"], THREAD_IDS["manager"])
-        self.assertEqual(self.state["job_archives"], [(ARCHIVED_JOB_ID, "liveprobe fixture archived before delivery"), (JOB_ID, "liveprobe fixture cleanup")])
+        self.assertEqual(
+            self.state["job_archives"],
+            [(ARCHIVED_JOB_ID, "liveprobe fixture archived before delivery"), (JOB_ID, "liveprobe fixture cleanup")],
+        )
         self.assertEqual([task for task, _ in self.state["task_archives"]], list(TASK_IDS.values()))
+
         methods = [method for method, _ in self.state["requests"]]
         self.assertEqual(methods.count("thread/start"), 4)
-        self.assertEqual(methods.count("turn/start"), 1)
-        direct = next(params for method, params in self.state["requests"] if method == "turn/start")
-        self.assertEqual(direct["threadId"], THREAD_IDS["job_executor"])
-        self.assertEqual(direct["model"], liveprobe.MODEL)
-        self.assertEqual(direct["effort"], liveprobe.EFFORT)
-        self.assertIn(("service-start", THREAD_IDS["manager"]), self.state["operations"])
-        self.assertIn(("service-stop", THREAD_IDS["manager"]), self.state["operations"])
+        self.assertEqual(methods.count("turn/start"), 4)
+        direct = [params for method, params in self.state["requests"] if method == "turn/start"]
+        self.assertEqual([params["threadId"] for params in direct], [THREAD_IDS[role] for role in liveprobe._ROLE_ORDER])
+        for role, params in zip(liveprobe._ROLE_ORDER, direct):
+            self.assertEqual(params["model"], liveprobe.MODEL)
+            self.assertEqual(params["effort"], liveprobe.EFFORT)
+            self.assertEqual(
+                params["input"], [{"type": "text", "text": f"Reply exactly {liveprobe._BASELINE_MARKERS[role]}."}]
+            )
+
+        service_start = self.state["timeline"].index(("service-start", THREAD_IDS["manager"]))
+        direct_starts = [index for index, event in enumerate(self.state["timeline"]) if event[0] == "turn/start"]
+        self.assertEqual(len(direct_starts), 4)
+        self.assertTrue(all(index < service_start for index in direct_starts))
+        self.assertIn(("service-stop", THREAD_IDS["manager"]), self.state["timeline"])
         self.assertTrue(self.stream.closed)
         self.assertEqual(result["resources"]["threads"], THREAD_IDS)
         self.assertEqual(result["resources"]["jobs"], {"stopped": JOB_ID, "archived_before_delivery": ARCHIVED_JOB_ID})
         self.assertEqual(
-            result["resources"]["turns"],
-            {
-                "executor_baseline_started": "turn-executor-baseline",
-                "executor_baseline_completed": "turn-executor-baseline",
-                "stopped_job_delivery": "turn-job-delivery",
-                "manager_ready_delivery": "turn-manager-delivery",
-            },
+            result["turn_counts"]["before_job_stop"],
+            {"manager": 2, "job_executor": 1, "idle_executor": 1, "archived_executor": 1},
+        )
+        self.assertEqual(
+            result["turn_counts"]["after_job_stop"],
+            {"manager": 2, "job_executor": 2, "idle_executor": 1, "archived_executor": 1},
         )
         self.assertEqual(
             result["cleanup"]["thread_archive"],
-            {
-                "archived_executor": "not_materialized_no_rollout",
-                "idle_executor": "not_materialized_no_rollout",
-                "job_executor": "archived",
-                "manager": "archived",
-            },
+            {role: "archived" for role in reversed(liveprobe._ROLE_ORDER)},
         )
+        self.assertEqual(
+            result["cleanup"]["thread_interrupt"],
+            {role: "not_needed" for role in reversed(liveprobe._ROLE_ORDER)},
+        )
+        for role in liveprobe._ROLE_ORDER:
+            baseline = result["history"][f"{role}:baseline"]
+            self.assertEqual(baseline["status_before_paged_history"], "idle")
+            self.assertEqual(baseline["thread_turns_list"]["result"], "ok")
+
+    def test_active_baseline_waits_for_metadata_idle_before_paged_history(self):
+        root = self.base / "fixture-active-baseline"
+        self.stream.active_reads_remaining[THREAD_IDS["manager"]] = 1
+        result = self._run_fixture(root)
+        self.assertEqual(result["status"], "passed")
+        self.assertIn((THREAD_IDS["manager"], "active"), self.state["metadata_statuses"])
+        self.assertEqual(result["calls"]["direct_turn_start"], 4)
+
+    def test_idle_paging_unsupported_compares_include_turns_on_same_fixture_without_extra_baseline(self):
+        root = self.base / "fixture-history-unsupported"
+        evidence_path = self.base / "history-unsupported.json"
+        self.stream.history_unsupported.add(THREAD_IDS["manager"])
+        with self.assertRaisesRegex(liveprobe.LiveProbeError, r"thread/read\(includeTurns=true\) returned 1 turns"):
+            self._run_fixture(root, evidence_path=evidence_path)
+
+        self.assertFalse(root.exists())
+        methods = [method for method, _ in self.state["requests"]]
+        self.assertEqual(methods.count("turn/start"), 1)
+        include_reads = [
+            params
+            for method, params in self.state["requests"]
+            if method == "thread/read" and params.get("includeTurns") is True
+        ]
+        self.assertEqual(include_reads, [{"threadId": THREAD_IDS["manager"], "includeTurns": True}])
+        evidence = json.loads(evidence_path.read_text())
+        comparison = evidence["history"]["manager:baseline"]
+        self.assertEqual(comparison["status_before_paged_history"], "idle")
+        self.assertEqual(comparison["thread_turns_list"]["result"], "unsupported")
+        self.assertEqual(comparison["thread_read_include_turns"]["result"], "ok")
+        self.assertEqual(comparison["thread_read_include_turns"]["count"], 1)
 
     def test_failure_writes_bounded_evidence_and_removes_marker_owned_root(self):
         root = self.base / "fixture-failure"
@@ -337,26 +425,6 @@ class LiveProbeTests(unittest.TestCase):
         evidence = json.loads(evidence_path.read_text())
         self.assertEqual(evidence["status"], "failed")
         self.assertNotIn("do-not-log", json.dumps(evidence))
-
-    def test_history_materialization_delay_waits_without_a_second_direct_model_turn(self):
-        root = self.base / "fixture-history-delay"
-        self.stream.history_not_ready.add(THREAD_IDS["job_executor"])
-        with mock.patch.object(liveprobe.cli, "create", side_effect=self._create), mock.patch.object(
-            liveprobe.cli, "bind", side_effect=self._bind
-        ), mock.patch.object(liveprobe.cli, "job_add", side_effect=self._job_add), mock.patch.object(
-            liveprobe.cli, "job_archive", side_effect=self._job_archive
-        ), mock.patch.object(liveprobe.cli, "archive", side_effect=self._archive):
-            result = liveprobe.run_live_delivery(
-                {"socket_path": SOCKET},
-                root,
-                runtime_module=self.runtime,
-                stream_factory=lambda _socket: self.stream,
-                process_factory=self._process_factory,
-                timeout_seconds=2,
-                sleeper=lambda _seconds: None,
-            )
-        self.assertEqual(result["status"], "passed")
-        self.assertEqual(result["calls"]["direct_turn_start"], 1)
 
     def test_nonempty_or_symlink_fixture_root_is_refused_before_any_resource_creation(self):
         root = self.base / "not-empty"
