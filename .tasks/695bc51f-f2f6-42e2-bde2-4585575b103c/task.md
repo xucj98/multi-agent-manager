@@ -33,3 +33,12 @@ GPU0/1/6/7当前均有外部占用，2–5为本项目四路训练。此前指�
 
 ## 完成训练后的评估交接
 用户要求完成训练及时安排eval并更新实验台账。请核对各run实际结束状态；完成后验证最终20k checkpoint完整/可恢复及metadata、归档已处理训练job，并在report给出明确可评模型清单（config/schema/seed/commit/绝对checkpoint路径、研究目的、预期结论）。通过任务报告交给e6908de7评估队列，勿自行重复启动eval。仍在训练的继续保留真实状态和完成事件监控。无需为没有变化的等待窗口改报告或发心跳；任务全部交付后结束turn，不为已完成事项持续wait。
+
+
+## MAM proactive wake is installed (2026-09-12 18:35 CST)
+
+The installed version now passed all191 source tests, optional wait compatibility, API compatibility and the isolated six-turn actual delivery acceptance. The production per-project service is healthy and bound to the Manager. This section supersedes all earlier requirements to remain active solely for monitoring or to poll hourly.
+
+Finish currently executable work and publish actual results/status, then end turn normally while registered long jobs continue. MAM wakes a dormant executor for any stopped unarchived job, even when other jobs are running. Handle results/cleanup/archive according to this task, and end again when no immediate work remains. A running-only task does not need a standing active turn. Do not stop experiments or archive running training/eval jobs merely to end your turn. Manager receives completed/no-job task follow-up after review routing.
+
+Optional `mam wait`, `mam wait list`, and `mam wait stop` are retained for a concrete need to wait within a turn. Do not produce unchanged waiting updates or start a custom loop to keep the turn alive. Existing experiment protocol, rollout checks, artifact paths and resource authorizations are unchanged. If a queued next run can be started now, continue that work before ending; automatic wake does not replace executing the queue.
