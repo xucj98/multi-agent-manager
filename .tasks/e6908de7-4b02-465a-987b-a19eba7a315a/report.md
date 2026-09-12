@@ -687,3 +687,32 @@ MAM `c492ec19-772d-403b-a7d0-052c2b5c9c42`（C1 GPU1，`c_rearrange_no_memory_tr
 安全 docs tree `task/e6908de7-r2-running-ledger` 提交 `db4fd88661ca0bf804b33c9e9c4d96cbff32205e`（`docs: queue put-back B checkpoints for C eval`）：将第二批 B 从过时的6项训练快照更新为10项，列出六个精确 checkpoint、传输状态和每 checkpoint eval0/1/2 smoke2→formal100 队列；顶层概述和覆盖表均不把未传/未评项填0。`git diff --check`通过，docs tree干净；活跃 C runtime 未变。
 
 C2/C3 的六项 episode-22 EOF partial继续保留为 not reportable、不自动重试，诊断已交 task `923ea224` / agent `01a09231`；本轮不从 renderer/Warp stderr推断根因或改活跃命令。实时MAM表中的健康 C1 六项 formal保持运行，未被传输或台账工作影响。后续 transfer/formal stopped 事件由 MAM 主动唤醒处理。
+
+## 2026-09-12 21:41 CST：r3 renderer 部署、传输收尾与门禁缺口
+
+已按最新授权建立独立 C runtime：
+`/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c-eval-renderer-r3`。三库实际 HEAD 为 RMBench
+`77477931bee18c2476bea36b400ab45dc67d9ebe`、bridge
+`f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI
+`a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`；均用 C `.local/create_worktree.sh` 创建，三树 tracked clean。候选以仅含
+`9d8f478..7747793` 的 bundle 经既有 `wuwen-nx-aic → wuwen-4090-aic` 路径导入，SHA-256
+`f2f6e9e83ff2880a524e681054073c86ddb26781a6e9f6f6147acda68da91303`；导入后本地与 C 端临时 bundle 已清理，C stable object/ref 保留。
+
+部署核对确认 `7747793` 父链为 `9d8f478 → eba81b4 → 7747793`；C runtime 的
+`envs/_base_task.py` 含 `_PROCESS_RENDERER` guard，`9d8f478..eba81b4` 的 patch-id
+`0c5fba6bd94eea3eb7f8ff82f72f6101f4de5eea` 与历史 `17b55bf` 相同。`git diff --check` 通过，候选
+`RendererLifecycleSourceTest` 两项 CPU AST 测试通过。标准 `worktree_env_smoke.py` 强制 Torch CUDA 可用，故在
+`CUDA_VISIBLE_DEVICES=''` 下按设计退出；没有将其算作 r3 失败，也没有在被占卡上重跑或创建 GPU 进程。
+
+C2 与 C3 当前均无实际空卡，尚未启动 40-reset、smoke 或 r3 formal，r2 健康 C1 jobs/runtime 完全未改。历史 40-reset
+receipt 保留的精确调用合同是固定物理卡映射到 `cuda:0`、系统 ICD、连续 seed `100000–100039`、无 policy/result leaf；但其
+脚本 `/mnt/public/xcj/Projects/state-vla/workspace/2a879870-8dda-4613-a684-0ad48a5e86be/records/rmbench_renderer_reset_gate.py`
+（历史 SHA-256 `c2ebcbc5c781297d63a9771fa60428e8a117ab92d7ce51114a111122a4753bd2`）随已归档 worktree 清理。C1/C2/C3 和当前 r3
+源码均无该文件或公共替代入口。按本 task 明确的“复用既有 harness、不得另造框架”边界，未根据 receipt 重写平行 harness；恢复一个经批准的原 harness 前，C2/C3 host gate 保持 pending。
+
+已收尾 stopped transfer `fe659917-4a05-4190-a9b1-a22824e09e43`：put-back serial-lag30/train seed1 的源/目标
+`_CHECKPOINT_METADATA` SHA-256 均为 `3eb0cf905927657e99f019be888f0a0f196d26690f28378cce0272fe4cb5ecd5`、61 个普通文件，独立
+`rsync -aicn --delete --omit-dir-times` 为零差异，MAM 已归档。安全台账树
+`task/e6908de7-r2-running-ledger` 的可集成提交为
+`81e815d98d6a198b3f99d1b11bb847f681b6c191`：主表将 put-back s0/s1 四项改为实际 C-ready，保留六项 r2 partial 的
+not-reportable 原始证据，并标明各 host r3 gate 通过后以新 leaf 重跑。
