@@ -31,3 +31,8 @@ Manager已读9de0262报告/源码/证据，接受C1/C2暂无可靠在线映射�
 C1/C2暂不部署猜测性wrapper；将最小平台支持复现说明准备为简短文本，含主机名/driver版本、默认命令、实测异常和C3对照、希望平台提供的实例内PID可见性支持，不发送给平台（用户尚未授权对外联系）。如果平台官方文档无法直接核实，不把该平台架构限制写成绝对事实。
 
 发布增量report：C3真实nvitop显示样本/入口/版本/卸载方式、C1/C2未修复边界、平台复现文本位置。删除无部署用途的重复临时probe/cache，保留最小证据即可。当前任务在这一步后再由Manager收尾。
+
+## Manager最终复核纠正：C3原入口正常，移除重复安装
+Manager在C3执行bash -lc登录shell后，command -v nvitop=/root/.local/bin/nvitop，原pipx版1.7.1执行nvitop --once --readonly --compute --only 0已经正确显示PID1032416/1032527、root、CPU数值、命令，01:40:22快照通过。此前非登录SSH shell的command -v空值不能证明未安装，需要在report明确纠正。无需保留重复的nvitop-c3。
+
+请只清理本任务新建的/root/.local/bin/nvitop-c3与/root/.local/share/venvs/nvitop-c3：先核验link目标/所有权路径，保留原/root/.local/bin/nvitop及pipx环境，复验原nvitop在登录shell正常显示compute和graphics。修改最终report为C3原工具可用、本任务未修复其底层；C1/C2仍未修复，需要平台支持。保留evidence和平台复现草稿（不外发），移到本任务MAM_ROOT/.tasks/2f6ec567-e628-46ba-94ff-ac97daa009cb下、更新报告链接，可将这两个明确文件按路径单独commit到管理分支，不触碰用户dirty文档。清空自己workspace后publish最终report，供Manager归档。
