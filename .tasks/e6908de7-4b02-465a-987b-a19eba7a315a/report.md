@@ -299,3 +299,22 @@ t+30/s1 **63/100**。四项均为100连续 seed、0 runtime error、全部 termi
 按既定 endpoint/seed 队列，C3 已运行 put-back s2 t+1/t+30（`d8f6e15c`、`f09cf37d`），C2 已运行
 rearrange s2 t+1/t+30（`f677b217`、`81a085f9`）。每个新 checkpoint 均先完成 prepare-audit、错开冷启动的
 video/no-video smoke2 和 90 秒首推理检查后才转 formal；没有依据首批成绩筛选后续模型。
+
+## 2026-09-12 08:56 C 台账一致性修正
+
+安全 docs worktree
+`/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-ledger`
+提交 `4ce7e47a9037c823b916c6959cac8d6f3448e236`，只更新
+`experiments/memory_chunk_20260910/EXPERIMENT_LEDGER.zh-CN.md`。它将首批 C 四项已完成 formal 从队列表的
+旧“运行中”直接改为最终状态：put-back t+30/s0 70/100、rearrange t+30/s0 90/100、put-back t+1/s1
+47/100、put-back t+30/s1 63/100；每行包含正常任务失败分类、0 runtime error、100 条 terminal、已归档 MAM
+job 和主 RMBench 稳定 `diagnostics_summary.json` 链接。
+
+同步更新 Q2 主表、已完成正式结果概述和总览为 6 份完整100、4 份 seed2 formal 运行中、4 份 C checkpoint
+待接续。历史 30 秒失败 leaf 仍作为证据保留，但不再与已完成 C 结果并列成当前失败。文本明确不同训练 seed/
+checkpoint 的数值差异不是同 checkpoint 复现误差；仅同任务、同训练 seed 的完整配对才可用于后续 Q2 受控比较。
+
+验证：`git diff --check` 通过；四条新增稳定结果链接均解析到
+`/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/` 下存在的原始结果文件。docs worktree
+提交后干净；未修改 C 冻结 eval tree、checkpoint、GPU job 或机器人。四个 seed2 formal 保持原样，下一步直接
+以 `mam wait` 等待其完成事件。
