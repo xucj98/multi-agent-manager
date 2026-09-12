@@ -39,11 +39,22 @@ PROJECT_ROOT/
 | `mam task create --title TITLE` | Manager | 生成 `TASK-ID`，登记任务，创建 task.md、report.md 草稿和空 workspace；返回 `TASK-ID` 与文件、目录路径，状态为“进行中” |
 | `mam task create --title TITLE --review TARGET-TASK-ID` | Manager | 创建任务，并在任务草稿中引用源 `TASK-ID` 当前已发布的要求、简报及已登记的交付代码 commit，供执行者 review |
 | `mam task bind TASK-ID --agent AGENT-ID` | Manager | 将已启动的 subagent 绑定到任务；一个未归档任务对应一个执行 agent，一个 agent 同时绑定一个任务 |
+| `mam task rebind TASK-ID --agent AGENT-ID --note NOTE` | Manager | 将已有执行者已停止接续的未归档任务交接给一个已确认 dormant 的新 agent；保留原 `TASK-ID`、workspace、worktree、job 和发布记录，并写入最小交接审计 |
 | `mam workspace add TASK-ID --repo REPO --base COMMIT` | 执行者 | 从 `PROJECT_ROOT/REPO` 调用该库的 `.local/create_worktree.sh`，从 base commit 新建 `task/TASK-ID` 分支及对应 `PROJECT_ROOT/workspace` worktree，同时创建环境和受控共享软链接；登记并返回路径与分支名 |
 
 `REPO` 不使用固定注册表，而是 `PROJECT_ROOT` 下非空的单层目录名；绝对路径、`.`、`..`、正反斜杠和其他路径逃逸形式都会被拒绝。MAM 仍会确认该目录是 primary Git checkout，并要求其中存在非软链接的 `.local/create_worktree.sh`。涉及哪些库及其 base commit 由任务说明确定，每个库分别调用 workspace add。具体安装和软链接规则由各库脚本负责。同一任务在不同库使用同名 `task/TASK-ID` 分支。
 
 MAM 自身的 `scripts/create_worktree.sh` 在源 MAM 根存在 `.local/README.md` 时，才会在新 worktree 建立指向它的单文件 `.local/README.md` 软链接；不会共享整个 `.local`。源文件缺失或目标已有文件时仍可创建 worktree，且不会覆盖目标。归档只将目录内仅有、且精确指向 primary MAM 根该 README 的链接视为已知忽略内容，其他 `.local` 内容仍会阻止删除。
+
+### 执行者交接
+
+`rebind` 是已有任务的受控交接，不能替代初次 `bind`，后者保持原有行为。调用者的 `CODEX_THREAD_ID` 必须等于项目已记录的 Manager；没有已记录 Manager、调用者不匹配、目标是 Manager、目标已绑定其他未归档任务、原任务已归档或尚未绑定执行者都会明确拒绝。`--note` 是必填的简短交接理由。
+
+Manager 应先协调旧执行者停止接续；新执行者可以先只读 `task show`、`report` 与原 workspace，但也要在交接前结束当前 turn。换绑时以只读 App Server `thread/read` 确认旧执行者和目标分别为 `idle` 或可查询的 `notLoaded`；`active`、unknown、systemError、无效身份或无法联系都不是 idle，操作会拒绝并给出处理提示。`notLoaded` 不会因此调用 `thread/resume`。另外，换绑会在旧/新 agent 的 optional-wait 登记锁中核验其进程身份；存在 running wait 或无法核验的 wait 同样拒绝。这个快照不能阻止外部客户端在随后另开旧线程 turn，因此交接仍依赖 Manager 让旧执行者停止接续，MAM 不改写 Codex parent 或 UI 元数据。
+
+成功时只替换任务记录的 `agent`，并向 `handoffs` 追加 `{from_agent, to_agent, at, note, manager}`。原 task/report、publication、workspace、仓库路径和分支、job 的 ID/PID/identity/观测/归档历史以及 review 关系都不复制、移动、重建、重启或归档；新执行者接续原 workspace，不再次运行同一任务的 `workspace add`。若同一 Manager 因丢失 CLI 响应以同一目标重试，`rebind` 返回 `unchanged`，不重新探测、不改写登记也不追加审计；目标已在其他活跃任务中的冲突仍会拒绝。
+
+换绑持锁顺序固定为 `service-start → service-cycle → bindings → TASK-ID → 按 agent 排序的 wait-*`。scheduler 的完整 cycle 在前两个锁内运行，因而不能在旧执行者最终状态核验和绑定落盘之间投递；`wait stop manager` 使用其已有的 `bindings → wait-*` 顺序，不会与交接反向等待。交接不清空 service state、history 或队列：下一轮 scheduler 通过现有 task agent/currentness 检查将旧收件人的 pending、accepted 或 uncertain 待办标记为陈旧并移入历史，之后同一 stopped job 按新执行者投递；review 和 Manager 路由随任务当前 agent 重新计算。
 
 ## 编辑、发布与查看
 
@@ -60,7 +71,7 @@ MAM 自身的 `scripts/create_worktree.sh` 在源 MAM 根存在 `.local/README.m
 
 ## 长任务进程
 
-job 指执行者登记的一个长时间运行的进程。预计运行超过 1 小时的程序（如正式数据生成、训练、评估）通过 `mam job add` 登记，通常的短 smoke 无需登记。同一执行者可为自己的任务登记多个进程，每条登记记录生成一个 `JOB-ID`，并关联所属任务，以便 Manager 找到对应执行者。
+job 指执行者登记的一个长时间运行的进程。预计运行超过 30 分钟的程序（如正式数据生成、训练、评估）通过 `mam job add` 登记，通常的短 smoke 无需登记。同一执行者可为自己的任务登记多个进程，每条登记记录生成一个 `JOB-ID`，并关联所属任务，以便 Manager 找到对应执行者。
 
 job 状态为“进行中／已停止／已归档”：查询确认进程结束后变为“已停止”，表示尚待执行者处理；job archive 可在 running、stopped 或 unknown/待核实观测下标记“已归档”，只结束 MAM 跟踪，不停止进程。
 
@@ -82,7 +93,7 @@ job archive 只记录归档结论，不删除 workspace，也不要求进程已�
 
 ## 状态展示
 
-`task status` 是对登记的轻量展示，不改变存储记录，也不探测进程。它保留任务的 `id`、标题、状态、agent 和 workspace；每个仓库保留路径、分支、状态、必要的 base 与交付 commit。`publications` 中可显示 task.md 和 report.md 各自最后一次发布的 Git commit。
+`task status` 是对登记的轻量展示，不改变存储记录，也不探测进程。它保留任务的 `id`、标题、状态、agent 和 workspace；每个仓库保留路径、分支、状态、必要的 base 与交付 commit。`publications` 中可显示 task.md 和 report.md 各自最后一次发布的 Git commit。发生执行者交接时，`handoffs` 以最小审计项展示旧/新 agent、时间、note 和 Manager 调用者。
 
 未归档 job 位于 `jobs.unarchived`，每项只含 `id`、`note`、`status` 和 `checked_at`；`jobs.cached` 明确这些是已保存的观测，已归档 job 只给出 `archived_count`。有未发布改动时才显示 `drafts`。任务归档或出错时保留归档结论或失败原因；review 任务保留源任务和成果代码 commit 引用。旧登记中不再使用的字段在读取时忽略，无需迁移。空值及正常的 false 清理标记可省略。
 

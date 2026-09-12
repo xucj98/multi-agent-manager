@@ -61,6 +61,20 @@ def _service_start_lock(store: Store):
         yield
 
 
+@contextlib.contextmanager
+def task_rebind_lock(store: Store, task: str):
+    """Serialize a task handoff with every scheduler delivery edge.
+
+    Keep this lock order aligned with :meth:`WakeScheduler.run_once`: service
+    startup/cycle coordination comes before the global binding registry and
+    then the individual task.  Optional-wait locks, when a caller needs them,
+    are acquired only after this context.
+    """
+
+    with _service_start_lock(store), store.lock("service-cycle"), store.lock("bindings"), store.lock(task):
+        yield
+
+
 def _timestamp() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
 

@@ -10,7 +10,7 @@ MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspac
 
 MAM 使用共享根目录 `MAM_ROOT`：Manager 编辑其中的 `task.md`，执行者编辑自己的 `report.md`。任务和报告通过 `mam task publish` 发布，并使用 `mam task show` 查看，未发布的修改是草稿。
 
-MAM 的任务 TASK-ID 和执行者 AGENT-ID 一一绑定。每个执行者有自己独立的 workspace `PROJECT_ROOT/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。`mam` 需在 `PROJECT_ROOT` 或其各级子目录中使用。
+MAM 的未归档任务 TASK-ID 和当前执行者 AGENT-ID 一一绑定。每个执行者有自己独立的 workspace `PROJECT_ROOT/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。`mam` 需在 `PROJECT_ROOT` 或其各级子目录中使用。
 
 ```text
 PROJECT_ROOT/
@@ -35,11 +35,13 @@ Manager 创建任务、填写任务要求并发布，再绑定执行 agent，age
 mam task create --title TITLE [--review TARGET-TASK-ID]
 mam task publish TASK-ID --file task
 mam task bind TASK-ID --agent AGENT-ID
+mam task rebind TASK-ID --agent AGENT-ID --note NOTE
 mam task archive TASK-ID --note NOTE
 ```
 
 - `create` 返回 `TASK-ID`；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求；然后发布任务。
 - 使用 codex 工具创建 subagent，要求其查看 `AGENTS.md` 并使用 `mam task show TASK-ID` 查看任务；获取 `AGENT-ID`，绑定执行 agent。
+- 需要交接已有任务时，Manager 先让旧执行者和新执行者结束当前 turn；新执行者可先只读查看已发布内容，再用 `rebind` 接续原 `TASK-ID`、workspace、worktree 和 job。不要为交接后的 agent 再次运行 `workspace add`。
 - 途中追加要求时，先更新 `task.md` 并发布，再通知执行者读取新版本。
 - Review 任务使用 `--review` 接收源任务的 `TASK-ID`。
 
