@@ -779,3 +779,47 @@ r3 的 C2/C3 独立 runtime 再次核对为 RMBench 77477931bee18c2476bea36b400a
 - `git diff --check`通过，分支/worktree干净；没有合入或修改活跃 runtime。
 
 当前状态必须区分：r3 三库环境已经部署且 renderer 静态/CPU检查通过；最小 gate 工具的 CPU验证已完成但尚待独立review和同步；C2/C3 GPU gate 仍因无实际空卡 pending；r2 的上述两项和既有完整 leaf 是有效正式结果，但整套三-seed队列及 r3 正式评测尚未完成。六项 C2/C3 EOF partial 仍 not reportable，未重试。本 task 当前没有未归档 job。
+
+## 2026-09-12 23:38 CST：C1 r3 已接续；C3 40-reset 的启动前解释器修复待聚焦复核
+
+C1/C3 均按最新低占用卡标准复核。C1 GPU1–7 在启动前有约24,211 MiB free、0% util；实测单个
+sim+policy 高峰约17.1 GiB used，故 GPU1/2/3 具备余量。没有终止外部进程或改动 r2 runtime、checkpoint、
+机器人或 Warp 设置。C3 GPU0–3 各约24,080 MiB free、0% util；C3 r3 runtime 已实读为干净的
+RMBench `bf34743334efc98440fa9b05e3f2f05e8303846a`、bridge
+`f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI
+`a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，并确认
+`envs/_base_task.py` 的 `_PROCESS_RENDERER` 复用补丁存在。
+
+C1 的 `rearrange_serial_lag30 / trainseed1` 新 r3 matching smoke 均完成基础设施门禁：
+
+| C1 card / eval seed | smoke evidence | formal100 MAM job |
+| --- | --- | --- |
+| GPU1 / eval1 | `c_rearrange_serial_lag30_trainseed1_evalseed1_smoke2_r3`：completed、2/2 accepted、episode0 video 700 frames 可读、episode1 no-video、两个 scheduler exit 0、零 worker infrastructure marker；任务正常失败 `button_not_pressed` 0/2 不阻断门禁 | `d626a209-7b69-4042-9427-3c73be8efe0d`，`c_rearrange_serial_lag30_trainseed1_evalseed1_100ep_r3`，已登记 running |
+| GPU2 / eval2 | `c_rearrange_serial_lag30_trainseed1_evalseed2_smoke2_r3`：同样 completed、2/2 accepted、video/no-video、两个 scheduler exit 0、零 infrastructure marker；0/2 正常 `button_not_pressed` | `71767977-6cda-461f-9a7a-6e8537c53e4d`，`c_rearrange_serial_lag30_trainseed1_evalseed2_100ep_r3`，已登记 running |
+
+两项 formal 都引用各自同 checkpoint、同 train/eval seed 的 smoke，使用 bf3474/f962663/a869498、端口
+19410/19412 与19420/19422；smoke MAM jobs 已验收归档。GPU1 已完成最初两个 terminal episode，GPU2仍在
+错峰的服务冷启动阶段，尚无正式分数或50条诊断。
+
+C3 首次 `renderer_reset_gate_c3_gpu0_r3_bf3474` 没有执行任何 reset：receipt
+`completed_count=0`，在 `get_metadata` 前失败，worker stderr 的首因是
+`ModuleNotFoundError: No module named 'numpy'`。根因是 gate 在
+`script/renderer_reset_gate.py` 对 `RMBench/.venv/bin/python` 调用 `Path.resolve()`，解析虚拟环境
+symlink 到共享 base interpreter，丢失虚拟环境 site-packages；这不是 renderer EOF/reset 失败，也不能作为
+40-reset 结果。
+
+最小修复已在独立且干净的 worktree
+`/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r3-lifecycle-gate`
+提交为 **`2e9677ce8ec9f623395184f63f32ddafa66e5e44`**：仅以
+`Path(os.path.abspath(...))` 保留虚拟环境解释器 symlink，并加一条 symlink 回归测试。验证均通过：
+
+```text
+python3 tests/test_renderer_reset_gate.py          3 passed
+python3 tests/test_renderer_lifecycle.py           2 passed
+/root/.local/bin/python3.10 tests/test_renderer_reset_gate.py    3 passed
+/root/.local/bin/python3.10 tests/test_renderer_lifecycle.py     2 passed
+/root/.local/bin/python3.10 -m py_compile script/renderer_reset_gate.py
+git diff --check
+```
+
+这是 bf3474 已获通过后的新运行时发现，原独立 review 不覆盖它。按任务要求，**尚未将2e9677c同步到C3，未重跑 gate**；请安排该窄修复的独立复核。复核通过后，C3 GPU0 仍有约24 GiB free，可先运行新的固定40-reset，再按已有授权接续 matching smoke→fresh formal100。原失败 receipt、worker stderr 和 outer log 原位保留。
