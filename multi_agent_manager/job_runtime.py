@@ -477,6 +477,45 @@ class AppServerEventStream:
                     thread = {**thread, "status": current_status}
         return {**snapshot, "thread": {**thread, "turns": turns}}
 
+    def read(self, thread_id: str) -> Any:
+        """Read only current thread metadata after a targeted resume."""
+
+        return self.request("thread/read", {"threadId": thread_id, "includeTurns": False})
+
+    def latest_turn(self, thread_id: str) -> Mapping[str, Any] | None:
+        """Return one metadata-only newest turn for delivery reconciliation.
+
+        This is intentionally a per-recipient operation.  Monitoring itself
+        never pages a thread's history or invokes this method in bulk.
+        """
+
+        page = self.request(
+            "thread/turns/list",
+            {"threadId": thread_id, "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded"},
+        )
+        if not isinstance(page, Mapping) or not isinstance(page.get("data"), list):
+            raise AppServerEventError("App Server thread/turns/list returned no turns page")
+        if not page["data"]:
+            return None
+        turn = page["data"][0]
+        if not isinstance(turn, Mapping):
+            raise AppServerEventError("App Server thread/turns/list returned an invalid turn")
+        return turn
+
+    def start_turn(self, thread_id: str, text: str) -> Any:
+        """Start one input turn on an already-resumed existing thread.
+
+        The caller supplies no model, effort, cwd, sandbox, or workspace
+        override.  ``thread/resume`` is deliberately separate so a scheduler
+        can prove the recipient remains idle immediately before this request.
+        """
+
+        if not isinstance(thread_id, str) or not thread_id:
+            raise AppServerEventError("App Server turn/start requires a thread id")
+        if not isinstance(text, str) or not text:
+            raise AppServerEventError("App Server turn/start requires non-empty text")
+        return self.request("turn/start", {"threadId": thread_id, "input": [{"type": "text", "text": text}]})
+
     def poll(self, timeout: float | None) -> dict[str, Any] | None:
         if self._events:
             return self._events.popleft()
