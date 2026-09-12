@@ -3,7 +3,11 @@
 交付代码位于 `task/e7183b34-6d86-4394-ada8-675f54b56c42`：
 
 - Runtime 组合提交：`9b7c2b2`、`dec9a09`。
-- 安装器/兼容性/liveprobe：`9d753d7`、`59729b1`、`f5d22d2`、`322e7af`。
+- 安装器/兼容性/liveprobe：`9d753d7`、`59729b1`、`f5d22d2`、`322e7af`、`8ad4220`。
+
+最后一个 clean-checkout 集成修复 `8ad4220` 让安装器的 `run_tests()` 在仅用于测试的子 shell 中将当前 checkout 置于 `PYTHONPATH` 首位。这样测试父进程和由 `start_service()`/`_spawn_service()` 启动、且 cwd 已切到 fixture `MAM_ROOT` 的 detached daemon 都导入当前源码；这项环境设置不会进入后续 pipx 安装或生产 service 命令。
+
+新增回归创建无 checkout `.venv`、无 editable install 的临时 Git checkout，并使用 site-packages 中带旧 `multi_agent_manager` 的解释器。它运行安装器的实际测试阶段和真实 fresh-project detached daemon，确认 child 未执行旧包 marker 且可 ready/stop。修复前同一场景稳定得到 `detached service did not signal verified startup readiness`；修复后通过。
 
 `liveprobe` 现在在启动 fixture service 前，依次为 Manager、stopped-job executor、no-job executor、archived-job executor 创建并绑定正常 persisted thread，然后各完成一个短 baseline。新 thread 在首个 user turn 前会拒绝 `thread/resume`；因此代码在成功 `turn/start` 后立即订阅同一 thread，等待该 turn 的 `turn/completed`，再确认 `thread/read` 为 idle，最后才分页读取历史。这样不会在 active baseline 上轮询历史。
 
@@ -11,8 +15,8 @@
 
 验证通过：
 
-- `.venv/bin/python -B -m unittest discover -s tests -v`：108 passed。
-- `bash -n scripts/install.sh`、`py_compile`、`git diff --check`：通过。
+- `.venv/bin/python -B -m unittest discover -s tests -q`：109 passed（67.866 秒），包括新增 clean-checkout daemon-source-import 回归。
+- 该回归单独运行：通过；`bash -n scripts/install.sh`、`py_compile`、`git diff --check`：通过。
 - 真实隔离验收：`wake_compat` 对随机未知 thread 的 `thread/read`、`thread/resume`、`thread/turns/list`、`turn/start` 均获明确拒绝，`model_requests=0`；随后 liveprobe 返回 `PASS`，`model turns: 6/6`。
 
 真实 fixture receipt（全部为本任务创建的专用资源）：
@@ -26,6 +30,6 @@
 
 Fixture task IDs：job `49567f34-f948-491f-9c41-7e48e165fc6d`、idle `1e8f384e-c8a8-4421-9b94-39968c90e7dd`、archived `f0e7ed1d-83cc-4abb-b5de-785f9670e64e`。其 stopped job 为 `dafb30c1-6bbd-4ede-8560-78ece113fd44`，预先 archived job 为 `e76a294a-a864-4061-b921-1821ebeb76cb`。历史计数在 stopped job 前为 `{manager: 2, job_executor: 1, idle_executor: 1, archived_executor: 1}`，之后及两个 quiet window 均为 `{manager: 2, job_executor: 2, idle_executor: 1, archived_executor: 1}`。这确认了两条准确投递、idle/archived executor 未收到 scheduler turn，以及无重复 start。
 
-清理完成：fixture service 已停止；两个 fixture job 和三个 fixture task 已归档；四个上表 persisted thread 均已 archive；marker-owned fixture 根已删除。未安装到全局、未启动/停止生产 service，未改动生产任务、用户 thread、远端任务或 GPU。
+清理完成：fixture service 已停止；两个 fixture job 和三个 fixture task 已归档；四个上表 persisted thread 均已 archive；marker-owned fixture 根已删除。此次 clean-checkout 回归的临时 checkout、旧包解释器和 fresh daemon 均在测试结束时删除/停止。未安装到全局、未启动/停止生产 service，未改动生产任务、用户 thread、远端任务或 GPU；按本次 CPU setup 修复要求，未重跑真实 6-turn liveprobe。
 
 必要的历史清理收据：早期 ephemeral 尝试的已记录 baseline turn 为 `01a09498-344a-78c0-a6f6-718270589652`，唯一在原 stream 关闭后可确认的 thread ID 为 `01a09498-2cfc-7da1-a26a-a313733c2e23`；仅带 turn ID 的 interrupt 被 API 以缺少 `threadId` 拒绝，其他三个 ephemeral ID 未被旧实现保存，不能通过 API 安全重建，未对其猜测操作。随后两个失败的 persisted fixture 在 baseline 前/期间遇到 API 时序限制：已知 Manager turn `01a094c8-13ef-7921-a22f-26dabc2230a0` 被仅针对该已知 ID interrupt 后 archive；其余未 materialize thread，以及零模型 resume 失败 fixture 的四个 thread，archive 均明确返回 `no rollout found`。这些 API 无法确认的未 materialize IDs 没有被 unarchive、resume 或再次操作。最终通过 fixture 的全部资源已有明确 archive 回执。
