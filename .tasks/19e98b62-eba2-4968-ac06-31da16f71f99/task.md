@@ -13,3 +13,6 @@
 登记mam job，确认真实PID/设备/初始finite loss后报告。完成时核对最终metadata/全部参数shape BF16 finite、checkpoint-only恢复、退出和资源回收，归档job。用独立RMBench文档worktree新增本组说明或更新已有wash训练表：研究目的、预期结论、config/seed/commit、checkpoint链接、实际运行/完成状态；与e690的EXPERIMENT_LEDGER避免并发写冲突，优先新增README_wash_seed_repeats.zh-CN.md供Manager合并导航。
 交付模型给Manager安排同一固定5episode offline回放；不得对wash运行RMBench仿真100，不操作真实机器人或内网Policy Manager，不自行部署。保持原训练数据筛选与offline可比协议。
 训练运行时mam wait实际await完成事件，无变化不汇报/不写等待窗口报告。未结束的训练由本执行者负责，全部交付后结束turn，临时文件自行清理，保留worktree供Manager归档。
+
+## Manager GPU release authorization (2026-09-12 14:02 CST)
+7ae41311 has published final verification for serial seed1/seed2: jobs aa6d7690 and 68ecba3b archived, original GPU2/3 PIDs gone. You may now start the previously planned full seed2 on local GPU2 and serial seed2 on local GPU3 after one immediate actual-free check; no takeover of unrelated new occupancy. Keep seed1 and all prior constraints.
