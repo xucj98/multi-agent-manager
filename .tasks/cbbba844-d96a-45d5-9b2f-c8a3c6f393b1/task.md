@@ -20,3 +20,12 @@
 
 ## 启动验收后的等待交接确认
 Manager已验收6条实际启动/step100/设备映射，当前无需新检查或重复报告。仍由你负责这6条训练停止后的产物验证和eval交接；保持mam wait实际await，等待工具返回事件后处理，不是在后台启动wait后直接结束turn。无变化不汇报、不刷新报告，固定超时后直接重新wait。只有任务真实完成或Manager明确交接时才结束turn。
+
+
+## MAM proactive wake is installed (2026-09-12 18:35 CST)
+
+The installed version now passed all191 source tests, optional wait compatibility, API compatibility and the isolated six-turn actual delivery acceptance. The production per-project service is healthy and bound to the Manager. This section supersedes all earlier requirements to remain active solely for monitoring or to poll hourly.
+
+Finish currently executable work and publish actual results/status, then end turn normally while registered long jobs continue. MAM wakes a dormant executor for any stopped unarchived job, even when other jobs are running. Handle results/cleanup/archive according to this task, and end again when no immediate work remains. A running-only task does not need a standing active turn. Do not stop experiments or archive running training/eval jobs merely to end your turn. Manager receives completed/no-job task follow-up after review routing.
+
+Optional `mam wait`, `mam wait list`, and `mam wait stop` are retained for a concrete need to wait within a turn. Do not produce unchanged waiting updates or start a custom loop to keep the turn alive. Existing experiment protocol, rollout checks, artifact paths and resource authorizations are unchanged. If a queued next run can be started now, continue that work before ending; automatic wake does not replace executing the queue.
