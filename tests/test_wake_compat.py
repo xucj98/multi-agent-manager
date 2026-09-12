@@ -508,9 +508,13 @@ run_live_delivery_probe() {
 }
 '''
 
-    def run_installer(self, *, probe_stubs: bool = True, **overrides: str) -> subprocess.CompletedProcess[str]:
-        environment = {
-            **os.environ,
+    def _fixture_environment(self, overrides: dict[str, str]) -> dict[str, str]:
+        environment = dict(os.environ)
+        # Test defaults must not inherit the real installer's optional Manager
+        # selection.  Individual tests supply it explicitly when exercising
+        # the final service-start path.
+        environment.pop("MAM_SERVICE_MANAGER", None)
+        environment.update({
             "HOME": str(self.home),
             "PIPX_HOME": str(self.pipx_home),
             "PATH": f"{self.fake_bin}:{os.environ['PATH']}",
@@ -519,8 +523,12 @@ run_live_delivery_probe() {
             "FAKE_MAM": str(self.fake_mam),
             "FAKE_EXPECT_PROJECT": str(self.project),
             "FAKE_MANAGER": MANAGER,
-            **overrides,
-        }
+        })
+        environment.update(overrides)
+        return environment
+
+    def run_installer(self, *, probe_stubs: bool = True, **overrides: str) -> subprocess.CompletedProcess[str]:
+        environment = self._fixture_environment(overrides)
         command = 'source "$1"\nrun_tests() { :; }\n'
         if probe_stubs:
             command += self._probe_stubs()
@@ -538,18 +546,7 @@ run_live_delivery_probe() {
     def run_checkout_tests(self, **overrides: str) -> subprocess.CompletedProcess[str]:
         """Run the installer's pre-pipx test phase against the fixture checkout."""
 
-        environment = {
-            **os.environ,
-            "HOME": str(self.home),
-            "PIPX_HOME": str(self.pipx_home),
-            "PATH": f"{self.fake_bin}:{os.environ['PATH']}",
-            "FAKE_LOG": str(self.log),
-            "FAKE_STATE": str(self.state),
-            "FAKE_MAM": str(self.fake_mam),
-            "FAKE_EXPECT_PROJECT": str(self.project),
-            "FAKE_MANAGER": MANAGER,
-            **overrides,
-        }
+        environment = self._fixture_environment(overrides)
         command = 'source "$1"\nCHECKOUT_ROOT="$2"\nchoose_source_python\nrun_tests\n'
         return subprocess.run(
             ["bash", "-c", command, "bash", str(self.checkout / "scripts" / "install.sh"), str(self.checkout)],
@@ -569,6 +566,25 @@ run_live_delivery_probe() {
             for line in self.log.read_text().splitlines()
             if line.startswith("cwd=") and "args=service " in line
         ]
+
+    def test_installer_fixture_does_not_inherit_manager_control_value(self):
+        with mock.patch.dict(os.environ, {"MAM_SERVICE_MANAGER": MANAGER}):
+            result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.service_commands(), ["service status", "service start", "service status"])
+
+    def test_checkout_tests_remove_manager_control_value(self):
+        (self.checkout / "tests" / "test_manager_environment.py").write_text(
+            "import os\n"
+            "import unittest\n"
+            "\n"
+            "class ManagerEnvironmentTests(unittest.TestCase):\n"
+            "    def test_manager_selection_is_not_a_test_input(self):\n"
+            "        self.assertNotIn('MAM_SERVICE_MANAGER', os.environ)\n",
+            encoding="utf-8",
+        )
+        result = self.run_checkout_tests(MAM_SERVICE_MANAGER=MANAGER)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_install_upgrade_failure_does_not_touch_probes_or_scheduler(self):
         result = self.run_installer(FAKE_PIPX_FAIL="1")

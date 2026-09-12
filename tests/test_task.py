@@ -17,7 +17,27 @@ from unittest.mock import patch
 from multi_agent_manager import cli
 
 ROOT = Path(__file__).resolve().parents[1]
-MAM = Path(sys.executable).with_name("mam")
+_CLI_BOOTSTRAP = (
+    "import sys; "
+    "sys.path.insert(0, sys.argv.pop(1)); "
+    "from multi_agent_manager.cli import main; "
+    "raise SystemExit(main())"
+)
+
+
+def mam_command(*args: str, python: str | Path | None = None) -> list[str]:
+    """Run this checkout's CLI without requiring an installed ``mam`` script."""
+
+    return [
+        str(python or sys.executable),
+        "-I",
+        "-S",
+        "-B",
+        "-c",
+        _CLI_BOOTSTRAP,
+        str(ROOT),
+        *args,
+    ]
 
 
 class TaskTests(unittest.TestCase):
@@ -68,7 +88,7 @@ printf env > "$target/.venv/marker"
         return cli.project_config(location)
 
     def call(self, *args, command="task", ok=True):
-        result = subprocess.run([str(MAM), command, *args], capture_output=True, text=True, cwd=self.projects)
+        result = subprocess.run(mam_command(command, *args), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0 if ok else 2, result.stdout + result.stderr)
         return json.loads(result.stdout if ok else result.stderr)
 
@@ -91,22 +111,22 @@ printf env > "$target/.venv/marker"
         return output.getvalue()
 
     def task_command_output(self, *args):
-        result = subprocess.run([str(MAM), "task", *args], capture_output=True, text=True, cwd=self.projects)
+        result = subprocess.run(mam_command("task", *args), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
     def job_command_output(self, *args):
-        result = subprocess.run([str(MAM), "job", *args], capture_output=True, text=True, cwd=self.projects)
+        result = subprocess.run(mam_command("job", *args), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
     def wait_call(self, *args, env=None, ok=True):
-        result = subprocess.run([str(MAM), "wait", *args], capture_output=True, text=True, env=env, cwd=self.projects)
+        result = subprocess.run(mam_command("wait", *args), capture_output=True, text=True, env=env, cwd=self.projects)
         self.assertEqual(result.returncode, 0 if ok else 2, result.stdout + result.stderr)
         return json.loads(result.stdout if ok else result.stderr)
 
     def wait_list_lines(self):
-        result = subprocess.run([str(MAM), "wait", "list"], capture_output=True, text=True, cwd=self.projects)
+        result = subprocess.run(mam_command("wait", "list"), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout.splitlines()
 
@@ -116,6 +136,36 @@ printf env > "$target/.venv/marker"
                 "token": token, "kind": "jobs", "task": task, "timeout": None,
                 "started_at": "test", "cancelled": None}
 
+    def test_source_cli_launcher_needs_no_adjacent_mam_or_site_package(self):
+        launcher = Path(self.temp.name) / "bare-python"
+        launcher.symlink_to(Path(sys.executable).resolve())
+        self.assertFalse(launcher.with_name("mam").exists())
+
+        shadow = Path(self.temp.name) / "shadow"
+        package = shadow / "multi_agent_manager"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        marker = Path(self.temp.name) / "shadow-cli-ran"
+        (package / "cli.py").write_text(
+            "from pathlib import Path\n"
+            "import os\n"
+            "Path(os.environ['MAM_TEST_SHADOW_MARKER']).write_text('shadow', encoding='utf-8')\n"
+            "raise SystemExit(91)\n",
+            encoding="utf-8",
+        )
+        environment = dict(os.environ)
+        environment.update({"PYTHONPATH": str(shadow), "MAM_TEST_SHADOW_MARKER": str(marker)})
+        result = subprocess.run(
+            mam_command("task", "list", python=launcher),
+            capture_output=True,
+            cwd=self.projects,
+            env=environment,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["标题\t任务状态\tTASK-ID\tAGENT-ID\tagent状态"])
+        self.assertFalse(marker.exists())
+
 
     def test_parallel_publications_preserve_drafts_and_index(self):
         first, second, draft = self.task(), self.task(), self.task()
@@ -124,7 +174,7 @@ printf env > "$target/.venv/marker"
         (self.root / "code.py").write_text("unstaged = True\n")
         index = self.git(self.root, "ls-files", "--stage", "--", "code.py", ".gitignore")
         draft_bytes = self.store.doc(draft, "task").read_bytes()
-        commands = [[str(MAM), "task", "publish", task, "--file", "task"] for task in (first, second)]
+        commands = [mam_command("task", "publish", task, "--file", "task") for task in (first, second)]
         processes = [subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.projects) for command in commands]
         for process in processes:
             stdout, stderr = process.communicate(timeout=20)
@@ -204,7 +254,7 @@ printf env > "$target/.venv/marker"
     def test_task_list_text_has_header_and_status_keeps_records(self):
         header = "标题\t任务状态\tTASK-ID\tAGENT-ID\tagent状态"
         self.assertEqual(self.task_command_output("list").splitlines(), [header])
-        rejected = subprocess.run([str(MAM), "task", "list", "--json"], capture_output=True, text=True, cwd=self.projects)
+        rejected = subprocess.run(mam_command("task", "list", "--json"), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(rejected.returncode, 2)
         unbound = self.call("create", "--title", "中文\n标题\twith whitespace")["id"]
         self.assertEqual(self.task_command_output("list").splitlines()[1].split("\t"),
@@ -234,7 +284,7 @@ printf env > "$target/.venv/marker"
         self.assertEqual(json.loads(self.task_command_output("show", task, "--json"))["content"],
                          "# 更新后的要求\n\n正文不应被 JSON 转义。\n")
         self.assertEqual(self.task_command_output("show", task), "# 更新后的要求\n\n正文不应被 JSON 转义。\n")
-        rejected = subprocess.run([str(MAM), "task", "show", task, "--revision", first],
+        rejected = subprocess.run(mam_command("task", "show", task, "--revision", first),
                                   capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(rejected.returncode, 2)
 
@@ -451,7 +501,7 @@ printf env > "$target/.venv/marker"
                 self.assertIn("repository name must be a non-empty single directory name", rejected["error"])
                 self.assertEqual(state.read_bytes(), before)
 
-        help_result = subprocess.run([str(MAM), "workspace", "add", "--help"], capture_output=True, text=True)
+        help_result = subprocess.run(mam_command("workspace", "add", "--help"), capture_output=True, text=True)
         self.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
         self.assertIn("below PROJECT_ROOT", help_result.stdout)
         self.assertNotIn("robot-bridge", help_result.stdout)
@@ -632,7 +682,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         other_config = self.configure(other_projects, other_root)
 
         def create(project, title):
-            result = subprocess.run([str(MAM), "task", "create", "--title", title], cwd=project,
+            result = subprocess.run(mam_command("task", "create", "--title", title), cwd=project,
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             return json.loads(result.stdout)["id"]
@@ -668,7 +718,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         (invalid / "env.json").write_text(json.dumps({"MAM_ROOT": str(self.root)}))
         with self.assertRaisesRegex(cli.Error, "missing required keys"):
             cli.project_config(nested)
-        rejected = subprocess.run([str(MAM), "task", "list"], cwd=nested, capture_output=True, text=True)
+        rejected = subprocess.run(mam_command("task", "list"), cwd=nested, capture_output=True, text=True)
         self.assertEqual(rejected.returncode, 2)
         self.assertIn("invalid project configuration", rejected.stderr)
         (invalid / "env.json").write_text("{")
@@ -686,10 +736,10 @@ base=$(git rev-parse --verify "$1^{commit}")
 
         outside = Path(self.temp.name) / "without configuration"
         outside.mkdir()
-        missing = subprocess.run([str(MAM), "task", "list"], cwd=outside, capture_output=True, text=True)
+        missing = subprocess.run(mam_command("task", "list"), cwd=outside, capture_output=True, text=True)
         self.assertEqual(missing.returncode, 2)
         self.assertIn("no .mam/env.json found", missing.stderr)
-        help_result = subprocess.run([str(MAM), "--help"], cwd=outside, capture_output=True, text=True)
+        help_result = subprocess.run(mam_command("--help"), cwd=outside, capture_output=True, text=True)
         self.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
 
     def test_configuration_resolves_path_aliases_and_keeps_linked_mam_root_distinct(self):
@@ -711,7 +761,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.assertEqual(cli.primary(linked), self.root)
         self.assertEqual(store.workspaces, self.projects / "workspace")
 
-        created = subprocess.run([str(MAM), "task", "create", "--title", "linked MAM root"], cwd=self.projects,
+        created = subprocess.run(mam_command("task", "create", "--title", "linked MAM root"), cwd=self.projects,
                                  capture_output=True, text=True)
         self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
         task = json.loads(created.stdout)["id"]
@@ -719,7 +769,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.assertFalse((self.root / ".local" / "tasks" / f"{task}.json").exists())
         main_before = self.git(self.root, "rev-parse", "main")
         state_before = self.git(self.root, "rev-parse", "project/state-vla")
-        published = subprocess.run([str(MAM), "task", "publish", task, "--file", "task"], cwd=self.projects,
+        published = subprocess.run(mam_command("task", "publish", task, "--file", "task"), cwd=self.projects,
                                    capture_output=True, text=True)
         self.assertEqual(published.returncode, 0, published.stdout + published.stderr)
         self.assertEqual(self.git(self.root, "rev-parse", "main"), main_before)
@@ -730,7 +780,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.git(self.root, "branch", "project/state-vla")
         config = self.configure(self.projects, self.root, "project/state-vla")
         store = cli.Store(config)
-        created = subprocess.run([str(MAM), "task", "create", "--title", "wrong publication branch"], cwd=self.projects,
+        created = subprocess.run(mam_command("task", "create", "--title", "wrong publication branch"), cwd=self.projects,
                                  capture_output=True, text=True)
         self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
         task = json.loads(created.stdout)["id"]
@@ -745,7 +795,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         main_before = self.git(self.root, "rev-parse", "main")
         branch_before = self.git(self.root, "rev-parse", "project/state-vla")
 
-        rejected = subprocess.run([str(MAM), "task", "publish", task, "--file", "task"], cwd=self.projects,
+        rejected = subprocess.run(mam_command("task", "publish", task, "--file", "task"), cwd=self.projects,
                                   capture_output=True, text=True)
         self.assertEqual(rejected.returncode, 2)
         self.assertIn("must be checked out on MAM_BRANCH", rejected.stderr)
@@ -773,10 +823,10 @@ base=$(git rev-parse --verify "$1^{commit}")
     def test_job_and_workspace_are_top_level_only(self):
         for command, description in (("job", "register, query and archive process records"),
                                      ("workspace", "manage repository worktrees and their environments")):
-            help_result = subprocess.run([str(MAM), command, "--help"], capture_output=True, text=True)
+            help_result = subprocess.run(mam_command(command, "--help"), capture_output=True, text=True)
             self.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
             self.assertIn(description, help_result.stdout)
-            old = subprocess.run([str(MAM), "task", command, "--help"], capture_output=True, text=True)
+            old = subprocess.run(mam_command("task", command, "--help"), capture_output=True, text=True)
             self.assertEqual(old.returncode, 2, old.stdout + old.stderr)
         self.assertEqual(self.job_command_output("list").splitlines(), ["描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID"])
 
