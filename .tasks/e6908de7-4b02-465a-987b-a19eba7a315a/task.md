@@ -136,3 +136,14 @@ Manager发现当前EXPERIMENT_LEDGER的队列表仍把已完成首批4项写作f
 
 ## 新完成B模型接入
 7ae41311最新report已验收rearrange no_memory seed1/2两个20k，训练job已归档，checkpoint-only恢复通过。现在接入这两个模型传输与C eval，不等serial seed1/2结束。路径以该已发布report为准；复用已验证no-memory variant，新增明确seed/run路径，不改schema。继续同源demo_clean_state/bs32/20k/H50/K30和各自smoke2→100门禁。给这两个新增模型分别建立台账行和传输/评估状态，seed0/1/2最终按独立训练重复分析。原12项仍运行的4项不打断，空位后接续。之后695和7ae的新完成产物同理接入，不重复重训/评估已有结果。
+
+## 用户更新：每个checkpoint三个eval seed，每seed100 rollout
+本轮仿真checkpoint（既有Q2/B与后续验收完成的B/U）统一eval_seed=0/1/2，每seed独立run且单GPU串行100，总计每checkpoint300。training_seed与eval_seed分列，结果路径包含两者；已有有效eval_seed0完整100和正在运行seed0全部保留，不重跑或覆盖。初始14个checkpoint是42个eval run，再按完成训练逐项加入，不能只补高成绩模型。wash属于真机/offline，不套RMBench仿真100协议。
+
+立即核对现有seed入口：eval_seed必须实际改变仿真初始条件列表，不能只改目录名或只改policy RNG。沿RMBench既有eval-seed映射生成3组互不重叠的100条件，eval_seed0继续原100000–100099；如果现有映射不支持，先提出明确可复现映射并本机最小实现/测试交Manager审阅。各比较模型使用同任务同eval_seed的完全相同列表，保留实际环境seed/接受规则；推理随机种子也需明确记录保持对应可比。不可暗中扫seed、拼接失败partial或把3个训练seed当3个eval seed。
+
+资源授权更新：解除此前每host最多2run的限制，可使用C1/C2/C3所有实际空闲GPU，一卡一个run，不能抢其他人的卡。按当前空闲卡列明确host/GPU/port/run计划再启动，进程与缓存/端口按run隔离。同一checkpoint可跨卡并行3个eval seed，每个seed的100条不能拆分。冷启动分批错开，保留首次90秒上限，不把扩并发掩盖成改时序。别只使用C2/C3四个槽而让其他已验收可用卡空闲。
+
+沿既有匹配smoke门禁，各run一个smoke含2rollout（1有video、1无），检查产物后才formal；相同checkpoint复用只读文件与已安装环境，无需重新传模型/装环境/重训。代码在本机独立树修改提交，新runtime版本用新部署worktree，不改活跃eval树。seed支持或调度新增代码须交独立review再大规模启动；既有seed0合法运行继续。
+
+台账按checkpoint列eval0/1/2的成功数、每项路径及合计/300；未齐时明确部分完成，不把缺失填0。完整后报告3组结果及合计率，仍按训练seed分别报告，跨模型按相同eval条件配对比较。研究计划从1变3 eval seeds为用户此次扩大样本的决定，记录调整日期，不把看过seed0后的新增写成原先预注册。逐run50检查和100收尾/回传/归档保持。先交明确seed映射和并发开跑计划，再持续执行授权队列。
