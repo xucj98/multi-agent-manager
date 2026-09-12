@@ -482,3 +482,19 @@ checkpoint/评测seed采用唯一结果leaf/run名。因此它在该唯一性前
 
 安全文档树 `RMBench-serial-ledger` 提交 `efbabe4`：更新四份B checkpoint状态，并为serial s1/s2加入eval_seed0/1/2覆盖行；
 `git diff --check`通过，文档树干净。
+
+## 2026-09-12 14:23 CST：serial C 传输收尾
+
+两条传输均已成功完成并归档，没有启动或修改任何 GPU 评测：
+
+- serial-lag30 train seed1：`verified_at=2026-09-12T14:20:51+08:00`；脚本的 `rsync -aicn --delete --omit-dir-times` 为零差异，C 端 `_CHECKPOINT_METADATA` SHA-256 为 `813e498e0f4f6ffd44e708d84f4f592591a063f1fc29af235278fe78c8c34949`，普通文件61个、4.9GiB；MAM `a5c39be1-dcfe-41f2-9041-879b2ff781a1` 已归档。
+- serial-lag30 train seed2：`verified_at=2026-09-12T14:22:29+08:00`；同一零差异校验通过，C 端 `_CHECKPOINT_METADATA` SHA-256 为 `07de6b2dfac14c0a2742a759ee0005deec91380a76741668eb34aee62ee301ae`，普通文件63个、4.9GiB；MAM `a6561ab9-c3d3-4f42-b0bc-b0948ea9196c` 已归档。
+
+因此 rearrange B 的 no-memory/serial-lag30 各 train seed1/2 四份 checkpoint 均已在 C 稳定 OpenPI 根准备就绪；每份仍是
+独立 eval_seed0/1/2 的三条 smoke2→formal100 队列，当前0条新评测已启动。安全文档树追加
+`bcd5393`（父提交 `efbabe4`），将两份serial改为C-ready、覆盖表改为各0/3待 review；`git diff --check`与
+工作树清洁核对通过。本 task 无未归档 job。
+
+刚读取独立review `300c4873-f12a-4d15-9d79-2ccf9df5e749`：仍为 working，尚未发布准入结论。因此保持
+`f508749` 只在本机独立树，C active eval tree和GPU队列均不扩容；C审计中 Warp cache 的跨host隔离结论仍仅依赖每个
+run leaf/run-name全局唯一，等待review裁定。
