@@ -1044,3 +1044,28 @@ MAM: 96f548b9-4fc1-44a2-9e18-533a2cb8e090
 ```
 
 其 C2-local audit/manifest、metadata route 和 dry-run 均已通过，正式 leaf 不存在；启动后 robot 服务已监听，尚未形成 terminal rollout 或 smoke verdict。只在该 smoke 的 video/no-video、terminal、退出和零基础设施 marker 全部通过后才直接启动 matching fresh formal100。C3 GPU0 的同 checkpoint evalseed1 formal `5be8d262-f6f6-45a4-ae0d-5b02e3dfc043` 保持运行，未修改。
+
+### C2 GPU7 smoke 验收与交接快照（2026-09-13）
+
+已完成此次交接前唯一待收尾的 stopped smoke。MAM job
+`96f548b9-4fc1-44a2-9e18-533a2cb8e090` 已归档；
+`c_rearrange_full_t_plus_30_trainseed0_evalseed2_smoke2_r3` 的固定
+seed `300000/300001` 都为 accepted terminal success，episode 0 的视频可读
+（383 frames），episode 1 保留 no-video 证据，两个 scheduler 均 exit 0，且
+EOF、renderer/native、traceback 和 runtime-error marker 均为 0。formal leaf 在
+smoke 验收前不存在，端口和 GPU 已释放；该 smoke 因此只作为对应 formal 的基础设施门禁，
+不计入正式结果。
+
+同一 frozen C2 runtime 已按已通过的 smoke 接续 formal，MAM job
+`d7f772a9-1b0e-4d80-9350-a7c794ac03f1`：C2 GPU7，
+`c_rearrange_full_t_plus_30_trainseed0_evalseed2_100ep_r3`，fixed seeds
+`300000..300099`，ports `19470/19472`，版本为 RMBench `2e9677c` /
+bridge `f962663` / OpenPI `a869498`。本次发布时 MAM 实时状态为 `running`；
+尚未重新读取 formal rollout 产物，故不声明 terminal 数或结果。
+
+交接时共有九个未归档、MAM 状态为 `running` 的 formal：C1 GPU1–7 的七项
+serial-lag30，以及 C3 GPU0 的 full-t+30 trainseed0/eval seed1
+(`5be8d262-f6f6-45a4-ae0d-5b02e3dfc043`) 和上述 C2 GPU7 formal。未启动、停止、
+修改或归档任何仍需后继 owner 核验的 job；新 owner 应从这些登记 job 和既有 raw
+artifact 继续处理。
+
