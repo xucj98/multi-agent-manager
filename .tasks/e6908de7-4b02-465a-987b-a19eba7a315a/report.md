@@ -443,3 +443,19 @@ scheduler 的首个 infer 已返回或有明确失败证据后才继续对应主
 请 Manager 按最新要求安排独立 review，重点检查 profile `seed` 是否确实进入 runner、训练 seed约束、
 manifest/smoke hash隔离及 run-cache 隔离；review通过前不会同步或启用 `f508749`。
 
+## 2026-09-12 13:54 CST：eval_seed0 收尾、三组计划复核
+
+三份已停止的 eval_seed0 formal 均已完成收尾，当前本 task 没有未归档 job：
+
+- rearrange full t+1 / train seed0：**87/100**，正常失败为 `block2_not_moved_to_middle` 4、`button_not_pressed` 5、`button_pressed_multiple_times` 4；C/本机252文件树 hash 为 `3f6419baf179671a54a29ac192c9129ea2dd0665a5b8f698e5d22105cf457160`。
+- rearrange full t+1 / train seed1：**99/100**，1条 `block1_disturbed_after_valid_press`；C/本机252文件树 hash 为 `a9dce212f4c189e40046a35e7d1afdad00e02ca99e48fab7b614b304ecdfb60e`。
+- rearrange no-memory / train seed0：**23/100**，前50为14/50，正常失败为 `button_not_pressed` 43、`block1_disturbed_after_valid_press` 17、`button_pressed_multiple_times` 16、`button_press_insufficient` 1；C/本机252文件树 hash 为 `edba065cfa813797f243092ac16c238fb83e0d6944f3c627491f2e8c070aeec8`。
+
+三项均为100个连续 accepted seed `100000–100099`、100个scheduler exit0、0 runtime error、100个视频检查通过；raw 保留在主 RMBench `eval_result/memory_chunk_20260910/`。至此12项 Q2 与两项能力基线的 eval_seed0 均已完整100（本机2项、C12项），不重跑或覆盖。
+
+安全 docs worktree 提交 `295effbbab8347b1ba43dca051740cbfde82089a`（`task/e6908de7-serial-ledger-20260912`），只更新 `EXPERIMENT_LEDGER.zh-CN.md`：消除所有过期运行中状态、记录三项收尾与hash，并按checkpoint列eval0/1/2。未完成 eval seed明确为待review而非0分。
+
+`f5087496a0f7c892bd322708e4ac0bbdeb74e523` 仍只在本机独立树
+`RMBench-eval-seed-runtime`；普通20k运行强制训练seed和eval seed，runner实际使用 profile `fixed.seed`，所以 eval0/1/2 分别从 `100000`、`200000`、`300000` 起。训练seed由checkpoint `exp_name` 的 `_sN`核验；每个新run独立manifest、smoke hash和Warp cache。CPU复核为 `py_compile`、`git diff --check`及 bridge `tests/benchmark/test_runner.py` **9 passed**。C 的活跃 `c-eval` 三树没有改动。
+
+13:54 CST 的只读资源快照与上表首波计划一致：C1 GPU1/2/4/5/6/7可用，C1 GPU0被占用、GPU3有外部1.2GiB使用而排除；C2 GPU2–7可用（首波使用4–7，2/3留给后续队列）；C3 GPU0–3可用。表列14组 robot/policy端口均无监听。独立review通过后，仍先错开 C1/GPU1、C2/GPU4、C3/GPU0 的冷启动；各自首个infer成功后才扩至同表其余卡，一卡完成自身smoke2再formal100。review通过前不部署、不启动GPU。
