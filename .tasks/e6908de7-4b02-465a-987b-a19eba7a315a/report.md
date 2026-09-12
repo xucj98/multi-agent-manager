@@ -642,3 +642,13 @@ MAM `23d046b3-c3b2-43bd-b59f-6965143accc7` 的 retry smoke 已自然结束并通
 安全台账树追加 `6bc7637`（父 `7b7670b`），将 B 组主概述、checkpoint 行和 eval 覆盖表的 GPU7 项统一为 formal运行中，记录 matching smoke MAM 已归档。`git diff --check` 通过且树干净。
 
 此刻共有9个已登记 formal running；C3 GPU1/2 仍按此前四项同型 accepted-reset EOF 结论暂停接续。当前没有未归档 stopped job，结束 turn 后由 MAM 对下一停止事件唤醒。
+
+## 2026-09-12 20:00 CST：C3 GPU3 r2 formal 不完整收尾
+
+MAM 主动唤醒后，C3 GPU3 的 `c_put_back_full_t_plus_30_trainseed0_evalseed2_100ep_r2`（MAM `3c3b8746-aecc-493f-8c79-104534d1d6e7`）已按停止结果收尾并归档。matching smoke `c_put_back_full_t_plus_30_trainseed0_evalseed2_smoke2_r2` 原已通过；formal 在 episode 22 / environment seed `300022` 的 accepted reset 遇到 `worker closed the RPC stream (EOFError)` 后停止。
+
+该 leaf 只有连续 `300000–300022` 的23条 partial episode，其中16成功；没有 `final_review.json`，故正式成绩为 **not reportable**，不以16/23计分，也不自动重试。已写 [failure review](/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/c_put_back_full_t_plus_30_trainseed0_evalseed2_100ep_r2/failure_review.json)（SHA-256 `f08203eb…42d0e1e`），保留 `diagnostics_summary.json`、episode/proc records、worker stderr 和 outer log。worker stderr 的 Vulkan renderer 初始化错误仅作观察，不作为 EOF 根因结论。
+
+这使 C2 GPU6/7 和 C3 GPU1/2/3 的 episode-22 accepted-reset worker EOF 共五项；C3 GPU1/2/3 不自动重试或接续，等待具体诊断裁定。当前余下8项 formal 仍运行：C1 GPU1–7 的 rearrange no-memory train1/train2 六项与 serial-lag30 train1/eval0，以及 C3 GPU0 的 put-back full t+1/train1/eval1。本轮未修改这些运行树、checkpoint、机器人或 Warp 配置。
+
+安全文档树 `task/e6908de7-r2-running-ledger` 已提交 `77dbfcc3f37f90dadd42225ee7ce4fab056fd448`（`docs: record C3 GPU3 EOF partial`）：主概述、B 组状态、eval_seed 覆盖表和 C3 EOF 摘要已同步；`git diff --check` 通过且工作树干净。
