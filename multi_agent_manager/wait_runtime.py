@@ -691,8 +691,9 @@ class UnifiedWait:
                     # an agent turn or claiming its jobs.
                     pending_active = True
                 continue
-            jobs.extend(self._unarchived_jobs(task))
-            if task.id not in delegated_sources:
+            task_jobs = self._unarchived_jobs(task)
+            jobs.extend(task_jobs)
+            if not task_jobs and task.id not in delegated_sources:
                 inactive_tasks.append(task)
         return Targets(tuple(active_agents), tuple(jobs), tuple(inactive_tasks), pending_active)
 
@@ -832,7 +833,10 @@ class UnifiedWait:
             self.states[agent] = ThreadState(agent, "idle", None)
         if target is None:
             return None
-        return self._agent_result(target.task)
+        # A completed turn alone does not resolve the task: reload its current
+        # jobs and review ownership before selecting an actionable wait result.
+        _, _, targets = self._refresh(require_caller_turn=True)
+        return self._reconcile(targets, probe_jobs=True, deadline=None)
 
     def _native_item_event(self, method: str, params: Mapping[str, Any]) -> dict[str, Any] | None:
         """Recognize native manager input emitted as an observed UserMessage item."""
