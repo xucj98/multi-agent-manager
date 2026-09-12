@@ -8,3 +8,6 @@
 当前主树原先就有未跟踪ROADMAP.zh-CN.md，以及docs/MEMORY_CONFIG、MEMORY_DESIGN_FRAMEWORK、MEMORY_SCHEMA_SAMPLES、MEMORY_SCHEMA_SWAP_T、docs/memory_config整个目录。不要删改任何未跟踪材料。把ROADMAP逐字副本备份到本task workspace的preserved/并记sha256，Manager会在确认备份后移除主树过期ROADMAP。其余schema文件是有价值材料，保留在paper当前工作空间。
 
 另读新Manager计划（主树只读），仅做机械/事实review：预算加总、链接、seed口径有无互相矛盾。不要重设计或扩scope。交付删除commit、备份hash/路径、发现列表、diff-check。发report并发布，结束turn等待MAM，不轮询。
+
+## 明确追加清理清单
+旧figures/source内5个tex及对应figures/*.pdf（overview、target_timeline、simulation_evidence、real_world_suite、real_robot_protocol）均是旧方案图，随旧稿由Git保留，从当前工作树删除；figures/frames的历史原始画面保留不动。旧paper.pdf也删除：Manager已改写LaTeX，但当前无latexmk/TeX编译器，不能把旧PDF伪称新稿。Makefile/README由Manager更新，不要编辑。新的figures未绘制不属于本task。删除commit加上这些明确文件，校验git历史可恢复。
