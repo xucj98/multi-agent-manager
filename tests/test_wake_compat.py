@@ -479,6 +479,19 @@ exit 72
     @staticmethod
     def _probe_stubs() -> str:
         return r'''
+ensure_runtime_logging() {
+    TARGET_SOCKET=/tmp/fake-app-server.sock
+    TARGET_LOG_PATH=/tmp/fake-app-server.log
+    printf 'trace socket=%s log=%s\n' "$TARGET_SOCKET" "$TARGET_LOG_PATH" >> "$FAKE_LOG"
+}
+run_wait_compatibility() {
+    printf 'wait python=%s socket=%s log=%s\n' "$INSTALLED_PYTHON" "$WAIT_SOCKET" "$WAIT_LOG_PATH" >> "$FAKE_LOG"
+    if [[ "${FAKE_WAIT_COMPAT_FAIL:-}" == 1 ]]; then
+        incomplete 'simulated optional wait compatibility failure'
+        return 1
+    fi
+    printf 'MAM optional wait: live App Server trace compatibility PASS\n'
+}
 run_lightweight_probe() {
     printf 'lightweight python=%s\n' "$INSTALLED_PYTHON" >> "$FAKE_LOG"
     COMPATIBILITY_JSON="$INSTALL_TMP/compatibility.json"
@@ -571,16 +584,19 @@ run_live_delivery_probe() {
         self.assertIn("scheduler healthy", result.stdout)
         log = self.log.read_text()
         self.assertIn(f"pipx args=install --force {self.checkout}", log)
+        self.assertIn(f"wait python={self.venv / 'bin' / 'python'}", log)
         self.assertIn(f"lightweight python={self.venv / 'bin' / 'python'}", log)
         self.assertIn(f"liveprobe python={self.venv / 'bin' / 'python'}", log)
+        self.assertLess(log.index("wait python"), log.index("lightweight"))
         self.assertLess(log.index("lightweight"), log.index("liveprobe"))
         self.assertLess(log.index("liveprobe"), log.index("args=service status"))
         self.assertEqual(self.service_commands(), ["service status", "service start", "service status"])
         self.assertNotIn("aaaaaaaa", log)
         bashrc = (self.home / ".bashrc").read_text()
         self.assertIn("export KEEP_THIS=1", bashrc)
-        self.assertNotIn("RUST_LOG", bashrc)
-        self.assertNotIn("LOG_FORMAT", bashrc)
+        self.assertEqual(bashrc.count("# >>> MAM Codex App Server trace >>>"), 1)
+        self.assertIn('export RUST_LOG="off,codex_app_server::message_processor=trace,codex_app_server::app_server_tracing=info"', bashrc)
+        self.assertIn("export LOG_FORMAT=json", bashrc)
         self.assertEqual(bashrc.count("# >>> MAM PATH >>>"), 1)
         self.assertLess(bashrc.index("# >>> MAM PATH >>>"), bashrc.index('[[ -z "$PS1" ]] && return'))
         self.assertTrue(list(self.home.glob(".bashrc.mam-path.*.bak")))
@@ -690,7 +706,17 @@ run_live_delivery_probe() {
         missing = self.root / "missing.sock"
         result = self.run_installer(probe_stubs=False, MAM_APP_SERVER_SOCKET=str(missing), FAKE_START_STATE="awaiting_manager")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("control socket is unavailable", result.stdout)
+        self.assertIn("no standalone fallback was launched", result.stdout + result.stderr)
+        self.assertEqual(self.service_commands(), [])
+
+    def test_optional_wait_compatibility_failure_happens_before_wake_or_scheduler(self):
+        result = self.run_installer(FAKE_WAIT_COMPAT_FAIL="1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("simulated optional wait compatibility failure", result.stdout)
+        log = self.log.read_text()
+        self.assertIn("wait python", log)
+        self.assertNotIn("lightweight", log)
+        self.assertNotIn("liveprobe", log)
         self.assertEqual(self.service_commands(), [])
 
     def test_live_delivery_failure_happens_before_existing_scheduler_stop(self):
@@ -739,15 +765,17 @@ run_live_delivery_probe() {
         self.assertIn("TOKEN=<redacted>", result.stdout)
         self.assertNotIn("TOKEN=do-not-log", result.stdout + result.stderr)
 
-    def test_non_exact_legacy_trace_block_is_not_removed(self):
+    def test_trace_block_is_retained_and_normalized_with_path_update(self):
         path = self.home / ".bashrc"
         content = path.read_text().replace("export LOG_FORMAT=json", "export LOG_FORMAT=custom")
         path.write_text(content, encoding="utf-8")
         result = self.run_installer()
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("cannot safely update shell PATH setup", result.stdout)
-        self.assertEqual(self.service_commands(), [])
-        self.assertIn("LOG_FORMAT=custom", path.read_text())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        updated = path.read_text()
+        self.assertEqual(updated.count("# >>> MAM Codex App Server trace >>>"), 1)
+        self.assertIn("export LOG_FORMAT=json", updated)
+        self.assertNotIn("LOG_FORMAT=custom", updated)
+        self.assertEqual(updated.count("# >>> MAM PATH >>>"), 1)
 
     def test_installer_does_not_implement_a_background_shell_supervisor(self):
         source = (self.source_root / "scripts" / "install.sh").read_text(encoding="utf-8")
