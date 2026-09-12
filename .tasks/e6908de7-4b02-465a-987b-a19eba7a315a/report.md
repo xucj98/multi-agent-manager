@@ -834,3 +834,23 @@ git diff --check
 `ab03f43e-07f7-4ff7-a16c-03cef1dff15e`，端口19440/19442；GPU3 smoke MAM为
 `1415096f-8cf5-4ece-a751-00a3fd3eea9e`。GPU5/6 的下一批已有CPU audit/dry-run，等前一同主机
 smoke 的首次 infer/停止事件后继续，未并发抢启动。
+
+## 2026-09-13 00:09 CST：新 Manager 交接与 C1 r3 接续
+
+已确认新 Manager `01a09657-e0f3-7352-b726-aba5bbd5d498` 的交接；本 task 继续使用原 TASK-ID、既有运行树和 `mam task publish` 发布报告。只读确认文件为 workspace 根的 `manager-handoff-ack.md`，未重建任务、未重启任何已有评测。
+
+C1 GPU5 的 `c_rearrange_serial_lag30_trainseed2_evalseed2_smoke2_r3` 已按既有 `validate_smoke_run` 实读验收：`diagnostics_summary.json` 为 `completed` / target 2，seed 300000、300001 均 accepted，episode0 video 和 episode1 no-video 的检查均为 ok，两个 scheduler child 都 exit 0，worker/outer logs 无 traceback、EOF、segfault 或 runtime-error marker。任务正常失败不作为 smoke gate 的选择条件。该 stopped smoke MAM job `b6ebe7cc-33f7-4194-b0ae-831a73918286` 已在核验后归档。
+
+同一 checkpoint、同一 train/eval seed 的 fresh formal 已在 C1 GPU5 启动并登记为 MAM `b9624ab0-9fdd-469e-a5a2-a2d22868dc22`：
+
+```text
+c_rearrange_serial_lag30_trainseed2_evalseed2_100ep_r3
+RMBench bf34743334efc98440fa9b05e3f2f05e8303846a
+bridge f9626636c4776d8eb15f9c556775cb2d12c000e5
+OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4
+GPU5 / ports 19450,19452 / seed sequence 300000..300099
+```
+
+启动后 GPU5 使用约16.2 GiB，首个 reset accepted 且 worker 已进入实际 700-step rollout；尚未形成正式分数或50条快照。C1 GPU6 的 rearrange serial-lag30 trainseed0/evalseed1 只读 checkpoint 已完成 audit 与 smoke dry-run，随后启动 matching smoke2；GPU7 的同 checkpoint evalseed2 audit/dry-run 已就绪，按同机冷启动错开接续。
+
+C3 GPU0–3 当前各约24,080 MiB free、0% util，bf3474/f962663/a869498 runtime clean 且 renderer process-reuse patch 存在。此前 C3 gate 的 `RMBench/.venv/bin/python` symlink 被 bf3474 的 `Path.resolve()` 跟随到 base interpreter，导致 `ModuleNotFoundError: numpy`，未完成任何 reset；原 receipt/log 保留。窄修复 `2e9677ce8ec9f623395184f63f32ddafa66e5e44` 由独立 review `e755c753-4acf-4958-85f4-7595fba739a0` 审阅中，尚未获当前 Manager 最终放行。因此不部署该提交、不重跑 C3 gate；这是当前唯一待 Manager 裁决的事项。
