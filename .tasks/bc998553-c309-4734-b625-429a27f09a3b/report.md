@@ -1,28 +1,43 @@
-# MAM proactive wake runtime — review follow-up
+# MAM proactive wake runtime — final integration follow-up
 
-实施 worktree：`/mnt/public/xcj/Projects/workspace/bc998553-c309-4734-b625-429a27f09a3b/multi-agent-manager`；分支：`task/bc998553-c309-4734-b625-429a27f09a3b`。
+实施 worktree：`/mnt/public/xcj/Projects/workspace/bc998553-c309-4734-b625-429a27f09a3b/multi-agent-manager`；分支：`task/bc998553-c309-4734-b625-429a27f09a3b`。本分支已合并最终集成基线 `555f6ff`（含 integration `20ff584` 与此前 runtime 阻断修复）。
 
-原始 runtime 提交为 `bf157209d6eb9ebdc0d07f5344ca175501941598`；本次供 Manager cherry-pick 的后续提交为 `45614a60f63517eff3075381c697d370f09bdccc`（`fix: reconcile proactive wake delivery states`）。
+供 Manager 按顺序 cherry-pick 的新增提交：
 
-## 已修复的验收阻断项
+- `23f9024` `fix: launch wake daemon from caller runtime`
+- `9ee6300` `feat: restore optional mam wait`
 
-- paused/interrupted 收件人会持久化阻断 turn 边界。后续仅在其元数据为 idle/notLoaded 时读取一次 `latest_turn`，不会为重查调用 `resume`；只有边界变化且最新 turn 为 completed 时才重新置为 pending。仍中断、边界未变或收件人 active 时不会启动 turn。
-- `task_ready` 的 source executor 为 unknown/systemError 或发送前查询失败时，保留相同签名的 pending/accepted 事件，不生成新事件；归档、review 抑制、执行者重绑和 source active 仍会使旧事件失效。
-- App Server 明确 JSON-RPC error 现在以兼容 `AppServerEventError` 的 `AppServerRpcError` 表示。`turn/start` 的明确拒绝记录为 retryable `rejected`，不会被后续无关 turn 误判为 `ambiguous`；仅无响应、传输失败和 daemon 在应答前退出进入 `uncertain` 边界对账。
+## daemon 代码来源隔离
 
-设计文档已同步上述状态语义。
+`_spawn_service()` 不再以 `MAM_ROOT` cwd 的 `python -m multi_agent_manager.wake_runtime` 选取代码。它以 `-I -S -c` 的小 bootstrap 运行，并把当前调用方已解析的 `wake_runtime.__file__` 包父目录置于导入路径首位；子进程同时移除继承的 `PYTHONPATH`。`MAM_ROOT` 仍只承担状态和日志 cwd，独立状态 worktree 中的旧、缺失或同名包不会覆盖当前安装或 source-checkout 调用方。
 
-## 回归与验证
+回归使用故意放入 `MAM_ROOT/multi_agent_manager/` 的 shadow runtime：真实 detached daemon 仍到达 `awaiting_manager` ready 状态、正常 stop，shadow sentinel 未生成。另一个子进程以 `-I -S` 手工加入 source root、cwd 设为 `MAM_ROOT` 且污染 `PYTHONPATH`，验证未 editable/install 的 source 调用同样启动正确 daemon。两者均无 Manager，未连接真实 App Server 或发起模型调用。
 
-新增 fake App Server/调度回归覆盖：中断后 completed 恢复且 active→idle 才单次启动、重查不 resume；accepted/pending `task_ready` 经 unknown 读失败后仍不重复唤醒；归档、review 抑制和重绑失效；明确 RPC 拒绝的 retry；以及既有 response-loss→ambiguous 路径。
+## 可选 `mam wait` 恢复与主动服务共存
+
+从 `main` 的 `3302520` 恢复了稳定的 wait 存储、CLI、runtime 和回归：`mam wait`、`mam wait list`、`mam wait stop --agent`、`mam wait stop manager`，包括固定一小时、当前 turn/身份选择、立即待办返回、手动 stop、原生输入取消和可见兼容性失败。`cli.py` 同时保留 proactive 的 service 命令与首次 Manager 绑定逻辑。
+
+主动 scheduler 在待投递 recipient 已有 wait 登记时保留 durable event；在最终 `turn/start` 前再次以同一 agent 的 wait 锁检查，防止 preflight 期间新登记的 wait 与新 turn 并行。无法核验 wait 身份也保守保留事件。wait 返回后，task/job 已归档会使旧事件失效而不产生冗余唤醒。
+
+`wait_compat.py`、其测试和 installer 仍完全由 installer task 所有；本次未修改这些文件。合并时 installer 应按已发布合同恢复该模块及其安装/兼容性覆盖。
+
+设计文档已同步默认主动跟进、可选 wait 的边界和锁定语义。
+
+## 验证
 
 ```text
-.venv/bin/python -B -m unittest tests.test_wake_runtime tests.test_job_runtime -v
-# 47 passed
-.venv/bin/python -B -m unittest discover -s tests -v
-# 109 passed
+.venv/bin/python -B -m unittest -v tests.test_wake_runtime
+# 36 passed
+.venv/bin/python -B -m unittest -v tests.test_wait_runtime
+# 38 passed
+.venv/bin/python -B -m unittest -v tests.test_task
+# 34 passed
+.venv/bin/python -B -m unittest discover -s tests -q
+# 153 passed
+.venv/bin/python -B -m py_compile multi_agent_manager/cli.py multi_agent_manager/wait_runtime.py multi_agent_manager/wake_runtime.py tests/test_task.py tests/test_wait_runtime.py tests/test_wake_runtime.py
+# passed
 git diff --check
 # passed
 ```
 
-未修改 `scripts/install.sh`、`wait_compat.py`、installer 测试、README 或 AGENTS；未安装、部署、重启 App Server，且未创建真实 Codex 线程或 GPU 作业。
+新增调度回归覆盖已登记 wait 阻止 stopped-job 投递、wait 返回后任务归档不再唤醒，以及 wait 在 delivery preflight 后才登记时最终边界仍阻止 `turn/start`。未进行全局安装、生产 daemon 操作、真实 App Server/model 调用或 GPU 作业；未改 installer、README 或 AGENTS。
