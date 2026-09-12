@@ -80,3 +80,15 @@ GPU7 `GPU-d005e95a-93d5-94b7-30ca-02f49f5af15a`→`238890`；wuwen-1 GPU4/5/6/7 
 模型、seed、动作协议或训练路径。六条当前均为 running；未启动 C eval。运行日志在
 `/mnt/public/xcj/Projects/workspace/cbbba844-d96a-45d5-9b2f-c8a3c6f393b1/training_logs/`，台账更新为
 RMBench `a7e851b`。
+
+## MAM 主动唤醒迁移后的实际状态（2026-09-12 18:37 +0800）
+
+已阅读任务 18:35 的主动唤醒迁移节。`mam task status` 在 18:37 +0800 成功重新解析本任务的全部
+6 个已登记 job：rearrange s0/s1/s2 与 put-back s0/s1/s2 均为 `running`，没有本任务已停止而未验收、
+未归档的 job，也没有最终 `/20000` checkpoint 可在此刻验收或交给 e690。训练进程、GPU 映射、模型、
+seed、动作协议和路径均未改动，未启动任何 eval。
+
+此前两次旧式 `mam wait` 分别在 wuwen-1 GPU7 与 GPU4 的状态查询遇到 SSH 超时；它们没有报告训练
+停止。上述成功的 MAM 状态查询已将对应四条远端训练以及两条本地训练均确认回 `running`。按新机制，
+此处结束 active turn；MAM 会在任一已登记且未归档的训练停止时重新唤醒执行者，届时再执行最终 checkpoint
+验收、资源释放/job 归档和 e690 可评清单交接。
