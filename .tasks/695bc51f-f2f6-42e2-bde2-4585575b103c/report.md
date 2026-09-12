@@ -2,14 +2,14 @@
 
 ## 当前可评交接（交 e6908de7-4b02-465a-987b-a19eba7a315a）
 
-更新时间：2026-09-12T19:15+08:00。以下表为当前状态，后文启动/巡检记录为历史。已采用18:35主动唤醒协议：远端no-memory seed1/2两路继续running；serial三个seed均完成并恢复PASS，无待启动训练项；停止后由MAM唤醒执行最终产物验收与e690交接，本轮结束，不维持监控用active等待。
+更新时间：2026-09-12T20:28+08:00。以下表为当前状态，后文启动/巡检记录为历史。已采用18:35主动唤醒协议：远端仅no-memory seed2继续running；serial三个seed均完成并恢复PASS，无待启动训练项；停止后由MAM唤醒执行最终产物验收与e690交接，本轮结束，不维持监控用active等待。
 
-当前可评：no-memory seed0与serial_lag30 seed0/1/2；no-memory seed1/2仍训练，未列为READY。
+当前可评：no-memory seed0/1与serial_lag30 seed0/1/2；仅no-memory seed2仍训练，未列为READY。
 
 | config | schema | seed | 当前状态 | checkpoint（绝对路径） |
 |---|---|---|---|---|
 | pi05_rmbench_put_back_block_no_memory | v1 / joint_dense，robot-only，无memory字段 | 0 | READY：20k保存及独立恢复PASS | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s0/20000 |
-| pi05_rmbench_put_back_block_no_memory | v1 / joint_dense，robot-only，无memory字段 | 1 | TRAINING：未交可评 | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s1/20000 |
+| pi05_rmbench_put_back_block_no_memory | v1 / joint_dense，robot-only，无memory字段 | 1 | READY：20k保存及独立恢复PASS | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s1/20000 |
 | pi05_rmbench_put_back_block_no_memory | v1 / joint_dense，robot-only，无memory字段 | 2 | TRAINING：未交可评 | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s2/20000 |
 | pi05_rmbench_put_back_block_serial_lag30 | v1 / serial_token，phase/origin_mat，lag30 | 0 | READY：20k保存及独立恢复PASS | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s0/20000 |
 | pi05_rmbench_put_back_block_serial_lag30 | v1 / serial_token，phase/origin_mat，lag30 | 1 | READY：20k保存及独立恢复PASS | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s1/20000 |
@@ -21,7 +21,7 @@
 
 训练日志：`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s0.log`；恢复证据：`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s0_checkpoint_gate.log`。该gate摘要input_memory_ids=[1,1]是沿用serial日志标签，no-memory实际obs已pop该字段、仅actions/policy_timing输出；检验脚本输出标签已修正，未改模型或重训。
 
-本模型smoke日志已保留至`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s0_artifacts`，smoke临时checkpoint已删除。请e690按自身matching smoke2→100协议接入本READY行并更新实验台账；远端no-memory seed1/2仍训练，不提前列为ready，不自行重复启动eval。
+本模型smoke日志已保留至`/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s0_artifacts`，smoke临时checkpoint已删除。请e690按自身matching smoke2→100协议接入本READY行并更新实验台账；远端仅no-memory seed2仍训练，不提前列为ready，不自行重复启动eval。
 
 
 研究目的：为既定 B 组补齐 put-back 的 `serial_lag30` 与 `no_memory` seed0 训练入口，使其与已有 full 三 seed、rearrange serial/no-memory 共享模型、loader 和训练参数，只替换 put-back 的数据、字段 schema、sidecar 与 robot norm。
@@ -31,6 +31,8 @@
 **新增可评：serial_lag30 seed1。** 20k Save Finalize完成、训练进程退出；step20000 grad_norm=0.3689/loss=0.0111/param_norm=1804.6769，200个日志区间全部有限。checkpoint metadata/data binding/norm及仅最终params/assets/metadata协议通过；wuwen-1新解释器拒绝训练源读取，恢复56叶、3,353,466,650元素、BF16、全部有限且逐shape匹配，真实actions[50,14]和memory_prediction_ids[1,2]通过，gate退出0。恢复证据 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s1_checkpoint_gate.log`；训练日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s1.log`。完整config/schema/seed/commit/绝对checkpoint路径及研究目的见当前表；请e690接入这项独立训练重复，不等no-memory剩余seed。无seed-only smoke临时产物；验证后GPU0=4MiB/0%。训练job已验收并归档。
 
 **新增可评：serial_lag30 seed2。** 20k Save Finalize完成、训练进程退出；step20000 grad_norm=0.3379/loss=0.0096/param_norm=1804.7695，200个日志区间全部有限。checkpoint metadata/data binding/norm及仅最终params/assets/metadata协议通过；wuwen-1新解释器拒绝训练源读取，恢复56叶、3,353,466,650元素、BF16、全部有限且逐shape匹配，真实actions[50,14]和memory_prediction_ids[1,2]通过，gate退出0。恢复证据 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s2_checkpoint_gate.log`；训练日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_serial_lag30_s2.log`。完整config/schema/seed/commit/绝对checkpoint路径及研究目的见当前表；请e690接入这项独立训练重复，不等no-memory剩余seed。无seed-only smoke临时产物；验证后GPU2=4MiB/0%。训练job已验收并归档。
+
+**新增可评：no_memory seed1。** 2026-09-12 20:26:30 完成20000 Save Finalize，训练PID1469111退出；step20000 grad_norm=0.0265/loss=0.0005/param_norm=1804.4281，200个日志区间全部有限。最终params/assets/metadata、数据绑定、专用norm及resolved config均通过。wuwen-1 GPU1新解释器checkpoint-only完整恢复51叶/3,353,433,872元素，全部BF16、有限且逐shape匹配，真实推理actions[50,14]有限、无memory输入及输出；gate退出0，GPU1释放为4MiB/0%。恢复证据 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s1_checkpoint_gate.log`；训练日志 `/mnt/public/xcj/Projects/openpi/logs/memory20k_695bc51f_put_back_no_memory_s1.log`。无seed-only smoke临时产物，正式模型及必要日志保留。完整config/schema/seed/commit/checkpoint路径、研究目的与预期检验见当前可评表，请e690直接接入seed1独立重复，不等seed2；训练job验收后归档。
 
 ## 当前单模型放行状态
 
