@@ -1,0 +1,3 @@
+# Review automated message prefix
+
+Read AGENTS/development instructions, source task a710b162, and create independent MAM worktree at21e27c7fb1967aaf6ef97ce1d91683f3380b9233. Review the small five-file diff against061eadc: all nonempty proactive messages begin with one literal [MAM Message] first line, existing content/batches preserved, no changes to human input, routing/deduplication/state or wait. Confirm existing local tests cover actual job/task payload and liveprobe checks. Run relevant CPU tests only, no installation or real model probes. No redesign or implementation changes. Publish concise PASS/blocker with candidate, workspace and validation, clean transient files and end turn. Manager owns production install after approval.
