@@ -1,0 +1,40 @@
+{
+  "base": "6139577e360c27f866e4dbb3dd2fc067cc7ddd50",
+  "branch": "codex/2a879870-lazy-probe-profile",
+  "cpu_only": true,
+  "gpu_before": "0, 16955 MiB\n1, 1 MiB\n2, 1 MiB\n3, 1041 MiB\n4, 1 MiB\n5, 1 MiB\n6, 1 MiB\n7, 1 MiB\n",
+  "cache_before": "23781478912\t/mnt/public/xcj/cache/uv",
+  "args": [
+    "bash",
+    "/mnt/public/xcj/Projects/state-vla/RMBench/.local/create_worktree.sh",
+    "6139577e360c27f866e4dbb3dd2fc067cc7ddd50",
+    "codex/2a879870-lazy-probe-profile",
+    "/mnt/public/xcj/Projects/state-vla/workspace/2a879870-8dda-4613-a684-0ad48a5e86be/profile/lazy-probe"
+  ],
+  "epoch_start": 1789145858.2668674,
+  "create_s": 52.92685668403283,
+  "epoch_end": 1789145911.1937253,
+  "exit": 0,
+  "worktree_allocated": "51438080\t/mnt/public/xcj/Projects/state-vla/workspace/2a879870-8dda-4613-a684-0ad48a5e86be/profile/lazy-probe/RMBench",
+  "venv_allocated": "41802240\t/mnt/public/xcj/Projects/state-vla/workspace/2a879870-8dda-4613-a684-0ad48a5e86be/profile/lazy-probe/RMBench/.venv",
+  "worktree_apparent": "23100627\t/mnt/public/xcj/Projects/state-vla/workspace/2a879870-8dda-4613-a684-0ad48a5e86be/profile/lazy-probe/RMBench",
+  "venv_apparent": "13870506\t/mnt/public/xcj/Projects/state-vla/workspace/2a879870-8dda-4613-a684-0ad48a5e86be/profile/lazy-probe/RMBench/.venv",
+  "cache_after": "23781481472\t/mnt/public/xcj/cache/uv",
+  "git_status": "",
+  "cleanup_s": 47.304935971973464,
+  "cleaned": true,
+  "gpu_after": "0, 16955 MiB\n1, 1 MiB\n2, 1 MiB\n3, 1041 MiB\n4, 1 MiB\n5, 1 MiB\n6, 1 MiB\n7, 1 MiB\n",
+  "probe_checks": [
+    {
+      "source": "source=/mnt/public/xcj/Projects/state-vla/.cache/.RMBench-worktree-env.D6xOaY",
+      "line": "line=507",
+      "wall_s": 0.20352506637573242
+    },
+    {
+      "source": "source=/mnt/public/xcj/Projects/state-vla/.local/create_worktree.sh",
+      "line": "line=120",
+      "wall_s": 0.10212111473083496
+    }
+  ],
+  "cache_delta_allocated_bytes": 2560
+}

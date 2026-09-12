@@ -1,0 +1,11 @@
+{
+  "source": "/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_100ep/episode_diagnostics.jsonl",
+  "sha256": "48f74cc24bd09bcae93c320bc357b300b03d16037022e0d9c955413210eddd8c",
+  "total": 100,
+  "full_success": 69,
+  "first50_success": 35,
+  "first50_failures": {
+    "button_not_pressed_after_center": 10,
+    "button_press_insufficient": 5
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "base": "3e69b1e665a8eac0104d261b233f1b3339007e00",
+  "candidate": "17b55bff1c79a0c5a836d1da089765934cb3a5b0",
+  "candidate_source_sha256": "fb855180ed2d3b3a764139e4a254599db3082ea40ce327ccd8f8b5f9872714d7",
+  "remote_file_matches_commit": true,
+  "changed_Base_Task_methods": [
+    "setup_scene"
+  ],
+  "setup_scene_except_renderer_ownership_AST_identical": true,
+  "scope": "static source equivalence only; actual rendering and action/observation equivalence require runtime evidence",
+  "lifecycle_job": "1ee98405-a6e7-4936-8d78-96aef1d82232"
+}

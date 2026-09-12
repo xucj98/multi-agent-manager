@@ -1,0 +1,89 @@
+{
+  "run": "/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/renderer_c1_smoke2_20260912",
+  "verified_at": "2026-09-12T01:40:05.778641+08:00",
+  "checks": {
+    "exit0": true,
+    "exact2_fixed_seeds": true,
+    "accepted2": true,
+    "terminal_without_error": true,
+    "video_checks": true,
+    "no_video_file": true,
+    "artifact_files": true,
+    "decoded_video": true,
+    "shutdown_records": true,
+    "services_gone": true,
+    "worker_no_infra_errors": true,
+    "clean_sources": true,
+    "gpu_reclaimed": true
+  },
+  "passed": true,
+  "episodes": [
+    {
+      "episode": 0,
+      "seed": 100000,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 1,
+      "seed": 100001,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 358,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    }
+  ],
+  "video": {
+    "programs": [],
+    "streams": [
+      {
+        "width": 320,
+        "height": 240,
+        "nb_read_frames": "500"
+      }
+    ]
+  },
+  "gpu_after": "1, GPU-ea6a20d2-0f5c-aae4-e65d-d3f81f8e9e04, 1 MiB",
+  "source": {
+    "RMBench": {
+      "commit": "17b55bff1c79a0c5a836d1da089765934cb3a5b0",
+      "status": ""
+    },
+    "robot-bridge": {
+      "commit": "8ea6078543a875b5ae223df16891cdc1fe975c66",
+      "status": ""
+    },
+    "openpi": {
+      "commit": "a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4",
+      "status": ""
+    }
+  },
+  "infra_markers": {
+    "ErrorIncompatibleDriver": 0,
+    "Your GPU driver does not support Vulkan": 0,
+    "worker closed the RPC stream": 0,
+    "ConnectionResetError": 0,
+    "EOFError": 0,
+    "Segmentation fault": 0
+  },
+  "sha256": {
+    "seed_preflight.jsonl": "f761d130fe908341c5e66567512c3a5d427cec32ae583ce5b1c8d98a2633bc86",
+    "episode_diagnostics.jsonl": "f9e950181475dbc1f42f7ba93d5b2f478fca2cddaaa92e01f4dfbdb6da47ad61",
+    "video_checks.jsonl": "7855f376926e0b74a9bb5440d6a94c85a5ca8a1b0bda315a659d88190dc1d060",
+    "_result.txt": "099ea4e545362ef8073135d9058dfd5aaffb74f097faceef65a6bbe67d1a6d90",
+    "episode0.mp4": "d48130e6c9049a8ae0042a9cc4748095c9e0ba79d38c2974626566136fb95e05",
+    "processes.jsonl": "0ad232f6235e430a3d593a45e7b902e2ad65ab0ae60ebed487915a90010acb9c"
+  }
+}

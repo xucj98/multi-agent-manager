@@ -1,0 +1,44 @@
+{
+  "kind": "renderer_candidate_40_reset_diagnostic",
+  "candidate_commit": "17b55bff1c79a0c5a836d1da089765934cb3a5b0",
+  "checks": {
+    "exit_zero": true,
+    "passed": true,
+    "count40": true,
+    "fixed_seed_order": true,
+    "fixed_episode_order": true,
+    "all_accepted": true,
+    "no_result_error": true,
+    "no_infra_error_markers": true,
+    "strict_tracked_clean": true
+  },
+  "error_marker_counts": {
+    "ErrorIncompatibleDriver": 0,
+    "Your GPU driver does not support Vulkan": 0,
+    "Traceback (most recent call last)": 0,
+    "ConnectionResetError": 0,
+    "EOFError": 0,
+    "Segmentation fault": 0,
+    "core dumped": 0,
+    "accepted\": false": 0
+  },
+  "strict_status": {
+    "RMBench": "",
+    "robot-bridge": "",
+    "openpi": ""
+  },
+  "gpu_after": "2, GPU-6d9bc890-77e2-5b8f-40f6-b5ef25cdf8b0, 4 MiB",
+  "started_at": "2026-09-12T00:59:15.057988+08:00",
+  "finished_at": "2026-09-12T01:29:41.126994+08:00",
+  "raw_sha256": {
+    "launch.json": "897931f3e1b6ce57e1cdda7fb2e809090f4955be18436b03d536611b5ad5c27c",
+    "driver.log": "a71b1f736b7a650085d3b08adec8bc4b884bd33844f4c1c38b279e19adc9e4a7",
+    "result.json": "eaeee02954be302de93a17629bf2f9bd9746a01bd69c33bd861b26a2fe827c4e",
+    "exit": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+  },
+  "lifecycle_gate_passed": true,
+  "policy_smoke_completed": false,
+  "formal_completed": false,
+  "review_pending": true,
+  "records": "/mnt/public/xcj/Projects/state-vla/workspace/2a879870-8dda-4613-a684-0ad48a5e86be/records/renderer-reuse-20260912-retry1"
+}

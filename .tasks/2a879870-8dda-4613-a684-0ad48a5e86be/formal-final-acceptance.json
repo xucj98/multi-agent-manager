@@ -1,0 +1,1369 @@
+{
+  "run": "/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/put_back_full_t_plus_1_s0_20k_renderer_100ep_20260912",
+  "verified_at": "2026-09-12T03:34:37.519467+08:00",
+  "checks": {
+    "exit0": true,
+    "exact100_fixed_seeds": true,
+    "accepted100": true,
+    "terminal_without_error": true,
+    "video_checks": true,
+    "no_video_files_after5": true,
+    "artifact_files": true,
+    "decoded_video": true,
+    "all_episode_artifacts": true,
+    "decoded_video1": true,
+    "decoded_video2": true,
+    "decoded_video3": true,
+    "decoded_video4": true,
+    "score_in_64_74": true,
+    "shutdown_records": true,
+    "services_gone": true,
+    "worker_no_infra_errors": true,
+    "clean_sources": true,
+    "gpu_reclaimed": true
+  },
+  "passed": true,
+  "episodes": [
+    {
+      "episode": 0,
+      "seed": 100000,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 1,
+      "seed": 100001,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 362,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 2,
+      "seed": 100002,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 356,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 3,
+      "seed": 100003,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 4,
+      "seed": 100004,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 356,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 5,
+      "seed": 100005,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 332,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 6,
+      "seed": 100006,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 362,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 7,
+      "seed": 100007,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 8,
+      "seed": 100008,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 9,
+      "seed": 100009,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 10,
+      "seed": 100010,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 358,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 11,
+      "seed": 100011,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 342,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 12,
+      "seed": 100012,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 350,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 13,
+      "seed": 100013,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 361,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 14,
+      "seed": 100014,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 332,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 15,
+      "seed": 100015,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 16,
+      "seed": 100016,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 17,
+      "seed": 100017,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 403,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 18,
+      "seed": 100018,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 363,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 19,
+      "seed": 100019,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 20,
+      "seed": 100020,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 21,
+      "seed": 100021,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 358,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 22,
+      "seed": 100022,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 23,
+      "seed": 100023,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 358,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 24,
+      "seed": 100024,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 348,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 25,
+      "seed": 100025,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 26,
+      "seed": 100026,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 321,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 27,
+      "seed": 100027,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 346,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 28,
+      "seed": 100028,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 29,
+      "seed": 100029,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 354,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 30,
+      "seed": 100030,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 351,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 31,
+      "seed": 100031,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 356,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 32,
+      "seed": 100032,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 366,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 33,
+      "seed": 100033,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 359,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 34,
+      "seed": 100034,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 35,
+      "seed": 100035,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 358,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 36,
+      "seed": 100036,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 332,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 37,
+      "seed": 100037,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 357,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 38,
+      "seed": 100038,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 363,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 39,
+      "seed": 100039,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 40,
+      "seed": 100040,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 339,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 41,
+      "seed": 100041,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 400,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 42,
+      "seed": 100042,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 43,
+      "seed": 100043,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 410,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 44,
+      "seed": 100044,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 359,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 45,
+      "seed": 100045,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 46,
+      "seed": 100046,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 347,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 47,
+      "seed": 100047,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 324,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 48,
+      "seed": 100048,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 347,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 49,
+      "seed": 100049,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 349,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 50,
+      "seed": 100050,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 51,
+      "seed": 100051,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 352,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 52,
+      "seed": 100052,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 361,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 53,
+      "seed": 100053,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 355,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 54,
+      "seed": 100054,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 55,
+      "seed": 100055,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 56,
+      "seed": 100056,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 341,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 57,
+      "seed": 100057,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 360,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 58,
+      "seed": 100058,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 348,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 59,
+      "seed": 100059,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 354,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 60,
+      "seed": 100060,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 61,
+      "seed": 100061,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 62,
+      "seed": 100062,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 63,
+      "seed": 100063,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 358,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 64,
+      "seed": 100064,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 65,
+      "seed": 100065,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 342,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 66,
+      "seed": 100066,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 347,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 67,
+      "seed": 100067,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 341,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 68,
+      "seed": 100068,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 356,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 69,
+      "seed": 100069,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 361,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 70,
+      "seed": 100070,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 71,
+      "seed": 100071,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 362,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 72,
+      "seed": 100072,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 347,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 73,
+      "seed": 100073,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 355,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 74,
+      "seed": 100074,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 357,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 75,
+      "seed": 100075,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 332,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 76,
+      "seed": 100076,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 349,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 77,
+      "seed": 100077,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 363,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 78,
+      "seed": 100078,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 79,
+      "seed": 100079,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 363,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 80,
+      "seed": 100080,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 415,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 81,
+      "seed": 100081,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 346,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 82,
+      "seed": 100082,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 316,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 83,
+      "seed": 100083,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 360,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 84,
+      "seed": 100084,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 346,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 85,
+      "seed": 100085,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 329,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 86,
+      "seed": 100086,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 342,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 87,
+      "seed": 100087,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 88,
+      "seed": 100088,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 89,
+      "seed": 100089,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 321,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 90,
+      "seed": 100090,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 91,
+      "seed": 100091,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 92,
+      "seed": 100092,
+      "result": "Fail",
+      "status": {
+        "failure_reason": "step_limit_reached",
+        "logical_step": 500,
+        "state": "failed",
+        "step_limit": 500,
+        "success": false,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 93,
+      "seed": 100093,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 345,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 94,
+      "seed": 100094,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 347,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 95,
+      "seed": 100095,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 360,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 96,
+      "seed": 100096,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 363,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 97,
+      "seed": 100097,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 347,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 98,
+      "seed": 100098,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 347,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 99,
+      "seed": 100099,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 353,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    }
+  ],
+  "video": {
+    "programs": [],
+    "streams": [
+      {
+        "width": 320,
+        "height": 240,
+        "nb_read_frames": "500"
+      }
+    ]
+  },
+  "gpu_after": "2, GPU-6d9bc890-77e2-5b8f-40f6-b5ef25cdf8b0, 4 MiB",
+  "source": {
+    "RMBench": {
+      "commit": "17b55bff1c79a0c5a836d1da089765934cb3a5b0",
+      "status": ""
+    },
+    "robot-bridge": {
+      "commit": "8ea6078543a875b5ae223df16891cdc1fe975c66",
+      "status": ""
+    },
+    "openpi": {
+      "commit": "a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4",
+      "status": ""
+    }
+  },
+  "infra_markers": {
+    "ErrorIncompatibleDriver": 0,
+    "Your GPU driver does not support Vulkan": 0,
+    "worker closed the RPC stream": 0,
+    "ConnectionResetError": 0,
+    "EOFError": 0,
+    "Segmentation fault": 0
+  },
+  "sha256": {
+    "seed_preflight.jsonl": "9ec701eb35363666a877178b228bde588fa550be0acdd1daa743c7c2e62789b9",
+    "episode_diagnostics.jsonl": "1fafa27ff99865246708ab8869d5232a90cd637ab8b44a3a614517e115d3e83e",
+    "video_checks.jsonl": "6c080abbb3179b96401931f0a099f33ed06c75312a2ee1b4d6367f3406d957c7",
+    "_result.txt": "4288c7ae318ef433ac75a99652b26a6597c5fd58e8ede020f8ebb15e96423b9d",
+    "episode0.mp4": "0f8ccda4b743bd0672dda07c1701d4949930385af960c4b744a57b16d72e15fe",
+    "processes.jsonl": "8a16917750008be7cbdf2c5da6dd29153a4e3493fe3f965318890adb61c2ba67"
+  }
+}

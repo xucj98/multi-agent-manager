@@ -1,0 +1,89 @@
+{
+  "run": "/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/renderer_c3_smoke2_20260912",
+  "verified_at": "2026-09-12T01:40:05.799433+08:00",
+  "checks": {
+    "exit0": true,
+    "exact2_fixed_seeds": true,
+    "accepted2": true,
+    "terminal_without_error": true,
+    "video_checks": true,
+    "no_video_file": true,
+    "artifact_files": true,
+    "decoded_video": true,
+    "shutdown_records": true,
+    "services_gone": true,
+    "worker_no_infra_errors": true,
+    "clean_sources": true,
+    "gpu_reclaimed": true
+  },
+  "passed": true,
+  "episodes": [
+    {
+      "episode": 0,
+      "seed": 100000,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 327,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    },
+    {
+      "episode": 1,
+      "seed": 100001,
+      "result": "Success",
+      "status": {
+        "failure_reason": null,
+        "logical_step": 319,
+        "state": "success",
+        "step_limit": 500,
+        "success": true,
+        "terminal": true
+      }
+    }
+  ],
+  "video": {
+    "programs": [],
+    "streams": [
+      {
+        "width": 320,
+        "height": 240,
+        "nb_read_frames": "327"
+      }
+    ]
+  },
+  "gpu_after": "0, GPU-c402ec26-9fff-a3f2-55c0-3b7e1c6e34b1, 1 MiB",
+  "source": {
+    "RMBench": {
+      "commit": "17b55bff1c79a0c5a836d1da089765934cb3a5b0",
+      "status": ""
+    },
+    "robot-bridge": {
+      "commit": "8ea6078543a875b5ae223df16891cdc1fe975c66",
+      "status": ""
+    },
+    "openpi": {
+      "commit": "a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4",
+      "status": ""
+    }
+  },
+  "infra_markers": {
+    "ErrorIncompatibleDriver": 0,
+    "Your GPU driver does not support Vulkan": 0,
+    "worker closed the RPC stream": 0,
+    "ConnectionResetError": 0,
+    "EOFError": 0,
+    "Segmentation fault": 0
+  },
+  "sha256": {
+    "seed_preflight.jsonl": "2861ac91900ed24ce75e5c14266cd9053f1d590ef960235823035bb8a640c659",
+    "episode_diagnostics.jsonl": "6a715318dbb7bdb81e7b1281b9a39c7d8912c131b5b35421f858d44abdab444c",
+    "video_checks.jsonl": "e43719d92a6adbfbfd19148d21d0dd61ac37eaf9a3c6573a3e348999d4b396c7",
+    "_result.txt": "34239f6478d8d4a25616770caa3ba74f959e1f4e69016a367e725bbb0227e3f5",
+    "episode0.mp4": "5aeee8b3695f7708549f0d7fc4502b401d68f2d3bbc904fb2eac0ddf25203964",
+    "processes.jsonl": "18005b340ffd1aa1ac59c705036c1c88291e5e64fe5795d2e1898fe1ed9a88aa"
+  }
+}

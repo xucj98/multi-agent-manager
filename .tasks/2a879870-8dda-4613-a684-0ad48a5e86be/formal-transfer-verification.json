@@ -1,0 +1,26 @@
+{
+  "files_verified": 255,
+  "bytes": 38494095,
+  "manifest_sha256": "7c52fe17050b51315b1f8b165351396abf29d7c8fe70b60549661c5d92bd5dd8",
+  "baseline_unchanged": true,
+  "score": 70,
+  "baseline_score": 69,
+  "percentage_point_delta": 1,
+  "score_gate_passed": true,
+  "infra_passed": true,
+  "failure_categories": {
+    "button_not_pressed_after_center": 22,
+    "button_press_insufficient": 8
+  },
+  "baseline_failure_categories": {
+    "button_not_pressed_after_center": 18,
+    "button_press_insufficient": 13
+  },
+  "matched_seed_results": {
+    "C_fail/baseline_fail": 11,
+    "C_success/baseline_fail": 20,
+    "C_success/baseline_success": 50,
+    "C_fail/baseline_success": 19
+  },
+  "local_result": "/mnt/public/xcj/Projects/RMBench/eval_result/cluster_c_eval_acceptance_20260911/put_back_full_t_plus_1_s0_20k_100ep"
+}

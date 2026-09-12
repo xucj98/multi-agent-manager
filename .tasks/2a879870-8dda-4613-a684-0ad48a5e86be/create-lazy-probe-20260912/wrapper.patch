@@ -1,0 +1,20 @@
+--- a/.local/create_worktree.sh
++++ b/.local/create_worktree.sh
+@@ -101,6 +101,7 @@
+ patch --batch --silent "$MANAGED_TMP" "$PATCH_FILE"
+ if [[ "$REPOSITORY" == RMBench ]]; then
+   patch --batch --silent "$MANAGED_TMP" "$RMBENCH_OFFLINE_LOCK_PATCH"
++  patch --batch --silent "$MANAGED_TMP" "$ROOT/.local/patches/RMBench-lazy-symlink-probe.patch"
+   export UV_OFFLINE=1
+ fi
+ 
+@@ -122,7 +123,8 @@
+ 
+ cache = Path(sys.argv[1]).resolve()
+ venv = Path(sys.argv[2]).resolve()
+-for path in sorted(venv.rglob("*")):
++# Existence probe: stop at the first valid cache link.
++for path in venv.rglob("*"):
+     if not path.is_symlink():
+         continue
+     try:

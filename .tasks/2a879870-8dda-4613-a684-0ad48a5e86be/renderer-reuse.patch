@@ -1,0 +1,27 @@
+diff --git a/envs/_base_task.py b/envs/_base_task.py
+index aa806ff..bfc4c88 100644
+--- a/envs/_base_task.py
++++ b/envs/_base_task.py
+@@ -34,6 +34,10 @@ current_file_path = os.path.abspath(__file__)
+ parent_directory = os.path.dirname(current_file_path)
+ 
+ 
++# Keep the renderer context alive across episode-local scenes in this process.
++_PROCESS_RENDERER = None
++
++
+ class Base_Task(gym.Env):
+ 
+     def __init__(self):
+@@ -283,7 +287,10 @@ class Base_Task(gym.Env):
+         from sapien.render import set_global_config
+ 
+         set_global_config(max_num_materials=50000, max_num_textures=50000)
+-        self.renderer = sapien.SapienRenderer()
++        global _PROCESS_RENDERER
++        if _PROCESS_RENDERER is None:
++            _PROCESS_RENDERER = sapien.SapienRenderer()
++        self.renderer = _PROCESS_RENDERER
+         # give renderer to sapien sim
+         self.engine.set_renderer(self.renderer)
+ 

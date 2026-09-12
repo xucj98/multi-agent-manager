@@ -1,0 +1,64 @@
+{
+  "checkpoint": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_serial_lag30_s2/20000",
+  "checkpoint_commit_timestamp_nsecs": 1789191532407359023,
+  "checkpoint_items": [
+    "assets",
+    "metadata",
+    "params"
+  ],
+  "checkpoint_parent_children": [
+    "20000"
+  ],
+  "command_commit_clean_seed_verified": true,
+  "config": {
+    "action_horizon": 50,
+    "asset_id": "rmbench_rearrange_blocks_robot",
+    "batch_size": 32,
+    "data_repo_id": "rearrange_blocks_demo_clean_state_shared_memory",
+    "memory_config_id": "rearrange_blocks_serial_lag30",
+    "name": "pi05_rmbench_rearrange_blocks_serial_lag30",
+    "num_train_steps": 20000,
+    "save_dtype": "bfloat16",
+    "save_full_state": false,
+    "schema_version": 1,
+    "seed": 2
+  },
+  "cpu_only": {
+    "cuda_visible_devices": "",
+    "jax_platforms": [
+      "cpu"
+    ]
+  },
+  "dataset": {
+    "repo_id": "rearrange_blocks_demo_clean_state_shared_memory",
+    "schema_version": 1,
+    "total_episodes": 50
+  },
+  "metadata_parse": {
+    "json_files": 9,
+    "jsonl_files": 6,
+    "norm_stats_json_parsed": true,
+    "plain_yaml_files": 5
+  },
+  "norm_stats_sha256": "5d84df27e9fce3c6ec28585319ed293fa59fc1822063ecfa0e95c5bf4478606b",
+  "params": {
+    "all_finite": true,
+    "dtype_counts": {
+      "bfloat16": 56
+    },
+    "elements": 3353474844,
+    "leaves": 56,
+    "shape_paths_match_registered_model": true
+  },
+  "standalone_policy_loaded": true,
+  "standalone_policy_type": "openpi.policies.policy.Policy",
+  "training_log": {
+    "all_scalar_values_finite": true,
+    "error_matches": [],
+    "final_grad_norm": 0.4465,
+    "final_loss": 0.0149,
+    "final_param_norm": 1805.5968,
+    "final_step": 20000,
+    "scalar_count": 200
+  }
+}

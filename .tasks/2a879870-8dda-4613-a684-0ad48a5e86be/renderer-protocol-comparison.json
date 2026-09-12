@@ -1,0 +1,318 @@
+{
+  "scope": "two fixed resets + identical 50-action hold trajectory, execute30/remaining20; not policy smoke",
+  "episodes": [
+    {
+      "seed": 100000,
+      "arrays": {
+        "actions": {
+          "shape": [
+            50,
+            14
+          ],
+          "dtype": "float32",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "initial_qpos": {
+          "shape": [
+            14
+          ],
+          "dtype": "float32",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "after30_qpos": {
+          "shape": [
+            14
+          ],
+          "dtype": "float32",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "initial_head_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "initial_left_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "initial_right_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "after30_head_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "after30_left_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "after30_right_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        }
+      }
+    },
+    {
+      "seed": 100001,
+      "arrays": {
+        "actions": {
+          "shape": [
+            50,
+            14
+          ],
+          "dtype": "float32",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "initial_qpos": {
+          "shape": [
+            14
+          ],
+          "dtype": "float32",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "after30_qpos": {
+          "shape": [
+            14
+          ],
+          "dtype": "float32",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "initial_head_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "initial_left_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "initial_right_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "after30_head_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "after30_left_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        },
+        "after30_right_camera": {
+          "shape": [
+            240,
+            320,
+            3
+          ],
+          "dtype": "uint8",
+          "exact_equal": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0
+        }
+      }
+    }
+  ],
+  "metadata_exact_equal": true,
+  "baseline_metadata": [
+    {
+      "episode_id": 0,
+      "seed": 100000,
+      "accepted": true,
+      "progress": {
+        "completed": 30,
+        "queued": 20
+      },
+      "initial_status": {
+        "state": "ready",
+        "terminal": false,
+        "success": false,
+        "failure_reason": null,
+        "logical_step": 0,
+        "step_limit": 500
+      },
+      "after_status": {
+        "state": "running",
+        "terminal": false,
+        "success": false,
+        "failure_reason": null,
+        "logical_step": 30,
+        "step_limit": 500
+      },
+      "instruction": "There are four mats, one block, and a button on the table. One block is on one of the mats. First, put the block to the center, then press the button. Then, put the block back in its original position."
+    },
+    {
+      "episode_id": 1,
+      "seed": 100001,
+      "accepted": true,
+      "progress": {
+        "completed": 30,
+        "queued": 20
+      },
+      "initial_status": {
+        "state": "ready",
+        "terminal": false,
+        "success": false,
+        "failure_reason": null,
+        "logical_step": 0,
+        "step_limit": 500
+      },
+      "after_status": {
+        "state": "running",
+        "terminal": false,
+        "success": false,
+        "failure_reason": null,
+        "logical_step": 30,
+        "step_limit": 500
+      },
+      "instruction": "There are four mats, one block, and a button on the table. One block is on one of the mats. First, put the block to the center, then press the button. Then, put the block back in its original position."
+    }
+  ],
+  "candidate_metadata": [
+    {
+      "episode_id": 0,
+      "seed": 100000,
+      "accepted": true,
+      "progress": {
+        "completed": 30,
+        "queued": 20
+      },
+      "initial_status": {
+        "state": "ready",
+        "terminal": false,
+        "success": false,
+        "failure_reason": null,
+        "logical_step": 0,
+        "step_limit": 500
+      },
+      "after_status": {
+        "state": "running",
+        "terminal": false,
+        "success": false,
+        "failure_reason": null,
+        "logical_step": 30,
+        "step_limit": 500
+      },
+      "instruction": "There are four mats, one block, and a button on the table. One block is on one of the mats. First, put the block to the center, then press the button. Then, put the block back in its original position."
+    },
+    {
+      "episode_id": 1,
+      "seed": 100001,
+      "accepted": true,
+      "progress": {
+        "completed": 30,
+        "queued": 20
+      },
+      "initial_status": {
+        "state": "ready",
+        "terminal": false,
+        "success": false,
+        "failure_reason": null,
+        "logical_step": 0,
+        "step_limit": 500
+      },
+      "after_status": {
+        "state": "running",
+        "terminal": false,
+        "success": false,
+        "failure_reason": null,
+        "logical_step": 30,
+        "step_limit": 500
+      },
+      "instruction": "There are four mats, one block, and a button on the table. One block is on one of the mats. First, put the block to the center, then press the button. Then, put the block back in its original position."
+    }
+  ],
+  "files_sha256": {
+    "baseline/episode0.npz": "69a046e2116b8d2ca1578682f85164d9c929859dcad632d4cc37dc42f719a314",
+    "baseline/episode1.npz": "69a046e2116b8d2ca1578682f85164d9c929859dcad632d4cc37dc42f719a314",
+    "candidate/episode0.npz": "69a046e2116b8d2ca1578682f85164d9c929859dcad632d4cc37dc42f719a314",
+    "candidate/episode1.npz": "69a046e2116b8d2ca1578682f85164d9c929859dcad632d4cc37dc42f719a314"
+  }
+}
