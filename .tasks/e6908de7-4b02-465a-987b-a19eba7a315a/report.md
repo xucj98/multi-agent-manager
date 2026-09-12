@@ -361,3 +361,11 @@ rearrange full t+1/s2 的 C formal 已完成 100 个连续 seed `100000–100099
 raw leaf 已 SSH tar 回传主 RMBench 同组目录；C/本机规范整树 hash 均为 `b611a89f27050f05ed7c63dc65526cd7f95efb267845bb9958d88d9a766ff2da`，稳定结果为 `c_rearrange_full_t_plus_30_s2_20k_100ep_seed0_first90_20260912/diagnostics_summary.json`。job 已归档。相同任务、相同训练 seed 的完整 target 对照为 t+30 93/100 对 t+1 96/100，即 **-3pp**；二者仍是不同 checkpoint，不能写成同 checkpoint 复现误差。
 
 安全 docs tree 提交 `abc59f0`，直接更新主 Q2 表、能力基线表、远端训练概述、已完成结果表、C checkpoint 清单和当前队列：10份完整100（本机2、C8），运行中仅 rearrange full t+1/s0、t+1/s1 和 serial-lag30/s0；no-memory/s0 已传输、将用释放的 C2 GPU3 接续。`git diff --check` 通过，新增稳定链接和本机回传树哈希均已实读核对。下一步只运行 no-memory/s0 自身 prepare-audit → matching smoke2；通过后才登记 formal100。
+
+## 2026-09-12 11:10 no-memory 接续
+
+C2 GPU3 的 rearrange no-memory/s0 已按释放槽位接续。prepare-audit确认 `fields=[]`、无 memory feedback，metadata 仍经 `load_train_config → _runtime_metadata → MemoryContext` 进入 scheduler；没有注入 legacy memory。matching smoke2 的 seed `100000,100001` 均 terminal、0 runtime error，episode0 视频 ffprobe 可读、episode1 按约定无视频，scheduler/robot/policy均正常退出。两条均为正常任务失败（`button_not_pressed`、`button_pressed_multiple_times`），不影响 smoke gate，也不作为性能筛选。
+
+formal100 已于11:10 CST 在 C2 GPU3 启动并登记为 MAM `ff4d1718-ab99-45fd-a310-f843ce458c37`，冻结 RMBench `7933426`、bridge `f962663`、OpenPI `a869498`，H50/K30、seed `100000–100099`、首个 infer90秒/后续30秒不变。启动后 MAM 为 running，GPU3已加载约10.1 GiB。当前 C 12 项均处于“8项正式完成，rearrange full t+1/s0、t+1/s1、serial-lag30/s0、no-memory/s0 formal运行中”；没有未登记或待启动模型。
+
+台账提交 `44aee09`，直接更新总览、能力基线表、C checkpoint 清单和队列历史；`git diff --check`通过，C三库、checkpoint和其它 active job未修改。继续使用裸 `mam wait` 等待真实完成事件；第50条仅按既有阈值检查，不以中途成绩改变参数、队列或分母。
