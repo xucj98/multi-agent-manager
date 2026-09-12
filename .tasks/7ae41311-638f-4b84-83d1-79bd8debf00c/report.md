@@ -189,3 +189,30 @@ GPU5 的 MAM job `b13b2fbd-ce10-4fac-87d0-62761879e057` 已自然停止。最终
 - 显式 CPU-only 核验（CUDA_VISIBLE_DEVICES 空、JAX cpu）实际读回 51 个参数叶、3,353,433,872 个元素，全部 BF16、全部有限，路径和 shape 与注册模型逐项一致；checkpoint-only standalone Policy 恢复成功。
 - 完整审计 JSON：/mnt/public/xcj/Projects/workspace/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_no_memory_s2.json。
 - MAM 复查为 stopped，原 PID 3957417 已不存在且不再占用本任务 GPU5；对应 job 已归档。
+
+
+## GPU3 serial-lag30 seed2：20000 验收与 e6908de7 评估交接
+
+GPU3 的 MAM wait 停止事件对应 job `68ecba3b-e570-4dd4-8cd1-4a82249a515d`。该训练自然结束并已按下列证据验收、归档；本任务未启动任何评测。
+
+### 可评模型清单：交 e6908de7 评估队列
+
+| 字段 | 已核对值 |
+| --- | --- |
+| config / schema / seed | pi05_rmbench_rearrange_blocks_serial_lag30 / rearrange_blocks_serial_lag30 schema v1 / seed2 |
+| 训练 commit | d10cc01d44c10e5ed0cd8c228d9409dd6cabac50，command 记录 clean worktree |
+| 绝对 checkpoint | /mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_serial_lag30_s2/20000 |
+| 固定训练条件 | Pi0.5 base、batch32、20,000 updates、H50/K30、BF16 final-only；rearrange_blocks_demo_clean_state_shared_memory，rmbench_rearrange_blocks_robot norm |
+| 研究目的 | 补齐 B 组 rearrange serial-lag30 的独立 seed，检验同骨干、同数据和同训练协议下的 seed 级稳定性，避免把 seed0 随机性误判为记忆表示差异。 |
+| 评测应检验的结论 | 将其作为 serial-lag30 可复现基线，与同协议 full/no-memory 变体及其它 seed 比较表示差异和方差；不预设或声称闭环成功率。 |
+
+该模型现可由 e6908de7-4b02-465a-987b-a19eba7a315a 按其既定“自身 smoke2 后正式 100”队列接入；本任务不重复启动 eval。
+
+### 20000 产物与恢复验收
+
+- 日志明确记录 Step20000：grad_norm=0.4465、loss=0.0149、param_norm=1805.5968；100 至 20000 共 200 条落盘标量均有限，未匹配 traceback、OOM、未处理 exception、NaN 或非有限错误。
+- 最终保存已原子提交：checkpoint metadata 含 commit timestamp，父目录仅含 20000；item 仅 params、assets、metadata，无 train_state 或 optimizer。
+- checkpoint metadata 中 config、dataset、command 和 norm 证据均可解析：数据为 50 episodes 的 rearrange_blocks_demo_clean_state_shared_memory，norm SHA-256 为 5d84df27e9fce3c6ec28585319ed293fa59fc1822063ecfa0e95c5bf4478606b；9 个 JSON、6 个 JSONL、5 个普通 YAML 与带标签 train config 均通过解析。
+- 显式 CPU-only 核验（CUDA_VISIBLE_DEVICES 空、JAX cpu）实际读回 56 个参数叶、3,353,474,844 个元素，全部 BF16、全部有限，路径和 shape 与注册 serial 模型逐项一致；checkpoint-only standalone Policy 恢复成功。
+- 完整审计 JSON：/mnt/public/xcj/Projects/workspace/7ae41311-638f-4b84-83d1-79bd8debf00c/closure/memory20k_7ae41311_rearrange_serial_lag30_s2.json。
+- MAM 复查为 stopped，原 PID 3956200 已不存在且不再占用本任务 GPU3；对应 job 已归档。
