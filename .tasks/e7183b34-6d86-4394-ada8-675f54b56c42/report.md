@@ -28,3 +28,13 @@
 ## 真实 App Server API 对齐
 
 在开始 fixture 前执行的无模型实测发现，当前 App Server 对同一随机、未登记 UUID 的四个 API 依次返回：`thread/read` 为 `thread not loaded`，`thread/resume` 为 `no rollout found for thread id`，`thread/turns/list` 为 `thread not loaded`，`turn/start` 为 `thread not found`。四项均为明确的空/未知 thread 拒绝，且没有创建 thread 或模型请求；原实现只识别 `not found` 等文字，因而保守地失败。现已把这两个实际空-thread 拒绝形式纳入同一受限分类，同时仍拒绝 `method not found` 等 unsupported-method 响应。此项不是 runtime 公共接口变更，也不需要 bypass。
+
+## 首次真实隔离 fixture（阻断，未重试）
+
+已在 `/tmp` 的新 marker-owned fixture 根运行一次真实隔离验收，未读取、启动、停止或修改生产 scheduler。前置轻量检查成功，四个未知-thread RPC 完成且 `model_requests=0`。fixture 随后注册三项 task、创建四个 ephemeral 专用 thread、绑定三个 executor、登记 stopped 与 archived short job，并按要求用 `gpt-5.6-terra`/`max` 启动了一次 baseline executor turn。
+
+该次运行在等待 baseline turn history 时收到实际 API 拒绝：`thread/turns/list` 返回 `ephemeral threads do not support thread/turns/list`。这阻断 liveprobe 的 turn-history/distribution 验证，也阻断当前 `wake_runtime.WakeScheduler` 的 `latest_turn()` 投递前边界检查；因此尚未出现可认定的 stopped-job 或 Manager delivery PASS。证据记录 `thread_start=4`、`direct_turn_start=1`，没有重试或额外模型 turn。
+
+cleanup 已 stop fixture service、archive 两个 fixture job 和三项 fixture task、关闭 control stream、删除 marker-owned fixture 根。App Server 同时拒绝对 ephemeral thread 的 archive/delete（`thread is not persisted and cannot be deleted`），所以该次 evidence 的 thread cleanup 标为 failed；stream close 后 ephemeral 生命周期未由可用 cleanup API 再确认。外层临时 evidence 仅用于本报告，随后会清理。
+
+需要 runtime/Manager 决定后续真实验收边界：在保持 ephemeral 专用 thread 的前提下，runtime 必须提供不依赖 `thread/turns/list` 且仍能安全做 delivery 前边界的实际路径；若只能用 persisted 专用 probe thread，则需要用户/Manager 明确改变 ephemeral 约束及其 archive/delete 清理方案。我未修改 runtime，也没有把这项阻断降级为 handshake 或 mock PASS。
