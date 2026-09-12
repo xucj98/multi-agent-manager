@@ -514,7 +514,7 @@ robot/policy均由 runner 收尾；其任务表现为0/2仅是正常任务失败
 `WARP_CACHE_PATH=.../runs/<run_name>/{robot,policy}` 直接写入 command，故 smoke 与 formal 的不同 result run
 名产生不同字符串。GPU1已恢复1 MiB/0%，端口19410/19412无监听；未启动 C2/C3 的后续 smoke。
 
-本机独立 runtime tree 的最小修复为 RMBench `9d8f478b4e76db79a7eab26a0433bf616418ce7d`
+本机独立 runtime tree 的最小修复为 RMBench `9d8f47887a50ea691e5624de139f10bfcfb54412`
 （父 `f508749`）：只将该 cache 根改为公共 `BenchmarkRunner` 已有的`{result_run}` child-command 占位符。runner
 在实际启动时才展开它，所以 smoke/formal 保存的 launch template 一致，同时每个具体 result run仍有独立
 robot/policy Warp cache；不改 public runner、端口、模型、seed、manifest、scheduler或 checkpoint。
