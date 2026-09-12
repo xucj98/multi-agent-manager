@@ -53,3 +53,23 @@ MAM 主动唤醒继续监控四条 attempt3 job。本轮正常结束；任一 st
 Step100、唯一 `20000`、完整参数树 shape/BF16/finite、model-only、assets/metadata、checkpoint-only
 恢复、退出和 GPU 回收后再归档，并将完成模型交给 Manager 安排固定 5-episode offline。本组不运行
 RMBench 仿真 100、真实机器人或部署。
+
+## 2026-09-13 01:33 CST：执行者交接后的实际运行核对
+
+Manager 已将任务 rebind 给当前执行者；`mam task status` 显示 agent 为
+`01a096ab-b7ba-7ce2-bd31-b38f1803b789`，既有 workspace、两个 worktree 和全部 12 条 job
+记录未改变。没有新建 worktree、重启训练或重复登记 job。
+
+即时实际核对确认四个 attempt3 PID 都存在、状态为 `R`、PPID 为 1，cwd 均为既有 OpenPI
+worktree；`nvidia-smi` 将它们分别映射至约 73.3 GiB 的 GPU4/5/2/3。日志持续前进，且新的
+Step100 均为 finite：
+
+| 协议 / seed | PID / GPU | Step100 loss | 本次核对时最新完整指标 |
+| --- | --- | ---: | --- |
+| full / 1 | 593959 / 4 | 0.0794 | Step5400，loss 0.0128 |
+| serial / 1 | 593965 / 5 | 0.7461 | Step5300，loss 0.0509 |
+| full / 2 | 594097 / 2 | 0.0785 | Step5400，loss 0.0122 |
+| serial / 2 | 594103 / 3 | 0.6359 | Step5400，loss 0.0573 |
+
+四条 MAM job 仍为 running，因此没有可归档事项。本轮结束，后续由 MAM 在 stopped 事件时唤醒；
+届时按既定最终 checkpoint、恢复和资源回收验收流程处理。
