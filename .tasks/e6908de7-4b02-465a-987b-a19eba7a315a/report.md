@@ -1023,3 +1023,24 @@ runtime: RMBench 2e9677ce8ec9f623395184f63f32ddafa66e5e44; bridge f9626636c4776d
 ```
 
 启动时 formal leaf 不存在，三库 tracked 状态 clean；runner 已写入 command/config/lineage，服务正在启动，尚无正式 terminal 或结果。C2 GPU6 的独立 40-reset gate `546b6d60-f038-4924-b60d-ece5d9489309` 仍 running 且 receipt 尚未出现，未据此推断进度或 PASS。
+
+### C2 40-reset PASS 与 r3 接续（2026-09-13 01:29 CST）
+
+已核验并归档 stopped MAM gate `546b6d60-f038-4924-b60d-ece5d9489309`。C2 receipt
+`.../c-eval-renderer-r3-2e9677c/records/renderer_reset_gate_c2_gpu6_r3_2e9677c.json` 为实际 GPU PASS：
+`passed=true`、`completed_count=requested_count=40`，seed `100000..100039` 的每条均
+`accepted=true`、`state=ready`、`terminal=false`，`error=null`；worker/outer logs 中 EOF、renderer/native、driver、segfault 与 traceback marker 均为 0。结束时 C2 GPU6/GPU7 各4 MiB used、24,207 MiB free、0% util，19460/19462/19470/19472 无监听。runtime 三库仍为 clean 的
+RMBench `2e9677c`、bridge `f962663`、OpenPI `a869498`。
+
+按 C2 的旧 `r2` incomplete 项和固定 eval-seed 队列，已在 C2 GPU7 接续
+`rearrange_full_t_plus_30 / trainseed0 / evalseed2` 的 fresh matching smoke：
+
+```text
+run: c_rearrange_full_t_plus_30_trainseed0_evalseed2_smoke2_r3
+checkpoint: .../pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s0/20000
+smoke seeds: 300000, 300001
+ports: 19470,19472
+MAM: 96f548b9-4fc1-44a2-9e18-533a2cb8e090
+```
+
+其 C2-local audit/manifest、metadata route 和 dry-run 均已通过，正式 leaf 不存在；启动后 robot 服务已监听，尚未形成 terminal rollout 或 smoke verdict。只在该 smoke 的 video/no-video、terminal、退出和零基础设施 marker 全部通过后才直接启动 matching fresh formal100。C3 GPU0 的同 checkpoint evalseed1 formal `5be8d262-f6f6-45a4-ae0d-5b02e3dfc043` 保持运行，未修改。
