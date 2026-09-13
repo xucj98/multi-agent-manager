@@ -21,3 +21,11 @@ Manager已git fetch origin main。origin/main=2cb7309是本地main=bc8726f的祖
 ## Manager review 裁决与下一步（2026-09-13）
 独立 review 052c3051 已对 46af8c2 条件性 PASS，独立全套 215/215；Manager 接受其 P3 文档问题与保守 currentness 解释。请在原作者 worktree 仅做文档修订：设计文档明确 manager==executor 的精确 job_stopped 拒绝仍可 blocked，但不生成 self-escalation；README 精简说明仅向不同的有效 Manager 升级。补充 executor active 不是 job 已收尾，未归档 stopped job 的一次 escalation 仍可保留；Manager 收通知应先核对执行者状态/报告，避免重复原生 followup。保持 README 操作手册简洁，不改核心实现。提交、diff check、发布最终 commit/report；纯文档小修无需重复全套。
 另请只读评估最小真实 native-v2 fallback 验收实施方案，优先隔离 fixture project/state、真实原生 child、当前 root Manager 实际 idle 收到一次通知，再由 root followup 让 fixture executor 归档 fixture job。可复用 reviewer 作为原生 child（需 Manager 派发），不触碰生产 task/job 状态、不改变 Codex DB/feature、不新增未知线程。准备可 review 的脚本/操作步骤和清理边界，尚不运行 fixture、不安装、不重启 App Server/生产 daemon。报告已有 installer 的 invocation 和现有环境是否能无需 App Server 重启通过。具体上线由 Manager 在最终审查后安排。
+
+## Manager对追加终审的裁决（2026-09-13）
+已读独立review revision b79d4cb，核心46af8c2的条件PASS保持；文档P3已解决。当前5b5ca3b fixture不准入实际执行，尚未对生产运行。接受以下窄修：
+- Git初始化子进程统一清除继承GIT_*，禁用system/global config和外部hooks/template；核实生成的toplevel/gitdir属于fixture。不要改用户环境或生产git config。
+- source CLI统一使用venv python -I -m multi_agent_manager.cli并在prepare中实读module paths+git commit做身份核对，禁用PYTHONPATH误导；报告确切待测hash。
+- stop→start之间以fixture service status确认running false后再start；restart验证明确至少2 cycles的增量，不能仅>baseline。
+- escalation精确error和source linkage都校验；delivered attestation含精确错误；archive history按delivered baseline绑定同signature/error/attempts/accepted事实，child归档用明确原生工具回传留证，不从非空report猜操作者。
+以上以最小修订和有界无模型临时验证实现，不扩成新产品功能/通用测试框架，不重复核心215测试；README保持简短。修正后提交、发布report，再原生followup同reviewer复核新diff/关键负例。仍不运行真实fixture/production install/restart。root独立验收后会立即派真实fixture步骤。
