@@ -1133,3 +1133,33 @@ RMBench `2e9677ce8ec9f623395184f63f32ddafa66e5e44`；全部 bridge 为
 `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI 为
 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。九个 stopped MAM job 已分别以 score、seed 范围和
 `final_review.json` 路径归档；本 task 当前没有未归档 job。
+
+## 2026-09-13 10:35 CST：N/S/J seed0 覆盖推进与 put-back baseline YAML 候选
+
+本次接续以已发布 task revision d2841deafcc1cca51dd30bac14a4ddaa7425946b 为准，未重训、未拼接 partial，也没有修改任何活跃 C runtime tree。
+
+### 当前 GPU 状态
+
+- C1 GPU1 的 rearrange no-memory / trainseed0 / evalseed1 已完成其自身 smoke2，两条固定 seed 200000/200001 都是 accepted terminal；episode0 视频可读（700 帧）、episode1 有 no-video ok=true，scheduler 两次 exit 0、policy/robot 均正常受控停止，且 worker/outer/process 日志没有 EOF、ConnectionReset、traceback、segfault、runtime-error 或 scheduler_exited_before_terminal。smoke 的 0/2 是正常任务失败，未被当作基础设施失败或成绩筛选。
+- 该 matching gate 复核后，已在 C1 GPU1 从冻结 RMBench bf34743334efc98440fa9b05e3f2f05e8303846a / bridge f9626636c4776d8eb15f9c556775cb2d12c000e5 / OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4 启动 fresh formal100：c_rearrange_no_memory_trainseed0_evalseed1_100ep_r3，固定 seed 200000..200099，端口 19410/19412，MAM job fad91d99-98b0-4545-ad14-ff90abfc16f1。本次发布时进程仍运行，已有正常 terminal rollout；不报告中途分数。
+- C1 GPU2 已在同一冻结 r3 tree 启动 no-memory / trainseed0 / evalseed2 的 matching smoke2：c_rearrange_no_memory_trainseed0_evalseed2_smoke2_r3，PID 3183493，固定 seed 300000/300001、端口 19420/19422。短 smoke 未登记 MAM；尚未给出 gate verdict 或启动对应 formal。
+- 已运行的 put-back full t+1 seed0 formal 保持不变：C2 GPU6 eval1 的 cb9080c2-b615-40de-8a15-69a7eed3d3f9 和 C3 GPU1 eval2 的 873c5bb0-c8fc-462c-8f40-8bbbe21747b6 都仍为 running。本次读取时两者各有 20 条 terminal/视频记录，尚未做 completion 判定。
+
+### put-back no-memory / serial_lag30 入口候选（待 focused review）
+
+独立 C worktree：
+/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c-eval-putback-baselines-yaml/。
+
+RMBench candidate：
+f401f5279c95451eb424ac98b831bab5552b2120，branch
+task/e6908de7-putback-baselines-yaml-rmbench；bridge/OpenPI 分别冻结在
+f9626636 / a869498f。改动仅为
+experiments/memory_chunk_20260910/configs/memory_schema_eval.yaml 的 17 行：
+- put_back_no_memory：实际 pi05_rmbench_put_back_block_no_memory / put_back_block_no_memory、joint_dense、空 fields；
+- put_back_serial_lag30：实际 pi05_rmbench_put_back_block_serial_lag30 / put_back_block_serial_lag30、serial_token、phase, origin_mat、query_selected/query feedback。
+
+在 C1 用独立只读 Python receipt 实读两份 checkpoint metadata，并经
+load_train_config → _runtime_metadata → MemoryContext 确认上述 config ID、field list、H50/K30、data repo 和 serial 两字段的 feedback。两个 checkpoint 均为完成的 20000，有 _CHECKPOINT_METADATA。
+
+两项均在 CUDA 空、JAX_PLATFORMS=cpu 条件下通过 --prepare-audit、smoke dry-run 和 formal dry-run；formal 命令含 matching smoke directory。checkpoint 的逐文件 path/size/mtime inventory 前后一致，git diff --check 通过，候选三树干净且没有生成 eval leaf。已立即提交 focused-review 请求；review 通过前不部署该树、不启动其 GPU smoke/formal，也不改动 c-eval-renderer-r3 或 c-eval-renderer-r3-2e9677c。
+
