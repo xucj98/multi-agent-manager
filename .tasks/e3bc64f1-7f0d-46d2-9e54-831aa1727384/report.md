@@ -91,3 +91,18 @@ N 的正式 root 为：
 | cover S | 7 | 2646146 | `081f64c5-ae21-4062-b7ea-1dd281ddaa1f` | `pi05_rmbench_cover_blocks_serial_lag30` |
 
 下一项运行验收为每条 step-100 的有限 loss、GPU占用、日志和 receipt；20k 完成后再按 task 合同做最终参数/metadata/shape/BF16/finite 与 checkpoint-only 恢复，随后归档对应 MAM job。
+
+
+## J/S：正式训练 step 100 回执
+
+`/mnt/public/xcj/Projects/openpi/checkpoints/wave1_js_formal20k_34002dce_nocmdbuf_20260913T1020Z/validation/formal_step100_receipt.json` 已在五条日志均出现 step 100 后生成，并由脚本再次核验五条远端 PID 存活、五组 `loss` / `grad_norm` / `param_norm` 均为有限数，同时保存 pmon、GPU 使用率和各训练日志的 SHA-256。当前 receipt SHA-256 为 `5d73850921cc3d5610ea035abd3a6a541ff0658e0d8a6708c3869f6eced7743a`。
+
+| task | arm | GPU | PID | step 100 loss | grad norm | param norm |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| swap_blocks | J | 1 | 2646142 | 0.2167 | 1.1243 | 1802.3861 |
+| battery_try | J | 3 | 2646143 | 0.0844 | 0.7095 | 1802.3865 |
+| cover_blocks | J | 5 | 2646144 | 0.2557 | 1.3287 | 1802.3861 |
+| swap_blocks | S | 6 | 2646145 | 0.6530 | 40.1187 | 1802.3918 |
+| cover_blocks | S | 7 | 2646146 | 0.8665 | 39.2737 | 1802.3960 |
+
+回执的 pmon 快照将 PID 2646142–2646146 分别映射到 GPU 1/3/5/6/7；随后 `ps` 再次确认五个训练进程均为 `Rl`。这些是仍在运行的 20k 正式训练，尚未归档；20k 结束后才执行最终 checkpoint 恢复验收和 job 收尾。
