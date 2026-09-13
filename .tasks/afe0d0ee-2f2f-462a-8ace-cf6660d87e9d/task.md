@@ -12,6 +12,8 @@ Manager此前已接受四项发现：v1 execute non-ok后record过早关闭、le
 
 上述“既有失败”不能只因在原logger提交cb861d3复现就排除logger引入。请针对同一最小输入沿实际原冻结OpenPI a869498/bridge f962与当前候选核对，区分早于整个logger、原logger引入、或本轮fix引入；若只是特定fixture不符合真实输入合同也须具体说明。无需机械全库重跑。
 
+Manager已接受你更正后的同blob四例基线复现：明确早于整个logger。Manager另直接核对fa62的episode_info等deepcopy在begin_query预算前，接受顺序遗漏并让作者窄修。action-dispatch传输前预留是否另为P2，请先用本轮合法H50/K30/robot_dim14说明实际未压缩诊断数组超额，不以4096行非合同fixture或包含普通RPC/容器开销的packed bytes判定；也可如实列为未确认边界。已发的dirty-diff备注保留为建议，现在不要继续追逐作者未提交改动。完成旧候选剩余实质检查后发布；新冻结commit到达再增量复核，避免反复测试变动中代码。
+
 给出精确commits、独立验证和剩余限制、是否准入最小受控GPU验收；不得运行GPU/正式eval/训练或改作者树。HF task0acf仍独立，不把它的未提交修复混入本review。发现实质问题即时报告Manager裁决；完成后publish report并正常结束，无需活跃等待。
 
 使用 gpt-5.6-terra/max 独立审查，Manager 亲自裁决，不改变科学设计。阅读 AGENTS 与本 task 已捕获的源要求、report 和准确交付，mam workspace add 分别从 OpenPI cb861d3824a46d9c243be7ff69159bcec17a0ac7 / robot-bridge a2c7f80b99556db2147c85ca9f625ffb840b276a 创建独立 review worktree。基线分别 a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4 / f9626636c4776d8eb15f9c556775cb2d12c000e5，审查这两个精确 diff，不混入高频 owner 未提交源码。
