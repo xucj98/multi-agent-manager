@@ -1,5 +1,15 @@
 # P0诊断记录接口：状态原始输出、动作和RNG的无行为改动采集
 
+## 当前继续：Manager已核实uv软链来源，替换错误路径断言后恢复工程验收
+
+Manager已亲自只读核对C共享部署及稳定installer，确认旧worktree_env_smoke.py以解析后路径含site-packages判来源，与C installer显式--link-mode symlink不兼容。P0 task环境中的nvidia_curobo0.7.8安装在本task venv，geom_cu词法路径在该venv/lib/python3.10/site-packages，真实实体在uv/archive-v0/UYbDTNQF-bGDe1JmV92NN。扩展13,367,808 bytes，SHA256 `874b95cb65d84eeb0a84562482de7551638f7c9974d3323b152142476f8abb01`，与installed RECORD的SHA256以及稳定wheel内同名成员逐字节内容一致。稳定wheel `/mnt/public/xcj/Projects/state-vla/.cache/curobo/wheel/nvidia_curobo-0.7.8-cp310-cp310-linux_x86_64.whl` SHA256 `780a878713cad48043b4537268c860e52393ddeb46709a6377409f9c65f4f988`。原smoke脚本SHA256 `589733e0d89f16880303a6bb02c4573348496e7f53805537def5e1cafaab9b21`。因此这一次路径字符串拒绝是环境检查误报，尚未执行的真实cuRobo CUDA distance仍必须完成，不能把来源核对当成CUDA运算通过。
+
+Manager也已重新计算并匹配总manifest f83efd753546825b3df2a09f006b0674cc1994ee6efeabe0908df5c9fe7ab23f、40-reset receipt f67665446952f080f43e20a8219942d584fe448da55e49f0b66543c0f1d95451及失败log cfe2d0e9f68d4407cc1026968509db89cc0403c8639eeea5c1ce2bc26f8702ba，接受C2 GPU6 renderer gate。此前允许实测选空卡的范围覆盖GPU6，无需回到已占用GPU0。
+
+授权在本机准备本task自有的smoke验证副本，只把上述路径字符串断言换成真实安装归属与内容核验：实际geom_cu.__file__词法位置属于本runtime venv（不要resolve解释器）、distribution安装来源/RECORD匹配、实际扩展与上述已核对稳定wheel成员hash一致；其余SAPIEN render、CUDA get_pose_distance、synchronize、finite与距离阈值完全保持。保存原脚本hash、仅该断言替换的diff和新脚本hash/命令，在C执行冻结副本。不得通过全局关闭assert、修改Path.resolve/重装依赖/改共享cache或源RMBench绕过。该替代检查是Manager对具体误报的裁决，不是将原失败标PASS；原日志/manifest保留，新增独立receipt。
+
+该实际smoke通过后，按之前已批准合同直接继续J/S各2episode诊断smoke和相同输入/key的GPU off/on配对，无需再等一次Manager许可。不重跑40-reset，不扩大模型/episode/cap，不改已review源或HF runtime；若真实CUDA运算或新步骤失败，保留实际首因后报告。沿C2 GPU6/19460,19462核实资源，预计>30min程序登记MAM，完成收尾/归档并发布当前状态置顶report。请把“来源核对通过”“替代smoke实际通过”“模型/诊断验收”分开记账，不能合并成一句GPU全通过。
+
 ## 当前执行：P0代码已验收，C2 最小 GPU 验收
 
 Manager 已接受独立 report `2fb0db335606ce18e2590c3be35e002f9f4c8046`，并直接核对 live ingress 集中检查及既有真实J/S路径。代码准入版本：OpenPI `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`、bridge `e147f600dc4329f330a6e2eb0335150b5b3093a3`；本轮不再改功能。此节取代之前CPU-only范围，授权你（terra/max）接续本TASK-ID的最小GPU验收，不派其他agent。
