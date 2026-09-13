@@ -1,6 +1,28 @@
 # 交付报告
 
-## 原入口首 query 准备（仅 CPU，未执行）
+## 最新状态（2026-09-14；覆盖下方历史样本预算）
+
+已完成 Manager 授权的 `put_back_block` / train seed 0 / env seed `100000` 修正来源路径 matched shadow：它只发出 **1** 次正常 action request，并以预期的诊断截停 `exit 70` 结束。收据确认唯一 accepted reset 为 episode 0 / seed `100000`，恰有一次 `infer_audited` 与一次 execute；原 iteration 后 clear，非 drain status 为 `queued=30`、`dropped=30`、`logical_step=0`。没有第二 query、episode、replay、warmup 或 probe。
+
+旧 shadow 失败原件仍保持不变（`64ee0c7c9f4e4d77a99e20af55ed830bc06b42455cbe820ca34e98ceb0a89d21`）：它因 `MemoryCheckpoint` source root 缺少 `memory20k_e7e5ac54_put_back_full_t_plus_1_s0` 层而在 service/reset/action 前停止，未消耗 sample。修正版只改用正确 source root、全新 result/capture 路径和 run 名；没有修改冻结工具或三库源码。
+
+- 正常 action sample 总预算现为 **8/8**，剩余 **0**。不得 retry、重跑 baseline，或启动 matching/formal smoke、完整轨迹或 formal 评测；formal 仍冻结。
+- 两臂完整实际 policy-request leaf fields 完全相同：`$.cmd`、`$.images.cam_high`、`$.images.cam_left_wrist`、`$.images.cam_right_wrist`、`$.memory_input_ids`、`$.prompt`、`$.state`。`policy_call_kwargs`、正常 policy/robot commands、runner environment、policy metadata、checkpoint verification 与 metadata verification 也相同。
+- 每臂自身 H50 `float32[50,14]` 的前 30 行均精确等于实际 K30 `float32[30,14]`。跨臂仍有数值差异：H50 为 `532/700` 个元素不同，max abs `0.0036021433770656586`、RMSE `0.0006788336719106482`；K30 为 `314/420` 个元素不同，max abs `0.002218961715698242`、RMSE `0.0006341486370427415`；首差均在 `[0,1]`（baseline `0.0005527432076632977`，shadow `-0.001193587202578783`）。
+- 版本化配对分析同时归一化共享 result root 与冻结运行树 result root。归一化后 preflight/episode context 仅余六个 `task_facts.final_block_pose` 标量差异；它们不在捕获到的实际 policy request 中。既有源码证据表明该 task-fact probe 不是有效的首 query 输入身份，因此这些值不能被当作实际输入不一致的证明。
+- 没有可直接捕获的模型侧实际 PRNG key；响应中的 `policy_rng` 只是 stream/call 元数据，未据此推断 key。
+
+本对照仅是有界诊断，不是 matching smoke 或 formal 证据；一组首 query 的相同或不同都不解冻正式评测，也不建立历史差异的因果解释。
+
+证据根为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/original_entry_first_query_20260914`。关键完整性哈希如下：
+
+- 修正 launcher `launch_shadow_fixed_source_root.sh`：`171d33f1068074bbcb5551da27263adb1315ae223f51aed2765a9884cd6af6e6`；三处最小 diff：`plans/matched_shadow_fixed_source_root.launcher.diff`，`e4f8faeb5359162b8171217e952d308161c57cba251e9a8ce7926180957f5071`；repair record：`dd337fdab6022ec196c64ff6831f15ccf5b7b37ad07506e0dde16f81bcd0da31`。
+- plan `67788b1eabfdd70af3464dc93443e8375c974eea3b1d62d8c6197f2436159666`；preflight tool `c8be70cb403df3951038c0c42861b9aaa58aba872d20ae1d465ceee7810fe412`，preflight result `4adefcb45e34d41f2ed49878978f5a743fe0fe0d82cf1a4f501ec1cde2be3d69`。
+- 修正 shadow runner receipt `a31cb6e3810fdf39b8a85c047d4579d6ca66b036c9c237a949dee9a47586a6e5`；episode receipt `474ac041805e6c68a7405cf957320243535846eeeb1344ff32fa313be880b752`；v2 validation `a1625cd5048bbc9be1a2569a490ce116932258bc174ea93355c48af686c92ac6`。
+- v2 analyzer `tools/analyze_fixed_shadow_pair_v2.py`：`fb62a01b35c460b18bd9357dae9a96ae55b53ce46b8b83ad2357ea75cdc52d4b`；analysis JSON `be1382272b3cbae2454b17e3bcedaf2656c6693da88fffdfccbde3bf6473c5c7`；Markdown `14d0e508b787019dcbcd4e05519ac223a6117b3fac1e1b7f9868ce666cdb5cfa`。用临时输出重跑后，三份 v2 输出逐字节 hash 均一致。
+
+
+## 历史：原入口首 query 准备（当时仅 CPU，尚未执行）
 
 已在任务私有目录准备保持原 `BenchmarkRunner` 启动、metadata、reset/preflight 和首 query 路线的有界诊断入口：[runner](/mnt/public/xcj/Projects/multi-agent-manager/.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/first_query_diagnostic/tools/original_entry_first_query_runner.py)（SHA-256 `376dd1fd087a5e79a9cbda4e83d1ff5b8534dc9c59429a60acbdf8ed2a0abf34`）仅替换其生成的 scheduler child；[scheduler](/mnt/public/xcj/Projects/multi-agent-manager/.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/first_query_diagnostic/tools/original_entry_first_query_scheduler.py)（`0561e295e644bee882c7abaee9d08e856b9e5ad00aeafbb4ed480ad7f3179ae2`）在首个同步 RPC 返回后才于 RAM 深拷贝完整 request/response，并在原 `run_iteration()`、`after_execute`、clear 和无 drain status 后写入收据。完整行为、边界和 8 MiB 单数组上限见[说明](/mnt/public/xcj/Projects/multi-agent-manager/.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/first_query_diagnostic/original_entry_first_query.md)（`c11656f94b8d2ef043964465d8ecca9a0d83575fc7ff25bf1c5e3499f2d9d6db`）。
 
@@ -87,6 +109,6 @@ baseline scheduler receipt SHA-256 为 `f56e3438c911ce76232b9e69b0928b3860f2df8d
 
 本节是有界诊断收据，从不构成 matching smoke 或 formal。shadow 不会自动重试；先前 6 个与本节 baseline 1 个正常 action samples 合计已使用 `7/8`，剩余 **1** 个未经 Manager 再授权不得使用。HF formal 继续冻结。
 
-## 未执行项
+## 历史：修正 shadow 前的未执行项
 
 此前的源码修复验证仍是 CPU-only；早先 C3 有界诊断已完成 6 次首 query 采样，本报告的“原入口有界首 query 执行”节另记录随后授权的 baseline 1 次真实 action request。未启动新的完整轨迹、matching smoke、formal 100、`r_s=30` 或 HF 效果试验，未训练、未改 checkpoint、未部署，也没有新增生产源码提交。累计已使用 `7/8` 个正常 action samples；剩余 1 个仅可在 Manager 对新的有界假设明确授权后使用。
