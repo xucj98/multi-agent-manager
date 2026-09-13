@@ -1,6 +1,20 @@
 # 交付报告
 
-## 最新执行结果（2026-09-14；C3 GPU0 授权的单实例 C0/C1/P 检查）
+## 最新工程轨迹状态（2026-09-14；C3 rearrange J r_s30）
+
+授权队列的首个两集工程 leaf 已完成并通过基础设施、证据和 r_s30 合同验收：`c_hf_j_shadow_rs30_degradation_rearrange_trainseed0_eval0_2ep`。它是 **engineering-only degradation control**，不会作为 matching smoke 或 formal 的准入依据；其余四个 J HF profile 仍须各自验收，且不会自动启动 formal。
+
+- 使用 C3 `wuwen-4090-3` 的 GPU0、端口 19400/19402 和冻结运行树；执行前 GPU0 为 `1 MiB / 24080 MiB free / 0%`，完成后四卡均为 `1 MiB / 24564 MiB / 0%`，端口已释放。冻结 OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4` 在运行后仍 clean；没有修改工具、三库、checkpoint 或已有 leaf。
+- 原 `hf_engineering.py`（SHA-256 `dcf93891de82adaf21e676c55ee30901309f9c9a6097841ff4be4c7ba7f29c87）先完成 task-private `prepare` 和 `dry-run`，再运行该一个 profile。外层 return code 为 0，`formal100_started=false`；原单-leaf `audit --profile` 通过，review SHA-256 为 `b5d4066880ca4adef101171a05dce475d9571dbd2c830eb69680566268881afb`。
+- 两个连续 accepted seed 为 episode 0 / `100000` 和 episode 1 / `100001`；两者 scheduler 均以 `episode_terminal`、return code 0 退出，rolling JSONL 的 header 身份、最终 `episode_finished`、`evidence_complete=true` 和无 `truncated` 均成立。video 策略为 episode 0 启用且 `393` 帧、episode 1 禁用且检查通过。结果为 Success / Fail；后者的普通任务失败原因为 `step_limit_reached`，不是 runtime/infrastructure error，因此按授权保留原件并继续队列。
+- r_s30 合同实际成立：两个 episode 都是 `mode=shadow`、`monitor_interval=30`、legacy continuous action RNG lifecycle；probe count、trigger count 和 clear count 均为 0。只报告 wire 可观察的 action stream/call 元数据：episode 0 共 14 次普通 action（calls 1–14），episode 1 共 24 次（calls 15–38）；不把它们称为模型内部 key。
+- 实际完成 action rows 为 `393` 与 `700`。执行 K 分布依次为 `{30: 13, 3: 1}` 和 `{30: 23, 10: 1}`；终态分别丢弃 27 与 20 个未执行后缀。每次 action 的保存状态输入均有记录（首个 memory IDs `[0,0,0]`，末个分别 `[3,2,0]` / `[3,1,0]`）；没有 probe source/target 或 probe action 可消费。记录的 action inference 时间为：episode 0 共 14 次、总 `27704.763 ms`、均值 `1978.912 ms`（含首次加载）；episode 1 共 24 次、总 `1435.361 ms`、均值 `59.807 ms`。
+- 结果 leaf 位于 `/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914/RMBench/eval_result/memory_chunk_20260910_hf_engineering/c_hf_j_shadow_rs30_degradation_rearrange_trainseed0_eval0_2ep`。rolling evidence SHA-256 为 episode 0 `832ffd5bd62b9202e6e690828108eee8c29e1ba0c2c9c774ba4b1a53a2cd4fb2`、episode 1 `4890a34500b800e2f2754bf964b7c02c182ffa39ba166f5c236c4358968808b9`；完整阶段收据为 task-private `hf_trajectory_engineering_20260914/.../stage_receipt.json`，SHA-256 `e37be9274ed9368d73b771f241e7ae1614b8ab97a7f23389c4b9bab5d99f321d`。
+- MAM job `e2190cb8-4c10-465a-b46a-bcc1e4d17861` 已在停止、审计和资源释放后归档。独立工程审阅 `9c7622d0` 已验收且没有新的阻断；它不建立完整环境等价或 formal 科学结论。
+
+接续顺序保持为 put-back J HF-fixed、put-back J HF-event、rearrange J HF-fixed、rearrange J HF-event；每个 profile 只运行其授权的两集，并在前一 leaf 完整验收后才启动。
+
+## 先前执行结果（2026-09-14；C3 GPU0 授权的单实例 C0/C1/P 检查）
 
 **结论：通过。** 已在 C3 的 `GPU0` 只执行一次授权的 `--execute`：一个真实 backend 实例依次完成 C0、C1 和 P；receipt 的 `decision` 为 `pass`。这只说明固定保存输入在同一已加载实例内，五次 forecast probe 未改变后续普通 action 的软件可观察结果或 action RNG 状态；它不证明环境推进、五帧新观测、完整 rollout、HF 效果或 formal 准入。
 
