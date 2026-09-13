@@ -39,3 +39,15 @@ Manager已git fetch origin main。origin/main=2cb7309是本地main=bc8726f的祖
 3. `_source_identity`用现有隔离Git helper拒绝非空 `git status --porcelain`，记录clean状态及HEAD/modulepaths。提供最小可调用核验，在首次fixture start前、最终停机后再次核对与prepare同一HEAD/clean/modulepaths；dirty tracked、untracked importable source和HEAD改变需被拒绝。测试在独立临时clone/venv中进行，不能污染真实author tree或production。运行中editable源不能改动，任何漂移使验收失败并保留现场。
 
 只补三个针对性正负例，测试新增调用的真实入口和时序，避免再用与实现相同假设的合成case替代行为检查；原核心215无新runtime变更无需重跑。不新增通用框架/超出三项的重构。提交干净版本、publish report、原生followup同reviewer复审差异与上述证据。仍未准入真实fixture或生产安装/重启。当前可做工作完成正常结束turn。
+
+## Manager 真实隔离验收进度（2026-09-13 11:18 UTC）
+
+独立复审 4580953c243b45b5c1d688bf3261aa990801d34a 已通过 3f2738a 的三项窄修，Manager 接受并依 runbook 实际执行。此前“不运行真实 fixture”的限制已由本节推进到受控隔离验收；生产安装仍待完整闭环。
+
+- Source 保持干净 3f2738abcfc9cbe50b25222562fc58b2bac0a7ff，module/CLI/source Git 身份已在 prepare 和 before-start 实读一致。
+- Fixture root: /mnt/public/xcj/Projects/.native-v2-fallback-fixture-20260913T1116Z；其中 project 为唯一 CLI cwd、state 为独立 MAM_ROOT。
+- Fixture TASK-ID eda0b0e4-d0b8-4439-a418-2bc56610d631，JOB-ID e85234e2-e078-494b-82b1-7c37d6722d61，本地 detached sleep 90 PID 1020130。Root 原生 followup 同一 child 01a096ab-e5f3-7672-8ff3-36328d3fcfb7 已实际完成登记；其生产审查 4006fc83 未修改。
+- blocked.json 已通过：真实 direct-input 精确拒绝，source attempts=1/blocked/no retry；唯一 Manager escalation pending/attempts=0。Root active 保持待投递。
+- stopped.json 已保存 service running=false/disabled 与冻结 cycles=13，现已仅重启 fixture service；下一步核验至少两个新 cycles 并写 restarted.json。未收到真实 idle-root notification，不能提前写 delivered attestation。
+- restarted 后 root 必须结束 turn，实际收到带同 TASK/JOB/精确错误的 MAM Message 才按 runbook 验 delivered；然后 native followup 同 child 仅归档此 fixture job，核 history、停止 fixture、verify-source after-stop、归档 fixture task并将 receipts 保留到 fixture 外再 guarded cleanup。
+- Source author 此期间不得修改 editable 源；生产 daemon、App Server、生产 task/job 均不在本次验收修改范围。
