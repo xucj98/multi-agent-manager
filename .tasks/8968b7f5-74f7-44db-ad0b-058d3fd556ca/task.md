@@ -38,3 +38,9 @@ Manager 已直接核对冻结 cb861d38/a2c7f80b 的调用链，接受 reviewer �
 2. legacy full-state J/T 的 diagnostic_record_id 仅在 after_execute 才接到 dense candidate；execute 非 ok 后，下一 build_act_request 的 discard 收到 None ID，随后清掉 candidate ID，导致已选中记录永留 pending。需在 candidate 阶段正确关联、记录已知拒绝/丢弃并收尾；actual K 未知仍为 null。回归保留真实 legacy F0/full-state 调用链，覆盖 execute 非 ok、下一观测/重试、supersede 和 episode 结束，不改变控制器 retry 语义。
 
 请与 reviewer 复用其精确复现；本次仍仅 CPU 修复和独立 review，未获 GPU 准入。
+
+## 完整性 P2 的范围裁决
+
+Manager 核对 status/context-only 判定与 checkpoint provenance 后：将空 sidecar 误称 recorded 的问题纳入最小修复。只验证本 schema 必需的证据分区/版本及缺失语义，让 recorder 和 validate_record 对相同残缺 sidecar 给出一致 incomplete/明确错误；不开发通用 schema 框架。
+
+checkpoint 的 actual_path/step 只是位置身份，当前代码不提供权重内容身份。本轮不新增逐 query 权重哈希或修改既有 provenance 后端；文档/记录显式标注该界限，并要求后续正式诊断的 run 级验收关联已核验的 checkpoint manifest（若现有 manifest 本身没有权重内容哈希，也不得称强内容身份）。没有该外部身份核验时，不能仅凭此 sidecar 宣称完整可复现。此项作为后续诊断准入条件记录，不阻塞当前 CPU 生命周期修复交付。
