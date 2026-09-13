@@ -146,3 +146,26 @@ stdout 均已复制到各 checkpoint 父目录的稳定 `artifacts/`。manifest 
 
 RMBench U 说明已提交为 `0b5c0fb`（最终验收记录）和 `4de1435`（manifest digest 更新）。
 六个模型现仅作为可复用、待排期的评测输入；按用户批准的新九任务计划，不自动启动 C eval 或重启任何项。
+
+## 断连恢复后的交付与归档准备（2026-09-13）
+
+已按 task revision `86f6fbf3bfb2c91cbb3b7ed9babf6fd71aeaf8e8` 完成只读恢复核对。稳定 manifest
+`/mnt/public/xcj/Projects/openpi/checkpoints/memory20k_cbbba844_manifest.json` 可读、JSON 有效，SHA-256
+仍为 `681cc5aad845bc6863bb5bc9af0b0d59a60a3fbebfef90b7c2af479554d56e5b`；其六条 run 的 checkpoint、
+archived training log、validator、CPU restore stdout 和 GPU restore stdout 全部可读。manifest 仍指向
+冻结 OpenPI `6266bd8bbfa5f3e451f7253c476d1108e1ff5e1e`、`failure_reasons=[]` 和
+`ready_for_owner_handoff_only`，可由已接续的 e690 evaluation owner 使用；本任务没有再启动评测。
+
+Manager 归档前必须保留整个 workspace 及以下任务独有材料：
+
+| 保留项 | 理由 |
+| --- | --- |
+| `openpi` task branch，`906f27c` 与 `6266bd8` | full-initial schema/config 及冻结训练源码 |
+| `robot-bridge` task branch，`e43275a` | runtime Context/contract 验收 |
+| `RMBench` task branch，`d4b32b8`、`0d9f38d`、`0b5c0fb`、`4de1435` | U 台账、最终验收与 manifest digest |
+| `training_logs/`（约 5.4 MB）和 `launch/` | 六条原始训练输出、两份空 attempt1 留痕及只读启动 wrapper/provenance |
+| `validation/`（约 109 KB） | 原 50-step CPU/GPU 门禁、HWC 失败/CHW retry 证据和验证脚本；final-20k 副本已在 checkpoint `artifacts/` |
+
+`validation/__pycache__/` 是唯一明确的可再生临时物；它可以在 Manager 决定清理 workspace 时移除，
+但本次没有删除任何 workspace、分支、代码、checkpoint、日志或模型。六个 MAM job 仍为 archived，
+本任务未重训、未重复 restore、未开评测；Manager 可据此决定最终 task/workspace 归档。
