@@ -169,3 +169,32 @@ Manager 归档前必须保留整个 workspace 及以下任务独有材料：
 `validation/__pycache__/` 是唯一明确的可再生临时物；它可以在 Manager 决定清理 workspace 时移除，
 但本次没有删除任何 workspace、分支、代码、checkpoint、日志或模型。六个 MAM job 仍为 archived，
 本任务未重训、未重复 restore、未开评测；Manager 可据此决定最终 task/workspace 归档。
+
+## Manager 归档准备完成（2026-09-13）
+
+已将任务独有的原始训练/启动/门禁材料和三库可恢复 git bundle 写入稳定目录
+`/mnt/public/xcj/Projects/openpi/checkpoints/u_training_provenance_cbbba844/`。该目录的
+`provenance_manifest.json` SHA-256 为
+`f47e064642d5c4d519b491c9220e0725724f2b2bd18561bfdd284f528a7ff18a`，`SHA256SUMS` 覆盖
+19 个复制文件、三份 bundle 和 manifest。本次 archive 的 19 个源文件（5,663,411 bytes）均逐文件
+复核为源/目的 SHA-256 相同，且 `sha256sum --check SHA256SUMS` 全部通过。
+
+三份 bundle 都包含完整历史、`git bundle verify` 通过，并经空白仓库 fetch 恢复后解析了所需提交：
+
+| repo | bundle SHA-256 | recovered HEAD |
+| --- | --- | --- |
+| openpi | `52845989cbca7429666f1b81b8642d1f9fcf6df81c66114a290897230aab13c1` | `6266bd8bbfa5f3e451f7253c476d1108e1ff5e1e`（含 `906f27c`） |
+| robot-bridge | `024cb5a8aab05b4a1b070fae67ba60eebe5b81aebc8f63cdf848c2e02da136a6` | `e43275a19c81c8db35dd20d0ce200f86c11431aa` |
+| RMBench | `3c16187e4c88fed682bb4415b17c72a653f9838a9d325efcfd0dba1f20238e96` | `4de143534d9648039d051659faa2f44f4fdde5a7`（含 `d4b32b8`、`0d9f38d`、`0b5c0fb`） |
+
+清理前再次检查当前本机进程的 cwd/打开文件、e690 workspace 的软链与引用，以及
+`wuwen-4090-{1,2,3}` 的运行命令；没有正在运行或已交接评测依赖本 task workspace。随后仅删除以下
+已逐文件同值归档的目录：
+
+- `/mnt/public/xcj/Projects/workspace/cbbba844-d96a-45d5-9b2f-c8a3c6f393b1/training_logs`
+- `/mnt/public/xcj/Projects/workspace/cbbba844-d96a-45d5-9b2f-c8a3c6f393b1/launch`
+- `/mnt/public/xcj/Projects/workspace/cbbba844-d96a-45d5-9b2f-c8a3c6f393b1/validation`（含 2 个明确可再生的 `__pycache__` 文件）
+
+未删除 workspace 根、checkpoint、模型、共享数据、branch 或三个已登记 worktree。`openpi`、
+`robot-bridge` 和 `RMBench` worktree 均仍在 `task/cbbba844-d96a-45d5-9b2f-c8a3c6f393b1` 且 clean；六个
+训练 job 仍 archived。Manager 现在可执行 task archive；本执行者没有运行 `mam task archive`。
