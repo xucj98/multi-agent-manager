@@ -107,6 +107,12 @@ job 状态包括 `running`、`stopped`、`archived`。进程停止后，由执�
 mam service status
 ```
 
+若状态显示 daemon 仍 `running`、`healthy`，但 `pending.events` 有 `delivery: blocked` 和
+`failure_kind: unsupported_multi_agent_v2_direct_input`，说明原生 multi-agent v2 子 agent 拒绝
+direct `turn/start`，不是 job 探测或 daemon 已停止。MAM 会停止重试该子 agent，并在 Manager 空闲时
+投递包含 TASK-ID、JOB-ID、executor 和错误的升级消息；Manager 应使用 parent-native
+`collaboration.followup_task` 协调执行者收尾和归档。普通 RPC/传输失败仍按原有退避或不确定性语义处理。
+
 ## 可选等待
 
 需要在当前 turn 等待执行者或 job 时，运行 `mam wait`。MAM 自动识别调用者和待处理事项，最多等待一小时；有待办时直接返回。默认仍按[自动唤醒](#自动唤醒)结束 turn，由 MAM 后续唤醒。

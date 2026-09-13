@@ -41,6 +41,11 @@ STARTUP_POLL_SECONDS = 0.05
 _EVENT_CURRENT = "current"
 _EVENT_STALE = "stale"
 _EVENT_UNVERIFIABLE = "unverifiable"
+_NATIVE_V2_DIRECT_INPUT_REJECTION = (
+    "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents"
+)
+_NATIVE_V2_DIRECT_INPUT_FAILURE = "unsupported_multi_agent_v2_direct_input"
+_MANAGER_NATIVE_FOLLOWUP = "manager_native_followup"
 _LOCAL_START_LOCKS: dict[str, threading.Lock] = {}
 _LOCAL_START_LOCKS_GUARD = threading.Lock()
 _DETACHED_CHILDREN: list[subprocess.Popen[bytes]] = []
@@ -775,6 +780,78 @@ class WakeScheduler:
         payload = {"kind": kind, "recipient": recipient, **fields}
         return {"signature": _event_signature(payload), **payload}
 
+    @staticmethod
+    def _executor_stopped_job_event(event: Mapping[str, Any]) -> bool:
+        """Return whether a stopped-job event was directed to its executor.
+
+        A task without an executor can route a stopped job to the Manager.
+        That is already a Manager delivery and must never be promoted again.
+        """
+
+        executor = event.get("executor")
+        return (
+            event.get("kind") == "job_stopped"
+            and _valid_agent(executor)
+            and event.get("recipient") == executor
+            and isinstance(event.get("task"), str)
+            and isinstance(event.get("task_title"), str)
+            and isinstance(event.get("job"), str)
+            and isinstance(event.get("note"), str)
+        )
+
+    @staticmethod
+    def _native_v2_direct_input_rejection(detail: Any) -> bool:
+        """Recognize only the known explicit native-v2 input prohibition.
+
+        A broad App Server RPC failure can be transient or can have a future
+        supported recovery path, so it deliberately remains on the ordinary
+        explicit-rejection retry path.
+        """
+
+        return detail == _NATIVE_V2_DIRECT_INPUT_REJECTION
+
+    @classmethod
+    def _native_v2_blocked_source(cls, event: Mapping[str, Any]) -> bool:
+        return (
+            cls._executor_stopped_job_event(event)
+            and event.get("delivery") == "blocked"
+            and event.get("failure_kind") == _NATIVE_V2_DIRECT_INPUT_FAILURE
+            and event.get("block_kind") == _NATIVE_V2_DIRECT_INPUT_FAILURE
+            and cls._native_v2_direct_input_rejection(event.get("last_error"))
+        )
+
+    @staticmethod
+    def _block_native_v2_direct_input(event: dict[str, Any], detail: str) -> None:
+        """Persist a known unsupported executor delivery without a retry timer."""
+
+        event.update({
+            "delivery": "blocked",
+            "failure_kind": _NATIVE_V2_DIRECT_INPUT_FAILURE,
+            "block_kind": _NATIVE_V2_DIRECT_INPUT_FAILURE,
+            "last_error": detail,
+            "next_attempt_at": None,
+        })
+        if not event.get("blocked_at"):
+            event["blocked_at"] = _timestamp()
+
+    def _manager_native_followup_event(self, source: Mapping[str, Any]) -> dict[str, Any] | None:
+        """Build one durable Manager escalation for a blocked executor event."""
+
+        if self.manager is None:
+            return None
+        return self._make_event(
+            _MANAGER_NATIVE_FOLLOWUP,
+            self.manager,
+            task=source["task"],
+            task_title=source["task_title"],
+            job=source["job"],
+            note=source["note"],
+            executor=source["executor"],
+            source_event=source["signature"],
+            error=source["last_error"],
+            action="use_native_followup_task",
+        )
+
     def _task_ready_event(self, task: Mapping[str, Any], task_id: str, title: str, executor: str) -> dict[str, Any] | None:
         if self.manager is None:
             return None
@@ -788,6 +865,63 @@ class WakeScheduler:
             task_status=task.get("status"),
             report_revision=report.get("revision"),
         )
+
+    def _native_v2_manager_escalations(
+        self,
+        state: Mapping[str, Any],
+        desired: dict[str, dict[str, Any]],
+        diagnostics: list[dict[str, str]],
+    ) -> None:
+        """Add one Manager event for each still-current blocked child wake.
+
+        The source event itself remains durable and blocked.  The escalation's
+        signature contains that source signature, so an unchanged condition is
+        retained across cycles and daemon restarts instead of creating another
+        Manager turn.  A changed job, archive, or rebind removes the source
+        from ``desired`` and therefore also retires its escalation.
+        """
+
+        manager = self.manager
+        events = state.get("events")
+        if not isinstance(events, Mapping):
+            return
+        for source in events.values():
+            if not isinstance(source, Mapping) or not self._native_v2_blocked_source(source):
+                continue
+            source_signature = source.get("signature")
+            if not isinstance(source_signature, str) or source_signature not in desired:
+                continue
+            task = source["task"]
+            executor = source["executor"]
+            if not _valid_agent(manager):
+                diagnostics.append({
+                    "kind": "native_v2_wake_manager_missing",
+                    "task": task,
+                    "message": f"executor {executor} cannot receive direct native-v2 input and no Manager is available",
+                })
+                continue
+            if manager == source.get("recipient"):
+                # The direct recipient already is the Manager.  Escalating it
+                # back to itself would recurse through the same unsupported
+                # delivery mechanism.
+                diagnostics.append({
+                    "kind": "native_v2_wake_manager_recipient",
+                    "task": task,
+                    "message": f"direct native-v2 input to Manager/executor {executor} is blocked; no self-escalation was created",
+                })
+                continue
+            escalation = self._manager_native_followup_event(source)
+            if escalation is None:
+                continue
+            desired[escalation["signature"]] = escalation
+            diagnostics.append({
+                "kind": "native_v2_wake_blocked",
+                "task": task,
+                "message": (
+                    f"direct input to executor {executor} was explicitly rejected for JOB-ID {source['job']}; "
+                    "Manager native follow-up is required"
+                ),
+            })
 
     def _desired_events(
         self, tasks: list[dict[str, Any]], states: Mapping[str, Mapping[str, Any]]
@@ -908,6 +1042,27 @@ class WakeScheduler:
                 existing.pop("last_condition_error", None)
             counters["observed"] = int(counters.get("observed", 0)) + 1
 
+    def _block_persisted_native_v2_rejections(self, state: Mapping[str, Any]) -> None:
+        """Upgrade a prior exact RPC rejection before its retry deadline.
+
+        Existing service state can outlive an installed scheduler process.  On
+        upgrade, do not make one more known-invalid child ``turn/start`` just
+        because the old code saved it as a generic explicit rejection.
+        """
+
+        events = state.get("events")
+        if not isinstance(events, Mapping):
+            return
+        for event in events.values():
+            if (
+                isinstance(event, dict)
+                and self._executor_stopped_job_event(event)
+                and event.get("delivery") == "rejected"
+                and event.get("failure_kind") == "explicit_rpc_rejection"
+                and self._native_v2_direct_input_rejection(event.get("last_error"))
+            ):
+                self._block_native_v2_direct_input(event, event["last_error"])
+
     def _source_suppressed_now(self, task_id: str) -> bool:
         tasks = self._load_tasks()
         suppressed, _ = self._review_graph(tasks)
@@ -944,6 +1099,25 @@ class WakeScheduler:
             ):
                 return _EVENT_CURRENT, None
             return _EVENT_STALE, "unbound task condition changed"
+        if kind == _MANAGER_NATIVE_FOLLOWUP:
+            executor = event.get("executor")
+            if (
+                not _valid_agent(executor)
+                or self.manager != event.get("recipient")
+                or executor == event.get("recipient")
+                or event.get("action") != "use_native_followup_task"
+            ):
+                return _EVENT_STALE, "native-v2 Manager escalation recipient changed"
+            job = next((item for item in self._unarchived_jobs(task) if item.get("id") == event.get("job")), None)
+            if (
+                task.get("agent") == executor
+                and job
+                and self._job_stopped(job)
+                and job.get("note") == event.get("note")
+                and task.get("title") == event.get("task_title")
+            ):
+                return _EVENT_CURRENT, None
+            return _EVENT_STALE, "native-v2 Manager escalation source condition changed"
         if kind == "task_ready":
             executor = task.get("agent")
             report = task.get("report") if isinstance(task.get("report"), Mapping) else {}
@@ -991,6 +1165,14 @@ class WakeScheduler:
                 )
             elif event.get("kind") == "task_unbound":
                 lines.append(f"TASK-ID {event['task']}: {event['task_title']} has no bound executor.")
+            elif event.get("kind") == _MANAGER_NATIVE_FOLLOWUP:
+                lines.append(
+                    f"Direct MAM input to executor AGENT-ID {event['executor']} was explicitly rejected for native "
+                    f"multi-agent v2 while handling JOB-ID {event['job']} ({event['note']}); "
+                    f"TASK-ID {event['task']}: {event['task_title']}. Error: {event['error']} "
+                    "Manager action required: use parent-native collaboration.followup_task to notify the executor; "
+                    "MAM has stopped retrying this direct turn/start."
+                )
         if not lines:
             return ""
         return "[MAM Message]\n" + "\n".join(lines)
@@ -1121,6 +1303,13 @@ class WakeScheduler:
         detail = str(error)
         for event in events:
             if isinstance(error, job_runtime.AppServerRpcError):
+                if self._executor_stopped_job_event(event) and self._native_v2_direct_input_rejection(detail):
+                    # This exact server acknowledgement is a capability
+                    # boundary for native v2 children, not a transient RPC
+                    # failure.  Preserve the source and let the Manager's
+                    # ordinary thread receive one native-followup escalation.
+                    self._block_native_v2_direct_input(event, detail)
+                    continue
                 # A JSON-RPC error is an acknowledged rejection.  It is safe
                 # to retry later, and an unrelated later turn must not turn it
                 # into a response-loss ambiguity.
@@ -1441,6 +1630,8 @@ class WakeScheduler:
                     _save_state(self.store, state)
                     return state
             desired, inconclusive, diagnostics = self._desired_events(tasks, states)
+            self._block_persisted_native_v2_rejections(state)
+            self._native_v2_manager_escalations(state, desired, diagnostics)
             state["diagnostics"] = diagnostics
             state["healthy"] = True
             state["error"] = None

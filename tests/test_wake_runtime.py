@@ -616,6 +616,283 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertNotIn("failure_kind", event)
         self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR])
 
+    def test_native_v2_rejection_escalates_once_when_manager_becomes_idle_and_clears_after_archive(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped", note="native completion")])
+        self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
+        self.scheduler().run_once()
+
+        source = next(iter(self.state()["events"].values()))
+        self.assertEqual(source["delivery"], "blocked")
+        self.assertEqual(source["failure_kind"], wake_runtime._NATIVE_V2_DIRECT_INPUT_FAILURE)
+        self.assertEqual(source["block_kind"], wake_runtime._NATIVE_V2_DIRECT_INPUT_FAILURE)
+        self.assertIsNone(source["next_attempt_at"])
+        self.assertEqual(self.starts, [])
+
+        # A daemon restart must retain the blocked source, but an active
+        # Manager must not be interrupted just to receive the escalation.
+        self.clock.advance(600)
+        self.statuses[MANAGER] = "active"
+        self.scheduler().run_once()
+        escalations = [event for event in self.state()["events"].values() if event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP]
+        self.assertEqual(len(escalations), 1)
+        self.assertEqual(escalations[0]["delivery"], "pending")
+        self.assertEqual(source["attempts"], 1)
+        self.assertEqual(self.starts, [])
+
+        self.statuses[MANAGER] = "idle"
+        self.scheduler().run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+        payload = self.starts[0][1]
+        self.assertIn(f"AGENT-ID {EXECUTOR}", payload)
+        self.assertIn("JOB-ID stopped", payload)
+        self.assertIn(TASK_ONE, payload)
+        self.assertIn(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION, payload)
+        self.assertIn("collaboration.followup_task", payload)
+
+        self.scheduler().run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+
+        # Native parent follow-up can activate the executor.  Once that owner
+        # archives its job, neither the stale source nor its escalation can
+        # create another Manager wake.
+        self.statuses[EXECUTOR] = "active"
+        task = self.store.read(TASK_ONE)
+        task["jobs"][0]["status"] = "archived"
+        self.store.write(task)
+        self.scheduler().run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+        self.assertFalse(self.state()["events"])
+
+    def test_persisted_native_v2_rejection_is_upgraded_without_one_more_executor_retry(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        scheduler = self.scheduler()
+        source = scheduler._make_event(
+            "job_stopped",
+            EXECUTOR,
+            task=TASK_ONE,
+            task_title=f"task {TASK_ONE[-1]}",
+            job="stopped",
+            note="stopped",
+            executor=EXECUTOR,
+        )
+        state = self.state()
+        state["events"][source["signature"]] = {
+            **source,
+            "created_at": "before",
+            "last_observed_at": "before",
+            "observed_count": 7,
+            "delivery": "rejected",
+            "failure_kind": "explicit_rpc_rejection",
+            "attempts": 7,
+            "next_attempt_at": 0.0,
+            "last_error": wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION,
+            "accepted_at": None,
+        }
+        wake_runtime._save_state(self.store, state)
+
+        self.statuses[MANAGER] = "active"
+        self.scheduler().run_once()
+        saved = self.state()["events"][source["signature"]]
+        self.assertEqual(saved["delivery"], "blocked")
+        self.assertEqual(saved["attempts"], 7)
+        self.assertIsNone(saved["next_attempt_at"])
+        self.assertEqual(self.starts, [])
+        self.assertEqual(
+            len([event for event in self.state()["events"].values() if event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP]),
+            1,
+        )
+
+    def test_native_v2_escalations_batch_and_a_new_stopped_job_stays_meaningful(self):
+        self.task(
+            TASK_ONE,
+            jobs=[
+                self.job("one", status="stopped", note="first completed"),
+                self.job("two", status="stopped", note="second completed"),
+            ],
+        )
+        self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
+        scheduler = self.scheduler()
+        scheduler.run_once()
+        self.assertEqual(self.starts, [])
+
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+        first_payload = self.starts[0][1]
+        self.assertIn("JOB-ID one", first_payload)
+        self.assertIn("JOB-ID two", first_payload)
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+
+        # A later stopped job has its own source signature and therefore earns
+        # one new Manager escalation; the accepted older escalation remains
+        # deduplicated.
+        self.turns[MANAGER] = {"id": "manager-completed", "status": "completed"}
+        task = self.store.read(TASK_ONE)
+        task["jobs"].append(self.job("three", status="stopped", note="later completed"))
+        self.store.write(task)
+        self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER, MANAGER])
+        self.assertIn("JOB-ID three", self.starts[-1][1])
+
+    def test_native_v2_escalation_waits_for_manager_unknown_paused_and_optional_wait(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
+        scheduler = self.scheduler()
+        scheduler.run_once()
+
+        self.statuses[MANAGER] = "unknown"
+        scheduler.run_once()
+        escalation = next(event for event in self.state()["events"].values() if event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP)
+        self.assertEqual(escalation["delivery"], "pending")
+        self.assertEqual(escalation["last_recipient_state"], "unknown")
+        self.assertEqual(self.starts, [])
+
+        self.statuses[MANAGER] = "paused"
+        scheduler.run_once()
+        self.assertEqual(self.starts, [])
+        self.assertEqual(
+            next(event for event in self.state()["events"].values() if event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP)["last_recipient_state"],
+            "paused",
+        )
+
+        observation = job_runtime.probe_process("local", os.getpid())
+        self.store.write_wait({
+            "agent": MANAGER,
+            "pid": os.getpid(),
+            "identity": observation["identity"],
+            "token": "manager-native-v2-wait",
+            "kind": "unified",
+            "role": "manager",
+            "task": None,
+            "turn_id": "manager-waiting-turn",
+            "timeout": 3600,
+            "started_at": "test",
+            "cancelled": None,
+        })
+        self.statuses[MANAGER] = "idle"
+        scheduler.run_once()
+        self.assertEqual(self.starts, [])
+        self.assertEqual(
+            next(event for event in self.state()["events"].values() if event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP)["last_recipient_state"],
+            "waiting",
+        )
+
+        self.store.remove_wait(MANAGER)
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+
+    def test_native_v2_escalation_is_stale_after_rebind(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
+        scheduler = self.scheduler()
+        scheduler.run_once()
+        self.statuses[MANAGER] = "active"
+        scheduler.run_once()
+        self.assertTrue(any(event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP for event in self.state()["events"].values()))
+
+        args = types.SimpleNamespace(task=TASK_ONE, agent=EXECUTOR_TWO, note="native parent handed off executor work")
+        states = {
+            EXECUTOR: {"status": "idle", "checked_at": "rebind", "error": None},
+            EXECUTOR_TWO: {"status": "idle", "checked_at": "rebind", "error": None},
+        }
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": MANAGER}, clear=False), \
+             mock.patch.object(cli, "agent_observations", return_value=states):
+            cli.rebind(self.store, args)
+
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR_TWO])
+        self.assertFalse(any(event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP for event in self.state()["events"].values()))
+        self.assertTrue(any(
+            event.get("kind") == wake_runtime._MANAGER_NATIVE_FOLLOWUP and event.get("resolution") == "condition changed or resolved"
+            for event in self.state()["history"]
+        ))
+
+    def test_native_v2_escalation_requires_a_manager(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
+        scheduler = self.scheduler()
+        scheduler.run_once()
+        wake_runtime._service_path(self.store, "manager.json").unlink()
+
+        self.clock.advance(600)
+        scheduler.run_once()
+        state = self.state()
+        self.assertEqual(state["mode"], "error")
+        self.assertIn("no determinable Manager", state["error"])
+        self.assertFalse(any(event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP for event in state["events"].values()))
+        self.assertEqual(self.starts, [])
+
+    def test_native_v2_rejection_to_manager_recipient_does_not_self_escalate(self):
+        self.task(TASK_ONE, agent=MANAGER, jobs=[self.job("stopped", status="stopped")])
+        self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
+        scheduler = self.scheduler()
+        scheduler.run_once()
+        scheduler.run_once()
+
+        source = next(iter(self.state()["events"].values()))
+        self.assertEqual(source["delivery"], "blocked")
+        self.assertFalse(any(event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP for event in self.state()["events"].values()))
+        self.assertTrue(any(item["kind"] == "native_v2_wake_manager_recipient" for item in self.state()["diagnostics"]))
+        self.assertEqual(self.starts, [])
+
+    def test_native_v2_escalation_rejection_does_not_recurse(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
+        scheduler = self.scheduler()
+        scheduler.run_once()
+
+        # The Manager delivery itself might see an ordinary explicit RPC
+        # rejection.  It stays retryable but must not manufacture a second
+        # escalation for the escalation event.
+        self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
+        scheduler.run_once()
+        escalations = [event for event in self.state()["events"].values() if event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP]
+        self.assertEqual(len(escalations), 1)
+        self.assertEqual(escalations[0]["delivery"], "rejected")
+        self.assertEqual(escalations[0]["failure_kind"], "explicit_rpc_rejection")
+
+        self.clock.advance(5)
+        scheduler.run_once()
+        escalations = [event for event in self.state()["events"].values() if event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP]
+        self.assertEqual(len(escalations), 1)
+        self.assertEqual(escalations[0]["delivery"], "accepted")
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+
+    def test_native_v2_blocked_delivery_is_pending_while_service_process_is_alive(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
+        scheduler = self.scheduler()
+        scheduler.run_once()
+        self.statuses[MANAGER] = "active"
+        scheduler.run_once()
+
+        identity = {"host": "local", "boot_id": "service", "start_ticks": 91}
+        state = self.state()
+        state.update({
+            "enabled": True,
+            "mode": "active",
+            "pid": 91,
+            "identity": identity,
+            "ready_at": "ready",
+            "healthy": True,
+            "error": None,
+        })
+        wake_runtime._save_state(self.store, state)
+        with mock.patch.object(job_runtime, "probe_process", return_value={"status": "running", "identity": identity, "error": None}):
+            status = wake_runtime.service_status(self.config)
+
+        self.assertTrue(status["running"])
+        self.assertTrue(status["healthy"])
+        self.assertEqual(status["status"], "pending")
+        self.assertTrue(any(
+            event.get("block_kind") == wake_runtime._NATIVE_V2_DIRECT_INPUT_FAILURE
+            for event in status["pending"]["events"]
+        ))
+        self.assertTrue(any(item["kind"] == "native_v2_wake_blocked" for item in status["diagnostics"]))
+
     def test_task_mutation_under_store_lock_wins_over_stale_probe(self):
         self.task(TASK_ONE, jobs=[self.job("race", pid=61)])
         self.statuses[EXECUTOR] = "active"
