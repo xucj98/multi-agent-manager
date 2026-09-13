@@ -110,3 +110,39 @@ loss；六个预期的最终 `/20000` checkpoint 目录目前均不存在。
 
 没有 stopped job，故本次没有 checkpoint 验收、job 归档、重启、重复登记或 C eval。后续由 MAM 在任一
 登记 job 停止时唤醒当前执行者，再进行最终产物验收和 e690 可评清单交接。
+
+## 六条最终20k验收、归档与可评交接（2026-09-13 09:52 +0800）
+
+最新任务要求的补收尾已完成，未重训、未重复 smoke、未启动 eval，且没有占用 wuwen-1。六个最终
+`/20000` 均存在（每个约 4.9 GB），拥有 `params`、`assets`、`metadata`、`_CHECKPOINT_METADATA`，
+没有 Orbax 临时目录；六份原训练日志均记录 step20000 finalize、异步保存完成和无后台保存错误。
+
+六条均通过 task-local `validation/validate_u_checkpoint.py` 的 CPU checkpoint-only restore：51 参数叶、
+3,353,433,872 elements、6,706,867,744 restored bytes、完整 shape、全 BF16/finite，并拒绝训练 dataset、
+base checkpoint 与源 YAML 读取。该验证器以向后兼容的 `--expected-step` / `--expected-seed` 参数复用原
+50-step 逻辑。实查 GPU1/7 空闲后顺序完成六条 GPU checkpoint-only policy restore：rearrange 三条的
+action 为 `[50,14]`、memory IDs 为 `[50,3]`，put-back 三条为 `[50,14]`、`[50,2]`；全部有限且通过。
+
+六个 MAM job 均已在验收后归档：`d87b16e1`、`a1137b5b`、`6ab90156`、`2520a158`、`b669c403`、`315d9224`。
+可评 manifest 是
+`/mnt/public/xcj/Projects/openpi/checkpoints/memory20k_cbbba844_manifest.json`，SHA-256
+`681cc5aad845bc6863bb5bc9af0b0d59a60a3fbebfef90b7c2af479554d56e5b`；它列出所有 checkpoint、冻结
+OpenPI `6266bd8bbfa5f3e451f7253c476d1108e1ff5e1`、训练日志、逐条 restore 结果、计划 eval leaf 与
+failure reason（六条均为 null）。为消除 task-local 路径依赖，训练日志、验证脚本和本次12个最终验收
+stdout 均已复制到各 checkpoint 父目录的稳定 `artifacts/`。manifest 的每条 `validation_artifacts`
+字段给出精确路径：`train.log`、`validate_u_checkpoint.py`、`final20k_cpu_restore.json` 和
+`final20k_gpu_restore.json`；后两者保存本次 validator 的 captured stdout，而不是旧 smoke50 日志。
+
+具体 archive 根为：
+
+| run | stable artifacts directory |
+| --- | --- |
+| rearrange s0 | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_initial/memory20k_cbbba844_rearrange_full_initial_s0/artifacts` |
+| rearrange s1 | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_initial/memory20k_cbbba844_rearrange_full_initial_s1/artifacts` |
+| rearrange s2 | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_initial/memory20k_cbbba844_rearrange_full_initial_s2/artifacts` |
+| put-back s0 | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_initial/memory20k_cbbba844_put_back_full_initial_s0/artifacts` |
+| put-back s1 | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_initial/memory20k_cbbba844_put_back_full_initial_s1/artifacts` |
+| put-back s2 | `/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_initial/memory20k_cbbba844_put_back_full_initial_s2/artifacts` |
+
+RMBench U 说明已提交为 `0b5c0fb`（最终验收记录）和 `4de1435`（manifest digest 更新）。
+六个模型现仅作为可复用、待排期的评测输入；按用户批准的新九任务计划，不自动启动 C eval 或重启任何项。
