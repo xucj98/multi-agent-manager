@@ -8,3 +8,9 @@
 核对PDF文字含40批/4000次执行/20模型/9个完整三eval，以及新增rearrange J train0 87/87/90=264/300和相同RNG对照的说明；旧图只展示既有固定子集，不要求重新生成。不要把此工作声称为空白GPT-6审稿、新的实验验收或第二轮论文科学PASS。
 
 交付独立worktree中干净commit（仅paper.pdf和必要简洁构建receipt，不提交build/缓存/逐页临时图）；receipt记录source commit、PDF SHA256、页数和实测检查结果。报告写回本MAM任务report.md并publish，给Manager精确产物commit与路径。清理你自己的临时渲染，保留可复核PDF/receipt/必要日志摘要。通常短构建无需job；实际预计>30分钟才登记。完成可执行工作后正常结束，MAM通知Manager。
+
+## Manager 确认论文仓库入口不适配，批准本任务一次性回退
+
+Manager已核对MAM的PROJECT_ROOT=/mnt/public/xcj/Projects，而论文源在/root/Documents/task-state-vla-paper；源树没有MAM强制要求的.local/create_worktree.sh。此为已授权构建的本地实现障碍，无需用户额外批准，也不为此扩展MAM功能。
+
+本任务允许用标准git worktree add，从既定8dc182a创建 `/mnt/public/xcj/Projects/workspace/4fa0a008-aa9d-4eaa-ab23-b05c7f20d8c7/task-state-vla-paper`，使用唯一分支`task/4fa0a008-aa9d-4eaa-ab23-b05c7f20d8c7`。若已有目录/分支先核实而不覆盖。其余编译/验证/发布要求不变，不改MAM配置/数据库、不伪造repos登记、不往主仓库添加无关环境脚本。报告中明确这是手动创建的独立worktree，给出git common-dir、源commit及路径，供Manager验收后按git worktree流程清理；仍通过当前MAM task发布报告。
