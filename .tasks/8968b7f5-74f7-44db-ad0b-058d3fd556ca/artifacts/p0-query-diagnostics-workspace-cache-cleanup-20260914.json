@@ -1,0 +1,284 @@
+{
+  "authorization_scope": "Remove only ordinary, non-symlink .pytest_cache/.ruff_cache and __pycache__/pyc within actual source/tests/scripts/packages roots of the two registered task worktrees; skip .venv, .local, and all shared links.",
+  "created_at": "2026-09-13T20:58:51.442507+00:00",
+  "kind": "p0_query_diagnostics_workspace_cache_cleanup_receipt",
+  "manager_task_revision": "c4a6ba6d29a676f9b214b60dd47b00f0b9650a06",
+  "persistent_refs_verified": [
+    {
+      "branch": "codex/p0-query-diagnostics-accepted",
+      "commit": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+      "repository": "openpi"
+    },
+    {
+      "branch": "codex/p0-query-diagnostics-accepted",
+      "commit": "e147f600dc4329f330a6e2eb0335150b5b3093a3",
+      "repository": "robot-bridge"
+    }
+  ],
+  "post_cleanup": [
+    {
+      "clean": true,
+      "head": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/openpi",
+      "remaining_authorized_caches": 0,
+      "remaining_ignored_paths": [
+        ".local",
+        ".venv/",
+        "assets",
+        "checkpoints",
+        "data",
+        "datasets",
+        "logs",
+        "offline_test",
+        "offline_test_results",
+        "policy_records",
+        "wandb"
+      ],
+      "repository": "openpi"
+    },
+    {
+      "clean": true,
+      "head": "e147f600dc4329f330a6e2eb0335150b5b3093a3",
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge",
+      "remaining_authorized_caches": 0,
+      "remaining_ignored_paths": [
+        ".local",
+        ".venv/",
+        "logs"
+      ],
+      "repository": "robot-bridge"
+    }
+  ],
+  "pre_cleanup": [
+    {
+      "cache_bytes": 1014824,
+      "cache_directory_or_file_count": 11,
+      "cache_entries": [
+        {
+          "bytes": 388,
+          "file_count": 4,
+          "kind": ".ruff_cache",
+          "ordinary_non_symlink": true,
+          "path": ".ruff_cache"
+        },
+        {
+          "bytes": 3092,
+          "file_count": 6,
+          "kind": ".pytest_cache",
+          "ordinary_non_symlink": true,
+          "path": ".pytest_cache"
+        },
+        {
+          "bytes": 88778,
+          "file_count": 7,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "packages/openpi-client/src/openpi_client/__pycache__"
+        },
+        {
+          "bytes": 29990,
+          "file_count": 3,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "src/openpi/__pycache__"
+        },
+        {
+          "bytes": 45669,
+          "file_count": 3,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "src/openpi/models_pytorch/__pycache__"
+        },
+        {
+          "bytes": 196821,
+          "file_count": 9,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "src/openpi/policies/__pycache__"
+        },
+        {
+          "bytes": 206271,
+          "file_count": 11,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "src/openpi/models/__pycache__"
+        },
+        {
+          "bytes": 28615,
+          "file_count": 1,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "src/openpi/models/utils/__pycache__"
+        },
+        {
+          "bytes": 40424,
+          "file_count": 6,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "src/openpi/shared/__pycache__"
+        },
+        {
+          "bytes": 363359,
+          "file_count": 12,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "src/openpi/training/__pycache__"
+        },
+        {
+          "bytes": 11417,
+          "file_count": 2,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "src/openpi/training/misc/__pycache__"
+        }
+      ],
+      "cache_file_count": 64,
+      "head": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/openpi",
+      "repository": "openpi",
+      "shared_links_skipped": [
+        ".local/",
+        "assets/",
+        "checkpoints/",
+        "data/",
+        "datasets/",
+        "logs/",
+        "offline_test/",
+        "offline_test_results/",
+        "policy_records/",
+        "wandb/"
+      ],
+      "skipped_top_level": [
+        ".venv/"
+      ],
+      "source_roots": [
+        "packages",
+        "scripts",
+        "src",
+        "tests"
+      ]
+    },
+    {
+      "cache_bytes": 1684373,
+      "cache_directory_or_file_count": 13,
+      "cache_entries": [
+        {
+          "bytes": 3547,
+          "file_count": 15,
+          "kind": ".ruff_cache",
+          "ordinary_non_symlink": true,
+          "path": ".ruff_cache"
+        },
+        {
+          "bytes": 16071,
+          "file_count": 6,
+          "kind": ".pytest_cache",
+          "ordinary_non_symlink": true,
+          "path": ".pytest_cache"
+        },
+        {
+          "bytes": 789976,
+          "file_count": 10,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "tests/scheduler/__pycache__"
+        },
+        {
+          "bytes": 39324,
+          "file_count": 1,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "tests/benchmark/__pycache__"
+        },
+        {
+          "bytes": 5404,
+          "file_count": 1,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "tests/scripts/__pycache__"
+        },
+        {
+          "bytes": 3482,
+          "file_count": 2,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "robot_bridge/__pycache__"
+        },
+        {
+          "bytes": 486379,
+          "file_count": 10,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "robot_bridge/scheduler/__pycache__"
+        },
+        {
+          "bytes": 24292,
+          "file_count": 4,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "robot_bridge/transport/__pycache__"
+        },
+        {
+          "bytes": 21728,
+          "file_count": 4,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "robot_bridge/utils/__pycache__"
+        },
+        {
+          "bytes": 161794,
+          "file_count": 4,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "robot_bridge/benchmark/__pycache__"
+        },
+        {
+          "bytes": 224,
+          "file_count": 1,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "robot_bridge/robot/__pycache__"
+        },
+        {
+          "bytes": 100737,
+          "file_count": 6,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "robot_bridge/robot/controllers/__pycache__"
+        },
+        {
+          "bytes": 31415,
+          "file_count": 5,
+          "kind": "__pycache__",
+          "ordinary_non_symlink": true,
+          "path": "scripts/__pycache__"
+        }
+      ],
+      "cache_file_count": 69,
+      "head": "e147f600dc4329f330a6e2eb0335150b5b3093a3",
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge",
+      "repository": "robot-bridge",
+      "shared_links_skipped": [
+        ".local/",
+        "logs/"
+      ],
+      "skipped_top_level": [
+        ".venv/"
+      ],
+      "source_roots": [
+        "packages",
+        "robot_bridge",
+        "scripts",
+        "tests"
+      ]
+    }
+  ],
+  "prior_artifact_package_unchanged": {
+    "artifact_index_sha256": "3b780eff9e980a1476e908d15eb82072c2b0f41d5cb684eada74755b88faeb28",
+    "path": "/mnt/public/xcj/Projects/multi-agent-manager/.tasks/8968b7f5-74f7-44db-ad0b-058d3fd556ca/artifacts/p0-query-diagnostics-accepted-20260914",
+    "sha256sums_sha256": "5bad74b7b565bd1ec3dc086310bd50ad42c382e96e3c3db425f25af928d9667d"
+  },
+  "schema_version": 1,
+  "source_task_archived_by_executor": false,
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca"
+}
