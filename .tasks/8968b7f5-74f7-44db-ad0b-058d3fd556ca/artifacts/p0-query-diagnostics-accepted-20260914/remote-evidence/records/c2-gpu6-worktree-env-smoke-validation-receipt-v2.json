@@ -1,0 +1,97 @@
+{
+  "actual_smoke": {
+    "exit_status": 0,
+    "log": {
+      "bytes": 1446,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-gpu6-worktree-env-smoke-validation.log",
+      "sha256": "fd9b7c68686505fc5171fca65b5c2053d7b9d8e0fd300f975cbc0be8848c0fb7"
+    },
+    "output": {
+      "curobo": "0.7.8",
+      "curobo_extension": "/mnt/public/xcj/cache/uv/archive-v0/UYbDTNQF-bGDe1JmV92NN/curobo/curobolib/geom_cu.cpython-310-x86_64-linux-gnu.so",
+      "device": "NVIDIA GeForce RTX 4090",
+      "iopath": "/mnt/public/xcj/cache/uv/archive-v0/M3NJ5VggaldpAa2QoL92e/iopath/__init__.py",
+      "pose_distance_max": 0.0,
+      "pytorch3d": "/mnt/public/xcj/cache/uv/archive-v0/NDdBYQWNDnszXePnYaPkB/pytorch3d/__init__.py",
+      "render_shape": [
+        32,
+        32,
+        4
+      ],
+      "torch": "2.4.1+cu121",
+      "torch_cuda": "12.1"
+    }
+  },
+  "created_at": "2026-09-13T17:40:03.448755+00:00",
+  "environment": {
+    "CUDA_VISIBLE_DEVICES": "6",
+    "SAPIEN_RENDER_DEVICE": "cuda:0",
+    "VK_ICD_FILENAMES": "/etc/vulkan/icd.d/nvidia_icd.json"
+  },
+  "kind": "c2_query_diagnostic_curobo_smoke_validation",
+  "passed": true,
+  "provenance": {
+    "distribution": {
+      "name": "nvidia_curobo",
+      "version": "0.7.8"
+    },
+    "extension_bytes": 13367808,
+    "extension_lexical": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/.venv/lib/python3.10/site-packages/curobo/curobolib/geom_cu.cpython-310-x86_64-linux-gnu.so",
+    "extension_sha256": "874b95cb65d84eeb0a84562482de7551638f7c9974d3323b152142476f8abb01",
+    "record_bytes": 13367808,
+    "record_path_lexical": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/.venv/lib/python3.10/site-packages/nvidia_curobo-0.7.8.dist-info/RECORD",
+    "record_sha256": "874b95cb65d84eeb0a84562482de7551638f7c9974d3323b152142476f8abb01",
+    "runtime_executable": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/.venv/bin/python",
+    "runtime_prefix": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/.venv",
+    "site_packages_lexical": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/.venv/lib/python3.10/site-packages",
+    "stable_wheel": "/mnt/public/xcj/Projects/state-vla/.cache/curobo/wheel/nvidia_curobo-0.7.8-cp310-cp310-linux_x86_64.whl",
+    "stable_wheel_member_sha256": "874b95cb65d84eeb0a84562482de7551638f7c9974d3323b152142476f8abb01",
+    "stable_wheel_sha256": "780a878713cad48043b4537268c860e52393ddeb46709a6377409f9c65f4f988"
+  },
+  "provenance_error": null,
+  "schema_version": 1,
+  "source": {
+    "RMBench": {
+      "clean": true,
+      "commit": "f401f5279c95451eb424ac98b831bab5552b2120",
+      "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench"
+    },
+    "openpi": {
+      "clean": true,
+      "commit": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+      "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/openpi"
+    },
+    "robot-bridge": {
+      "clean": true,
+      "commit": "e147f600dc4329f330a6e2eb0335150b5b3093a3",
+      "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/robot-bridge"
+    }
+  },
+  "validation_copy": {
+    "command_file": {
+      "bytes": 386,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/c2-smoke-validation/c2-gpu6-worktree-env-smoke-validation.command.txt",
+      "sha256": "513d6b49d63d5afb7537cbc2aa8e875b9b0aff434086c60012d605641c0937b2"
+    },
+    "minimal_diff": {
+      "bytes": 921,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/c2-smoke-validation/worktree_env_smoke_validation.diff",
+      "sha256": "fe48237f6a3523fbd7d60066c3cfbcfc069f90d0349329c15da58c9c99788b83"
+    },
+    "original": {
+      "bytes": 3147,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/c2-smoke-validation/worktree_env_smoke_original.py",
+      "sha256": "589733e0d89f16880303a6bb02c4573348496e7f53805537def5e1cafaab9b21"
+    },
+    "provenance_helper": {
+      "bytes": 6409,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/c2-smoke-validation/query_diagnostic_curobo_provenance.py",
+      "sha256": "2da74cd31ef810d0452c8b93ffa958c3121a077a5487a3729a7efe8a4b3dbec6"
+    },
+    "validation": {
+      "bytes": 3120,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/c2-smoke-validation/worktree_env_smoke_validation.py",
+      "sha256": "83ef06c84a93d76f944e79f9aae92a593d4e05e7847908b05309de5678a383f0"
+    }
+  }
+}

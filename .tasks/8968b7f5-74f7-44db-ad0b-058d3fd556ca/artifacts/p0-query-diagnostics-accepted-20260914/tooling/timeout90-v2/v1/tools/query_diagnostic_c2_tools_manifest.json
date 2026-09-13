@@ -1,0 +1,79 @@
+{
+  "authorized_runs": {
+    "full_t_plus_1": {
+      "checkpoint": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s0/20000",
+      "env_seeds": [
+        100000,
+        100001
+      ],
+      "episodes": [
+        0,
+        1
+      ],
+      "query_ids": [
+        1
+      ],
+      "result_run": "query_diagnostic_full_t_plus_1_smoke_20260914",
+      "runner_id": "query_diagnostic_full_t_plus_1"
+    },
+    "serial_lag30": {
+      "checkpoint": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s0/20000",
+      "env_seeds": [
+        100000,
+        100001
+      ],
+      "episodes": [
+        0,
+        1
+      ],
+      "query_ids": [
+        1
+      ],
+      "result_run": "query_diagnostic_serial_lag30_smoke_20260914",
+      "runner_id": "query_diagnostic_serial_lag30"
+    }
+  },
+  "created_at": "2026-09-13T17:59:24+00:00",
+  "execution_environment": {
+    "cuda_visible_devices": "6",
+    "experiment_group": "query_diagnostic_c2_20260914",
+    "policy_port": 19462,
+    "robot_port": 19460,
+    "sapien_render_device": "cuda:0",
+    "vulkan_icd": "/etc/vulkan/icd.d/nvidia_icd.json"
+  },
+  "host_alias": "wuwen-4090-2",
+  "kind": "frozen_c2_query_diagnostic_tools",
+  "pairing_contract": {
+    "calls_per_model": {
+      "logging_off": 1,
+      "logging_on": 1
+    },
+    "comparisons": [
+      "ordinary actions/state output",
+      "saved recorded output",
+      "on-sidecar input",
+      "state_before_split",
+      "final RNG state"
+    ],
+    "input_source": "scheduler.input_before_policy_transport materialized from the selected record NPZ",
+    "rng_source": "policy.rng.state_before_split materialized from the selected record NPZ"
+  },
+  "schema_version": 1,
+  "source_identity": {
+    "RMBench": "f401f5279c95451eb424ac98b831bab5552b2120",
+    "openpi": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+    "robot_bridge": "e147f600dc4329f330a6e2eb0335150b5b3093a3"
+  },
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca",
+  "tools": {
+    "launch_query_diagnostic_smoke.sh": {
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-v1/launch_query_diagnostic_smoke.sh",
+      "sha256": "61e3e8ce80bbe0f17fd8d1b56472038189b5be3931bca16b476c2d70b0c1d732"
+    },
+    "pair_query_diagnostic_logging.py": {
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-v1/pair_query_diagnostic_logging.py",
+      "sha256": "cdf577911a203994be50fd423b522e95cd5604f43c94e15b0ea247c18f8bce42"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+--- v1/full_t_plus_1/scheduler_config.yaml
++++ timeout90-v2/full_t_plus_1/scheduler_config.yaml
+@@ -2,8 +2,9 @@
+ params:
+   move_steps: 30
+   debug_iterations: 0
++  policy_first_infer_timeout: 90.0
+   diagnostic_trace:
+-    directory: "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics/full_t_plus_1"
++    directory: "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/full_t_plus_1"
+     episode_ids: [0, 1]
+     query_ids: [1]
+     max_records: 2

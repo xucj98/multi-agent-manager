@@ -1,0 +1,20 @@
+--- v1/serial_lag30/runner_input_manifest.json
++++ timeout90-v2/serial_lag30/runner_input_manifest.json
+@@ -19,7 +19,7 @@
+         "method": "json_rows",
+         "status": "ready"
+       },
+-      "weight_content_manifest": "TaskRecords/manifests/serial_lag30/weight_content_manifest.json"
++      "weight_content_manifest": "TaskRecords/manifests-timeout90-v2/serial_lag30/weight_content_manifest.json"
+     }
+   ],
+   "path_aliases": {
+@@ -49,7 +49,7 @@
+   "simulation_runs": [
+     {
+       "checkpoint_ref": "query_diagnostic_serial_lag30_checkpoint",
+-      "config_source": "TaskRecords/manifests/serial_lag30",
++      "config_source": "TaskRecords/manifests-timeout90-v2/serial_lag30",
+       "id": "query_diagnostic_serial_lag30",
+       "overrides": {
+         "evaluation_kind": "technical_query_diagnostic_smoke",

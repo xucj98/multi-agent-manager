@@ -1,0 +1,51 @@
+{
+  "deployment_receipt": {
+    "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2-deployment-receipt.json",
+    "sha256": "0a2809fd871679bf425fbfc0d9aa443da0ac54b82ec6da9e1b73d9c1011f581d"
+  },
+  "gpu6": {
+    "memory_total_mib": 24564,
+    "memory_used_mib": 4,
+    "raw": "6, 4, 24564, 0",
+    "utilization_percent": 0
+  },
+  "kind": "c2_timeout90_v2_preflight",
+  "new_outputs_absent": [
+    "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/eval_result/query_diagnostic_c2_20260914_timeout90_v2/query_diagnostic_full_t_plus_1_smoke_20260914_timeout90_v2",
+    "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/full_t_plus_1",
+    "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/pairs-timeout90-v2/full_t_plus_1",
+    "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/eval_result/query_diagnostic_c2_20260914_timeout90_v2/query_diagnostic_serial_lag30_smoke_20260914_timeout90_v2",
+    "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30",
+    "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/pairs-timeout90-v2/serial_lag30"
+  ],
+  "passed": true,
+  "ports_listening": {
+    "19460": false,
+    "19462": false
+  },
+  "schema_version": 1,
+  "source": {
+    "RMBench": {
+      "clean": true,
+      "commit": "f401f5279c95451eb424ac98b831bab5552b2120",
+      "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench"
+    },
+    "openpi": {
+      "clean": true,
+      "commit": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+      "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/openpi"
+    },
+    "robot-bridge": {
+      "clean": true,
+      "commit": "e147f600dc4329f330a6e2eb0335150b5b3093a3",
+      "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/robot-bridge"
+    }
+  },
+  "status": "passed",
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca",
+  "task_owned_processes": [],
+  "v1_failure_receipt": {
+    "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-query-diagnostic-full_t_plus_1-failure-receipt.json",
+    "sha256": "681a5b4b5dc29069d69d1821190cb52e961be4f7009152b27b148533d8a67ad2"
+  }
+}

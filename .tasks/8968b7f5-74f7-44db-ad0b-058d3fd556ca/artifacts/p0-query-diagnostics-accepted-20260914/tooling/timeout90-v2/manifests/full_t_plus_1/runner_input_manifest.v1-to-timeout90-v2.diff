@@ -1,0 +1,20 @@
+--- v1/full_t_plus_1/runner_input_manifest.json
++++ timeout90-v2/full_t_plus_1/runner_input_manifest.json
+@@ -19,7 +19,7 @@
+         "method": "json_rows",
+         "status": "ready"
+       },
+-      "weight_content_manifest": "TaskRecords/manifests/full_t_plus_1/weight_content_manifest.json"
++      "weight_content_manifest": "TaskRecords/manifests-timeout90-v2/full_t_plus_1/weight_content_manifest.json"
+     }
+   ],
+   "path_aliases": {
+@@ -49,7 +49,7 @@
+   "simulation_runs": [
+     {
+       "checkpoint_ref": "query_diagnostic_full_t_plus_1_checkpoint",
+-      "config_source": "TaskRecords/manifests/full_t_plus_1",
++      "config_source": "TaskRecords/manifests-timeout90-v2/full_t_plus_1",
+       "id": "query_diagnostic_full_t_plus_1",
+       "overrides": {
+         "evaluation_kind": "technical_query_diagnostic_smoke",

@@ -1,0 +1,19 @@
+{
+  "config": {
+    "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/serial_lag30/scheduler_config.yaml",
+    "sha256": "1348358152825df1ece05697c60421d7ca760efc0c23c38fe69c797b88f66f89"
+  },
+  "diagnostic_directory": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30",
+  "first_policy_log_marker": "First policy inference uses 90.0s RPC budget.",
+  "first_policy_rpc_seconds": 90.0,
+  "frozen_scheduler_source": {
+    "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/robot-bridge/robot_bridge/scheduler/base.py",
+    "sha256": "e9d7a93a7250c89b16c5e08fbe3ddbed82c3c209ad9db82768b2228c230ba2d9"
+  },
+  "kind": "timeout90_scheduler_config_validation",
+  "no_policy_or_robot_connection": true,
+  "passed": true,
+  "schema_version": 1,
+  "status": "passed",
+  "subsequent_policy_rpc_seconds": 30.0
+}

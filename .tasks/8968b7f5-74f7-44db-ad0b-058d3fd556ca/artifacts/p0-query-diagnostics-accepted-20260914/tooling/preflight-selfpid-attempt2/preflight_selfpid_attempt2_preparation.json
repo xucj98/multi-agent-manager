@@ -1,0 +1,77 @@
+{
+  "change_summary": {
+    "bytes": 5783,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/tools/preflight_selfpid_attempt2_change_summary.json",
+    "sha256": "96b758642487d7bcf9f28211607410ef3929d65e2407108b3f896e924b763ad3"
+  },
+  "combined_minimal_diff": {
+    "bytes": 6280,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/tools/v2-to-preflight-selfpid-attempt2-tools.diff",
+    "sha256": "93040a7dfd7df2d3d5709c1d2ec37649def2b4fedc6ad65afcc4f52c515ffffc"
+  },
+  "deployment_manifest": {
+    "bytes": 13679,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/deployment/query_diagnostic_c2_timeout90_v2_preflight_selfpid_attempt2_deployment_manifest.json",
+    "sha256": "93e6692b6513cadd13640e368489332f7b4feb81663c7aea212fc8f2dd9613f8"
+  },
+  "deployment_verifier": {
+    "bytes": 14608,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/deployment/verify_timeout90_v2_deployment.py",
+    "sha256": "c04d181524ba4e2357d976584359f5e9c15d9ac666cb3d812971ddf011225931"
+  },
+  "deployment_verifier_cpu_check_receipt": {
+    "bytes": 1054,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/local-validation/deployment_verifier_cpu_check.json",
+    "sha256": "3041da8e4b9c4fcf1c21b62ca8ede66cc631c5d9869209e5afbd17a39f923cf6"
+  },
+  "kind": "c2_timeout90_v2_preflight_selfpid_attempt2_preparation",
+  "manager_task_revision": "c13aa2c55aaec8da3e211696b22b4dc613feec27",
+  "original_v2_preflight": {
+    "bytes": 6347,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/tools/c2_timeout90_v2_preflight.py",
+    "sha256": "e6cf1ebac7c61b801588189bfdf3370ae4ee69fbe9e8684f0a6020fb51a4f855"
+  },
+  "prepared_at": "2026-09-13T19:15:16+00:00",
+  "repaired_preflight": {
+    "bytes": 7058,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/tools/c2_timeout90_v2_preflight.py",
+    "sha256": "194e18392772adab9b699f1505550570432a7dc7b72572bba4d4741fa1215caa"
+  },
+  "schema_version": 1,
+  "scope": {
+    "existing_v2_manifests_reused_without_copy": true,
+    "new_attempt_receipts_only": true,
+    "no_source_tree_or_checkpoint_change": true,
+    "other_run_path_processes_still_rejected": true,
+    "single_preflight_self_pid_exclusion": true,
+    "v1_and_v2_failure_evidence_preserved": true
+  },
+  "self_pid_cpu_check_receipt": {
+    "bytes": 554,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/local-validation/preflight_self_pid_cpu_check.json",
+    "sha256": "e0b46cab097267daffca57184f2328c6323ad0290c8a4f5b989339c2f29cc582"
+  },
+  "self_pid_cpu_check_script": {
+    "bytes": 4859,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/local-validation/preflight_self_pid_cpu_check.py",
+    "sha256": "39620fb53e55153a17865ddaf4b22acb7b49346324844da383c0b2c60f8fcd7e"
+  },
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca",
+  "tools_manifest": {
+    "bytes": 6445,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/tools/query_diagnostic_c2_timeout90_v2_preflight_selfpid_attempt2_tools_manifest.json",
+    "sha256": "8d8819c8b1c7e6c954934486ee2a7ffca942fc28b46f4d4cf3ca6decc52bc773"
+  },
+  "unchanged_reused_configs": {
+    "full_t_plus_1": {
+      "bytes": 369,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/full_t_plus_1/scheduler_config.yaml",
+      "sha256": "59aeb0fb748ce5017580bf25c5a7ca425fd2f8b4ce66b5f72610b2dc8d9da041"
+    },
+    "serial_lag30": {
+      "bytes": 368,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/serial_lag30/scheduler_config.yaml",
+      "sha256": "1348358152825df1ece05697c60421d7ca760efc0c23c38fe69c797b88f66f89"
+    }
+  }
+}

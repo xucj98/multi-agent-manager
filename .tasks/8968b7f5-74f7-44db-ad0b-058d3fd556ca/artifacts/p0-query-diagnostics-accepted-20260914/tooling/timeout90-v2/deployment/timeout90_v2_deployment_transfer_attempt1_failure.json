@@ -1,0 +1,32 @@
+{
+  "attempt": 1,
+  "bounded_recovery": {
+    "kind": "layout-only move of existing staged regular files",
+    "no_content_change": true,
+    "no_overwrite": true,
+    "no_retransfer": true,
+    "requires_hash_verification_before_finalization": true
+  },
+  "created_at": "2026-09-13T18:52:04+00:00",
+  "first_error": {
+    "cause": "the local frozen tools directory was archived as STAGE/tools rather than the intended nested destination STAGE/tools/query-diagnostic-c2-timeout90-v2",
+    "command_phase": "move_staged_runtime_tools",
+    "message": "mv: cannot stat STAGE/tools/query-diagnostic-c2-timeout90-v2: No such file or directory"
+  },
+  "frozen_deployment_manifest": {
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/deployment/query_diagnostic_c2_timeout90_v2_deployment_manifest.json",
+    "sha256": "c8ec1b8b1b06189fac425792e10698a6287adb0860aafac0554de3a0f7a3c6fa"
+  },
+  "kind": "c2_query_diagnostic_timeout90_v2_deployment_transfer_attempt",
+  "remote_state_after_failure": {
+    "deployment_receipt": "absent",
+    "deployment_verifier": "retained in the task-private staging directory",
+    "gpu_program": "not started",
+    "manifests_timeout90_v2": "moved to final new path",
+    "runtime_tools": "all frozen files retained in the task-private staging directory at its flat tools level",
+    "source_tree_or_checkpoint_write": false
+  },
+  "schema_version": 1,
+  "status": "failed_before_runtime",
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca"
+}

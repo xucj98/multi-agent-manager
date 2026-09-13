@@ -1,0 +1,89 @@
+{
+  "config": {
+    "bytes": 368,
+    "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/serial_lag30/scheduler_config.yaml",
+    "sha256": "1348358152825df1ece05697c60421d7ca760efc0c23c38fe69c797b88f66f89"
+  },
+  "kind": "timeout90_selected_query_smoke_acceptance",
+  "passed": true,
+  "process_events": {
+    "bytes": 4573,
+    "path": "/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/query_diagnostic_c2_20260914_timeout90_v2/query_diagnostic_serial_lag30_smoke_20260914_timeout90_v2/processes.jsonl",
+    "sha256": "e83aa7628ff8d8b37e2c2943ea7d10e606214c5d90e1f79d938c453291284a1d"
+  },
+  "records": [
+    {
+      "array_bundle": {
+        "bytes": 440765,
+        "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30/arrays/episode-000000-query-000001-seq-000001.npz",
+        "sha256": "6b4fcfa71a8346db3c67f3d7402b9aa7e58dee52c1658a647b3f387411da1c67"
+      },
+      "env_seed": 100000,
+      "episode_id": 0,
+      "query_id": 1,
+      "record": {
+        "bytes": 30161,
+        "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30/records/episode-000000-query-000001-seq-000001.json",
+        "sha256": "6be8b9aaaae38eb8204cdbb9d1c3de7f011fee67377553f02bbb4b950f896e64"
+      },
+      "record_id": "episode-000000-query-000001-seq-000001"
+    },
+    {
+      "array_bundle": {
+        "bytes": 440760,
+        "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30/arrays/episode-000001-query-000001-seq-000001.npz",
+        "sha256": "19f3155845991dcdc13f02334f5085768e96414fab79edc767b21a6d6fce92a1"
+      },
+      "env_seed": 100001,
+      "episode_id": 1,
+      "query_id": 1,
+      "record": {
+        "bytes": 30172,
+        "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30/records/episode-000001-query-000001-seq-000001.json",
+        "sha256": "a75f18c79e14c56c6e933209c5324e4da3bfdbcc3af6eab976ad8ac9a889e2b7"
+      },
+      "record_id": "episode-000001-query-000001-seq-000001"
+    }
+  ],
+  "result_scheduler_config": {
+    "bytes": 379,
+    "path": "/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/query_diagnostic_c2_20260914_timeout90_v2/query_diagnostic_serial_lag30_smoke_20260914_timeout90_v2/scheduler.yaml",
+    "sha256": "61e63e11eaeae2d0e51c34177a3631415d8c83c63f1b6e200e6ad0414961280b"
+  },
+  "result_summary": {
+    "bytes": 3295,
+    "path": "/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/query_diagnostic_c2_20260914_timeout90_v2/query_diagnostic_serial_lag30_smoke_20260914_timeout90_v2/diagnostics_summary.json",
+    "sha256": "66ac30fc95c015e2af10aa013bc5142874d512564c3dda0582fbb690e3adba3d"
+  },
+  "scheduler_first_infer_log_marker": "First policy inference uses 90.0s RPC budget.",
+  "scheduler_logs": [
+    {
+      "bytes": 56605,
+      "path": "/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/query_diagnostic_c2_20260914_timeout90_v2/query_diagnostic_serial_lag30_smoke_20260914_timeout90_v2/processes/002-scheduler.stdout.log",
+      "sha256": "f54b54f0f50453b0ae41a0cc5433a493c24582d4de56181bf4107ff149e17a42"
+    },
+    {
+      "bytes": 77917,
+      "path": "/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/query_diagnostic_c2_20260914_timeout90_v2/query_diagnostic_serial_lag30_smoke_20260914_timeout90_v2/processes/003-scheduler.stdout.log",
+      "sha256": "696e6066e8d443427a4dfe66dd3b81734c985e79e70efb81e6962c243d2f0971"
+    }
+  ],
+  "schema_version": 1,
+  "status": "passed",
+  "subsequent_policy_rpc_seconds": 30.0,
+  "validator_results": [
+    {
+      "array_bundle": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30/arrays/episode-000000-query-000001-seq-000001.npz",
+      "array_count": 43,
+      "record": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30/records/episode-000000-query-000001-seq-000001.json",
+      "status": "recorded"
+    },
+    {
+      "array_bundle": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30/arrays/episode-000001-query-000001-seq-000001.npz",
+      "array_count": 43,
+      "record": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30/records/episode-000001-query-000001-seq-000001.json",
+      "status": "recorded"
+    }
+  ],
+  "variant": "serial_lag30"
+}

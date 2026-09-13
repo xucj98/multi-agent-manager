@@ -1,0 +1,34 @@
+{
+  "created_at_utc": "2026-09-13T17:37:29.048582+00:00",
+  "expected_extension_sha256": "874b95cb65d84eeb0a84562482de7551638f7c9974d3323b152142476f8abb01",
+  "expected_wheel_sha256": "780a878713cad48043b4537268c860e52393ddeb46709a6377409f9c65f4f988",
+  "files": {
+    "build_c2_smoke_validation_receipt.py": {
+      "bytes": 4582,
+      "sha256": "5708c0a4242d0cbf3fb02c68868b52b7ef8cddbe94d45a0041eb62227767e03f"
+    },
+    "c2-gpu6-worktree-env-smoke-validation.command.txt": {
+      "bytes": 386,
+      "sha256": "513d6b49d63d5afb7537cbc2aa8e875b9b0aff434086c60012d605641c0937b2"
+    },
+    "query_diagnostic_curobo_provenance.py": {
+      "bytes": 6409,
+      "sha256": "2da74cd31ef810d0452c8b93ffa958c3121a077a5487a3729a7efe8a4b3dbec6"
+    },
+    "worktree_env_smoke_original.py": {
+      "bytes": 3147,
+      "sha256": "589733e0d89f16880303a6bb02c4573348496e7f53805537def5e1cafaab9b21"
+    },
+    "worktree_env_smoke_validation.diff": {
+      "bytes": 921,
+      "sha256": "fe48237f6a3523fbd7d60066c3cfbcfc069f90d0349329c15da58c9c99788b83"
+    },
+    "worktree_env_smoke_validation.py": {
+      "bytes": 3120,
+      "sha256": "83ef06c84a93d76f944e79f9aae92a593d4e05e7847908b05309de5678a383f0"
+    }
+  },
+  "kind": "c2_query_diagnostic_curobo_smoke_validation_preparation",
+  "manager_authorization_task_revision": "3d0a30be3036b2e27ec592341fdd00eaa2d70ee7",
+  "schema_version": 1
+}

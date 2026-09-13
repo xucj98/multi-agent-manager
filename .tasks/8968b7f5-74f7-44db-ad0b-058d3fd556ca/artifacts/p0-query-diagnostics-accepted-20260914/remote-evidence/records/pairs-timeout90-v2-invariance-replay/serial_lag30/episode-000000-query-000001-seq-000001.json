@@ -1,0 +1,362 @@
+{
+  "backend_actions_boundary": {
+    "expected_backend_actions": {
+      "dtype": "<f4",
+      "nonfinite": false,
+      "sha256": "6b2829a11609339ceee5943ff508f08e36ea9697ac5f2708b782148da4a3bca4",
+      "shape": [
+        50,
+        14
+      ]
+    },
+    "operation": "np.asarray(saved_policy_after_output_transform.actions, dtype=np.float32)",
+    "saved_policy_actions": {
+      "dtype": "<f8",
+      "nonfinite": false,
+      "sha256": "121a8dd496503e46704fa1249c08a21e42495fe1d261e940680705e452c9e342",
+      "shape": [
+        50,
+        14
+      ]
+    },
+    "scope": "Only expected actions cross this explicit OpenPiBackend boundary; all other replay fields remain strict and uncast."
+  },
+  "checkpoint": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s0/20000",
+  "cross_process_saved_replay": {
+    "comparisons": {
+      "logging_off_vs_saved_backend_output": {
+        "actions": {
+          "difference": "output.actions: array values differ",
+          "equal": false
+        },
+        "key_state_logits": {
+          "difference": null,
+          "equal": true
+        },
+        "key_state_prediction": {
+          "difference": null,
+          "equal": true
+        },
+        "memory_prediction_ids": {
+          "difference": null,
+          "equal": true
+        }
+      },
+      "logging_on_vs_saved_backend_output": {
+        "actions": {
+          "difference": "output.actions: array values differ",
+          "equal": false
+        },
+        "key_state_logits": {
+          "difference": null,
+          "equal": true
+        },
+        "key_state_prediction": {
+          "difference": null,
+          "equal": true
+        },
+        "memory_prediction_ids": {
+          "difference": null,
+          "equal": true
+        }
+      }
+    },
+    "passed": false,
+    "scope": "Additional saved-output replay check after only the explicit backend actions cast; it does not redefine same-process logging invariance."
+  },
+  "finished_at": "2026-09-13T20:21:41+00:00",
+  "input": {
+    "diagnostic_context_added_only_for_logging_on": true,
+    "source": "scheduler.input_before_policy_transport"
+  },
+  "kind": "actual_model_logging_invariance_and_saved_replay_pair",
+  "logging_invariance": {
+    "comparisons": {
+      "final_rng_logging_off_vs_logging_on": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_off_final_rng_vs_saved": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_final_rng_vs_saved": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_sidecar_input_vs_saved_pre_transport_input": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_sidecar_rng_after_vs_saved": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_sidecar_rng_before_vs_saved": {
+        "difference": null,
+        "equal": true
+      },
+      "ordinary_output_logging_off_vs_logging_on": {
+        "difference": null,
+        "equal": true
+      }
+    },
+    "ordinary_output_fields": [
+      "actions",
+      "key_state_logits",
+      "key_state_prediction",
+      "memory_prediction_ids"
+    ],
+    "passed": true,
+    "scope": "One loaded backend, same restored starting key, same ordinary pre-transport input, with diagnostic context added only to logging-on. Ordinary output excludes only timing and the diagnostic sidecar."
+  },
+  "ordinary_output": {
+    "bundle": {
+      "arrays": {
+        "array_000": {
+          "dtype": "<f4",
+          "field": "logging_off.actions",
+          "nbytes": 2800,
+          "nonfinite": false,
+          "sha256": "08c59917e10e35b3a6ef3ef7c8a559b4b4be01d3fe28937c6f81c37d85487610",
+          "shape": [
+            50,
+            14
+          ]
+        },
+        "array_001": {
+          "dtype": "<i4",
+          "field": "logging_off.key_state_prediction",
+          "nbytes": 8,
+          "nonfinite": false,
+          "sha256": "8628f7ce6032f7df53d094afe952a322c80a9c8c1f77ca41cd3f5d234dbbe32f",
+          "shape": [
+            2
+          ]
+        },
+        "array_002": {
+          "dtype": "<f4",
+          "field": "logging_off.key_state_logits",
+          "nbytes": 40,
+          "nonfinite": true,
+          "sha256": "60169beaa5a40713ea1520b1bf82cc2c76855b2f35099852264a4ff180430e9e",
+          "shape": [
+            2,
+            5
+          ]
+        },
+        "array_003": {
+          "dtype": "<i4",
+          "field": "logging_off.memory_prediction_ids",
+          "nbytes": 8,
+          "nonfinite": false,
+          "sha256": "e0d0ad9118771e4e8342bf7b0004dfad601fd848bb8db4fafe5b55bc3be9cef3",
+          "shape": [
+            1,
+            2
+          ]
+        },
+        "array_004": {
+          "dtype": "<f4",
+          "field": "logging_on.actions",
+          "nbytes": 2800,
+          "nonfinite": false,
+          "sha256": "08c59917e10e35b3a6ef3ef7c8a559b4b4be01d3fe28937c6f81c37d85487610",
+          "shape": [
+            50,
+            14
+          ]
+        },
+        "array_005": {
+          "dtype": "<i4",
+          "field": "logging_on.key_state_prediction",
+          "nbytes": 8,
+          "nonfinite": false,
+          "sha256": "8628f7ce6032f7df53d094afe952a322c80a9c8c1f77ca41cd3f5d234dbbe32f",
+          "shape": [
+            2
+          ]
+        },
+        "array_006": {
+          "dtype": "<f4",
+          "field": "logging_on.key_state_logits",
+          "nbytes": 40,
+          "nonfinite": true,
+          "sha256": "60169beaa5a40713ea1520b1bf82cc2c76855b2f35099852264a4ff180430e9e",
+          "shape": [
+            2,
+            5
+          ]
+        },
+        "array_007": {
+          "dtype": "<i4",
+          "field": "logging_on.memory_prediction_ids",
+          "nbytes": 8,
+          "nonfinite": false,
+          "sha256": "e0d0ad9118771e4e8342bf7b0004dfad601fd848bb8db4fafe5b55bc3be9cef3",
+          "shape": [
+            1,
+            2
+          ]
+        }
+      },
+      "bundle": {
+        "bytes": 7064,
+        "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/pairs-timeout90-v2-invariance-replay/serial_lag30/episode-000000-query-000001-seq-000001-ordinary-output.npz",
+        "sha256": "725c19b73fe9768c8ac3216ad85d8cda86a87a959c1475791653a582de9a81cb"
+      },
+      "uncompressed_array_bytes": 5712
+    },
+    "logging_off": {
+      "items": {
+        "actions": {
+          "dtype": "<f4",
+          "kind": "array",
+          "nonfinite": false,
+          "sha256": "08c59917e10e35b3a6ef3ef7c8a559b4b4be01d3fe28937c6f81c37d85487610",
+          "shape": [
+            50,
+            14
+          ]
+        },
+        "key_state_logits": {
+          "dtype": "<f4",
+          "kind": "array",
+          "nonfinite": true,
+          "sha256": "60169beaa5a40713ea1520b1bf82cc2c76855b2f35099852264a4ff180430e9e",
+          "shape": [
+            2,
+            5
+          ]
+        },
+        "key_state_prediction": {
+          "dtype": "<i4",
+          "kind": "array",
+          "nonfinite": false,
+          "sha256": "8628f7ce6032f7df53d094afe952a322c80a9c8c1f77ca41cd3f5d234dbbe32f",
+          "shape": [
+            2
+          ]
+        },
+        "memory_prediction_ids": {
+          "dtype": "<i4",
+          "kind": "array",
+          "nonfinite": false,
+          "sha256": "e0d0ad9118771e4e8342bf7b0004dfad601fd848bb8db4fafe5b55bc3be9cef3",
+          "shape": [
+            1,
+            2
+          ]
+        }
+      },
+      "kind": "mapping"
+    },
+    "logging_on": {
+      "items": {
+        "actions": {
+          "dtype": "<f4",
+          "kind": "array",
+          "nonfinite": false,
+          "sha256": "08c59917e10e35b3a6ef3ef7c8a559b4b4be01d3fe28937c6f81c37d85487610",
+          "shape": [
+            50,
+            14
+          ]
+        },
+        "key_state_logits": {
+          "dtype": "<f4",
+          "kind": "array",
+          "nonfinite": true,
+          "sha256": "60169beaa5a40713ea1520b1bf82cc2c76855b2f35099852264a4ff180430e9e",
+          "shape": [
+            2,
+            5
+          ]
+        },
+        "key_state_prediction": {
+          "dtype": "<i4",
+          "kind": "array",
+          "nonfinite": false,
+          "sha256": "8628f7ce6032f7df53d094afe952a322c80a9c8c1f77ca41cd3f5d234dbbe32f",
+          "shape": [
+            2
+          ]
+        },
+        "memory_prediction_ids": {
+          "dtype": "<i4",
+          "kind": "array",
+          "nonfinite": false,
+          "sha256": "e0d0ad9118771e4e8342bf7b0004dfad601fd848bb8db4fafe5b55bc3be9cef3",
+          "shape": [
+            1,
+            2
+          ]
+        }
+      },
+      "kind": "mapping"
+    }
+  },
+  "passed": false,
+  "record": {
+    "array_bundle": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30/arrays/episode-000000-query-000001-seq-000001.npz",
+    "array_bundle_sha256": "6b4fcfa71a8346db3c67f3d7402b9aa7e58dee52c1658a647b3f387411da1c67",
+    "episode_id": 0,
+    "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30/records/episode-000000-query-000001-seq-000001.json",
+    "query_id": 1,
+    "record_id": "episode-000000-query-000001-seq-000001",
+    "sha256": "6be8b9aaaae38eb8204cdbb9d1c3de7f011fee67377553f02bbb4b950f896e64"
+  },
+  "rng": {
+    "logging_off_final": {
+      "algorithm": "threefry2x32",
+      "key_data": {
+        "dtype": "<u4",
+        "nonfinite": false,
+        "sha256": "e98d82da3870b8e15c37fa90d06bfefb61fe4f0307c421fd604f2a0499ee7538",
+        "shape": [
+          2
+        ]
+      }
+    },
+    "logging_on_final": {
+      "algorithm": "threefry2x32",
+      "key_data": {
+        "dtype": "<u4",
+        "nonfinite": false,
+        "sha256": "e98d82da3870b8e15c37fa90d06bfefb61fe4f0307c421fd604f2a0499ee7538",
+        "shape": [
+          2
+        ]
+      }
+    },
+    "saved_state_after_split": {
+      "algorithm": "threefry2x32",
+      "key_data": {
+        "dtype": "<u4",
+        "nonfinite": false,
+        "sha256": "e98d82da3870b8e15c37fa90d06bfefb61fe4f0307c421fd604f2a0499ee7538",
+        "shape": [
+          2
+        ]
+      }
+    },
+    "state_before_split": {
+      "algorithm": "threefry2x32",
+      "key_data": {
+        "dtype": "<u4",
+        "nonfinite": false,
+        "sha256": "ee46b0976453423852f7415e61fcc341d384b01771f7ba4bf3597bee1a051029",
+        "shape": [
+          2
+        ]
+      }
+    }
+  },
+  "schema_version": 2,
+  "script": {
+    "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2-invariance-replay-s-continuation/pair_query_diagnostic_logging_invariance_replay.py",
+    "sha256": "acabef4d10f45f4e5ade67b85d5d5b79d8a5c9a9550a85c25723354337336272"
+  },
+  "started_at": "2026-09-13T20:20:24+00:00",
+  "status": "failed"
+}

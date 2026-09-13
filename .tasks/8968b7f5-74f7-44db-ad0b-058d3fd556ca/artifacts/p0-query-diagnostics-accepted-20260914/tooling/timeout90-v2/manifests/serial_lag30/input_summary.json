@@ -1,0 +1,13 @@
+{
+  "checkpoint": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s0/20000",
+  "checkpoint_file_count": 63,
+  "checkpoint_total_bytes": 5258483478,
+  "diagnostic_directory": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/serial_lag30",
+  "metadata_digest": "6c5cfabd74c3cc563c6b31917d964a3b0e80b72b99c55db8683d7b3ff4052b0f",
+  "params_assets_digest": "f787d1e3b5668766601af7b08283242cdc72dfb66518e578e24b9df10a96233e",
+  "runner_input_audit_sha256": "4a85696eb16fcd9366083cdb7c48ca52df96fb2132d8f31e59947e8608ad63db",
+  "runner_input_manifest_sha256": "10ad93f497f3514ccb89d65b27cdddab66fe72aa884d71f0c28a7b1227a12430",
+  "scheduler_config_sha256": "1348358152825df1ece05697c60421d7ca760efc0c23c38fe69c797b88f66f89",
+  "variant": "serial_lag30",
+  "weight_content_aggregate_sha256": "00f414d08fbfdb395a02a824c6137fe93a40f6fd4ae68371477600a0efa1ad2e"
+}

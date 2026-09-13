@@ -1,0 +1,10 @@
+--- /mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/tools/build_c2_smoke_validation_receipt.py	2026-09-14 01:37:29.025243000 +0800
++++ /mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/tools/build_c2_smoke_validation_receipt_v2.py	2026-09-14 01:39:37.840624000 +0800
+@@ -78,6 +78,7 @@
+     provenance: dict[str, Any] | None = None
+     provenance_error: dict[str, str] | None = None
+     try:
++        import torch  # Load libc10 before importing the compiled cuRobo extension.
+         from curobo.curobolib import geom_cu
+ 
+         provenance = verify_curobo_extension_origin(geom_cu.__file__)

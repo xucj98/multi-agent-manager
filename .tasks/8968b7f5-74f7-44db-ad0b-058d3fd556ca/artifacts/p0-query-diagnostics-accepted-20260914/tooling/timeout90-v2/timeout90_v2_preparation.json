@@ -1,0 +1,173 @@
+{
+  "deployment": {
+    "no_source_tree_or_checkpoint_write": true,
+    "remote_manifests_root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2",
+    "remote_tools_root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2",
+    "v1_artifacts_preserved": true
+  },
+  "frozen_pair_script": {
+    "bytes": 14441,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/tools/pair_query_diagnostic_logging.py",
+    "sha256": "cdf577911a203994be50fd423b522e95cd5604f43c94e15b0ea247c18f8bce42"
+  },
+  "kind": "c2_timeout90_v2_local_preparation",
+  "launcher": {
+    "diff": {
+      "bytes": 3634,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/tools/launch_query_diagnostic_smoke.v1-to-timeout90-v2.diff",
+      "sha256": "f4d1f34829425297997133ef99a748b57e2f75ff886e5844a03b91e12c4707cf"
+    },
+    "v1": {
+      "bytes": 4761,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/v1/tools/launch_query_diagnostic_smoke.sh",
+      "sha256": "61e3e8ce80bbe0f17fd8d1b56472038189b5be3931bca16b476c2d70b0c1d732"
+    },
+    "v2": {
+      "bytes": 5208,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/tools/launch_query_diagnostic_smoke_timeout90_v2.sh",
+      "sha256": "62e5285fe1df7640e017980b1c26ae7192c8b49929a880813aa51c136c49150a"
+    }
+  },
+  "manager_task_revision": "5223fb70aa219e92ad34d9c73aad1172e18fa207",
+  "preparer": {
+    "bytes": 41879,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/prepare_timeout90_v2.py",
+    "sha256": "cfc621908aee108e46531a22d4931ae1b7aaf4f68ca68d368c7fee842862a1b9"
+  },
+  "runner_manifest_diffs": {
+    "full_t_plus_1": {
+      "changed_json_paths": [
+        "checkpoints[0].weight_content_manifest",
+        "simulation_runs[0].config_source"
+      ],
+      "diff": {
+        "bytes": 833,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/full_t_plus_1/runner_input_manifest.v1-to-timeout90-v2.diff",
+        "sha256": "1054c55e5b84926e6dda8a95d478c56ddffb76eb1f35f0ff51af9f16641d466c"
+      },
+      "v1": {
+        "bytes": 2633,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/v1/manifests/full_t_plus_1/runner_input_manifest.json",
+        "sha256": "7109aec53ea9f42bb64f4772b1bda3433dc04c889100c694385be5394bff9a41"
+      },
+      "v2": {
+        "bytes": 2659,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/full_t_plus_1/runner_input_manifest.json",
+        "sha256": "0bf9ce0284e07b8f5b389b70029e21979e7d58e6fe38342d2968a155910510e1"
+      }
+    },
+    "serial_lag30": {
+      "changed_json_paths": [
+        "checkpoints[0].weight_content_manifest",
+        "simulation_runs[0].config_source"
+      ],
+      "diff": {
+        "bytes": 825,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/serial_lag30/runner_input_manifest.v1-to-timeout90-v2.diff",
+        "sha256": "3860db981bfd4dbd997191a651e2dc0e629d6ac50a9eb120da033d1e66a30aec"
+      },
+      "v1": {
+        "bytes": 2630,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/v1/manifests/serial_lag30/runner_input_manifest.json",
+        "sha256": "2cf5b99fb952a2ed244e8f1de77b515b09a19fe70341f33d8ed4e0db2ff738a3"
+      },
+      "v2": {
+        "bytes": 2656,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/serial_lag30/runner_input_manifest.json",
+        "sha256": "10ad93f497f3514ccb89d65b27cdddab66fe72aa884d71f0c28a7b1227a12430"
+      }
+    }
+  },
+  "scheduler_config_diffs": {
+    "full_t_plus_1": {
+      "diff": {
+        "bytes": 565,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/full_t_plus_1/scheduler_config.v1-to-timeout90-v2.diff",
+        "sha256": "72bb9ede3cb009f38cf24e940334ad93a905826153a9152830e3a7985cfd9c5d"
+      },
+      "v1": {
+        "bytes": 321,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/v1/manifests/full_t_plus_1/scheduler_config.yaml",
+        "sha256": "3ef7bf537b922ac740ede9c18d7e637482cf42e02682a64ec8e4298d4a836f47"
+      },
+      "v2": {
+        "bytes": 369,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/full_t_plus_1/scheduler_config.yaml",
+        "sha256": "59aeb0fb748ce5017580bf25c5a7ca425fd2f8b4ce66b5f72610b2dc8d9da041"
+      }
+    },
+    "serial_lag30": {
+      "diff": {
+        "bytes": 561,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/serial_lag30/scheduler_config.v1-to-timeout90-v2.diff",
+        "sha256": "374a72db40f219862bd23e37fd68a520e9959171fdf04dd0c10e6f58869fa5e6"
+      },
+      "v1": {
+        "bytes": 320,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/v1/manifests/serial_lag30/scheduler_config.yaml",
+        "sha256": "5621ad8ef70219c770c6ad6f907f71606489e0a558bf8dfe0475ae42b6de3d67"
+      },
+      "v2": {
+        "bytes": 368,
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/serial_lag30/scheduler_config.yaml",
+        "sha256": "1348358152825df1ece05697c60421d7ca760efc0c23c38fe69c797b88f66f89"
+      }
+    }
+  },
+  "schema_version": 1,
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca",
+  "tools_manifest": {
+    "bytes": 5650,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/tools/query_diagnostic_c2_timeout90_v2_tools_manifest.json",
+    "sha256": "f7899e550cd13a8fa32493ad208d5a9ce58b260ac4ae6fde17e557fe3ce5151f"
+  },
+  "v1_sources": {
+    "manifests": {
+      "full_t_plus_1": {
+        "v1_input_summary": {
+          "bytes": 1001,
+          "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/v1/manifests/full_t_plus_1/input_summary.json",
+          "sha256": "67cda7c3a1227de03c61a4ef60d8b3608e8bd4134a855bf09154ecf1c2bb0076"
+        },
+        "v2_input_summary": {
+          "bytes": 1014,
+          "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/full_t_plus_1/input_summary.json",
+          "sha256": "c890d5263d89c95348068e9ab6e4b2066342d89b193706ac2278aa542b7a0d83"
+        },
+        "v2_runner_input_audit": {
+          "bytes": 12809,
+          "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/full_t_plus_1/runner_input_audit.json",
+          "sha256": "3f35e8137ee8c028f08e66ffd9a533cd8901a6257fb4877608bcacc786d2a726"
+        },
+        "v2_weight_content_manifest": {
+          "bytes": 12658,
+          "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/full_t_plus_1/weight_content_manifest.json",
+          "sha256": "e12b9dd8f9c5c5533ba35e3dadc92a5fc26d80ccf822d5128e1d11397e6dd490"
+        }
+      },
+      "serial_lag30": {
+        "v1_input_summary": {
+          "bytes": 997,
+          "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/v1/manifests/serial_lag30/input_summary.json",
+          "sha256": "76d6705148dec9da3123c782c3529c138b49fb7a4c8ee462ead82e6e7f47c857"
+        },
+        "v2_input_summary": {
+          "bytes": 1010,
+          "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/serial_lag30/input_summary.json",
+          "sha256": "5f34102fdecc7d1d06d40c1fc064438c8a814939bc29e17d3a10876392113d06"
+        },
+        "v2_runner_input_audit": {
+          "bytes": 13448,
+          "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/serial_lag30/runner_input_audit.json",
+          "sha256": "4a85696eb16fcd9366083cdb7c48ca52df96fb2132d8f31e59947e8608ad63db"
+        },
+        "v2_weight_content_manifest": {
+          "bytes": 13236,
+          "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/manifests/serial_lag30/weight_content_manifest.json",
+          "sha256": "863aeeec0917ec2448f3986d539be4c25f246ecf14f46852426daee5604914ea"
+        }
+      }
+    },
+    "tools": {}
+  }
+}

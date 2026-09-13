@@ -1,0 +1,20 @@
+{
+  "checked_at": "2026-09-13T19:15:16+00:00",
+  "deployment_manifest": {
+    "bytes": 13679,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/deployment/query_diagnostic_c2_timeout90_v2_preflight_selfpid_attempt2_deployment_manifest.json",
+    "sha256": "93e6692b6513cadd13640e368489332f7b4feb81663c7aea212fc8f2dd9613f8"
+  },
+  "frozen_tools_manifest": {
+    "bytes": 6445,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/tools/query_diagnostic_c2_timeout90_v2_preflight_selfpid_attempt2_tools_manifest.json",
+    "sha256": "8d8819c8b1c7e6c954934486ee2a7ffca942fc28b46f4d4cf3ca6decc52bc773"
+  },
+  "kind": "c2_timeout90_v2_preflight_selfpid_attempt2_deployment_verifier_cpu_check",
+  "passed": true,
+  "repaired_preflight_tamper_rejected": true,
+  "schema_version": 1,
+  "status": "passed",
+  "tamper_error_type": "RuntimeError",
+  "verified_file_count": 26
+}

@@ -1,0 +1,10 @@
+{
+  "exit_code": 1,
+  "finished_at": "2026-09-13T20:21:43+00:00",
+  "kind": "c2_timeout90_v2_pipeline_status",
+  "last_phase": "serial_lag30_logging_invariance_and_saved_replay_pair",
+  "outer_log": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-query-diagnostic-timeout90-v2-invariance-replay-s-pipeline.log",
+  "schema_version": 1,
+  "started_at": "2026-09-13T20:15:56+00:00",
+  "status": "failed"
+}

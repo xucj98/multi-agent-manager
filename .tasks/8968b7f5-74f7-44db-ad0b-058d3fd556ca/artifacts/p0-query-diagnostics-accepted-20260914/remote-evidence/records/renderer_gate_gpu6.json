@@ -1,0 +1,744 @@
+{
+  "completed_count": 40,
+  "device": {
+    "cuda_visible_devices": "6",
+    "sapien_render_device": "cuda:0",
+    "vulkan_icd": "/etc/vulkan/icd.d/nvidia_icd.json"
+  },
+  "error": null,
+  "finished_at": "2026-09-13T17:24:24.640214+00:00",
+  "kind": "rmbench_renderer_reset_gate",
+  "passed": true,
+  "requested_count": 40,
+  "rows": [
+    {
+      "accepted": true,
+      "elapsed_s": 102.223,
+      "episode_id": 0,
+      "seed": 100000,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 47.965,
+      "episode_id": 1,
+      "seed": 100001,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 64.727,
+      "episode_id": 2,
+      "seed": 100002,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 56.105,
+      "episode_id": 3,
+      "seed": 100003,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 51.362,
+      "episode_id": 4,
+      "seed": 100004,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 45.828,
+      "episode_id": 5,
+      "seed": 100005,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 51.74,
+      "episode_id": 6,
+      "seed": 100006,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 48.826,
+      "episode_id": 7,
+      "seed": 100007,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 58.819,
+      "episode_id": 8,
+      "seed": 100008,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 49.998,
+      "episode_id": 9,
+      "seed": 100009,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 50.528,
+      "episode_id": 10,
+      "seed": 100010,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 51.15,
+      "episode_id": 11,
+      "seed": 100011,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 44.908,
+      "episode_id": 12,
+      "seed": 100012,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 46.024,
+      "episode_id": 13,
+      "seed": 100013,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 43.572,
+      "episode_id": 14,
+      "seed": 100014,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 47.301,
+      "episode_id": 15,
+      "seed": 100015,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 47.203,
+      "episode_id": 16,
+      "seed": 100016,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 45.825,
+      "episode_id": 17,
+      "seed": 100017,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 45.617,
+      "episode_id": 18,
+      "seed": 100018,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 46.942,
+      "episode_id": 19,
+      "seed": 100019,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 45.68,
+      "episode_id": 20,
+      "seed": 100020,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 46.897,
+      "episode_id": 21,
+      "seed": 100021,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 46.985,
+      "episode_id": 22,
+      "seed": 100022,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 44.983,
+      "episode_id": 23,
+      "seed": 100023,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 43.776,
+      "episode_id": 24,
+      "seed": 100024,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 45.351,
+      "episode_id": 25,
+      "seed": 100025,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 44.394,
+      "episode_id": 26,
+      "seed": 100026,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 46.873,
+      "episode_id": 27,
+      "seed": 100027,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 44.495,
+      "episode_id": 28,
+      "seed": 100028,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 44.09,
+      "episode_id": 29,
+      "seed": 100029,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 48.222,
+      "episode_id": 30,
+      "seed": 100030,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 45.758,
+      "episode_id": 31,
+      "seed": 100031,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 45.825,
+      "episode_id": 32,
+      "seed": 100032,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 45.15,
+      "episode_id": 33,
+      "seed": 100033,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 45.377,
+      "episode_id": 34,
+      "seed": 100034,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 46.235,
+      "episode_id": 35,
+      "seed": 100035,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 46.159,
+      "episode_id": 36,
+      "seed": 100036,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 46.452,
+      "episode_id": 37,
+      "seed": 100037,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 46.337,
+      "episode_id": 38,
+      "seed": 100038,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    },
+    {
+      "accepted": true,
+      "elapsed_s": 45.689,
+      "episode_id": 39,
+      "seed": 100039,
+      "status": {
+        "failure_reason": null,
+        "logical_step": 0,
+        "state": "ready",
+        "step_limit": 500,
+        "success": false,
+        "terminal": false
+      }
+    }
+  ],
+  "schema_version": 1,
+  "seed_sequence": "100000..100039",
+  "source": {
+    "rmbench": {
+      "clean": true,
+      "commit": "f401f5279c95451eb424ac98b831bab5552b2120",
+      "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench"
+    },
+    "robot_bridge": {
+      "clean": true,
+      "commit": "e147f600dc4329f330a6e2eb0335150b5b3093a3",
+      "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/robot-bridge"
+    }
+  },
+  "started_at": "2026-09-13T16:51:40.818038+00:00",
+  "task": {
+    "config": "demo_clean_eval",
+    "name": "put_back_block",
+    "video": false
+  },
+  "worker_infra_markers": {
+    "ConnectionResetError": 0,
+    "EOFError": 0,
+    "ErrorIncompatibleDriver": 0,
+    "Segmentation fault": 0,
+    "Traceback (most recent call last)": 0,
+    "Your GPU driver does not support Vulkan": 0,
+    "core dumped": 0
+  },
+  "worker_log": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/renderer_gate_gpu6_worker.stderr.log",
+  "worker_metadata": {
+    "action": {
+      "arms": {
+        "dtype": "float32",
+        "shape": [
+          null,
+          14
+        ],
+        "space": "qpos"
+      }
+    },
+    "capabilities": {
+      "commands": [
+        "reset",
+        "get_obs",
+        "execute",
+        "clear_actions",
+        "get_episode_status",
+        "is_idle"
+      ],
+      "execution_progress": {
+        "completed": "completed",
+        "observation": "execution_progress",
+        "queued": "queued",
+        "unit": "policy_rows"
+      },
+      "reset": {
+        "seed_preflight": true,
+        "video_output_path": true
+      },
+      "wait_condition": {
+        "action_queue_remaining": "logical action count"
+      }
+    },
+    "controller": "rmbench_sim",
+    "observation": {
+      "episode_done": {
+        "dtype": "bool",
+        "source": "episode_status.terminal"
+      },
+      "episode_status": {
+        "source": "RMBench task status"
+      },
+      "execution_progress": {
+        "completed": {
+          "dtype": "int",
+          "source": "take_action_cnt"
+        },
+        "queued": {
+          "dtype": "int",
+          "source": "action queue"
+        },
+        "unit": "policy_rows"
+      },
+      "images": {
+        "head_camera": {
+          "color": "rgb",
+          "dtype": "uint8",
+          "shape": [
+            null,
+            null,
+            3
+          ]
+        },
+        "left_camera": {
+          "color": "rgb",
+          "dtype": "uint8",
+          "shape": [
+            null,
+            null,
+            3
+          ]
+        },
+        "right_camera": {
+          "color": "rgb",
+          "dtype": "uint8",
+          "shape": [
+            null,
+            null,
+            3
+          ]
+        }
+      },
+      "logical_step": {
+        "dtype": "int",
+        "source": "take_action_cnt"
+      },
+      "qpos": {
+        "dtype": "float32",
+        "order": [
+          "left_joint_0",
+          "left_joint_1",
+          "left_joint_2",
+          "left_joint_3",
+          "left_joint_4",
+          "left_joint_5",
+          "left_gripper",
+          "right_joint_0",
+          "right_joint_1",
+          "right_joint_2",
+          "right_joint_3",
+          "right_joint_4",
+          "right_joint_5",
+          "right_gripper"
+        ],
+        "shape": [
+          14
+        ],
+        "space": "qpos"
+      }
+    },
+    "protocol_version": 1,
+    "runtime": {
+      "dependency_files_sha256": {
+        "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/docs/worktree_env/requirements-rmbench-sim.txt": "03c6930f5cd30e465c1ebcdf8003f2c79586c604c7ec9d51568c818e7e4ecd80",
+        "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/robot-bridge/uv.lock": "d0b8ab334df0387d2d53dcf7c6acc29a48252b733b0d6c187e46e19136180b58"
+      },
+      "python_executable": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/.venv/bin/python",
+      "python_version": "3.10.19 (main, Feb 12 2026, 00:42:18) [Clang 21.1.4 ]",
+      "source_files_sha256": {
+        "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/description/utils/generate_episode_instructions.py": "a833413ea95bce51c47ed5f216fbcc68cea0ecd276f2c5ec3e6e289211067e03",
+        "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/envs/_base_task.py": "fb855180ed2d3b3a764139e4a254599db3082ea40ce327ccd8f8b5f9872714d7",
+        "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/robot-bridge/robot_bridge/robot/controllers/rmbench_rpc.py": "a279ff1523beba84eacdccafb9bbcf21f98efe3327d2ab8e944384be13e84687",
+        "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/robot-bridge/robot_bridge/robot/controllers/rmbench_sim_worker.py": "9dd98c4060c2085b0765019fd8b199100178b9a24be1b0c1075ee9b02b798e94",
+        "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/robot-bridge/robot_bridge/transport/codec.py": "6762e26fb780d877dfc52a72405f2d83eb6af93f9718d809e26f17dabb8df493"
+      },
+      "sources": {
+        "bridge": {
+          "commit": "e147f600dc4329f330a6e2eb0335150b5b3093a3",
+          "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/robot-bridge"
+        },
+        "rmbench": {
+          "commit": "f401f5279c95451eb424ac98b831bab5552b2120",
+          "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench"
+        }
+      }
+    }
+  },
+  "worker_proxy": "RMBenchSimulationController"
+}

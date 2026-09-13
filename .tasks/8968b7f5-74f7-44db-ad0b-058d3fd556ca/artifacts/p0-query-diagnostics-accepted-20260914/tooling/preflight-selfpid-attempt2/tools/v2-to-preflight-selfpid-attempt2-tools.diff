@@ -1,0 +1,117 @@
+--- v2/tools/c2_timeout90_v2_preflight.py
++++ preflight-selfpid-attempt2/tools/c2_timeout90_v2_preflight.py
+@@ -22,7 +22,7 @@
+     "openpi": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+ }
+ V1_FAILURE_RECEIPT = "681a5b4b5dc29069d69d1821190cb52e961be4f7009152b27b148533d8a67ad2"
+-DEPLOYMENT_RECEIPT = "c2-query-diagnostic-timeout90-v2-deployment-receipt.json"
++DEPLOYMENT_RECEIPT = "c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2-deployment-receipt.json"
+ 
+ 
+ def sha256(path: Path) -> str:
+@@ -46,6 +46,23 @@
+ 
+ def command(*args: str) -> str:
+     return subprocess.run(args, text=True, capture_output=True, check=True).stdout
++
++
++def task_owned_processes(ps_output: str, *, self_pid: int) -> list[dict[str, object]]:
++    """Return other process rows whose command line contains this task run path."""
++    owned: list[dict[str, object]] = []
++    for line in ps_output.splitlines():
++        fields = line.strip().split(maxsplit=1)
++        if not fields:
++            continue
++        try:
++            pid = int(fields[0])
++        except ValueError as exc:
++            raise ValueError(f"could not parse process PID from ps output: {line!r}") from exc
++        args = fields[1] if len(fields) == 2 else ""
++        if RUN in args and pid != self_pid:
++            owned.append({"pid": pid, "args": args})
++    return owned
+ 
+ 
+ def main() -> int:
+@@ -81,7 +98,7 @@
+         if any(f":{port}" in ports for port in (19460, 19462)):
+             raise RuntimeError("C2 policy or robot port is already listening")
+         ps = subprocess.run(["ps", "-eo", "pid=,args="], text=True, capture_output=True, check=True).stdout
+-        owned = [line for line in ps.splitlines() if RUN in line]
++        owned = task_owned_processes(ps, self_pid=os.getpid())
+         if owned:
+             raise RuntimeError(f"task-owned C2 process remains: {owned!r}")
+         new_paths = []
+--- v2/tools/launch_query_diagnostic_smoke_timeout90_v2.sh
++++ preflight-selfpid-attempt2/tools/launch_query_diagnostic_smoke_timeout90_v2.sh
+@@ -13,7 +13,7 @@
+ C_ROOT=/mnt/public/xcj/Projects/state-vla
+ RUN="$C_ROOT/workspace/$TASK_ID/c2-query-diagnostic"
+ RECORDS="$C_ROOT/workspace/$TASK_ID/records"
+-TOOLS="$RECORDS/tools/query-diagnostic-c2-timeout90-v2"
++TOOLS="$RECORDS/tools/query-diagnostic-c2-timeout90-v2-preflight-selfpid-attempt2"
+ EXPERIMENT_GROUP=query_diagnostic_c2_20260914_timeout90_v2
+ GPU=6
+ 
+@@ -77,7 +77,7 @@
+ "$RUN/robot-bridge/.venv/bin/python" "$TOOLS/validate_timeout90_config.py" \
+   --config "$SCHEDULER_CONFIG" \
+   --expected-directory "$DIAGNOSTIC_DIR" \
+-  --output "$RECORDS/timeout90-v2-config-validation-${VARIANT}.json"
++  --output "$RECORDS/timeout90-v2-preflight-selfpid-attempt2-config-validation-${VARIANT}.json"
+ 
+ ROBOT_COMMAND="env VK_ICD_FILENAMES=$VK_ICD_FILENAMES WARP_CACHE_PATH=$RUN/RMBench/.local/warp-cache/$EXPERIMENT_GROUP/runs/{result_run}/robot $RUN/robot-bridge/.venv/bin/python $RUN/robot-bridge/scripts/run_robot_server.py --port 19460 --config configs/robot_controllers/rmbench_sim.yaml --host 127.0.0.1 --overrides params.rpc_timeout=600 params.startup_timeout=120 params.worker_log_path={run_dir}/processes/rmbench_sim_worker.stderr.log"
+ POLICY_COMMAND="env VK_ICD_FILENAMES=$VK_ICD_FILENAMES WARP_CACHE_PATH=$RUN/RMBench/.local/warp-cache/$EXPERIMENT_GROUP/runs/{result_run}/policy XLA_PYTHON_CLIENT_MEM_FRACTION=0.4 PYTHONPATH=$RUN/robot-bridge:$RUN/openpi/packages/openpi-client/src RB_OPENPI_POLICY_DIR=$CHECKPOINT_PARENT/20000 $RUN/openpi/.venv/bin/python $RUN/robot-bridge/scripts/run_policy_server.py --port 19462 --config configs/policy_backends/openpi.yaml --host 127.0.0.1"
+--- v2/tools/run_query_diagnostic_pair_timeout90_v2.sh
++++ preflight-selfpid-attempt2/tools/run_query_diagnostic_pair_timeout90_v2.sh
+@@ -12,7 +12,7 @@
+ C_ROOT=/mnt/public/xcj/Projects/state-vla
+ RUN="$C_ROOT/workspace/$TASK_ID/c2-query-diagnostic"
+ RECORDS="$C_ROOT/workspace/$TASK_ID/records"
+-TOOLS="$RECORDS/tools/query-diagnostic-c2-timeout90-v2"
++TOOLS="$RECORDS/tools/query-diagnostic-c2-timeout90-v2-preflight-selfpid-attempt2"
+ GPU=6
+ 
+ case "$VARIANT" in
+--- v2/tools/run_timeout90_v2_pipeline.sh
++++ preflight-selfpid-attempt2/tools/run_timeout90_v2_pipeline.sh
+@@ -6,9 +6,9 @@
+ C_ROOT=/mnt/public/xcj/Projects/state-vla
+ RUN="$C_ROOT/workspace/$TASK_ID/c2-query-diagnostic"
+ RECORDS="$C_ROOT/workspace/$TASK_ID/records"
+-TOOLS="$RECORDS/tools/query-diagnostic-c2-timeout90-v2"
+-STATUS="$RECORDS/c2-query-diagnostic-timeout90-v2-pipeline-status.json"
+-OUTER_LOG="$RECORDS/c2-query-diagnostic-timeout90-v2-pipeline.log"
++TOOLS="$RECORDS/tools/query-diagnostic-c2-timeout90-v2-preflight-selfpid-attempt2"
++STATUS="$RECORDS/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2-pipeline-status.json"
++OUTER_LOG="$RECORDS/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2-pipeline.log"
+ STARTED_AT="$(date -u --iso-8601=seconds)"
+ PHASE="preflight"
+ 
+@@ -23,7 +23,7 @@
+ trap finish EXIT
+ 
+ "$RUN/robot-bridge/.venv/bin/python" "$TOOLS/c2_timeout90_v2_preflight.py" \
+-  --output "$RECORDS/c2-query-diagnostic-timeout90-v2-preflight.json"
++  --output "$RECORDS/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2-preflight.json"
+ 
+ PHASE="full_t_plus_1_smoke"
+ 
+@@ -37,7 +37,7 @@
+   --diagnostic-dir "$RECORDS/diagnostics-timeout90-v2/full_t_plus_1" \
+   --result-dir "$RUN/RMBench/eval_result/query_diagnostic_c2_20260914_timeout90_v2/query_diagnostic_full_t_plus_1_smoke_20260914_timeout90_v2" \
+   --validator "$RUN/robot-bridge/scripts/validate_query_diagnostic.py" \
+-  --output "$RECORDS/timeout90-v2-smoke-acceptance-full_t_plus_1.json"
++  --output "$RECORDS/timeout90-v2-preflight-selfpid-attempt2-smoke-acceptance-full_t_plus_1.json"
+ 
+ PHASE="full_t_plus_1_logging_off_on_pair"
+ 
+@@ -55,7 +55,7 @@
+   --diagnostic-dir "$RECORDS/diagnostics-timeout90-v2/serial_lag30" \
+   --result-dir "$RUN/RMBench/eval_result/query_diagnostic_c2_20260914_timeout90_v2/query_diagnostic_serial_lag30_smoke_20260914_timeout90_v2" \
+   --validator "$RUN/robot-bridge/scripts/validate_query_diagnostic.py" \
+-  --output "$RECORDS/timeout90-v2-smoke-acceptance-serial_lag30.json"
++  --output "$RECORDS/timeout90-v2-preflight-selfpid-attempt2-smoke-acceptance-serial_lag30.json"
+ 
+ PHASE="serial_lag30_logging_off_on_pair"
+ 

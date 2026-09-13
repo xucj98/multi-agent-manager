@@ -1,0 +1,17 @@
+{
+  "kind": "c2_timeout90_v2_preflight_self_pid_cpu_check",
+  "matched_other_pids": [
+    1283872,
+    1283877
+  ],
+  "passed": true,
+  "preflight": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2/tools/c2_timeout90_v2_preflight.py",
+  "residual_command_contains_run": true,
+  "residual_pid": 1283877,
+  "residual_pid_rejected": true,
+  "schema_version": 1,
+  "self_command_contains_run": true,
+  "self_pid": 1283875,
+  "self_pid_ignored": true,
+  "status": "passed"
+}

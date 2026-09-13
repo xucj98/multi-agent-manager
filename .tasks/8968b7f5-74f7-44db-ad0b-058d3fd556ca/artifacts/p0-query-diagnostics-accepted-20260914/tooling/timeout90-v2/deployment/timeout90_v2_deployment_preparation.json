@@ -1,0 +1,37 @@
+{
+  "deployment_manifest": {
+    "bytes": 12102,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/deployment/query_diagnostic_c2_timeout90_v2_deployment_manifest.json",
+    "sha256": "c8ec1b8b1b06189fac425792e10698a6287adb0860aafac0554de3a0f7a3c6fa"
+  },
+  "frozen_file_count": 24,
+  "frozen_tools_manifest": {
+    "bytes": 5650,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/tools/query_diagnostic_c2_timeout90_v2_tools_manifest.json",
+    "sha256": "f7899e550cd13a8fa32493ad208d5a9ce58b260ac4ae6fde17e557fe3ce5151f"
+  },
+  "kind": "c2_query_diagnostic_timeout90_v2_deployment_preparation",
+  "manager_task_revision": "5223fb70aa219e92ad34d9c73aad1172e18fa207",
+  "manifest_file_count": 14,
+  "prepared_at": "2026-09-13T18:47:34+00:00",
+  "remote_deployment_root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/deployment-timeout90-v2",
+  "remote_receipt": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-query-diagnostic-timeout90-v2-deployment-receipt.json",
+  "runtime_tool_count": 10,
+  "schema_version": 1,
+  "scope": {
+    "excluded": [
+      "tools/__pycache__",
+      "source trees",
+      "checkpoints",
+      "shared cache"
+    ],
+    "only_frozen_tools_and_manifests": true,
+    "v1_artifacts_preserved": true
+  },
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca",
+  "verifier": {
+    "bytes": 14608,
+    "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2/deployment/verify_timeout90_v2_deployment.py",
+    "sha256": "c04d181524ba4e2357d976584359f5e9c15d9ac666cb3d812971ddf011225931"
+  }
+}

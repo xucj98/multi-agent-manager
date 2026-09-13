@@ -1,0 +1,209 @@
+{
+  "deployment_manifest_remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/deployment-timeout90-v2/query_diagnostic_c2_timeout90_v2_deployment_manifest.json",
+  "files": [
+    {
+      "bytes": 6347,
+      "category": "runtime_tool",
+      "logical_path": "runtime_tools/c2_timeout90_v2_preflight.py",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/c2_timeout90_v2_preflight.py",
+      "sha256": "e6cf1ebac7c61b801588189bfdf3370ae4ee69fbe9e8684f0a6020fb51a4f855"
+    },
+    {
+      "bytes": 3634,
+      "category": "runtime_tool",
+      "logical_path": "runtime_tools/launch_query_diagnostic_smoke.v1-to-timeout90-v2.diff",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/launch_query_diagnostic_smoke.v1-to-timeout90-v2.diff",
+      "sha256": "f4d1f34829425297997133ef99a748b57e2f75ff886e5844a03b91e12c4707cf"
+    },
+    {
+      "bytes": 5208,
+      "category": "runtime_tool",
+      "logical_path": "runtime_tools/launch_query_diagnostic_smoke_timeout90_v2.sh",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/launch_query_diagnostic_smoke_timeout90_v2.sh",
+      "sha256": "62e5285fe1df7640e017980b1c26ae7192c8b49929a880813aa51c136c49150a"
+    },
+    {
+      "bytes": 14441,
+      "category": "runtime_tool",
+      "logical_path": "runtime_tools/pair_query_diagnostic_logging.py",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/pair_query_diagnostic_logging.py",
+      "sha256": "cdf577911a203994be50fd423b522e95cd5604f43c94e15b0ea247c18f8bce42"
+    },
+    {
+      "bytes": 5650,
+      "category": "runtime_tool",
+      "logical_path": "runtime_tools/query_diagnostic_c2_timeout90_v2_tools_manifest.json",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/query_diagnostic_c2_timeout90_v2_tools_manifest.json",
+      "sha256": "f7899e550cd13a8fa32493ad208d5a9ce58b260ac4ae6fde17e557fe3ce5151f"
+    },
+    {
+      "bytes": 2622,
+      "category": "runtime_tool",
+      "logical_path": "runtime_tools/run_query_diagnostic_pair_timeout90_v2.sh",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/run_query_diagnostic_pair_timeout90_v2.sh",
+      "sha256": "31eb34d05cb44e5000b1460708b3dfd891f6b68072fe0f1d3bf31d533be13307"
+    },
+    {
+      "bytes": 2836,
+      "category": "runtime_tool",
+      "logical_path": "runtime_tools/run_timeout90_v2_pipeline.sh",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/run_timeout90_v2_pipeline.sh",
+      "sha256": "adece3c928df6bfa8344d7ce6780c9407679f23e68bbc9a96cc94546f0ac5d59"
+    },
+    {
+      "bytes": 7979,
+      "category": "runtime_tool",
+      "logical_path": "runtime_tools/validate_completed_diagnostic_smoke.py",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/validate_completed_diagnostic_smoke.py",
+      "sha256": "68628a39872f1f4b0b7103fc09055adc2ff2e2cc91b44730204ec472c2347798"
+    },
+    {
+      "bytes": 5626,
+      "category": "runtime_tool",
+      "logical_path": "runtime_tools/validate_timeout90_config.py",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/validate_timeout90_config.py",
+      "sha256": "2e84d49ae71d605f411b5b4ab0ec845d729ef857e024e35838abfc4fb8d35f09"
+    },
+    {
+      "bytes": 1636,
+      "category": "runtime_tool",
+      "logical_path": "runtime_tools/write_timeout90_pipeline_status.py",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/write_timeout90_pipeline_status.py",
+      "sha256": "6b23aa6e33a10cccac1babb7a7394416efa84b271c3eeae91c54e42dda07044c"
+    },
+    {
+      "bytes": 1014,
+      "category": "manifest",
+      "logical_path": "manifests/full_t_plus_1/input_summary.json",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/full_t_plus_1/input_summary.json",
+      "sha256": "c890d5263d89c95348068e9ab6e4b2066342d89b193706ac2278aa542b7a0d83"
+    },
+    {
+      "bytes": 12809,
+      "category": "manifest",
+      "logical_path": "manifests/full_t_plus_1/runner_input_audit.json",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/full_t_plus_1/runner_input_audit.json",
+      "sha256": "3f35e8137ee8c028f08e66ffd9a533cd8901a6257fb4877608bcacc786d2a726"
+    },
+    {
+      "bytes": 2659,
+      "category": "manifest",
+      "logical_path": "manifests/full_t_plus_1/runner_input_manifest.json",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/full_t_plus_1/runner_input_manifest.json",
+      "sha256": "0bf9ce0284e07b8f5b389b70029e21979e7d58e6fe38342d2968a155910510e1"
+    },
+    {
+      "bytes": 833,
+      "category": "manifest",
+      "logical_path": "manifests/full_t_plus_1/runner_input_manifest.v1-to-timeout90-v2.diff",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/full_t_plus_1/runner_input_manifest.v1-to-timeout90-v2.diff",
+      "sha256": "1054c55e5b84926e6dda8a95d478c56ddffb76eb1f35f0ff51af9f16641d466c"
+    },
+    {
+      "bytes": 565,
+      "category": "manifest",
+      "logical_path": "manifests/full_t_plus_1/scheduler_config.v1-to-timeout90-v2.diff",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/full_t_plus_1/scheduler_config.v1-to-timeout90-v2.diff",
+      "sha256": "72bb9ede3cb009f38cf24e940334ad93a905826153a9152830e3a7985cfd9c5d"
+    },
+    {
+      "bytes": 369,
+      "category": "manifest",
+      "logical_path": "manifests/full_t_plus_1/scheduler_config.yaml",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/full_t_plus_1/scheduler_config.yaml",
+      "sha256": "59aeb0fb748ce5017580bf25c5a7ca425fd2f8b4ce66b5f72610b2dc8d9da041"
+    },
+    {
+      "bytes": 12658,
+      "category": "manifest",
+      "logical_path": "manifests/full_t_plus_1/weight_content_manifest.json",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/full_t_plus_1/weight_content_manifest.json",
+      "sha256": "e12b9dd8f9c5c5533ba35e3dadc92a5fc26d80ccf822d5128e1d11397e6dd490"
+    },
+    {
+      "bytes": 1010,
+      "category": "manifest",
+      "logical_path": "manifests/serial_lag30/input_summary.json",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/serial_lag30/input_summary.json",
+      "sha256": "5f34102fdecc7d1d06d40c1fc064438c8a814939bc29e17d3a10876392113d06"
+    },
+    {
+      "bytes": 13448,
+      "category": "manifest",
+      "logical_path": "manifests/serial_lag30/runner_input_audit.json",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/serial_lag30/runner_input_audit.json",
+      "sha256": "4a85696eb16fcd9366083cdb7c48ca52df96fb2132d8f31e59947e8608ad63db"
+    },
+    {
+      "bytes": 2656,
+      "category": "manifest",
+      "logical_path": "manifests/serial_lag30/runner_input_manifest.json",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/serial_lag30/runner_input_manifest.json",
+      "sha256": "10ad93f497f3514ccb89d65b27cdddab66fe72aa884d71f0c28a7b1227a12430"
+    },
+    {
+      "bytes": 825,
+      "category": "manifest",
+      "logical_path": "manifests/serial_lag30/runner_input_manifest.v1-to-timeout90-v2.diff",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/serial_lag30/runner_input_manifest.v1-to-timeout90-v2.diff",
+      "sha256": "3860db981bfd4dbd997191a651e2dc0e629d6ac50a9eb120da033d1e66a30aec"
+    },
+    {
+      "bytes": 561,
+      "category": "manifest",
+      "logical_path": "manifests/serial_lag30/scheduler_config.v1-to-timeout90-v2.diff",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/serial_lag30/scheduler_config.v1-to-timeout90-v2.diff",
+      "sha256": "374a72db40f219862bd23e37fd68a520e9959171fdf04dd0c10e6f58869fa5e6"
+    },
+    {
+      "bytes": 368,
+      "category": "manifest",
+      "logical_path": "manifests/serial_lag30/scheduler_config.yaml",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/serial_lag30/scheduler_config.yaml",
+      "sha256": "1348358152825df1ece05697c60421d7ca760efc0c23c38fe69c797b88f66f89"
+    },
+    {
+      "bytes": 13236,
+      "category": "manifest",
+      "logical_path": "manifests/serial_lag30/weight_content_manifest.json",
+      "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2/serial_lag30/weight_content_manifest.json",
+      "sha256": "863aeeec0917ec2448f3986d539be4c25f246ecf14f46852426daee5604914ea"
+    }
+  ],
+  "frozen_tools_manifest": {
+    "bytes": 5650,
+    "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/query_diagnostic_c2_timeout90_v2_tools_manifest.json",
+    "sha256": "f7899e550cd13a8fa32493ad208d5a9ce58b260ac4ae6fde17e557fe3ce5151f"
+  },
+  "kind": "c2_query_diagnostic_timeout90_v2_deployment_manifest",
+  "manager_task_revision": "5223fb70aa219e92ad34d9c73aad1172e18fa207",
+  "receipt_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-query-diagnostic-timeout90-v2-deployment-receipt.json",
+  "remote_roots": {
+    "deployment": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/deployment-timeout90-v2",
+    "manifests": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2",
+    "records": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records",
+    "tools": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2"
+  },
+  "schema_version": 1,
+  "source_identity": {
+    "RMBench": "f401f5279c95451eb424ac98b831bab5552b2120",
+    "openpi": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+    "robot_bridge": "e147f600dc4329f330a6e2eb0335150b5b3093a3"
+  },
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca",
+  "transfer_scope": {
+    "excluded": [
+      "tools/__pycache__",
+      "source trees",
+      "checkpoints",
+      "shared cache"
+    ],
+    "only_frozen_tools_and_manifests": true,
+    "v1_artifacts_preserved": true
+  },
+  "verifier": {
+    "bytes": 14608,
+    "remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/deployment-timeout90-v2/verify_timeout90_v2_deployment.py",
+    "sha256": "c04d181524ba4e2357d976584359f5e9c15d9ac666cb3d812971ddf011225931"
+  }
+}

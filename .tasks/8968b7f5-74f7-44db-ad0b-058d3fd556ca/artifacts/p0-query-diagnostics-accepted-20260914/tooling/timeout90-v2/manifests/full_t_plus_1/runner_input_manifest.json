@@ -1,0 +1,73 @@
+{
+  "checkpoints": [
+    {
+      "component": "Pi0.5",
+      "id": "query_diagnostic_full_t_plus_1_checkpoint",
+      "input_ready": true,
+      "metadata": {
+        "hash": "3b5d9b56a6d9abcaad95c6fc4824b2cd4e2b80bfc5d59ef7380f0d12f08622a4",
+        "path": "CheckpointFull/20000/metadata",
+        "status": "ready"
+      },
+      "path": "CheckpointFull/20000",
+      "role": "simulation",
+      "tree_hash": {
+        "digest": "d29535bfbe13776d3f006639b450cb85701647772414034fd01484838da940de",
+        "entry_id": "query_diagnostic_full_t_plus_1_checkpoint",
+        "evidence": "runner_input_audit.json",
+        "evidence_sha256": "3f35e8137ee8c028f08e66ffd9a533cd8901a6257fb4877608bcacc786d2a726",
+        "method": "json_rows",
+        "status": "ready"
+      },
+      "weight_content_manifest": "TaskRecords/manifests-timeout90-v2/full_t_plus_1/weight_content_manifest.json"
+    }
+  ],
+  "path_aliases": {
+    "CheckpointFull": "read-only frozen checkpoint parent",
+    "RMBench": "isolated task RMBench worktree",
+    "TaskRecords": "task-owned diagnostic inputs, manifests, and outputs"
+  },
+  "purpose": "C2 selected-query diagnostic technical smoke; no success-rate or mechanism claim",
+  "run_profiles": {
+    "query_diagnostic_full_t_plus_1_profile": {
+      "config": "RMBench/policy/pi05/deploy_policy.yml",
+      "fixed": {
+        "eval_video_count": 5,
+        "eval_video_key_state_overlay": true,
+        "eval_video_log": true,
+        "instruction_type": "unseen",
+        "pi0_step": 30,
+        "policy_name": "pi05",
+        "seed": 0,
+        "task_config": "demo_clean_eval",
+        "task_name": "put_back_block",
+        "test_num": 100
+      }
+    }
+  },
+  "schema_version": 1,
+  "simulation_runs": [
+    {
+      "checkpoint_ref": "query_diagnostic_full_t_plus_1_checkpoint",
+      "config_source": "TaskRecords/manifests-timeout90-v2/full_t_plus_1",
+      "id": "query_diagnostic_full_t_plus_1",
+      "overrides": {
+        "evaluation_kind": "technical_query_diagnostic_smoke",
+        "memory_config_id": "put_back_block_full_t_plus_1",
+        "memory_representation": "joint_dense",
+        "train_config_name": "pi05_rmbench_put_back_block_full_t_plus_1"
+      },
+      "profile": "query_diagnostic_full_t_plus_1_profile",
+      "task_overrides": {}
+    }
+  ],
+  "source_identity": {
+    "openpi": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+    "rmbench": "f401f5279c95451eb424ac98b831bab5552b2120",
+    "robot_bridge": "e147f600dc4329f330a6e2eb0335150b5b3093a3"
+  },
+  "stage": {
+    "scope": "Existing frozen 20k checkpoint; two accepted episodes only; diagnostic query 1 only.",
+    "status": "inputs_ready"
+  }
+}

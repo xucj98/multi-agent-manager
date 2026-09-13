@@ -1,0 +1,73 @@
+{
+  "checkpoints": [
+    {
+      "component": "Pi0.5",
+      "id": "query_diagnostic_serial_lag30_checkpoint",
+      "input_ready": true,
+      "metadata": {
+        "hash": "6c5cfabd74c3cc563c6b31917d964a3b0e80b72b99c55db8683d7b3ff4052b0f",
+        "path": "CheckpointSerial/20000/metadata",
+        "status": "ready"
+      },
+      "path": "CheckpointSerial/20000",
+      "role": "simulation",
+      "tree_hash": {
+        "digest": "f787d1e3b5668766601af7b08283242cdc72dfb66518e578e24b9df10a96233e",
+        "entry_id": "query_diagnostic_serial_lag30_checkpoint",
+        "evidence": "runner_input_audit.json",
+        "evidence_sha256": "4a85696eb16fcd9366083cdb7c48ca52df96fb2132d8f31e59947e8608ad63db",
+        "method": "json_rows",
+        "status": "ready"
+      },
+      "weight_content_manifest": "TaskRecords/manifests-timeout90-v2/serial_lag30/weight_content_manifest.json"
+    }
+  ],
+  "path_aliases": {
+    "CheckpointSerial": "read-only frozen checkpoint parent",
+    "RMBench": "isolated task RMBench worktree",
+    "TaskRecords": "task-owned diagnostic inputs, manifests, and outputs"
+  },
+  "purpose": "C2 selected-query diagnostic technical smoke; no success-rate or mechanism claim",
+  "run_profiles": {
+    "query_diagnostic_serial_lag30_profile": {
+      "config": "RMBench/policy/pi05/deploy_policy.yml",
+      "fixed": {
+        "eval_video_count": 5,
+        "eval_video_key_state_overlay": true,
+        "eval_video_log": true,
+        "instruction_type": "unseen",
+        "pi0_step": 30,
+        "policy_name": "pi05",
+        "seed": 0,
+        "task_config": "demo_clean_eval",
+        "task_name": "put_back_block",
+        "test_num": 100
+      }
+    }
+  },
+  "schema_version": 1,
+  "simulation_runs": [
+    {
+      "checkpoint_ref": "query_diagnostic_serial_lag30_checkpoint",
+      "config_source": "TaskRecords/manifests-timeout90-v2/serial_lag30",
+      "id": "query_diagnostic_serial_lag30",
+      "overrides": {
+        "evaluation_kind": "technical_query_diagnostic_smoke",
+        "memory_config_id": "put_back_block_serial_lag30",
+        "memory_representation": "serial_token",
+        "train_config_name": "pi05_rmbench_put_back_block_serial_lag30"
+      },
+      "profile": "query_diagnostic_serial_lag30_profile",
+      "task_overrides": {}
+    }
+  ],
+  "source_identity": {
+    "openpi": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+    "rmbench": "f401f5279c95451eb424ac98b831bab5552b2120",
+    "robot_bridge": "e147f600dc4329f330a6e2eb0335150b5b3093a3"
+  },
+  "stage": {
+    "scope": "Existing frozen 20k checkpoint; two accepted episodes only; diagnostic query 1 only.",
+    "status": "inputs_ready"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "constraints": {
+    "no_j_rerun": true,
+    "no_new_gpu_invocation_in_preparation": true,
+    "ordinary_output_bundle_max_uncompressed_bytes": 8388608,
+    "saved_replay_actions_boundary_only": "np.asarray(saved_policy_after_output_transform.actions, dtype=np.float32)",
+    "serial_pair_receipt_root": "pairs-timeout90-v2-invariance-replay/serial_lag30"
+  },
+  "frozen_dependencies": [
+    {
+      "relative_path": "launch_query_diagnostic_smoke_timeout90_v2.sh",
+      "sha256": "9726dcbb7dd2346c739f4e9501e30f679c06cb16551f30b2394f16d70f8c9b25"
+    },
+    {
+      "relative_path": "validate_completed_diagnostic_smoke.py",
+      "sha256": "68628a39872f1f4b0b7103fc09055adc2ff2e2cc91b44730204ec472c2347798"
+    },
+    {
+      "relative_path": "write_timeout90_pipeline_status.py",
+      "sha256": "6b23aa6e33a10cccac1babb7a7394416efa84b271c3eeae91c54e42dda07044c"
+    },
+    {
+      "relative_path": "pair_query_diagnostic_logging.py",
+      "sha256": "cdf577911a203994be50fd423b522e95cd5604f43c94e15b0ea247c18f8bce42"
+    }
+  ],
+  "kind": "c2_invariance_replay_s_continuation_tools_manifest",
+  "manager_task_revision": "0d1576069c7d6f90b765be6ca3b190368cbb69bf",
+  "remote_tools_root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2-invariance-replay-s-continuation",
+  "runtime_tools": [
+    {
+      "bytes": 13442,
+      "relative_path": "derive_pair_boundary_receipt.py",
+      "sha256": "259d07b6d11a173289b7545eed0e6b4b43b37f377050a398afb417de04d57fca"
+    },
+    {
+      "bytes": 20794,
+      "relative_path": "pair_query_diagnostic_logging_invariance_replay.py",
+      "sha256": "acabef4d10f45f4e5ade67b85d5d5b79d8a5c9a9550a85c25723354337336272"
+    },
+    {
+      "bytes": 7440,
+      "relative_path": "c2_serial_lag30_continuation_preflight.py",
+      "sha256": "29b89aede0ddcd61f714b3d6d75ae4c6bb2dc35d5b28aec06c5e2651f08c4e75"
+    },
+    {
+      "bytes": 2436,
+      "relative_path": "run_serial_lag30_pair_invariance_replay.sh",
+      "sha256": "4b87d468644e216a63caee049c97a897f931cac4d71bcf9a6b08730201160c88"
+    },
+    {
+      "bytes": 2342,
+      "relative_path": "run_serial_lag30_continuation.sh",
+      "sha256": "a2b6147af7118ce5b6a91862fdc37ccbde7a7356ed752f54479bba546488e168"
+    }
+  ],
+  "schema_version": 1,
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca"
+}

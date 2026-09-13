@@ -1,0 +1,123 @@
+{
+  "authorized_runs": {
+    "full_t_plus_1": {
+      "env_seeds": [
+        100000,
+        100001
+      ],
+      "episodes": [
+        0,
+        1
+      ],
+      "horizon": 50,
+      "max_array_bytes": 67108864,
+      "max_records": 2,
+      "move_steps": 30,
+      "query_ids": [
+        1
+      ],
+      "result_run": "query_diagnostic_full_t_plus_1_smoke_20260914_timeout90_v2"
+    },
+    "serial_lag30": {
+      "env_seeds": [
+        100000,
+        100001
+      ],
+      "episodes": [
+        0,
+        1
+      ],
+      "horizon": 50,
+      "max_array_bytes": 67108864,
+      "max_records": 2,
+      "move_steps": 30,
+      "query_ids": [
+        1
+      ],
+      "result_run": "query_diagnostic_serial_lag30_smoke_20260914_timeout90_v2"
+    }
+  },
+  "kind": "frozen_c2_query_diagnostic_timeout90_v2_tools",
+  "manager_task_revision": "5223fb70aa219e92ad34d9c73aad1172e18fa207",
+  "only_authorized_runtime_change": {
+    "new_diagnostic_root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2",
+    "new_manifest_root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests-timeout90-v2",
+    "new_result_group": "query_diagnostic_c2_20260914_timeout90_v2",
+    "no_extra_infer_prewarm": true,
+    "params.policy_first_infer_timeout": 90.0,
+    "subsequent_policy_rpc_seconds": 30.0
+  },
+  "runtime_tools": [
+    {
+      "expected_remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/c2_timeout90_v2_preflight.py",
+      "name": "c2_timeout90_v2_preflight.py",
+      "sha256": "e6cf1ebac7c61b801588189bfdf3370ae4ee69fbe9e8684f0a6020fb51a4f855"
+    },
+    {
+      "expected_remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/launch_query_diagnostic_smoke.v1-to-timeout90-v2.diff",
+      "name": "launch_query_diagnostic_smoke.v1-to-timeout90-v2.diff",
+      "sha256": "f4d1f34829425297997133ef99a748b57e2f75ff886e5844a03b91e12c4707cf"
+    },
+    {
+      "expected_remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/launch_query_diagnostic_smoke_timeout90_v2.sh",
+      "name": "launch_query_diagnostic_smoke_timeout90_v2.sh",
+      "sha256": "62e5285fe1df7640e017980b1c26ae7192c8b49929a880813aa51c136c49150a"
+    },
+    {
+      "expected_remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/pair_query_diagnostic_logging.py",
+      "name": "pair_query_diagnostic_logging.py",
+      "sha256": "cdf577911a203994be50fd423b522e95cd5604f43c94e15b0ea247c18f8bce42"
+    },
+    {
+      "expected_remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/run_query_diagnostic_pair_timeout90_v2.sh",
+      "name": "run_query_diagnostic_pair_timeout90_v2.sh",
+      "sha256": "31eb34d05cb44e5000b1460708b3dfd891f6b68072fe0f1d3bf31d533be13307"
+    },
+    {
+      "expected_remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/run_timeout90_v2_pipeline.sh",
+      "name": "run_timeout90_v2_pipeline.sh",
+      "sha256": "adece3c928df6bfa8344d7ce6780c9407679f23e68bbc9a96cc94546f0ac5d59"
+    },
+    {
+      "expected_remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/validate_completed_diagnostic_smoke.py",
+      "name": "validate_completed_diagnostic_smoke.py",
+      "sha256": "68628a39872f1f4b0b7103fc09055adc2ff2e2cc91b44730204ec472c2347798"
+    },
+    {
+      "expected_remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/validate_timeout90_config.py",
+      "name": "validate_timeout90_config.py",
+      "sha256": "2e84d49ae71d605f411b5b4ab0ec845d729ef857e024e35838abfc4fb8d35f09"
+    },
+    {
+      "expected_remote_path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2/write_timeout90_pipeline_status.py",
+      "name": "write_timeout90_pipeline_status.py",
+      "sha256": "6b23aa6e33a10cccac1babb7a7394416efa84b271c3eeae91c54e42dda07044c"
+    }
+  ],
+  "schema_version": 1,
+  "source_identity": {
+    "RMBench": "f401f5279c95451eb424ac98b831bab5552b2120",
+    "openpi": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+    "robot_bridge": "e147f600dc4329f330a6e2eb0335150b5b3093a3"
+  },
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca",
+  "v1_sources": {
+    "launcher": {
+      "sha256": "61e3e8ce80bbe0f17fd8d1b56472038189b5be3931bca16b476c2d70b0c1d732"
+    },
+    "pair": {
+      "sha256": "cdf577911a203994be50fd423b522e95cd5604f43c94e15b0ea247c18f8bce42"
+    },
+    "runner_input_manifests": {
+      "full_t_plus_1": "7109aec53ea9f42bb64f4772b1bda3433dc04c889100c694385be5394bff9a41",
+      "serial_lag30": "2cf5b99fb952a2ed244e8f1de77b515b09a19fe70341f33d8ed4e0db2ff738a3"
+    },
+    "scheduler_configs": {
+      "full_t_plus_1": "3ef7bf537b922ac740ede9c18d7e637482cf42e02682a64ec8e4298d4a836f47",
+      "serial_lag30": "5621ad8ef70219c770c6ad6f907f71606489e0a558bf8dfe0475ae42b6de3d67"
+    },
+    "tools_manifest": {
+      "sha256": "36d913b151db2fc624783d856266ae06f6b6493d8b89ee00b14af084d5e5a442"
+    }
+  }
+}

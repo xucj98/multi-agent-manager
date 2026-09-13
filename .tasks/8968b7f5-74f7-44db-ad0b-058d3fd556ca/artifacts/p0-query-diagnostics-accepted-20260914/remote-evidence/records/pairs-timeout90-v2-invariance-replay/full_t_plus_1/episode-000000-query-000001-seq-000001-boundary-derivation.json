@@ -1,0 +1,279 @@
+{
+  "backend_actions_boundary": {
+    "execute_k30": {
+      "comparison": {
+        "difference": null,
+        "equal": true
+      },
+      "identity": {
+        "dtype": "<f4",
+        "nonfinite": false,
+        "sha256": "2ec9a093395864d27b65e08ea68f9ce4309454076890b96964560902729afaa2",
+        "shape": [
+          30,
+          14
+        ]
+      }
+    },
+    "policy_after_output_transform_actions": {
+      "dtype": "<f8",
+      "nonfinite": false,
+      "sha256": "1ea2d7be93f7ecf82c9fa1443dc45181daef03fc00422821695cadd028ec5ee7",
+      "shape": [
+        50,
+        14
+      ]
+    },
+    "policy_to_backend_actions": {
+      "identity": {
+        "dtype": "<f4",
+        "nonfinite": false,
+        "sha256": "28dd865d2ca69883f8120850c383ce2d2c2b7b26178270857e775acbba4356ac",
+        "shape": [
+          50,
+          14
+        ]
+      },
+      "operation": "np.asarray(policy_after_output_transform.actions, dtype=np.float32)"
+    },
+    "post_wire_h50": {
+      "comparison": {
+        "difference": null,
+        "equal": true
+      },
+      "identity": {
+        "dtype": "<f4",
+        "nonfinite": false,
+        "sha256": "28dd865d2ca69883f8120850c383ce2d2c2b7b26178270857e775acbba4356ac",
+        "shape": [
+          50,
+          14
+        ]
+      }
+    },
+    "source": {
+      "bytes": 27381,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/robot-bridge/robot_bridge/policy/backends/openpi.py",
+      "sha256": "566df98afccd320717e027f235cb5e997836a89112344ca208e9507b3cea05b8"
+    },
+    "statement": "output[\"actions\"] = np.asarray(result[\"actions\"], dtype=np.float32)"
+  },
+  "cross_process_saved_replay": {
+    "comparison": {
+      "difference": "saved policy actions after the frozen backend float32 conversion have a different identity from the persisted direct pair ordinary actions",
+      "equal": false
+    },
+    "expected_backend_actions": {
+      "dtype": "<f4",
+      "nonfinite": false,
+      "sha256": "28dd865d2ca69883f8120850c383ce2d2c2b7b26178270857e775acbba4356ac",
+      "shape": [
+        50,
+        14
+      ]
+    },
+    "observed_ordinary_actions": {
+      "dtype": "<f4",
+      "nonfinite": false,
+      "sha256": "e7520d71939c2b297f3d2ffe9bd3ccc17ff5fb4dafcee4078ab38f537f2442e1",
+      "shape": [
+        50,
+        14
+      ]
+    },
+    "passed": false,
+    "scope": "Saved policy after_output_transform.actions are compared at the frozen OpenPiBackend output boundary after only the explicit float32 actions conversion. This is an additional replay check, not evidence that logging changed the same-process invocation.",
+    "unavailable": [
+      "The old pair receipt persisted only action identity, not the direct off/on ordinary arrays; max_abs and RMSE cannot be reconstructed offline.",
+      "The old recursive saved-output comparison stopped at the actions dtype mismatch, so later saved-output fields were not evaluated and are unavailable rather than passed."
+    ]
+  },
+  "finished_at": "2026-09-13T19:52:47+00:00",
+  "kind": "query_diagnostic_pair_boundary_derivation",
+  "legacy_pair": {
+    "comparisons": {
+      "logging_off_final_rng_vs_logging_on": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_off_final_rng_vs_saved": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_off_vs_logging_on": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_off_vs_saved_recorded_output": {
+        "difference": "output.actions: dtype/shape float32/(50, 14) != float64/(50, 14)",
+        "equal": false
+      },
+      "logging_on_final_rng_vs_saved": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_sidecar_input_vs_saved_pre_transport_input": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_sidecar_rng_after_vs_saved": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_sidecar_rng_before_vs_saved": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_vs_saved_recorded_output": {
+        "difference": "output.actions: dtype/shape float32/(50, 14) != float64/(50, 14)",
+        "equal": false
+      }
+    },
+    "error": {
+      "message": "logging off/on pair comparison failed",
+      "traceback": "Traceback (most recent call last):\n  File \"/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2-preflight-selfpid-attempt2/pair_query_diagnostic_logging.py\", line 292, in main\n    raise RuntimeError(\"logging off/on pair comparison failed\")\nRuntimeError: logging off/on pair comparison failed\n",
+      "type": "RuntimeError"
+    },
+    "finished_at": "2026-09-13T19:24:05+00:00",
+    "ordinary_output": {
+      "actions": {
+        "dtype": "<f4",
+        "nonfinite": false,
+        "sha256": "e7520d71939c2b297f3d2ffe9bd3ccc17ff5fb4dafcee4078ab38f537f2442e1",
+        "shape": [
+          50,
+          14
+        ]
+      },
+      "keys": [
+        "actions",
+        "memory_prediction",
+        "memory_prediction_ids"
+      ],
+      "state": null
+    },
+    "passed": false,
+    "receipt": {
+      "bytes": 4500,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/pairs-timeout90-v2/full_t_plus_1/episode-000000-query-000001-seq-000001.json",
+      "sha256": "77e397f3574b09ee389d0aac4637923bf6b39a4feac8c556a067e5d8676af0b3"
+    },
+    "record": {
+      "array_bundle": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/full_t_plus_1/arrays/episode-000000-query-000001-seq-000001.npz",
+      "array_bundle_sha256": "85cf69da786301ec412ee49b459370db9240cdd7811ad610b4ea505d4a0cb37c",
+      "episode_id": 0,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/full_t_plus_1/records/episode-000000-query-000001-seq-000001.json",
+      "query_id": 1,
+      "record_id": "episode-000000-query-000001-seq-000001",
+      "sha256": "9f7191f0fd1c87464b378450c89524dc25d4c066012228db3792f9bcc9d4b1fe"
+    },
+    "rng": {
+      "logging_off_final": {
+        "algorithm": "threefry2x32",
+        "key_data": {
+          "dtype": "<u4",
+          "nonfinite": false,
+          "sha256": "e98d82da3870b8e15c37fa90d06bfefb61fe4f0307c421fd604f2a0499ee7538",
+          "shape": [
+            2
+          ]
+        }
+      },
+      "logging_on_final": {
+        "algorithm": "threefry2x32",
+        "key_data": {
+          "dtype": "<u4",
+          "nonfinite": false,
+          "sha256": "e98d82da3870b8e15c37fa90d06bfefb61fe4f0307c421fd604f2a0499ee7538",
+          "shape": [
+            2
+          ]
+        }
+      },
+      "saved_state_after_split": {
+        "algorithm": "threefry2x32",
+        "key_data": {
+          "dtype": "<u4",
+          "nonfinite": false,
+          "sha256": "e98d82da3870b8e15c37fa90d06bfefb61fe4f0307c421fd604f2a0499ee7538",
+          "shape": [
+            2
+          ]
+        }
+      },
+      "state_before_split": {
+        "algorithm": "threefry2x32",
+        "key_data": {
+          "dtype": "<u4",
+          "nonfinite": false,
+          "sha256": "ee46b0976453423852f7415e61fcc341d384b01771f7ba4bf3597bee1a051029",
+          "shape": [
+            2
+          ]
+        }
+      }
+    },
+    "script": {
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2-preflight-selfpid-attempt2/pair_query_diagnostic_logging.py",
+      "sha256": "cdf577911a203994be50fd423b522e95cd5604f43c94e15b0ea247c18f8bce42"
+    },
+    "started_at": "2026-09-13T19:23:05+00:00",
+    "status": "failed"
+  },
+  "logging_invariance": {
+    "comparisons": {
+      "logging_off_final_rng_vs_logging_on": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_off_final_rng_vs_saved": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_off_vs_logging_on": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_final_rng_vs_saved": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_sidecar_input_vs_saved_pre_transport_input": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_sidecar_rng_after_vs_saved": {
+        "difference": null,
+        "equal": true
+      },
+      "logging_on_sidecar_rng_before_vs_saved": {
+        "difference": null,
+        "equal": true
+      }
+    },
+    "ordinary_output_fields": [
+      "actions",
+      "memory_prediction",
+      "memory_prediction_ids"
+    ],
+    "passed": true,
+    "scope": "The original pair loaded one backend and invoked it twice from the same restored starting key; it compares ordinary output strictly while excluding timing and the diagnostic sidecar, plus final key and sidecar input/key alignment."
+  },
+  "manager_task_revision": "0d1576069c7d6f90b765be6ca3b190368cbb69bf",
+  "passed": false,
+  "record": {
+    "array_bundle": {
+      "bytes": 441124,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/full_t_plus_1/arrays/episode-000000-query-000001-seq-000001.npz",
+      "sha256": "85cf69da786301ec412ee49b459370db9240cdd7811ad610b4ea505d4a0cb37c"
+    },
+    "json": {
+      "bytes": 43010,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics-timeout90-v2/full_t_plus_1/records/episode-000000-query-000001-seq-000001.json",
+      "sha256": "9f7191f0fd1c87464b378450c89524dc25d4c066012228db3792f9bcc9d4b1fe"
+    }
+  },
+  "schema_version": 1,
+  "started_at": "2026-09-13T19:52:47+00:00",
+  "status": "failed"
+}

@@ -1,0 +1,20 @@
+--- /mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/tools/worktree_env_smoke_original.py	2026-09-14 01:34:37.845928572 +0800
++++ /mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/tools/worktree_env_smoke_validation.py	2026-09-14 01:36:09.888796980 +0800
+@@ -11,6 +11,7 @@
+ import curobo
+ from curobo.curobolib import geom_cu
+ from curobo.curobolib.geom import get_pose_distance
++from query_diagnostic_curobo_provenance import verify_curobo_extension_origin
+ 
+ 
+ def render() -> tuple[int, ...]:
+@@ -31,8 +32,7 @@
+ 
+ 
+ def curobo_distance() -> float:
+-    if "site-packages" not in str(Path(geom_cu.__file__).resolve()):
+-        raise RuntimeError(f"cuRobo extension is not from the venv: {geom_cu.__file__}")
++    verify_curobo_extension_origin(geom_cu.__file__)
+     device = torch.device("cuda")
+     shape = (1, 1)
+     position = torch.zeros((*shape, 3), device=device)

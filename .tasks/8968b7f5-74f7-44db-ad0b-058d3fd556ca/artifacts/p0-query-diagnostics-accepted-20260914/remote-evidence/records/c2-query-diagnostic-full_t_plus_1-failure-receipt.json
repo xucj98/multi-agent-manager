@@ -1,0 +1,232 @@
+{
+  "created_at_utc": "2026-09-13T18:18:06.640288+00:00",
+  "environment": {
+    "CUDA_VISIBLE_DEVICES": "6",
+    "SAPIEN_RENDER_DEVICE": "cuda:0",
+    "VK_ICD_FILENAMES": "/etc/vulkan/icd.d/nvidia_icd.json"
+  },
+  "execution": {
+    "accepted_env_seeds": [
+      100000
+    ],
+    "accepted_episode_ids": [
+      0
+    ],
+    "benchmark_error": "EpisodeFailure: episode 0: scheduler_exited_before_terminal: scheduler exited with returncode 1",
+    "benchmark_status": "failed",
+    "diagnostics_summary": {
+      "bytes": 636,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/eval_result/query_diagnostic_c2_20260914/query_diagnostic_full_t_plus_1_smoke_20260914/diagnostics_summary.json",
+      "sha256": "12e78b0a9ad03cbdd35742bdeba047621c0a9f1620c4ed9d737c7391b758b35e"
+    },
+    "never_started_episode_ids": [
+      1
+    ],
+    "policy_process": {
+      "loaded_before_request": true,
+      "post_request_log_observation": "The policy log reports that ptxas was unavailable and the driver would perform PTX compilation. This receipt does not infer that this observation caused the timeout.",
+      "server_listened_before_request": true,
+      "stdout": {
+        "bytes": 8755,
+        "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/eval_result/query_diagnostic_c2_20260914/query_diagnostic_full_t_plus_1_smoke_20260914/processes/001-policy.stdout.log",
+        "sha256": "6cfd96082461fb5266e15d929ce0d76f6613d2e8c26866a137436864cb7e2ac5"
+      }
+    },
+    "process_events": {
+      "bytes": 3449,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/eval_result/query_diagnostic_c2_20260914/query_diagnostic_full_t_plus_1_smoke_20260914/processes.jsonl",
+      "sha256": "b1b42d43bb7fa6dbbb05f9b16850d39b57f6288979793093aa2a866fb0466a13"
+    },
+    "result_leaf": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/eval_result/query_diagnostic_c2_20260914/query_diagnostic_full_t_plus_1_smoke_20260914",
+    "result_text": {
+      "bytes": 190,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/eval_result/query_diagnostic_c2_20260914/query_diagnostic_full_t_plus_1_smoke_20260914/_result.txt",
+      "sha256": "3a95879aca8f6399d852b493ba2459b12293269d4ae7cc392898561e37b157f6"
+    },
+    "runner_log": {
+      "bytes": 4194,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/query_diagnostic_full_t_plus_1_runner.log",
+      "sha256": "4e23c03d75b58fcf9ad9ac335ec9d1e77ecfdb4b81c9828649fd9d00d556290d"
+    },
+    "scheduler_exit": {
+      "reason": "scheduler_exited_before_terminal",
+      "returncode": 1,
+      "stdout": {
+        "bytes": 20781,
+        "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/eval_result/query_diagnostic_c2_20260914/query_diagnostic_full_t_plus_1_smoke_20260914/processes/002-scheduler.stdout.log",
+        "sha256": "ecb2dc2e568c88b36915af79a0af5fe4ca19bd26e542035ec6cb36f167175815"
+      }
+    }
+  },
+  "first_failure": {
+    "classification": "policy_rpc_timeout",
+    "exception_message": "timed out in 30.0s",
+    "exception_type": "TimeoutError",
+    "outer_runner_error": "EpisodeFailure: episode 0: scheduler_exited_before_terminal: scheduler exited with returncode 1",
+    "record": {
+      "array_bundle": {
+        "bytes": 128065,
+        "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics/full_t_plus_1/arrays/episode-000000-query-000001-seq-000001.npz",
+        "sha256": "74147ab0897a5f6f3177e534b6ba9f3c41ead69d6e52037fbe57e44c6e69e4e0"
+      },
+      "json": {
+        "bytes": 17709,
+        "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics/full_t_plus_1/records/episode-000000-query-000001-seq-000001.json",
+        "sha256": "7ccb86e357790d2ac8d48af35a0d092ebbc54802fdea994f910a3ab8419acaef"
+      },
+      "policy_reason": "policy RPC raised TimeoutError: timed out in 30.0s",
+      "policy_status": "not_received",
+      "status": "policy_response_missing",
+      "unavailable_evidence": [
+        "policy response",
+        "raw J/T memory coordinates",
+        "decoded memory IDs",
+        "action chunk and execute slice",
+        "action-dispatch mapping",
+        "accepted/discarded lifecycle completion"
+      ]
+    },
+    "scheduler_call": "WebSocketClient.call() waiting for the policy response",
+    "selected_query": {
+      "env_seed": 100000,
+      "episode_id": 0,
+      "query_id": 1,
+      "record_id": "episode-000000-query-000001-seq-000001",
+      "sequence": 1
+    }
+  },
+  "frozen_tools": {
+    "launch_query_diagnostic_smoke": {
+      "bytes": 4761,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-v1/launch_query_diagnostic_smoke.sh",
+      "sha256": "61e3e8ce80bbe0f17fd8d1b56472038189b5be3931bca16b476c2d70b0c1d732"
+    },
+    "pair_query_diagnostic_logging": {
+      "bytes": 14441,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-v1/pair_query_diagnostic_logging.py",
+      "sha256": "cdf577911a203994be50fd423b522e95cd5604f43c94e15b0ea247c18f8bce42"
+    },
+    "tools_manifest": {
+      "bytes": 2741,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-v1/query_diagnostic_c2_tools_manifest.json",
+      "sha256": "36d913b151db2fc624783d856266ae06f6b6493d8b89ee00b14af084d5e5a442"
+    }
+  },
+  "host": {
+    "hostname": "is-ddj72hiexddjfwo6-devmachine-0",
+    "ssh_alias": "wuwen-4090-2"
+  },
+  "inputs": {
+    "full_t_plus_1_runner_input_manifest": {
+      "bytes": 2633,
+      "exists": true,
+      "mtime_utc": "2026-09-13T16:45:42.720956+00:00",
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests/full_t_plus_1/runner_input_manifest.json",
+      "sha256": "7109aec53ea9f42bb64f4772b1bda3433dc04c889100c694385be5394bff9a41"
+    },
+    "serial_lag30_runner_input_manifest": {
+      "bytes": 2630,
+      "exists": true,
+      "mtime_utc": "2026-09-13T16:45:49.066555+00:00",
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/manifests/serial_lag30/runner_input_manifest.json",
+      "sha256": "2cf5b99fb952a2ed244e8f1de77b515b09a19fe70341f33d8ed4e0db2ff738a3"
+    }
+  },
+  "kind": "c2_query_diagnostic_smoke_failure_receipt",
+  "no_retry_boundary": {
+    "j_logging_off_on_pair": "not run",
+    "j_relaunch": "not run",
+    "reason": "The required J acceptance did not pass. The task contract requires preserving the first real CUDA/runner/diagnostic failure without retry or expansion.",
+    "resource_expansion": "not performed",
+    "serial_lag30_logging_off_on_pair": "not run",
+    "serial_lag30_smoke": "not run",
+    "source_dependency_cache_checkpoint_transport_timeout_changes": "not performed"
+  },
+  "postflight": {
+    "gpu6": {
+      "memory_used_mib": 4,
+      "utilization_percent": 0
+    },
+    "ports_listening": {
+      "19460": false,
+      "19462": false
+    },
+    "postflight_log": {
+      "bytes": 761,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-query-diagnostic-postflight-after-full_t_plus_1-failure.log",
+      "sha256": "fc2265553acc175007b888a9d887b5c51dcba15df1bcc343485bd3126c02c46f"
+    },
+    "preflight_log": {
+      "bytes": 1253,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-query-diagnostic-preflight-before-full_t_plus_1.log",
+      "sha256": "15629be2b4a9b45ac05a05c52fdd7419b4bcc9999d22bda3674110007978f770"
+    },
+    "source_trees_clean": true,
+    "task_owned_processes": []
+  },
+  "prior_evidence": {
+    "manager_authorized_replacement_worktree_smoke": {
+      "bytes": 5095,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-gpu6-worktree-env-smoke-validation-receipt-v2.json",
+      "sha256": "7496adfd40ed35ce1a5b32119b9b3fe3a86c1498e9fc7758962c6a8596c08b61"
+    },
+    "pre_j_run_evidence": {
+      "bytes": 12597,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-query-diagnostic-run-evidence-before-j-smoke.json",
+      "sha256": "f83efd753546825b3df2a09f006b0674cc1994ee6efeabe0908df5c9fe7ab23f"
+    },
+    "renderer_gate": {
+      "bytes": 18322,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/renderer_gate_gpu6.json",
+      "sha256": "f67665446952f080f43e20a8219942d584fe448da55e49f0b66543c0f1d95451"
+    }
+  },
+  "schema_version": 1,
+  "scope": {
+    "configured_env_seeds": [
+      100000,
+      100001
+    ],
+    "configured_episode_ids": [
+      0,
+      1
+    ],
+    "horizon": 50,
+    "max_array_bytes": 67108864,
+    "max_records": 2,
+    "move_steps": 30,
+    "selected_query_ids": [
+      1
+    ],
+    "variant": "full_t_plus_1"
+  },
+  "source": {
+    "RMBench": {
+      "clean": true,
+      "commit": "f401f5279c95451eb424ac98b831bab5552b2120",
+      "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench"
+    },
+    "openpi": {
+      "clean": true,
+      "commit": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+      "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/openpi"
+    },
+    "robot-bridge": {
+      "clean": true,
+      "commit": "e147f600dc4329f330a6e2eb0335150b5b3093a3",
+      "root": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/robot-bridge"
+    }
+  },
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca",
+  "validation": {
+    "acceptance_status": "not_passed",
+    "exit_code": 0,
+    "interpretation": "The validator accepted the internally consistent incomplete record. It did not establish the task-required recorded J evidence or diagnostic acceptance.",
+    "log": {
+      "bytes": 434,
+      "path": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/query_diagnostic_full_t_plus_1_record_validation.log",
+      "sha256": "71f20184e5c2da55169ac92e2f083e2570da5f6d813e156b1f944ce66cb37d94"
+    },
+    "reported_status": "policy_response_missing"
+  }
+}

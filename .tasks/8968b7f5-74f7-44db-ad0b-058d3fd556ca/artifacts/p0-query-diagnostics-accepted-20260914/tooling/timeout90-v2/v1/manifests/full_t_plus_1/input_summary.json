@@ -1,0 +1,13 @@
+{
+  "checkpoint": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s0/20000",
+  "checkpoint_file_count": 60,
+  "checkpoint_total_bytes": 5258412876,
+  "diagnostic_directory": "/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/diagnostics/full_t_plus_1",
+  "metadata_digest": "3b5d9b56a6d9abcaad95c6fc4824b2cd4e2b80bfc5d59ef7380f0d12f08622a4",
+  "params_assets_digest": "d29535bfbe13776d3f006639b450cb85701647772414034fd01484838da940de",
+  "runner_input_audit_sha256": "3f35e8137ee8c028f08e66ffd9a533cd8901a6257fb4877608bcacc786d2a726",
+  "runner_input_manifest_sha256": "7109aec53ea9f42bb64f4772b1bda3433dc04c889100c694385be5394bff9a41",
+  "scheduler_config_sha256": "3ef7bf537b922ac740ede9c18d7e637482cf42e02682a64ec8e4298d4a836f47",
+  "variant": "full_t_plus_1",
+  "weight_content_aggregate_sha256": "9bac89f2d41a09c5cec138acd0274d5bd0c8a5f21bb5cad0ac825f069defc22f"
+}
