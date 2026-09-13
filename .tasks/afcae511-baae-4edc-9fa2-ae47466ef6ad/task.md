@@ -1762,6 +1762,12 @@ matching smoke `c_put_back_serial_lag30_trainseed0_evalseed0_smoke2_r3` 同样�
 两条 formal 均从不存在的新 r3 leaf 以 `--smoke-run` 启动，没有覆盖 partial 或有效结果；两条 MAM job 均记录真实 remote PID/boot identity。本轮至此不等待 formal 完成；后续由 MAM 唤醒后再按完整 100 条 raw-artifact 合同验收、归档，并在正式验收后清理 matching smoke。
 # 新增两批正式评测证据核验
 
+## Manager 最终验收（2026-09-14）
+
+接受独立报告22573f3723f23d7eba832f32f28b358d1d730436与receipt 78f0c059cc0508bdad91ed8555411a3f26595ba6657989fec40cd219337a34c9。Manager另行从C1重哈希两份final review和20项引用原件、重算200条连续固定seed/preflight/terminal/outcome，核对process/scheduler exits、video flags、实际checkpoint/RNG配置和smoke/cleanup保留链，与独立审计一致。J47/100、T46/100纳入原协议正式结果；未重新解码MP4和不可重哈希已删除smoke raw的限制均保留。
+
+Manager验收receipt `/root/Documents/task-state-vla-paper/docs/analysis/putback_jt_train1_eval1_acceptance_20260914.json` SHA797985325c95fb2625b1752148fa1af393900d882e433a71967934cd96fd77d7；独立receipt原字节已持久复制入同目录 `putback_jt_train1_eval1_independent_audit_20260914.json`。新增快照 `accepted_results_20260914_jt_train1_eval1.json` SHA cacfbedcfefc47c1931f27cf6b924bd7030f0e232ac08e09c5a871eced3c8f2e：46批/4600执行/20模型/12完整3eval。旧44批快照和PDF保留独立身份；eval2继续既定队列，不由本review归档或修改。核验任务无剩余可执行工作，可以归档。
+
 只读审计，terra/max。先读 MAM AGENTS/README/.local/README/.local/wuwen-4090.md 与源任务最新发布 report，勿读取历史标题推断当前状态。Manager 自己裁决、更新论文；你不做科研主张设计。
 
 范围限定 C1 两个完成 leaf：`/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/c_put_back_full_t_plus_1_trainseed1_evalseed1_100ep_r3` 和同目录 `c_put_back_full_t_plus_30_trainseed1_evalseed1_100ep_r3`。报告声称分别 47/100 和 46/100，final_review SHA 分别 f02b472b80d9009bca1d26df66a77c343ea4e48d8c39a1b68c70e607f6d13cc3、94f4e4297d3b63b69b09a4296a1ef0684b3bb138c57d9b250767e305e6ca752b。
