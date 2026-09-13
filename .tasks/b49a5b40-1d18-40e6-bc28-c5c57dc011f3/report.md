@@ -1,7 +1,7 @@
 # native multi-agent v2 wake rejection fix
 
 代码交付：核心修复 `46af8c2afd3790a8e1d0538e4f624170753e67fc`；本次 P3 文档修订与隔离验收预案
-`95c99f8c5a5ea4eee9dc88139c334f37eb903e5d`（branch `task/b49a5b40-1d18-40e6-bc28-c5c57dc011f3`，worktree
+`5b5ca3bb1524c53c8d39bbd2159c30b2bc40db9c`（branch `task/b49a5b40-1d18-40e6-bc28-c5c57dc011f3`，worktree
 `/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager`，基线
 `bc8726f3e2f13351c52650f03bc88bd76a68ed25`）。
 
