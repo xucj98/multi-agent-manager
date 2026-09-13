@@ -1306,3 +1306,7 @@ P-S 正式 leaf `c_put_back_serial_lag30_trainseed0_evalseed0_100ep_r3` 已于 2
 matching smoke `c_put_back_no_memory_trainseed0_evalseed0_smoke2_r3` 也从 raw artifact 重验：`100000/100001` accepted terminal、两条 scheduler exit 0、episode0 解码 500 帧、episode1 no-video、日志零基础设施 marker；其既有 review SHA-256 为 `7b47b1980562e9224c4f0cc2cb16e9e3f6d3f18be45dc29f4275ded2477cd1f3`。formal command 保留该 smoke 引用，并保留 input audit/manifest 副本。
 
 正式验收记录为 `/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/c_put_back_no_memory_trainseed0_evalseed0_100ep_r3/final_review.json`，SHA-256 `d1a50ca1c31b861520ba2e12908babcd2dd5370e05998aaa1dde514e5626ce47`；其中保存核心 raw artifact、配置、command、scheduler 和 lineage 的 SHA-256。下一步仅归档该已完成 MAM job，再将 matching smoke 以 cleanup receipt 留痕后删除；formal raw artifact 与 final review 保留。
+
+### P-N archive 与 matching-smoke 清理已完成
+
+MAM job `d40eb04a-0ad4-421b-a74a-7734d6f3c9db` 已于终验后归档，archive note 固定记录完整 `100000..100099`、17/100、final review SHA 和 PID/端口释放。正式 leaf 已保留 `smoke_cleanup_receipt.json`，SHA-256 为 `688aff3ad62f52427b9f058cb69937a79deb008ad654abbf75a862f6ec6f86fb`：删除前 matching smoke 为 51 个文件 / 1,844,435 bytes，receipt 保留 smoke review SHA、completed/2、accepted terminal、video/no-video、scheduler exit、核心 raw artifact SHA、formal command 引用及 formal final-review SHA。随后只删除 `c_put_back_no_memory_trainseed0_evalseed0_smoke2_r3`；P-N formal raw artifacts、lineage、副本和 `final_review.json` 均保留。本节没有对 P-S 做任何操作。
