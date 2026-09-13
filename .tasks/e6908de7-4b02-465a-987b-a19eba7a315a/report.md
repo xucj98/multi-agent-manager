@@ -1,3 +1,18 @@
+## 当前状态：put-back J/T train1 · eval1 正式100已启动（2026-09-14 CST）
+
+已按发布 revision `468bc0d32e4dd5056b06264915a685912992811e` 去重并启动首对缺失评测；新增训练、转换和数据传输均为 0。广泛扫描结果显示，J train1/eval1 仅有历史 `r2` partial（23 集、`failure_review.json`，没有 `final_review.json`），J/T 的 train1/2、eval1/2 不存在可复用的完整正式100，因此没有重跑任何有效结果。
+
+运行树冻结且 clean：RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。两条命令均从同一 C1 runtime 运行，checkpoint metadata 已核对为 `demo_clean_state`、H50/K30、full `last_executed` feedback；首个 infer 保持 90 秒，后续 infer 保持 30 秒。
+
+| arm | matching smoke2 | smoke 结果 | formal100 / 资源 | MAM job |
+| --- | --- | ---: | --- | --- |
+| J `full_t_plus_1`, train1/eval1 | `c_put_back_full_t_plus_1_trainseed1_evalseed1_smoke2_r3` | 2/2；`200000..200001`，video/no-video、terminal、process/port、source/hash 全部通过 | `c_put_back_full_t_plus_1_trainseed1_evalseed1_100ep_r3`；C1 GPU1，19410/19412，outer PID `723437` | `bf7a953a-e35a-4ca3-a8cc-ccd9cf4f3cd0` |
+| T `full_t_plus_30`, train1/eval1 | `c_put_back_full_t_plus_30_trainseed1_evalseed1_smoke2_r3` | 1/2；`200000..200001`，video/no-video、terminal、process/port、source/hash 全部通过 | `c_put_back_full_t_plus_30_trainseed1_evalseed1_100ep_r3`；C1 GPU2，19420/19422，outer PID `723438` | `d805fb5c-f1ff-41ae-8b6d-59a3aa481e07` |
+
+两条 formal 已由 MAM 以实际 C1 outer PID 登记为 running；启动后尚未完成 episode，未报告分数。任务私有 records 保存 prelaunch、audit、dry-run、outer PID/log 与两份 smoke review。formal 停止后将先执行完整100/连续 seeds/嵌套 terminal/video/process/source/hash 验收，写 `final_review.json`、归档 job、写 matching-smoke cleanup receipt，再删除且只删除对应 smoke；遇到基础设施首因则保留 leaf 并停止该项。其后按既定队列继续 train1/eval2，再 train2/eval1、train2/eval2。
+
+---
+
 ## 当前状态：C3 高频工程验证被 matched action gate 阻断（2026-09-14 CST）
 
 C3 GPU0 上的获批有限工程验证已完成 8 个两集 leaf，**没有启动 HF matching smoke、r_s30 控制或任何 HF formal100**。运行根为 `/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914`，三库仍干净且精确固定为 RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`。冻结矩阵、baseline inputs 与 run matrix SHA 分别为 `20e414eb…700adb`、`305250a1…5610`、`f5e5dc56…8a69`；任务私有工具 SHA 为 `dcf93891de82adaf21e676c55ee30901309f9c9a6097841ff4be4c7ba7f29c87`。
