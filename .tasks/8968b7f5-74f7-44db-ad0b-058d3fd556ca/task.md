@@ -1,5 +1,13 @@
 # P0诊断记录接口：状态原始输出、动作和RNG的无行为改动采集
 
+## 当前窄修：live array_ref 的录入与离线状态不一致
+
+独立 report d1fffd76062e9b8b0ec36dd3b9506df9be18b892 已确认 b169 的真实 J/S Policy→recorder→validator 有效、Memory-v1 完整性和 scheduler 预算预检修复。Manager 已直接核对 _Externalizer/sidecar checks 与真实 Policy.capture：reviewer 将 raw action ndarray 手工替换成 array_ref，录入为 recorded、离线缺 NPZ key 后拒绝的现象成立；尚无证据表明当前真实 Policy producer 会生成这种 descriptor。将其按 P2 录入校验一致性窄修处理，不作算法失败或无限硬化依据。
+
+从当前 clean bridge b1695f7f04050836a764c1e85a6db163e3526ada 修：在 live policy sidecar ingress 对预先 externalized array_ref 统一明确拒绝为 incomplete（或等价保证录入的数组与本次 NPZ 实际绑定）；离线已落盘 array_ref 的正常解析继续有效，真实 ndarray/非有限 logits 不受影响。优先少量集中检查，不再增加各字段重复的数百行 validator，不在 Policy 开销路径新增复制/RNG操作，不改 HF。OpenPI bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6 保持不变。
+
+验证本次 raw-action 描述符反例、一个其他必需数组入口、合法真实 serial/joint 及离线完整性；保留此前容量/lifecycle 默认路径结论，无需机械重跑全库。交 clean commit 和紧凑 report 即可，仍不执行 GPU/正式评测/训练。GPU 验收由 Manager 根据完整已验科学路径、离线验证及实际运行合同裁决，不随意把任意人为非法 fixture 定成所有工程工作的 blocker。
+
 ## Manager 增量复审裁决：memory 部分完整性仍需窄修
 
 你已交付OpenPI bc7603c5 / bridge fa62a9fe，独立review afe0仍在进行。Reviewer复现：把有效serial sidecar的memory缩成仅{"representation":"serial_token"}，recorder仍返回True、写status=recorded且validate_record通过。Manager直接核对fa62a9fe的_complete_sidecar_error只检查非空representation，并与bc7603c5的真实memory evidence生成器比较，确认遗漏。该生成器还会自然返回metadata_incomplete/missing_key_state_output等不完整状态，不能因为总sidecar写了complete就称完整。
