@@ -30,3 +30,8 @@ Manager逐行审核移除camera_keys、同步MemoryLeRobotDataset.hf_dataset、a
 Manager已直接核对MemoryLeRobotDataset._episode/build_episode：构建整集Memory数据需要数值/绑定列和sidecar，当前hf_dataset[start:stop]却连同相机列解码整集，导致随机首batch极慢。授权在从冻结N867aa05建立的独立加载修复候选tree做最小性能修复：在整集读取前投影到build_episode实际需要的column binding（含state用于query_count、series/availability/constants/events）与episode索引列；普通__getitem__从原dataset获取当前帧的真实图像路径必须保持，禁止dummy、改变图像转换或对原HF/source数据全局删列。可同样避免_episode_positions为读取episode_index解码首帧图像。
 
 不改数据、sampler/seed/次序、norm、targets/mask/loss/输入语义；原冻结树保持不动。补证明整集cache不触发图像解码的回归、原始/新路径实际样本的图像与数值/标签/权重逐值一致（至少三任务与一个现有memory J/S路径），处理列投影后原hf reference同步及stats-only兼容。实际random32batch/2worker速度与finite确认；同源原始对照可用固定contiguous batch避免无界慢profile。代码diff和结果交Manager快速review后，以新干净commit继续原50-step保存恢复→正式；不需再咨询是否可以修这个明确瓶颈。优先解除N启动，J/S继续已有语义接入，禁止把新实验指标调优混入性能修复。
+
+## Manager N候选短训练准入（2026-09-13 17:10 CST）
+Manager已阅读66049be与5835fa04055d520e418cc1448c1bd58fa1e665cb完整实现，复核三任务N+既有rearrange J/S的32-row图像/state/action/target/weight相同SHA256，三任务normal PyTorch和JAX loader均3/3 finite、bs32/shuffle/2 workers真实三路图像。root独立66049be memory_data_test 13/13，5835fa0新增投影/嵌套专项4/4 passed。准许现在从 clean loader/openpi=5835fa0 依既定设备swap N GPU0、battery N GPU2、cover N GPU4开展各自50-step训练、保存与checkpoint-only恢复，seed0、bs32、H50/K30、真实数据/既有norm、默认cache且unset HF_LEROBOT_HOME，原N867aa05树保持冻结不动。
+这次准入仅loader执行变更，不等J/S新schema全完成。profile中的loader_seed=42仅profiling，正式训练仍按已定train seed0完整命令；验收报告明确此前precommit profile的git HEAD=867aa05并记录当时diff，不能把该行改写为clean5835fa0跑过。可复用flat路径等价证据，无需再反复重跑norm/数据审计。
+各自50step通过finite-loss/保存/恢复合同后，立即发布receipt并通知Manager审查20k正式准入，不自行扩大方案；短smoke无需mam job，若实际预计超过30min及时登记。先执行已经准入的短训练，不再等待额外口头确认。J/S继续独立开发，不修改此执行树。
