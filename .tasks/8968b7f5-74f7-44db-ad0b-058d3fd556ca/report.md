@@ -1,138 +1,103 @@
-# P0 选中 query 诊断记录接口：完成报告
+# P0 选中 query 诊断记录接口：P1/P2 窄修复交付报告
 
 ## 交付
 
 - OpenPI worktree：`/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/openpi`
   - 冻结基线：`a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`
-  - 交付 commit：`cb861d3824a46d9c243be7ff69159bcec17a0ac7` (`Add opt-in selected-query policy diagnostics`)
+  - 原接口提交：`cb861d3824a46d9c243be7ff69159bcec17a0ac7`
+  - 本轮修复提交：`bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6` (`Preflight selected-query policy diagnostics`)
 - robot-bridge worktree：`/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge`
   - 冻结基线：`f9626636c4776d8eb15f9c556775cb2d12c000e5`
-  - 交付 commit：`a2c7f80b99556db2147c85ca9f625ffb840b276a` (`Persist selected-query diagnostic records`)
+  - 原接口提交：`a2c7f80b99556db2147c85ca9f625ffb840b276a`
+  - 本轮修复提交：`fa62a9febc8fab9098994d0cb8e1894a0590b7e8` (`Fix selected-query diagnostic lifecycle and bounds`)
 
-两个 worktree 均已在各自 `task/8968b7f5-74f7-44db-ad0b-058d3fd556ca` 分支干净提交。
+两个 worktree 均位于 `task/8968b7f5-74f7-44db-ad0b-058d3fd556ca`，本轮提交后工作树干净。
 
-## 实现范围
+## 修复内容
 
-OpenPI 的 `Policy.infer` 新增仅由
-`__openpi_diagnostic_context__` 启用的 sidecar；该字段在任何输入 transform 前移除，默认
-请求和响应不增加字段、不写文件。选中调用记录变换前输入、batched transform 后输入、
-`Observation.from_dict` 后传入 sampler 的输入（包括图像 uint8 到归一化 float 的变化）、
-完整 raw action chunk、output transform 后输出、显式 noise，以及 JAX split 前 key、实际
-sampling key 和 split 后 key。日志快照不额外 split RNG、生成 noise、调用 decoder 或改变
-transform；捕获失败会以 `capture_failed` sidecar 明示，保持动作和最终 RNG 路径不变。
+### execute 非 OK 后的生命周期
 
-`Pi0.sample_actions_with_key_state_details` 在不改变既有三值普通 wire 的情况下，提供选中
-诊断所需的 decoder selected IDs、实际用于 action condition 的 IDs 和真实 logits。J/T 的
-tail 记录为连续 `raw_joint_memory_coordinates_before_output_transform`，并显式注明不是
-classification logits；S 记录含 `-inf` padding 的真实 key-state logits、selected IDs 和
-action-condition IDs。数组 descriptor 提供 dtype/shape；通用 policy 无法如实声明物理单位时
-写为 `null`，RMBench scheduler 对最终 14 维 arms qpos target slice 另行声明单位约定。
+- Memory v1 record 只有在 trace 已 `accepted` 且已无下一次消费时才由 observation refresh 收口。controller 的 execute RPC 非 `ok` 后，`SchedulerBase.run_iteration()` 返回 retry 而不调用 `after_execute()`；该 record 会保持 active，`actual_k.value` 为 `null`，状态为 `not_yet_observed`。
+- 新的 `_discard_unaccepted_diagnostic_candidate()` 在下一次 stale `build_act_request`、terminal observation 或 reset 时显式写入 discard 原因并收口，不改变 retry、动作构造或 execute 行为。
+- legacy full-state candidate 在 policy response 到达时就关联 `diagnostic_record_id`，不再等待 `after_execute()`；因此 execute 拒绝后的 supersede、terminal 和 reset 都能更新同一 record。legacy/JT 未观测 actual K 仍写 `null`，不把旧 trace 初始化值 `0` 解释成执行零行。
+- CPU 回归保留真实 `SchedulerBase.run_iteration()` 的 controller execute-non-ok 路径，覆盖 Memory v1 和 legacy full-state 的 retry、supersede、terminal 与 reset。
 
-robot-bridge 新增窄的 schema v1 `QueryDiagnosticRecorder`，只接受严格的
-`params.diagnostic_trace` 配置。每个选中 query 写 strict-finite JSON 与 NPZ：数组、bytes
-和非有限浮点外置，JSON 引用包含 key/dtype/shape/nonfinite；校验器核对 SHA-256、JSON 文件名、
-`query.record_id` 与 NPZ 文件名的跨文件关联。首次 JSON/NPZ 发布使用同目录 hard-link，避免
-并发 recorder 覆盖另一方的初始证据；同一记录的有限 lifecycle 更新使用 atomic replacement。
-写入失败、数组上限、缺 policy response、sidecar link mismatch 都会留下显式状态或 recorder
-status，不中断 policy/scheduler 动作路径。
+### 采集与存储容量
 
-`OpenPiSimulationScheduler` 将选中 context 注入 policy request，关联 policy sidecar、output
-action chunk 与实际 `execute` request，并持续记录 cache、accepted/discarded/terminal、planned K、
-已消费的 memory rows 与有 controller execution-progress 支持的 actual K。S 的
-query-selected feedback 将旧 trace 的初始化 `actual_k=0` 规范为
-`not_recorded_for_query_selected_feedback` / `value: null`，不声称执行零行。benchmark runner
-把已接受 episode/seed 仅作为诊断构造参数传入 scheduler，未发起第二次 reset。
+- scheduler 在复制 scheduler input 前按 shape/dtype/nbytes 预检；超限时只写入小型有限的 `not_recorded_array_limit` record，不请求 Policy sidecar，也不创建 NPZ。
+- selection context 传递 `max_array_bytes` 和已保留的 scheduler 字节数。OpenPI 使用剩余预算，在每个诊断专用 host/device snapshot 前预检：三种 input view、显式 noise、raw actions、output-transform output、memory J/T/S evidence、RNG key、metadata 和 sampler kwargs。
+- Policy 超限时保留正常 input/transform/sampling/RNG 路径，只返回小型 `not_recorded_array_limit` sidecar。serial path 在 diagnostic sampler 尚未选中前超限时走既有 sampler，保持 logging-off 的 action 与 RNG 语义。
+- bridge 对 policy/scheduler/action-dispatch 全部计划保存的证据预检后才复制或 externalize；动作关联现在先传递同步引用给 recorder，避免在 cap 判定前额外复制 output action 或 execute request。
+- 真实 `Policy.infer → OpenPI msgpack → bridge codec → recorder` seam 使用 `1024×1024` RGB 图像和剩余 1 byte Policy 预算。sidecar 在 input preflight 即受限，packed response 小于 16 KiB，recorder 写有限 cap record、无 NPZ；普通 actions、state 和最终 JAX RNG 与 logging-off 一致。
 
-新增文档与入口：
+### P2 完整性与 checkpoint 身份边界
 
-- `docs/reference/query-diagnostic.md`
-- `scripts/query_diagnostic_dry_run.py`
-- `scripts/validate_query_diagnostic.py`
+- `recorded` 现在要求 schema-v1 complete sidecar、选中 context（含容量 envelope）匹配、policy/sampler identity、metadata、三种 input view 和 batching、有效 JAX/PyTorch RNG evidence、noise evidence、memory representation、raw/transform 后 actions、有限 timing，以及 scheduler action mapping 和 execute request。
+- recorder 对残缺 sidecar 写显式 `policy_sidecar_incomplete`；`validate_record()` 对手工改成 `recorded` 的残缺 JSON 也会拒绝。回归覆盖空 complete sidecar 和缺失 sampling-key data。
+- 每条 scheduler policy identity 都标明 `policy_dir`、runtime provenance 和可能的 step 只是位置或运行引用。接口不提供逐 query 权重内容哈希；正式诊断结论仍需关联独立核验的 run-level checkpoint manifest。没有权重内容哈希的 manifest 不可称为强内容身份。
+- 文档已更新 cap 范围、超限语义、同步 I/O 边界、完整性合同和 checkpoint 限制；synthetic dry-run fixture 已补足 P2 必需 evidence。
 
 ## CPU 验证
 
-以下命令均在对应独立 worktree 完成，未启动 GPU rollout、训练、评测、部署或真机/仿真控制。
+以下均为 CPU-only 命令；未启动 GPU rollout、训练、正式评测、部署、仿真控制或真机控制。
 
 ```bash
-# openpi
-JAX_PLATFORMS=cpu .venv/bin/pytest -q \
-  src/openpi/policies/policy_diagnostic_test.py \
-  src/openpi/training/memory_data_test.py \
-  src/openpi/models/pi0_memory_test.py
-# 16 passed
+# OpenPI worktree
+JAX_PLATFORMS=cpu .venv/bin/python -m pytest \
+  src/openpi/policies/policy_diagnostic_test.py -q
+# 6 passed
 
 .venv/bin/ruff check src/openpi/policies/policy.py \
-  src/openpi/policies/policy_diagnostic_test.py src/openpi/models/pi0.py
-.venv/bin/python -m compileall -q src/openpi/policies/policy.py \
-  src/openpi/policies/policy_diagnostic_test.py src/openpi/models/pi0.py
-.venv/bin/python scripts/worktree_env_smoke.py
-# 均通过
+  src/openpi/policies/policy_diagnostic_test.py
+.venv/bin/ruff format --check src/openpi/policies/policy.py \
+  src/openpi/policies/policy_diagnostic_test.py
+.venv/bin/python -m py_compile src/openpi/policies/policy.py \
+  src/openpi/policies/policy_diagnostic_test.py
+# all passed
 ```
 
 ```bash
-# robot-bridge
-PYTHONPATH=/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/openpi/packages/openpi-client/src \
-  .venv/bin/pytest -q \
-  tests/scheduler/test_query_diagnostic.py \
-  tests/scheduler/test_openpi_simulation.py \
-  tests/scheduler/test_memory_v1_schedulers.py \
-  tests/scheduler/test_memory_context.py \
-  tests/scripts/test_run_scheduler.py \
-  tests/benchmark/test_runner.py
-# 66 passed
+# Run from the OpenPI worktree with bridge source on PYTHONPATH
+JAX_PLATFORMS=cpu \
+PYTHONPATH=/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge \
+.venv/bin/python -m pytest \
+  /mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge/tests/scheduler/test_query_diagnostic.py \
+  /mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge/tests/scheduler/test_openpi_simulation.py -q
+# 35 passed
 
-.venv/bin/ruff check --ignore EXE001 \
-  robot_bridge/scheduler/query_diagnostic.py \
+# robot-bridge worktree
+.venv/bin/ruff check robot_bridge/scheduler/query_diagnostic.py \
   robot_bridge/scheduler/openpi_simulation.py \
-  robot_bridge/scheduler/memory_context.py robot_bridge/benchmark/runner.py \
-  scripts/run_scheduler.py scripts/query_diagnostic_dry_run.py \
-  scripts/validate_query_diagnostic.py tests/scheduler/test_query_diagnostic.py \
-  tests/scripts/test_run_scheduler.py tests/benchmark/test_runner.py
-.venv/bin/python -m compileall -q robot_bridge/scheduler/query_diagnostic.py \
-  robot_bridge/scheduler/openpi_simulation.py robot_bridge/scheduler/memory_context.py \
-  robot_bridge/benchmark/runner.py scripts/run_scheduler.py \
-  scripts/query_diagnostic_dry_run.py scripts/validate_query_diagnostic.py
-.venv/bin/python scripts/worktree_env_smoke.py
-# 均通过；EXE001 仅忽略已有 run_scheduler.py shebang 非 executable mode
+  tests/scheduler/test_query_diagnostic.py scripts/query_diagnostic_dry_run.py
+.venv/bin/ruff format --check robot_bridge/scheduler/query_diagnostic.py \
+  robot_bridge/scheduler/openpi_simulation.py \
+  tests/scheduler/test_query_diagnostic.py scripts/query_diagnostic_dry_run.py
+.venv/bin/python -m py_compile robot_bridge/scheduler/query_diagnostic.py \
+  robot_bridge/scheduler/openpi_simulation.py \
+  tests/scheduler/test_query_diagnostic.py scripts/query_diagnostic_dry_run.py
+# all passed
 ```
 
-额外完成 OpenPI msgpack 与 bridge transport codec 的含 `-inf` logits round trip；结果通过。
-新鲜 CPU dry-run 写入并校验了一条合成 S 记录，返回 `status=recorded`、`array_count=15`；
-临时目录已删除：
-
 ```bash
+OUT="$(mktemp -d /tmp/query-diagnostic.XXXXXX)"
 .venv/bin/python scripts/query_diagnostic_dry_run.py --directory "$OUT"
 .venv/bin/python scripts/validate_query_diagnostic.py "$OUT"/records/*.json
+# status=recorded, array_count=17
 ```
 
-Policy 测试保留真实 Policy transform、batch、RNG split 与 output-transform 调用链，覆盖默认关闭、
-J/T、S、显式 noise、`-inf`、image canonicalization 和 capture-failure 不干扰。Bridge 测试覆盖
-多 query、严格 JSON/NPZ、hash/link、array cap、写失败、初始发布 race 不覆盖、J/T progress、S
-unknown actual K，以及 runner identity 不触发 reset。
+dry-run 目录已删除。两个 worktree 的 `git diff --check` 也通过。
 
-## 存储、时间与 I/O 边界
+`tests/scheduler/test_openpi_memory_transform_contract.py` 仍有 4 个既有失败：
+`openpi/transforms.py:246` 的 `ValueError: output array is read-only`。该失败已在 reviewer 的干净
+`cb861d3` OpenPI source 上复现，早于本轮诊断修改；本轮未改动该 transform 路径。
 
-默认完全关闭。开启后必须显式选择 episode/query；`max_records` 默认 16、最大 64，
-`max_array_bytes` 每条默认 64 MiB、最大 512 MiB。未压缩数组上界因此默认 1 GiB、极限 32 GiB；
-NPZ 压缩、JSON 和文件系统开销不计入此界限。已存在的同名 evidence 不会被新 recorder 覆盖。
+## 存储、时间与未验证边界
 
-`model_infer_ms` 只覆盖 policy sampling；`diagnostic_capture_ms` 单独覆盖 sidecar snapshot/
-构造，scheduler status 单独暴露最近 JSON、NPZ 与总写入耗时。选中 JSON/NPZ 是 policy response
-后、execute dispatch 前的同步 I/O，会增加该次 dispatch 延迟；默认路径不执行这些操作。JAX
-设备执行可能异步，因此 wall/monotonic、本地 infer timing 和写入 timing 只描述本地编排，不能
-解释为 kernel、controller 或物理动作完成时刻。
+默认关闭。开启时 `max_records` 默认 16、最大 64；`max_array_bytes` 每条默认 64 MiB、最大
+512 MiB。上限只计算诊断专用快照的未压缩 array nbytes；重复证据按每次保存计数，有限 JSON
+metadata、NPZ/msgpack 容器开销以及普通 policy RPC input transport 不计入该数字。超限记录明确
+incomplete，不带 NPZ。
 
-记录止于 policy output transform 和 scheduler 形成的 `execute` request。未记录或验证
-controller 内部排队、TOPP path、底层 SDK 命令、物理 tick、相机采集内部状态，也不证明启用记录
-与关闭记录的物理实时轨迹逐时刻完全等价。
-
-## 后续最小 GPU smoke（需 Manager 另行批准）
-
-1. 在冻结 checkpoint 与本次两个 commit 上准备专用 scheduler YAML，使用空的诊断目录，选择一个
-   accepted episode、`query_ids: [1]`、`max_records: 1` 和 64 MiB cap。
-2. 只运行一个受控 simulation query，不开展正式评测；保存 scheduler status 和 record/NPZ，执行
-   `scripts/validate_query_diagnostic.py`。
-3. 对 policy 层使用相同输入、初始 key 和显式 noise 做 logging off/on 配对检查，比较 actions、
-   state 与最终 RNG；再检查 scheduler record 的 checkpoint/source identity、episode/seed/query、
-   J/T 或 S evidence 与 execute slice。
-4. 单独报告 I/O 延迟，不把该 smoke 外推为 controller/TOPP/physical-tick 的验证或正式实验结果。
+选中 JSON/NPZ 写入仍在 policy response 后、execute dispatch 前同步进行，可能增加该 query 的
+本地 dispatch 延迟。JAX 设备异步和 controller 内部队列、TOPP、SDK、物理 tick、相机内部状态均未由
+此 CPU 修复验证。未进行 GPU smoke；是否准入仍由 Manager 和复审决定。
