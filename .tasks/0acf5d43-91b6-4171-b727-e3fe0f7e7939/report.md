@@ -50,7 +50,7 @@ receipt 的 artifact writer 尝试并成功写入全部 9 个预期 pickle。实
 
 本次实际时长约 74 秒，结束后才尝试依据先前等待记录登记 MAM job；`mam job add` 复查 PID 时已发现它停止，因而拒绝创建 job。没有本次运行可归档的 job，也没有触碰任何其他进程。
 
-## 最新修订（2026-09-14；同实例 probe 副作用检查仍仅 CPU 准备）
+## 上一修订（执行前 CPU 准备；2026-09-14）
 
 已修复 Manager 复核指出的两处 CPU 控制缺口；**没有**以 `--execute` 运行检查，没有构造真实 `OpenPiBackend`、加载 checkpoint/model/GPU、发送 sampler request、环境 reset、仿真轨迹或 formal。历史正常 action 诊断预算仍为 **8/8**，本节未改变其记账或结论。
 
@@ -64,7 +64,7 @@ receipt 的 artifact writer 尝试并成功写入全部 9 个预期 pickle。实
 
 本节交付后等待 Manager 验收和未来明确 GPU 授权；不能据 CPU seam pass、plan 或源码审计把 probe 副作用检查写成 PASS，更不能解冻 HF/matching/formal。
 
-## 最新状态（2026-09-14；覆盖下方历史样本预算）
+## 此前状态（2026-09-14；覆盖下方历史样本预算）
 
 已完成 Manager 授权的 `put_back_block` / train seed 0 / env seed `100000` 修正来源路径 matched shadow：它只发出 **1** 次正常 action request，并以预期的诊断截停 `exit 70` 结束。收据确认唯一 accepted reset 为 episode 0 / seed `100000`，恰有一次 `infer_audited` 与一次 execute；原 iteration 后 clear，非 drain status 为 `queued=30`、`dropped=30`、`logical_step=0`。没有第二 query、episode、replay、warmup 或 probe。
 
