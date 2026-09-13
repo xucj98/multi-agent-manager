@@ -90,7 +90,7 @@ N 的正式 root 为：
 | swap S | 6 | 2646145 | `cb3e5246-fa74-40df-8325-0431f9587f73` | `pi05_rmbench_swap_blocks_serial_lag30` |
 | cover S | 7 | 2646146 | `081f64c5-ae21-4062-b7ea-1dd281ddaa1f` | `pi05_rmbench_cover_blocks_serial_lag30` |
 
-下一项运行验收为每条 step-100 的有限 loss、GPU占用、日志和 receipt；20k 完成后再按 task 合同做最终参数/metadata/shape/BF16/finite 与 checkpoint-only 恢复，随后归档对应 MAM job。
+五条正式 run 的 step-100 有限指标、GPU 占用、日志和 receipt 已验收，详见下节；20k 完成后再按 task 合同做最终参数/metadata/shape/BF16/finite 与 checkpoint-only 恢复，随后归档对应 MAM job。
 
 
 ## J/S：正式训练 step 100 回执
