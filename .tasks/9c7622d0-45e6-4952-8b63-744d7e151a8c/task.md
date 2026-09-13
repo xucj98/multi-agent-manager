@@ -426,6 +426,6 @@ baseline scheduler receipt SHA-256 为 `f56e3438c911ce76232b9e69b0928b3860f2df8d
 
 核查两项，精简给源码位置与明确限制：
 1. random_light=false、crazy_random_light_rate=0 下，rmbench_sim_worker 的 get_obs→env.get_obs→camera helper 是否仍有 physics scene.step、环境 NumPy/Python RNG 消耗、任务状态变化？Manager 已读 worker 的 deque 和 _base_task.get_obs/take_action；你补查相机调用内部及 reset/get_obs 关联。不要从源码静态检查声称数值或完整轨迹等价。
-2. 既有 hf_engineering 工具/manifest 如何仅执行 r_s30、J HF-fixed、J HF-event 各两任务每模式两集的工程轨迹（eval0 seeds100000/100001，H50 K30，fixed/event interval5）？辨别哪些命令会自动再跑 baseline/shadow 或 formal，哪些 acceptance gate 依赖历史跨进程动作 bitwise 等价。列出可直接采用的已有命令、配置和必要的最小任务私有 runner 方案；不得修改 gate/把历史失败改PASS。只读检查，无执行授权。
+2. 既有 hf_engineering 工具/manifest 如何仅执行现有 rearrange r_s30 两集、J HF-fixed 和 J HF-event 各两任务每模式两集的工程轨迹（eval0 seeds100000/100001，H50 K30，fixed/event interval5）？辨别哪些命令会自动再跑 baseline/shadow 或 formal，哪些 acceptance gate 依赖历史跨进程动作 bitwise 等价。列出可直接采用的已有命令、配置和必要的最小任务私有 runner 方案；不得修改 gate/把历史失败改PASS。只读检查，无执行授权。
 
-Manager 将单独发布最多12 episode attempts的工程阶段；此阶段成功率不能用来调参/改任务，也不是formal准入。本审阅交付具体阻碍及最小核验建议，不扩展成新框架或新一轮全库回归。写 report.md 并 mam task publish --file report，结束 turn。
+Manager 将单独发布最多10 episode attempts（现有5个profile；不新增put-back r_s30）的工程阶段；此阶段成功率不能用来调参/改任务，也不是formal准入。本审阅交付具体阻碍及最小核验建议，不扩展成新框架或新一轮全库回归。写 report.md 并 mam task publish --file report，结束 turn。
