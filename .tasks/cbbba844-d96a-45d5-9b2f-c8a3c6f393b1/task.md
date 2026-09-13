@@ -40,3 +40,5 @@ Manager 01a09657-e0f3-7352-b726-aba5bbd5d498 将用 mam task rebind 将本任务
 
 ## 用户批准新计划与本次收尾（2026-09-13 09:35 CST）
 用户已批准/root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN.zh-CN.md实施。Manager实查wuwen-1八卡均空闲；MAM六条U均stopped，但turn/start被Codex拒绝：direct app-server input is not allowed for multi-agent v2 sub-agents。因此使用当前collaboration followup手动唤醒你。优先验收六条最终20k：完整性、元数据、BF16/finite、checkpoint-only恢复，按原验收脚本复用；本机GPU1/7可在启动前确认空闲后用于顺序恢复，不占wuwen-1（已全部分配新覆盖训练）。验收每项后归档对应job，汇总可评manifest与失败原因，发布report及时通知Manager/evaluation_owner。不要重训既有U，不要占新八卡。此项是补收尾不是新seed扩张。
+## 服务器断连后恢复：仅完成交付收尾
+用户要求恢复受影响执行者。Manager断连前已验收全部6个20k checkpoint、恢复证据及manifest SHA256 681cc5aad845bc6863bb5bc9af0b0d59a60a3fbebfef90b7c2af479554d56e5b；六个job均已归档，eval已交e6908de7。**不要重训、重复GPU恢复或重复开评测。** 本次恢复仅核对交付记录/manifest可访问并补归档准备：报告原workspace有哪些必须保留的独有证据、代码commit、临时物，确认下游已能使用。原训练6266bd8与日志必须可追溯，不自行删worktree/branch/产物。当前新计划入口为/root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN.zh-CN.md，旧日期计划已移除。发布最终精简报告后正常结束，由Manager决定task归档。
