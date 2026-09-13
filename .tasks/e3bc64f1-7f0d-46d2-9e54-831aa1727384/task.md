@@ -22,3 +22,6 @@ Manager直接核对已转换key_state_config：cover phase有6类，red/green/bl
 
 ## Manager N代码准入与缓存复核（2026-09-13 10:10 CST）
 Manager已审核867aa05e428d6ce259fba99f55def3b5b4fce951完整N diff并通过diff-check；直接逐集核对三套共150episode sidecar与原Parquet action[:14]逐值完全一致、M+1尾重复、finite及total_frames=29920/32626/50904，N代码准入。补默认缓存/norm/真实batch证据后可直接每新路径50step save/restore gate；各项通过后逐项正式20k，不用再次等待代码审批。正式step100/GPU/日志/MAMjob receipt必须回报。N冻结执行tree保持不动，J/S在开发tree继续。Manager已独立SSH核对用户要求的/root/.cache软链及三套默认路径metadata可见；全部后续命令去除HF_LEROBOT_HOME override。
+
+## Manager stats-only准入补充（2026-09-13）
+Manager逐行审核移除camera_keys、同步MemoryLeRobotDataset.hf_dataset、adapter前dummy视觉注入。补每任务固定索引原始/优化路径至少一个batch的state/action逐值一致，以及2-worker行为，通过后commit到干净独立stats执行tree，保持N冻结树不变。norm保留原seed/sampler/实际9984行合同，产物验收后继续已授权的smoke→正式，不再等第二轮代码审批。
