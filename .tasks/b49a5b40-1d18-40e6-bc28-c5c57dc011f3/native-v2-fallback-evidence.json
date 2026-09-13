@@ -1,0 +1,582 @@
+{
+  "kind": "manager-native-v2-fallback-live-acceptance",
+  "status": "passed",
+  "fixture_root": "/mnt/public/xcj/Projects/.native-v2-fallback-fixture-20260913T1116Z",
+  "source_commit": "3f2738abcfc9cbe50b25222562fc58b2bac0a7ff",
+  "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+  "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+  "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631",
+  "job": "e85234e2-e078-494b-82b1-7c37d6722d61",
+  "manager_received_exact_message": true,
+  "child_final_response_error": "503 provider CPU overloaded after successful job archive and receipt; actual artifacts independently verified",
+  "checks": {
+    "true_native_rejection_once": true,
+    "manager_active_not_interrupted": true,
+    "restart_deduplicated": true,
+    "actual_idle_root_delivery_once": true,
+    "same_child_native_archive": true,
+    "events_resolved_in_history": true,
+    "source_identity_clean_before_after": true,
+    "fixture_service_stopped": true,
+    "fixture_task_job_archived": true
+  },
+  "receipts": {
+    "archived.json": {
+      "sha256": "d18f5e11ac7fd61ba6b7884aa16e0e5219d522f38eadc8d713e4db286477aa12",
+      "content": {
+        "checked_at": "2026-09-13T11:22:14+00:00",
+        "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+        "escalation_accepted_at": "2026-09-13T11:19:41+00:00",
+        "escalation_action": "use_native_followup_task",
+        "escalation_attempts": 1,
+        "escalation_delivery": "accepted",
+        "escalation_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+        "escalation_history_resolution": "condition changed or resolved",
+        "escalation_signature": "18aa34ffb176cbe5b69421b3376ba22bd0809af961f9c25b73d005ce07d428e8",
+        "escalation_source_event": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+        "job": "e85234e2-e078-494b-82b1-7c37d6722d61",
+        "job_archive_note": "native-v2 fallback fixture handled",
+        "job_archived_at": "2026-09-13T11:20:38+00:00",
+        "job_status": "archived",
+        "kind": "native-v2-fallback-checkpoint",
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "phase": "archived",
+        "source_attempts": 1,
+        "source_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+        "source_history_resolution": "condition changed or resolved",
+        "source_signature": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+        "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631",
+        "task_status": "working"
+      }
+    },
+    "blocked.json": {
+      "sha256": "fbffd7ae2c1863d9f286d9e796860aa52503666eb117143c266a192aa7374ccf",
+      "content": {
+        "checked_at": "2026-09-13T11:17:34+00:00",
+        "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+        "escalation_accepted_at": null,
+        "escalation_action": "use_native_followup_task",
+        "escalation_attempts": 0,
+        "escalation_delivery": "pending",
+        "escalation_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+        "escalation_signature": "18aa34ffb176cbe5b69421b3376ba22bd0809af961f9c25b73d005ce07d428e8",
+        "escalation_source_event": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+        "job": "e85234e2-e078-494b-82b1-7c37d6722d61",
+        "kind": "native-v2-fallback-checkpoint",
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "phase": "blocked",
+        "service_cycles": 11,
+        "service_identity": {
+          "boot_id": "12b43f59-23b6-4c80-af48-148de198cb3d",
+          "host": "local",
+          "start_ticks": 54697730,
+          "started_at": "2026-09-13T11:15:53Z"
+        },
+        "service_pid": 1020925,
+        "source_attempts": 1,
+        "source_block_kind": "unsupported_multi_agent_v2_direct_input",
+        "source_delivery": "blocked",
+        "source_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+        "source_failure_kind": "unsupported_multi_agent_v2_direct_input",
+        "source_next_attempt_at": null,
+        "source_signature": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+        "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631",
+        "turn_start_attempts": 1
+      }
+    },
+    "child-archive.json": {
+      "sha256": "d284e0ba1c7c82dd9271e256e9f5173212d919eefa109f2cc89dcb5a396fb282",
+      "content": {
+        "attestation": "child received collaboration.followup_task and ran mam job archive e85234e2-e078-494b-82b1-7c37d6722d61 --note 'native-v2 fallback fixture handled' for TASK-ID eda0b0e4-d0b8-4439-a418-2bc56610d631",
+        "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+        "job": "e85234e2-e078-494b-82b1-7c37d6722d61",
+        "job_archive_note": "native-v2 fallback fixture handled",
+        "job_archived_at": "2026-09-13T11:20:38+00:00",
+        "job_status": "archived",
+        "kind": "native-v2-fallback-child-archive",
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "recorded_at": "2026-09-13T11:20:38+00:00",
+        "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631"
+      }
+    },
+    "child-registration.json": {
+      "sha256": "ac0b1e02cf79577845758c9e4fa159d8ab4d836ac4482c2dd573b1a8002dbd83",
+      "content": {
+        "child": {
+          "command": [
+            "sleep",
+            "90"
+          ],
+          "detached": true,
+          "host": "localhost",
+          "pid": 1020130
+        },
+        "command": [
+          "sleep",
+          "90"
+        ],
+        "controlled_cli": [
+          "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/.venv/bin/python",
+          "-I",
+          "-c",
+          "from multi_agent_manager.cli import main; raise SystemExit(main())"
+        ],
+        "host": "localhost",
+        "job_add": {
+          "archive": null,
+          "checked_at": "2026-09-13T11:15:25.890684Z",
+          "host": "localhost",
+          "id": "e85234e2-e078-494b-82b1-7c37d6722d61",
+          "identity": {
+            "boot_id": "12b43f59-23b6-4c80-af48-148de198cb3d",
+            "host": "localhost",
+            "start_ticks": 54694923,
+            "started_at": "2026-09-13T11:15:25Z"
+          },
+          "note": "native-v2 fallback isolated sleep fixture",
+          "pid": 1020130,
+          "probe": {
+            "checked_at": "2026-09-13T11:15:25.890684Z",
+            "error": null,
+            "identity": {
+              "boot_id": "12b43f59-23b6-4c80-af48-148de198cb3d",
+              "host": "localhost",
+              "start_ticks": 54694923,
+              "started_at": "2026-09-13T11:15:25Z"
+            },
+            "status": "running"
+          },
+          "started_at": "2026-09-13T11:15:25Z",
+          "status": "running",
+          "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631"
+        },
+        "job_id": "e85234e2-e078-494b-82b1-7c37d6722d61",
+        "pid": 1020130,
+        "task_id": "eda0b0e4-d0b8-4439-a418-2bc56610d631"
+      }
+    },
+    "delegation.json": {
+      "sha256": "54956f856d081569e167a79a0f1781bd872ad08b3add3009130ea36126c7306e",
+      "content": {
+        "attestation": "root used collaboration.followup_task to delegate only the fixture job",
+        "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+        "kind": "native-v2-fallback-delegation",
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "recorded_at": "2026-09-13T11:14:41+00:00",
+        "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631"
+      }
+    },
+    "delivered.json": {
+      "sha256": "6e9352d7fedde0dc56ee602009f079b858b7352b0b5b81f8705dcb951884acb6",
+      "content": {
+        "checked_at": "2026-09-13T11:19:54+00:00",
+        "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+        "escalation_accepted_at": "2026-09-13T11:19:41+00:00",
+        "escalation_action": "use_native_followup_task",
+        "escalation_attempts": 1,
+        "escalation_delivery": "accepted",
+        "escalation_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+        "escalation_signature": "18aa34ffb176cbe5b69421b3376ba22bd0809af961f9c25b73d005ce07d428e8",
+        "escalation_source_event": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+        "job": "e85234e2-e078-494b-82b1-7c37d6722d61",
+        "kind": "native-v2-fallback-checkpoint",
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "manager_attestation": "[MAM Message] TASK-ID eda0b0e4-d0b8-4439-a418-2bc56610d631 JOB-ID e85234e2-e078-494b-82b1-7c37d6722d61 ERROR: App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents received in the new idle-root turn",
+        "phase": "delivered",
+        "service_cycles": 25,
+        "service_identity": {
+          "boot_id": "12b43f59-23b6-4c80-af48-148de198cb3d",
+          "host": "local",
+          "start_ticks": 54710430,
+          "started_at": "2026-09-13T11:18:00Z"
+        },
+        "service_pid": 1022968,
+        "source_attempts": 1,
+        "source_block_kind": "unsupported_multi_agent_v2_direct_input",
+        "source_delivery": "blocked",
+        "source_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+        "source_failure_kind": "unsupported_multi_agent_v2_direct_input",
+        "source_next_attempt_at": null,
+        "source_signature": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+        "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631",
+        "turn_start_attempts": 2
+      }
+    },
+    "prepare.json": {
+      "sha256": "7bce28875c0d3fd439ce3c0baa4b864cac6c5383da4200829f755cc5d6674524",
+      "content": {
+        "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+        "fixture_git_dir": "/mnt/public/xcj/Projects/.native-v2-fallback-fixture-20260913T1116Z/state/.git",
+        "fixture_git_toplevel": "/mnt/public/xcj/Projects/.native-v2-fallback-fixture-20260913T1116Z/state",
+        "kind": "native-v2-fallback-prepare",
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "not_done": [
+          "no MAM task",
+          "no scheduler",
+          "no App Server connection",
+          "no Codex thread or follow-up"
+        ],
+        "prepared_at": "2026-09-13T11:13:52+00:00",
+        "root": "/mnt/public/xcj/Projects/.native-v2-fallback-fixture-20260913T1116Z",
+        "side_effects": [
+          "new isolated fixture directory",
+          "new isolated fixture Git state",
+          "new fixture project config"
+        ],
+        "source_clean": true,
+        "source_cli": [
+          "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/.venv/bin/python",
+          "-I",
+          "-c",
+          "from multi_agent_manager.cli import main; raise SystemExit(main())"
+        ],
+        "source_commit": "3f2738abcfc9cbe50b25222562fc58b2bac0a7ff",
+        "source_git_status": "",
+        "source_git_toplevel": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager",
+        "source_modules": {
+          "multi_agent_manager": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/multi_agent_manager/__init__.py",
+          "multi_agent_manager.cli": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/multi_agent_manager/cli.py",
+          "multi_agent_manager.wake_runtime": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/multi_agent_manager/wake_runtime.py"
+        },
+        "source_python": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/.venv/bin/python",
+        "source_python_resolved": "/mnt/public/xcj/cache/shared-python/cpython-3.10.19-linux-x86_64-gnu/bin/python3.10",
+        "source_root": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager"
+      }
+    },
+    "restarted.json": {
+      "sha256": "c8c2fea5dd8804f92495416a05170af78b2984b88901f69c34fe3dec3b06a8ba",
+      "content": {
+        "blocked_checkpoint": {
+          "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+          "escalation_accepted_at": null,
+          "escalation_action": "use_native_followup_task",
+          "escalation_attempts": 0,
+          "escalation_delivery": "pending",
+          "escalation_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+          "escalation_signature": "18aa34ffb176cbe5b69421b3376ba22bd0809af961f9c25b73d005ce07d428e8",
+          "escalation_source_event": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+          "job": "e85234e2-e078-494b-82b1-7c37d6722d61",
+          "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+          "service_cycles": 11,
+          "service_identity": {
+            "boot_id": "12b43f59-23b6-4c80-af48-148de198cb3d",
+            "host": "local",
+            "start_ticks": 54697730,
+            "started_at": "2026-09-13T11:15:53Z"
+          },
+          "service_pid": 1020925,
+          "source_attempts": 1,
+          "source_block_kind": "unsupported_multi_agent_v2_direct_input",
+          "source_delivery": "blocked",
+          "source_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+          "source_failure_kind": "unsupported_multi_agent_v2_direct_input",
+          "source_next_attempt_at": null,
+          "source_signature": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+          "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631",
+          "turn_start_attempts": 1
+        },
+        "checked_at": "2026-09-13T11:18:33+00:00",
+        "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+        "escalation_accepted_at": null,
+        "escalation_action": "use_native_followup_task",
+        "escalation_attempts": 0,
+        "escalation_delivery": "pending",
+        "escalation_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+        "escalation_signature": "18aa34ffb176cbe5b69421b3376ba22bd0809af961f9c25b73d005ce07d428e8",
+        "escalation_source_event": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+        "job": "e85234e2-e078-494b-82b1-7c37d6722d61",
+        "kind": "native-v2-fallback-checkpoint",
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "phase": "restarted",
+        "service_cycles": 17,
+        "service_identity": {
+          "boot_id": "12b43f59-23b6-4c80-af48-148de198cb3d",
+          "host": "local",
+          "start_ticks": 54710430,
+          "started_at": "2026-09-13T11:18:00Z"
+        },
+        "service_pid": 1022968,
+        "source_attempts": 1,
+        "source_block_kind": "unsupported_multi_agent_v2_direct_input",
+        "source_delivery": "blocked",
+        "source_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+        "source_failure_kind": "unsupported_multi_agent_v2_direct_input",
+        "source_next_attempt_at": null,
+        "source_signature": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+        "stopped_checkpoint": {
+          "service_cycles": 13,
+          "service_identity": {
+            "boot_id": "12b43f59-23b6-4c80-af48-148de198cb3d",
+            "host": "local",
+            "start_ticks": 54697730,
+            "started_at": "2026-09-13T11:15:53Z"
+          },
+          "service_pid": 1020925,
+          "service_status": {
+            "counters": {
+              "accepted": 0,
+              "cycles": 13,
+              "observed": 7,
+              "queued": 2,
+              "turn_start_attempts": 1
+            },
+            "healthy": false,
+            "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+            "mode": "disabled",
+            "running": false,
+            "status": "disabled"
+          },
+          "turn_start_attempts": 1
+        },
+        "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631",
+        "turn_start_attempts": 1
+      }
+    },
+    "service-final-status.json": {
+      "sha256": "85844f45b6cb66fa6a3cc1f74fdf8696238a46ead8731dbb192f55f0526d6dba",
+      "content": {
+        "status": "disabled",
+        "running": false,
+        "healthy": false,
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "mode": "disabled",
+        "pending": {
+          "count": 0,
+          "events": []
+        },
+        "counters": {
+          "accepted": 1,
+          "cycles": 42,
+          "observed": 39,
+          "queued": 2,
+          "turn_start_attempts": 2
+        },
+        "heartbeat_at": "2026-09-13T11:22:41+00:00",
+        "ready_at": "2026-09-13T11:18:00+00:00",
+        "error": "service process is no longer running",
+        "diagnostics": [
+          {
+            "kind": "unknown_executor",
+            "message": "executor 01a096ab-e5f3-7672-8ff3-36328d3fcfb7 is systemError",
+            "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631"
+          }
+        ]
+      }
+    },
+    "service-stopped-status.json": {
+      "sha256": "0d88eea1533846ae3ab78314a941b35c7558126223fc6735ddfa8a5cac8f7263",
+      "content": {
+        "status": "disabled",
+        "running": false,
+        "healthy": false,
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "mode": "disabled",
+        "pending": {
+          "count": 2,
+          "events": [
+            {
+              "accepted_at": null,
+              "action": "use_native_followup_task",
+              "attempts": 0,
+              "created_at": "2026-09-13T11:17:34+00:00",
+              "delivery": "pending",
+              "error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+              "executor": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+              "job": "e85234e2-e078-494b-82b1-7c37d6722d61",
+              "kind": "manager_native_followup",
+              "last_error": null,
+              "last_observed_at": "2026-09-13T11:17:54+00:00",
+              "last_recipient_state": "active",
+              "next_attempt_at": 0.0,
+              "note": "native-v2 fallback isolated sleep fixture",
+              "observed_count": 3,
+              "recipient": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+              "source_event": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+              "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631",
+              "task_title": "native-v2 fallback isolated acceptance"
+            },
+            {
+              "accepted_at": null,
+              "attempts": 1,
+              "before_turn_id": "01a09a79-d543-7141-aca0-884311b45fda",
+              "before_turn_observed": true,
+              "before_turn_status": "completed",
+              "block_kind": "unsupported_multi_agent_v2_direct_input",
+              "blocked_at": "2026-09-13T11:17:24+00:00",
+              "created_at": "2026-09-13T11:17:24+00:00",
+              "delivery": "blocked",
+              "executor": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+              "failure_kind": "unsupported_multi_agent_v2_direct_input",
+              "job": "e85234e2-e078-494b-82b1-7c37d6722d61",
+              "kind": "job_stopped",
+              "last_attempt_at": "2026-09-13T11:17:24+00:00",
+              "last_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+              "last_observed_at": "2026-09-13T11:17:54+00:00",
+              "next_attempt_at": null,
+              "note": "native-v2 fallback isolated sleep fixture",
+              "observed_count": 4,
+              "recipient": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+              "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631",
+              "task_title": "native-v2 fallback isolated acceptance"
+            }
+          ]
+        },
+        "counters": {
+          "accepted": 0,
+          "cycles": 13,
+          "observed": 7,
+          "queued": 2,
+          "turn_start_attempts": 1
+        },
+        "heartbeat_at": "2026-09-13T11:17:54+00:00",
+        "ready_at": "2026-09-13T11:15:53+00:00",
+        "error": "service process is no longer running",
+        "diagnostics": [
+          {
+            "kind": "native_v2_wake_blocked",
+            "message": "direct input to executor 01a096ab-e5f3-7672-8ff3-36328d3fcfb7 was explicitly rejected for JOB-ID e85234e2-e078-494b-82b1-7c37d6722d61; Manager native follow-up is required",
+            "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631"
+          }
+        ]
+      }
+    },
+    "source-after-stop.json": {
+      "sha256": "961519e5a8a5f9cc5b42dd50af03077454c83b146c2125e3d9f51b5f11d07275",
+      "content": {
+        "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+        "kind": "native-v2-fallback-source-verification",
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "phase": "after-stop",
+        "prepare_receipt": "prepare.json",
+        "root": "/mnt/public/xcj/Projects/.native-v2-fallback-fixture-20260913T1116Z",
+        "source_clean": true,
+        "source_cli": [
+          "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/.venv/bin/python",
+          "-I",
+          "-c",
+          "from multi_agent_manager.cli import main; raise SystemExit(main())"
+        ],
+        "source_commit": "3f2738abcfc9cbe50b25222562fc58b2bac0a7ff",
+        "source_git_status": "",
+        "source_git_toplevel": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager",
+        "source_modules": {
+          "multi_agent_manager": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/multi_agent_manager/__init__.py",
+          "multi_agent_manager.cli": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/multi_agent_manager/cli.py",
+          "multi_agent_manager.wake_runtime": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/multi_agent_manager/wake_runtime.py"
+        },
+        "source_python": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/.venv/bin/python",
+        "source_python_resolved": "/mnt/public/xcj/cache/shared-python/cpython-3.10.19-linux-x86_64-gnu/bin/python3.10",
+        "source_root": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager",
+        "verified_at": "2026-09-13T11:22:45+00:00"
+      }
+    },
+    "source-before-start.json": {
+      "sha256": "04337e3328432018e06ea48bd01c3053463a30dc936adf7f0adf00de430e9bf5",
+      "content": {
+        "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+        "kind": "native-v2-fallback-source-verification",
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "phase": "before-start",
+        "prepare_receipt": "prepare.json",
+        "root": "/mnt/public/xcj/Projects/.native-v2-fallback-fixture-20260913T1116Z",
+        "source_clean": true,
+        "source_cli": [
+          "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/.venv/bin/python",
+          "-I",
+          "-c",
+          "from multi_agent_manager.cli import main; raise SystemExit(main())"
+        ],
+        "source_commit": "3f2738abcfc9cbe50b25222562fc58b2bac0a7ff",
+        "source_git_status": "",
+        "source_git_toplevel": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager",
+        "source_modules": {
+          "multi_agent_manager": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/multi_agent_manager/__init__.py",
+          "multi_agent_manager.cli": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/multi_agent_manager/cli.py",
+          "multi_agent_manager.wake_runtime": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/multi_agent_manager/wake_runtime.py"
+        },
+        "source_python": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager/.venv/bin/python",
+        "source_python_resolved": "/mnt/public/xcj/cache/shared-python/cpython-3.10.19-linux-x86_64-gnu/bin/python3.10",
+        "source_root": "/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager",
+        "verified_at": "2026-09-13T11:15:47+00:00"
+      }
+    },
+    "stopped.json": {
+      "sha256": "2e8e6075843c576036af17968e92f8a9ba8150810e98f32a48c6228c904e9a41",
+      "content": {
+        "blocked_checkpoint": {
+          "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+          "escalation_accepted_at": null,
+          "escalation_action": "use_native_followup_task",
+          "escalation_attempts": 0,
+          "escalation_delivery": "pending",
+          "escalation_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+          "escalation_signature": "18aa34ffb176cbe5b69421b3376ba22bd0809af961f9c25b73d005ce07d428e8",
+          "escalation_source_event": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+          "job": "e85234e2-e078-494b-82b1-7c37d6722d61",
+          "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+          "service_cycles": 11,
+          "service_identity": {
+            "boot_id": "12b43f59-23b6-4c80-af48-148de198cb3d",
+            "host": "local",
+            "start_ticks": 54697730,
+            "started_at": "2026-09-13T11:15:53Z"
+          },
+          "service_pid": 1020925,
+          "source_attempts": 1,
+          "source_block_kind": "unsupported_multi_agent_v2_direct_input",
+          "source_delivery": "blocked",
+          "source_error": "App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents",
+          "source_failure_kind": "unsupported_multi_agent_v2_direct_input",
+          "source_next_attempt_at": null,
+          "source_signature": "70dc17a903ff26d5edd92a69e8396957aefe7abccf0c5cb84b7383e86c606078",
+          "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631",
+          "turn_start_attempts": 1
+        },
+        "child": "01a096ab-e5f3-7672-8ff3-36328d3fcfb7",
+        "job": "e85234e2-e078-494b-82b1-7c37d6722d61",
+        "kind": "native-v2-fallback-stopped",
+        "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "phase": "stopped",
+        "recorded_at": "2026-09-13T11:18:00+00:00",
+        "service_status": {
+          "counters": {
+            "accepted": 0,
+            "cycles": 13,
+            "observed": 7,
+            "queued": 2,
+            "turn_start_attempts": 1
+          },
+          "healthy": false,
+          "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+          "mode": "disabled",
+          "running": false,
+          "status": "disabled"
+        },
+        "state_enabled": false,
+        "state_mode": "disabled",
+        "stopped_cycles": 13,
+        "stopped_service_identity": {
+          "boot_id": "12b43f59-23b6-4c80-af48-148de198cb3d",
+          "host": "local",
+          "start_ticks": 54697730,
+          "started_at": "2026-09-13T11:15:53Z"
+        },
+        "stopped_service_pid": 1020925,
+        "stopped_turn_start_attempts": 1,
+        "task": "eda0b0e4-d0b8-4439-a418-2bc56610d631"
+      }
+    },
+    "task-archive.json": {
+      "sha256": "6714e363845c196f39575c0cc73d8587fbeca0e10be2fe2a1c79997414c8c796",
+      "content": {
+        "note": "native-v2 fallback fixture completed and receipts retained",
+        "removed": [
+          {
+            "workspace": "/mnt/public/xcj/Projects/.native-v2-fallback-fixture-20260913T1116Z/project/workspace/eda0b0e4-d0b8-4439-a418-2bc56610d631"
+          }
+        ],
+        "at": "2026-09-13T11:22:45+00:00"
+      }
+    }
+  }
+}
