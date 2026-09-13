@@ -1,5 +1,20 @@
 # 交付报告
 
+## 最新增量（2026-09-14；同实例 probe 副作用检查仅 CPU 准备）
+
+已完成 Manager 新授权的冻结源码审计、task-private 同实例检查工具和 CPU seam tests；**没有**以 `--execute` 运行检查，没有构造真实 `OpenPiBackend`、加载 checkpoint/model/GPU、发送 sampler request、环境 reset、仿真轨迹或 formal。历史正常 action 诊断预算仍为 **8/8**，本节未改变其记账或结论。
+
+- 冻结 C3 运行树仍 clean，OpenPI / robot-bridge / RMBench HEAD 分别为 `0ce566bd34f99cb4775422f012ab67c16aa53885`、`ffa122494c19e1c0154e877010f7b470967ccfc6`、`6abebf08d084d0be43aa56ebe158dc8395fa58e4`。默认计划的实际 preflight 同时验证了 checkpoint `.../memory20k_e7e5ac54_put_back_full_t_plus_1_s0/20000` 的 `metadata`/`params` 存在。
+- [检查说明](/mnt/public/xcj/Projects/multi-agent-manager/.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/probe_side_effect_check/README.md)、[源码审计](/mnt/public/xcj/Projects/multi-agent-manager/.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/probe_side_effect_check/source_audit.md)、[工具](/mnt/public/xcj/Projects/multi-agent-manager/.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/probe_side_effect_check/tools/probe_side_effect_check.py) 和 [CPU tests](/mnt/public/xcj/Projects/multi-agent-manager/.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/probe_side_effect_check/tools/test_probe_side_effect_check.py) 已同步到 C3 task-private 根 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/probe_side_effect_check`，没有触碰三套冻结仓库。
+- 最终 C3 工具 SHA-256 为 `fa9bf3292a09e39dd1d2421d4276c16b76034deeb22794ed61cd1681b95ae9e1`，tests 为 `f881cde072d2518413ee21ba1cb8ab0bd8bc816cfa865efc3e8cd29c1489f6aa`；说明和审计分别为 `677b019d1ae372a5aa42d6e29bc35c567fbb141d0865f6c27a86e22b1eda2c26`、`b879680aedb7655e1299079f15d4e80173ecf8fcf7422de643e29f78d85c3abc`。
+- 默认计划（未导入 backend/model）位于 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/probe_side_effect_check/plan_20260914_v2/plan.json`，SHA-256 `4408a8732f3fa259f5224de6dfe7c40add97e40e5a7fc511a076f8f4fb5a9916`。它记录完整保存 request 的文件 SHA `8e642b353b0a2bfd6e7569f1f4c52aa9490aad92df4102ffda73ecf47091ac48`、三库实际身份和精确 `3 action + 5 probe` 上限。
+- 工具严格使用生产 server 的顶层 `cmd` 剥离规则；每一次调用由固定保存输入的独立 `deepcopy` 生成，并记录来源/副本 identity、哈希和调用后是否发生局部 transform mutation。真实执行时仅在一个 Python 进程中创建一次真实 backend，直接记录该 `_policy` 的 JAX `_rng`、`_probe_rng`、initial keys 和序号；不把 `policy_rng` stream/call metadata 当 key。C0/C1 任何 ordinary output（只排除 `policy_timing`）、最终 action key 或序号不一致即不进入 P。P 的任意 probe 若改 action key/序号即停止；合法 P 后仍要求 P action output/key/sequence 与 C1 严格一致。调用在进入 backend 前记账，异常不 retry；完整小数组在返回后存入 pickle，policy state 在收据后恢复。
+- CPU seam tests 为 `8 passed`，本机和 C3 frozen OpenPI venv 均通过；Ruff 和 Python compile 也通过。覆盖 C0/C1 不等不 probe、probe 改 action key、probe 改 action sequence、P normal output 改变、合法严格 `3+5`、异常后不 retry、输入 hash/identity 保持以及默认 plan 不构造 backend。另只读载入现有 saved request/response 以验证工具的 deep-copy/hash/strict-output comparison 能处理实际 `state`、三张 image、memory IDs、`H50` 和 raw memory arrays；这没有调用模型。
+
+源码审计结论是可实施性而非实验结果：`Policy.probe_forecast` 使用独立 `_probe_rng`，而 `infer_audited` 消耗 `_rng`；backend 对两者均是直接转发，显式 `reset_episode_rng` 初始化/复位 rolling state。现有 WebSocket RPC 不暴露或设置实际 key，因此单独 RPC 无法做该精确对照，必须使用本工具的同进程 backend helper。controller 方面只证实 worker deque 将同一输入 action rows 按顺序逐项传给 `env.take_action`；`get_obs` 仍会 render/camera，环境 `take_action` 有 TOPP/physics/可能 light RNG，故不声称 30-row 与分次 5-row drain 的完整环境推进等价。
+
+本节交付后等待 Manager 验收和未来明确 GPU 授权；不能据 CPU seam pass、plan 或源码审计把 probe 副作用检查写成 PASS，更不能解冻 HF/matching/formal。
+
 ## 最新状态（2026-09-14；覆盖下方历史样本预算）
 
 已完成 Manager 授权的 `put_back_block` / train seed 0 / env seed `100000` 修正来源路径 matched shadow：它只发出 **1** 次正常 action request，并以预期的诊断截停 `exit 70` 结束。收据确认唯一 accepted reset 为 episode 0 / seed `100000`，恰有一次 `infer_audited` 与一次 execute；原 iteration 后 clear，非 drain status 为 `queued=30`、`dropped=30`、`logical_step=0`。没有第二 query、episode、replay、warmup 或 probe。
