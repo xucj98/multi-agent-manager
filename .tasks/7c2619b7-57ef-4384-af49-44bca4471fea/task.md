@@ -1,0 +1,13 @@
+# put-back HF-fixed 两集独立证据核验
+
+terra/max reviewer。按 MAM AGENTS/task show，仅为必要源库创建独立review worktree、读对应 AGENTS。Manager负责实验解释与下阶段设计，本任务是已完成两集的窄范围只读工程审阅；不运行GPU、模型、仿真、额外测试，不修改冻源码/工具/结果，不等待后续event/rearrange，不重新审阅全库。
+
+冻结源 OpenPI0ce566bd34f99cb4775422f012ab67c16aa53885 / bridgeffa122494c19e1c0154e877010f7b470967ccfc6 / RMBench6abebf08d084d0be43aa56ebe158dc8395fa58e4，源task report42ddc58362c7757512e14499800446742ab12899。C3=wuwen-4090-3。真实runtime /mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914；目标名 c_hf_j_hf_fixed_put_back_trainseed0_evalseed0_smoke2。原leaf在runtime/RMBench/eval_result/memory_chunk_20260910/<目标名>。
+
+目标stage目录 /mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/hf_trajectory_engineering_20260914/<目标名>。stage_receipt.json SHA2bd6cf0cdd6384b0923bf39f8a884067c7f7d7551d244846ee15807b9f21e875；trace_contract_validation.json SHA7483ffca1dc661a84ef30e0b6db967731c12025be84f375f7eb1386ac6673a9b。原helper review在runtime/.local/highfreq_engineering/audits/reviews/<目标名>.review.json，SHAefd2a6d9e00c5cba72d37901bb44f8bcd784ab788cc5a2ad081e949f58fa00dd。不运行helper的run或audit --pair。
+
+独立重哈希review/收据及其真实引用，核对两集100000/100001与真实checkpoint/schema/config/光照/RNG/来源身份，terminal/video/process/evidence完整性和0基础设施异常（任务失败允许，不看分数决定PASS）。从两份原始rolling JSONL自行重算每集17action/83probe/500rows、每5已完成行probe且30边界不probe、99次forecast消费与真实输入一致、时间对齐和原计划phase比较、无中途normal action/clear/trigger、每集reset及各流调用连续。phase列以metadata field order确定。Manager发现progress/terminal顶层logical_step来自上一轮_current_logical_step，应以source_step+completed_rows和episode_status重建真实完成时刻；现有字段足够，不据顶层旧时间误判。
+
+注意：HF-fixed可以记录deviation streak>0但trigger=false，并不等于发生replan；该leaf尚只是matching-smoke候选，不等于HF有效或formal准入。历史跨进程bitwise失败不重跑、不改PASS。不要把wire stream/call当实际内部PRNG key，也不要把policy_timing当独立确认同步端到端时延。
+
+交精简report和本地JSON receipt（必要精确hash、重算计数、失败/限制、明确结论）；只读SSH拉取的小数据可留本任务evidence。先发实际阻断，正常完成发布report后结束turn。Manager独立从原始状态/动作字段分析科学边界，不需要你设计论文主张或按这两集提出调参。
