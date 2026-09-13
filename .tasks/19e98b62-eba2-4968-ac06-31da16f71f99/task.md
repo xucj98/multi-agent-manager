@@ -33,3 +33,6 @@ Manager 01a09657-e0f3-7352-b726-aba5bbd5d498 将用 mam task rebind 将本任务
 
 ## 用户预算重排：暂停新增开跑（2026-09-13）
 用户否决普遍每配置3训练seed的旧预算，要求优先RMBench九任务覆盖，Manager正在重写论文主张/文献定位/最小实验清单。自此不再按旧队列启动新的训练、smoke、formal或追加eval seed；此节覆盖所有此前自动扩展授权。已经运行的job自然收尾，正常核验/记录/归档，保留checkpoint和完整结果；不杀训练、不丢弃不利结果、不重启失败项。已训练未评模型只整理可复用清单，等待新排期，不自行开跑。当前可执行收尾完成后正常结束turn，MAM自动唤醒。
+
+## Manager最终验收与归档准备（2026-09-13）
+Manager已独立核对四份formal_20000_acceptance、每份五个checkpoint metadata哈希、验收脚本哈希和全部CPU/GPU restore日志，接受四个20k完成。继续只做归档前材料保全：在openpi/checkpoints下建立本task稳定小清单/README，引用四个checkpoint、各自training_acceptance、完整训练日志、attempt1/2历史和验证脚本；记录SHA256。保存RMBench最终说明c886ff2原文到稳定归档，并用完整history Git bundle保留唯一未合并RMBench文档branch（以及训练source若不在持久branch可达，必要时bundle），verify bundle可恢复。不要复制checkpoint大参数/数据集，不合入任何活跃runtime。自查workspace外引用不依赖即将删除的task路径，仅清理明确由本task产生的Python/pytest/ruff缓存和临时receipt，未知材料保留并说明。发布最终stable清单/report供Manager archive；你不自行archive task，不新增评测。
