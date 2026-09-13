@@ -1,5 +1,21 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## 当前任务：HF GPU成对差异的首query窄诊断，正式评测继续暂停
+
+C3工程report `1b0006941651c958d7ece0b217034c33634a2bd0` 已发布，8个2episode leaf正常退出，但matched两任务未通过动作等价。Manager已亲自核对原始failure文件SHA `c6519c947782001a07295daf7aeed4a6a1d2295669c17ececd8acb537e2c26f4`、精确source与比较脚本，作如下裁决：
+
+- evaluator脚本将matched baseline的50×14完整预测和shadow的30×14实际queued_actions直接比较，是审计口径错误；已交eval owner修自己的离线比较。不能仅修shape便宣称PASS。
+- Manager直接重算相同前30×14：rearrange episode0/1分别284/292个数值不同，max_abs 0.0038730204/0.0038729906，RMSE0.0007002742/0.0007253131；put-back两个episode各299个不同，max_abs0.0034926604，RMSE0.0006326193。因此同一执行前缀仍确有差异，不凭形状错误撤销工程暂停，也不擅自放宽容差。
+- 第一动作发生于source_step0，早于任何中途probe，不能归因于之后probe消耗RNG。当前recorded input只有robot_state/memory_input_ids，没有图像或完整语言输入。Manager又直接核对OpenPI0ce: policy_rng只有stream/call，无实际PRNG key；“计数相同”不证明采样key相同。不得称完整输入/真实随机状态已相同。
+
+请复用本task已有源码树，先只读查配置/命令/模型/权重身份、实际import来源、Policy初始化/reset及首query观测路径，排查是否为记录口径、不同初始visual/language/transform输入、实际key、固定输入下GPU采样差异；不预设原因、不改变算法/阈值/模型/动作执行频率。原准入commit仍OpenPI0ce566bd34f99cb4775422f012ab67c16aa53885/bridgeffa122494c19e1c0154e877010f7b470967ccfc6/RMBench6abebf08d084d0be43aa56ebe158dc8395fa58e4。
+
+可直接使用已释放的C3 GPU0做有界诊断，但先核对资源与独占端口，复用eval owner精确冻结runtime作为只读源，任务自有工具/证据写到本TASK-ID，不能在eval owner运行树改源码或共享cache。优先put-back train0 / env100000的matched baseline和shadow，各只捕获首个真实policy query的完整输入及实际action PRNG split前/采样/split后key、输入transform前后image/state/memory/prompt/token的shape/dtype/hash（必要完整数组只保留这个query、有界），以及输出完整H50/实际K30。捕获wrapper只用于工程诊断并保存source/hash/插入点，不额外split RNG或调用模型，不把新instrumentation冒充原始证据。不要再跑完整16episode对照。
+
+然后在同一实际完整输入与同初始key/同noise下，做最小GPU重复/两条入口交叉调用，区分输入不一致与推理不一致；总正常action采样最多8次，首轮不执行新长轨迹，不做正式100、r_s30或HF效果试验。实际PRNG可在task私有诊断wrapper观测；生产wire是否需补真实key由证据与Manager随后裁决，当前不无目的扩日志框架。若用P0工具只复用测试思路，不合入另一个未完成GPU验收分支。
+
+交紧凑报告：已确认与未确认原因、首个真正差异位置、实际来源/full input/key/action证据及hash、最小必要修复方案；需改生产代码时先交具体原因，由Manager裁决后干净提交并另审。上游算法已通过CPU的部分不机械重做。预计>30min诊断登记MAM真实PID；完成或遇确定需裁决点正常结束，不轮询。root负责解释和裁决，仍terra/max执行。
+
 ## 当前修复：Manager 对复审 27b16d899 的裁决
 
 Manager 已直接读取冻结 bridge552ea 的 _formal_gate/_accepted_episode/_record、writer，以及 RMBenchc99 的 validate_smoke_run，确认下列遗漏。上一轮真实 recorder 接线、child identity 和单次 reset 已通过，不重做算法/RNG改动。候选基线仍 OpenPI0ce566bd34f99cb4775422f012ab67c16aa53885（保持不变）、bridge552ea78f73e62fddc747d5d26e7e6c365fa00339、RMBenchc99ec6a2c6df96ec8705b106b125935fce862052（保留 f401 祖先）。复用已有独立树。
