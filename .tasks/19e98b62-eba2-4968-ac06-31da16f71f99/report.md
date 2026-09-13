@@ -131,3 +131,26 @@ attempt1 中断与 attempt2 启动拒绝的全部证据仍保留在
 `/mnt/public/xcj/Projects/openpi/logs/attempt_history/19e98b62-eba2-4968-ac06-31da16f71f99/`，
 其 SHA256 清单未变；这些失败/中断 run 没有被重训、丢弃或纳入任何结果。当前没有未归档 job 或可执行
 实验事项，保留 worktree、checkpoint 和证据供 Manager 验收与后续排期。
+
+## 2026-09-13：归档前稳定清单与材料保全完成
+
+Manager 已独立接受四份 `formal_20000_acceptance.json`、每份五个 checkpoint metadata 哈希、验证脚本
+及全部 CPU/GPU restore 日志。本轮未复制 checkpoint 参数或数据集，未启动训练、评测、offline、部署或
+runtime；只建立了以下稳定小型索引和 Git 保全材料：
+
+- [稳定四模型清单](/mnt/public/xcj/Projects/openpi/checkpoints/README_19e98b62_wash_seed_repeats.md)：四个 checkpoint、run 根的 `training_acceptance`、完整训练日志、历史 attempt1/2 与验证脚本的稳定引用。
+- [归档 manifest](/mnt/public/xcj/Projects/openpi/checkpoints/archive_19e98b62_wash_seed_repeats/MANIFEST.md)：四组五个 checkpoint metadata、训练/验收日志与历史清单的 SHA256；还记录 cleanup 范围和 workspace 依赖审计。
+- [归档 SHA256SUMS](/mnt/public/xcj/Projects/openpi/checkpoints/archive_19e98b62_wash_seed_repeats/SHA256SUMS)：`sha256sum -c` 全部通过；自身 SHA256 为 `9b1a17dca61201b6d923ad8a5dc6652a632b1c667f29ed7c9133bf8e8fb1b54a`。
+- RMBench 最终说明的 byte-for-byte 副本、完整未合并文档分支 bundle（head `c886ff2d58117b3f35de76fb7dbfcd8bfa07ee89`）及 OpenPI 训练源完整 history bundle（head `056bcc887637cc6eda565a8ad7d45c88021d4bcd`）均在同一归档目录。两 bundle 通过 `git bundle verify`，并在 fresh bare repository 中实际 fetch、`git fsck --no-dangling` 和目标提交解析；RMBench 恢复的 README SHA256 与归档副本一致。
+
+OpenPI 源提交也仍由 `codex/put-back-memory-baselines` 和 `codex/unified-sim-real-runtime` 本地分支可达，
+但额外完整 bundle 消除了对其分支寿命的依赖。checkpoint/验收/日志均在共享稳定路径；历史
+`cwd` 和 `metadata/command.txt` 中出现的 task workspace 仅是不可变训练 provenance，完成模型的
+checkpoint-only restore 与归档材料不依赖该 workspace。
+
+清理只删除了四份已被 manifest 记录 SHA256 的 task-created
+`attempt3_running_20260912T1954CST/checkpoint_root_trace_receipt.json`；它们已由各 run 根的
+`launch_identity.json`、完整 `train.log` 和 `training_acceptance` 覆盖。没有发现 task workspace 中
+非 virtualenv 的 `__pycache__`、`.pytest_cache`、`.ruff_cache` 或 `.pyc`；virtualenv cache、历史日志、
+启动身份、模型参数、数据和未知材料均保留。所有 12 条 MAM job 已归档，当前无可执行实验事项；等待
+Manager 验收并 archive 本任务。
