@@ -1,0 +1,142 @@
+{
+  "archive_source_mapping_validation": [
+    {
+      "archive_copy": "/mnt/public/xcj/Projects/multi-agent-manager/.tasks/8968b7f5-74f7-44db-ad0b-058d3fd556ca/artifacts/p0-query-diagnostics-accepted-20260914/tooling/c2-base",
+      "content_bytes": 44178,
+      "exact_sha256_match": true,
+      "non_bytecode_files": 5,
+      "source": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/tools"
+    },
+    {
+      "archive_copy": "/mnt/public/xcj/Projects/multi-agent-manager/.tasks/8968b7f5-74f7-44db-ad0b-058d3fd556ca/artifacts/p0-query-diagnostics-accepted-20260914/tooling/timeout90-v2",
+      "content_bytes": 284203,
+      "exact_sha256_match": true,
+      "non_bytecode_files": 45,
+      "source": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2"
+    },
+    {
+      "archive_copy": "/mnt/public/xcj/Projects/multi-agent-manager/.tasks/8968b7f5-74f7-44db-ad0b-058d3fd556ca/artifacts/p0-query-diagnostics-accepted-20260914/tooling/preflight-selfpid-attempt2",
+      "content_bytes": 126130,
+      "exact_sha256_match": true,
+      "non_bytecode_files": 19,
+      "source": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2"
+    },
+    {
+      "archive_copy": "/mnt/public/xcj/Projects/multi-agent-manager/.tasks/8968b7f5-74f7-44db-ad0b-058d3fd556ca/artifacts/p0-query-diagnostics-accepted-20260914/tooling/invariance-replay-s-continuation",
+      "content_bytes": 94442,
+      "exact_sha256_match": true,
+      "non_bytecode_files": 13,
+      "source": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-invariance-replay-s-continuation"
+    },
+    {
+      "archive_copy": "/mnt/public/xcj/Projects/multi-agent-manager/.tasks/8968b7f5-74f7-44db-ad0b-058d3fd556ca/artifacts/p0-query-diagnostics-accepted-20260914/tooling/c2-smoke-validation",
+      "content_bytes": 25263,
+      "exact_sha256_match": true,
+      "non_bytecode_files": 9,
+      "source": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/tools"
+    }
+  ],
+  "authorization_scope": "Remove only five already-preserved task-private workspace tool directories and two accepted-commit transfer bundles; leave MAM artifacts, C evidence, and registered source worktrees untouched.",
+  "bundle_preservation_validation": [
+    {
+      "bundle_heads": [
+        "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6 HEAD"
+      ],
+      "bytes": 14895,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/transfer/openpi-bc7603c5.bundle",
+      "persistent_commit": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+      "persistent_ref": "/mnt/public/xcj/Projects/openpi/refs/heads/codex/p0-query-diagnostics-accepted",
+      "preserved_by_ref": true,
+      "sha256": "07597fe036a3c445682c5284e58211e9e6f9fce9fafc9562dfb4298ca0877e36"
+    },
+    {
+      "bundle_heads": [
+        "e147f600dc4329f330a6e2eb0335150b5b3093a3 HEAD"
+      ],
+      "bytes": 48581,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/transfer/robot-bridge-e147f600.bundle",
+      "persistent_commit": "e147f600dc4329f330a6e2eb0335150b5b3093a3",
+      "persistent_ref": "/mnt/public/xcj/Projects/robot-bridge/refs/heads/codex/p0-query-diagnostics-accepted",
+      "preserved_by_ref": true,
+      "sha256": "85cb3d0c29d4f0be0447fd81a8950b6516b51b1d2cbc20fc575cc81f1e70831b"
+    }
+  ],
+  "created_at": "2026-09-13T20:52:29.782095+00:00",
+  "deleted_directories": [
+    {
+      "bytecode_file_count": 3,
+      "is_symlink": false,
+      "nested_symlinks": [],
+      "non_bytecode_file_count": 7,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic",
+      "regular_file_bytes": 157610,
+      "regular_file_count": 10
+    },
+    {
+      "bytecode_file_count": 9,
+      "is_symlink": false,
+      "nested_symlinks": [],
+      "non_bytecode_file_count": 19,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2",
+      "regular_file_bytes": 239935,
+      "regular_file_count": 28
+    },
+    {
+      "bytecode_file_count": 6,
+      "is_symlink": false,
+      "nested_symlinks": [],
+      "non_bytecode_file_count": 45,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-timeout90-v2",
+      "regular_file_bytes": 360781,
+      "regular_file_count": 51
+    },
+    {
+      "bytecode_file_count": 4,
+      "is_symlink": false,
+      "nested_symlinks": [],
+      "non_bytecode_file_count": 9,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/tools",
+      "regular_file_bytes": 54307,
+      "regular_file_count": 13
+    },
+    {
+      "bytecode_file_count": 5,
+      "is_symlink": false,
+      "nested_symlinks": [],
+      "non_bytecode_file_count": 13,
+      "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-invariance-replay-s-continuation",
+      "regular_file_bytes": 159187,
+      "regular_file_count": 18
+    }
+  ],
+  "kind": "p0_query_diagnostics_workspace_cleanup_receipt",
+  "manager_task_revision": "060f79cb30a0b0167d8f5ce54752e0b69c4a7719",
+  "post_cleanup": {
+    "registered_worktrees": [
+      {
+        "clean": true,
+        "head": "bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6",
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/openpi"
+      },
+      {
+        "clean": true,
+        "head": "e147f600dc4329f330a6e2eb0335150b5b3093a3",
+        "path": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge"
+      }
+    ],
+    "remaining_top_level_entries": [
+      "openpi",
+      "robot-bridge"
+    ],
+    "source_task_archived_by_executor": false,
+    "workspace": "/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca"
+  },
+  "prior_acceptance_archive": {
+    "artifact_index_sha256": "3b780eff9e980a1476e908d15eb82072c2b0f41d5cb684eada74755b88faeb28",
+    "commit": "c053f611b5d1e5385ac25e4d78e139bf866bf618",
+    "path": "/mnt/public/xcj/Projects/multi-agent-manager/.tasks/8968b7f5-74f7-44db-ad0b-058d3fd556ca/artifacts/p0-query-diagnostics-accepted-20260914",
+    "sha256sums_sha256": "5bad74b7b565bd1ec3dc086310bd50ad42c382e96e3c3db425f25af928d9667d"
+  },
+  "schema_version": 1,
+  "task_id": "8968b7f5-74f7-44db-ad0b-058d3fd556ca"
+}
