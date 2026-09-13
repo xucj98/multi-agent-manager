@@ -263,3 +263,6 @@ Manager随后发布精确arms/触发阈值/试验计数。代码未验收前可�
 新功能每种路径先匹配smoke2含video/no-video；另做J baseline/shadow的同checkpoint/seed/action RNG成对工程核验，确认额外观测不会改变任务cue、动作流、仿真随机性或终态；保存实际command序列/进度证据而非只比成功率。工程seed固定900000/900001，不进入正式seed100000/200000/300000各100清单。依据smoke仅判接口/基础设施/执行合同/吞吐，不根据分数调阈值或换任务。r_s1仅可做短吞吐probe，不自动扩展到正式全网格。
 
 代码review及Manager准入后按第一层优先从可用卡并发开跑，每批真实job登记；为保证响应，不需要收齐全部24批才发布进展。完成100集按原terminal/seeds/exit/video/metadata/rawhash合同验收，负结果保留；出错只修基础设施并独立运行完整新批。扩展cover/swap等留在后续，不能把本轮2任务说成九任务验证。
+
+## Manager接受smoke合同核实后的更正
+保留既有正式门禁，撤销900000/900001要求，不为它新增engineering seed CLI。baseline/shadow成对工程smoke使用既有eval0的100000/100001，独立目录标明工程等价检查，不据分数改阈值；不作为不同HF模式的matching gate。每个新正式配置/每eval seed仍跑严格匹配的smoke2→formal100，source/manifest/hash规则不放宽。明确random_light=false与crazy_random_light_rate=0留痕；先核对原baseline实际设置，若改变了原环境条件则补同条件baseline，不沿用不匹配成绩。新增试验数24批不含短工程smoke和因必要环境对齐追加的baseline，后者需明确单列原因和数量。
