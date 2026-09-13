@@ -73,3 +73,34 @@ Step100 均为 finite：
 
 四条 MAM job 仍为 running，因此没有可归档事项。本轮结束，后续由 MAM 在 stopped 事件时唤醒；
 届时按既定最终 checkpoint、恢复和资源回收验收流程处理。
+
+## 2026-09-13 16:40 CST：attempt3 三条完成验收与归档
+
+本次以当前绑定执行者实际核对 PID、GPU、日志与 checkpoint，不依据旧 MAM 缓存判断。full seed1
+（PID 593959/GPU4）、full seed2（594097/GPU2）及 serial seed2（594103/GPU3）都已自然退出并
+释放各自 GPU；日志分别记录唯一 Step20000、Orbax finalization 和 `No errors found in background
+save thread`。三条完成模型如下，均为原冻结 commit
+`056bcc887637cc6eda565a8ad7d45c88021d4bcd`、bs32、20k、BF16 model-only：
+
+| 协议 / seed | Step20000 loss | CPU 完整参数验收 | checkpoint-only GPU 恢复 | MAM job |
+| --- | ---: | --- | --- | --- |
+| full / 1 | 0.0050 | 51 leaves、3,353,433,872 elements；全 BF16、finite、shape 完整 | GPU4；actions `(50,14)`，memory IDs `(50,1)` | `7518e4c3-ecc4-4f1a-bc39-cbb9e770b413` 已归档 |
+| full / 2 | 0.0048 | 51 leaves、3,353,433,872 elements；全 BF16、finite、shape 完整 | GPU2；actions `(50,14)`，memory IDs `(50,1)` | `b28ed7fa-6e7d-402c-80c5-a18c89caa939` 已归档 |
+| serial / 2 | 0.0163 | 56 leaves、3,353,454,358 elements；全 BF16、finite、shape 完整 | GPU3；actions `(50,14)`，memory IDs `(1,1)` | `9a0d41f8-562d-4631-9d21-8271bda81876` 已归档 |
+
+每条验证都要求 checkpoint 仅有数字目录 `20000`、`params/assets/metadata`、无 `train_state`；加载时
+审计钩子拒绝原训练数据、base weights、外部 norm 和 memory YAML 读取。CPU 与 GPU 子命令均以
+exit 0 完成；GPU 检查是 checkpoint 恢复与一次 finite infer，并非 offline rollout、RMBench 仿真或
+部署。各 checkpoint 的 `training_acceptance/` 目录保留 CPU/GPU 日志及
+`formal_20000_acceptance.json`；共享可复用验证脚本和被中断尝试的 SHA256 清单在
+`/mnt/public/xcj/Projects/openpi/logs/attempt_history/19e98b62-eba2-4968-ac06-31da16f71f99/acceptance/`。
+三个训练 PID 被回收前未能读取数值 exit code，因此只据成功保存日志陈述完成，不虚报 exit 0。
+
+attempt1 的四条中断和 attempt2 的四条启动拒绝证据均未删除，仍位于同一 `attempt_history` 下的
+各 run 目录；`interrupted_attempts.sha256` 记录其 JSON、启动身份与日志哈希。它们没有被当作
+完成模型或纳入任何评测。
+
+serial seed1（PID 593965，MAM `1261e32e-293c-49b9-b4bc-cda02fe42413`）在 16:40 CST 实际仍为
+`R`/PPID 1、占用 GPU5；最后一次读取日志为 Step19800、loss 0.0073，最终目录尚未出现 `20000`。
+它保持自然运行，未被终止、重启或重复登记。本任务的预算重排暂停规则仍生效：不会新开训练、smoke、
+formal、offline 或额外 eval；该模型完成后才按同一验收与归档流程处理。
