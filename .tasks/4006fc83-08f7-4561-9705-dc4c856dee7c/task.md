@@ -31,3 +31,5 @@ Manager 初读发现需优先核查默认关闭等价：Policy.reset 新增无�
 默认reset改变跨episode action RNG的P1已由Manager真实Policy路径复现并接受，作者正在窄修。Manager另直接确认benchmark在100集循环外启动policy server，历史action RNG连续消费；故HF逐episode reset不能直接使用历史baseline成绩。按源task最新裁决，普通baseline/shadow保持历史默认行为；显式matched baseline/shadow使用与HF完全相同的每episode initial key0重置协议，probe流独立。新对照J/S各两任务×3eval共12批，总量从24增至36正式批、0训练，旧结果不失效但不作为新协议的直接对照。
 
 增量复审最小显式配置：baseline仍原K30/MemoryContext，不引入中间状态消费；matched baseline无probe，matched shadow probe不改cache/动作；普通默认与旧版本、matched baseline与matched shadow分别做跨episode action key/动作等价。标清eval环境种子与固定policy初始key的区别。不要反复复现已接受的P1或因新配置等待而停止其他冻结代码审查；最后针对作者精确新commits给代码准入结论。
+
+Manager已直接核对源53f853a及benchmark._wait/_record，接受你b55c30e的P1-2：rolling trace仅内存/get_status，episode scheduler退出后无法事后审计。已发布源task要求窄修持久化；不能仅末尾保存64条，须逐计划/事件保留完整前缀、trigger清后缀及terminal/异常，容量超限明确incomplete。待作者新精确commits，再做文件实际落盘可解析与跨进程收尾的增量复核；无需重复整库测试或现在空等。保留冻结报告作为未准入记录。
