@@ -8,6 +8,8 @@ Manager此前已接受四项发现：v1 execute non-ok后record过早关闭、le
 
 作者声称OpenPI6、bridge35 CPU通过，synthetic17数组recorded；这不是独立PASS。此前4个read-only transform failures如仍出现，需保留准确旧基线复现来源，不笼统归为环境或新代码错误。检查变更包含的格式化是否隐藏了默认路径行为变动。checkpoint强身份仍由独立run-level权重manifest提供，本任务不扩展逐query权重哈希。
 
+上述“既有失败”不能只因在原logger提交cb861d3复现就排除logger引入。请针对同一最小输入沿实际原冻结OpenPI a869498/bridge f962与当前候选核对，区分早于整个logger、原logger引入、或本轮fix引入；若只是特定fixture不符合真实输入合同也须具体说明。无需机械全库重跑。
+
 给出精确commits、独立验证和剩余限制、是否准入最小受控GPU验收；不得运行GPU/正式eval/训练或改作者树。HF task0acf仍独立，不把它的未提交修复混入本review。发现实质问题即时报告Manager裁决；完成后publish report并正常结束，无需活跃等待。
 
 使用 gpt-5.6-terra/max 独立审查，Manager 亲自裁决，不改变科学设计。阅读 AGENTS 与本 task 已捕获的源要求、report 和准确交付，mam workspace add 分别从 OpenPI cb861d3824a46d9c243be7ff69159bcec17a0ac7 / robot-bridge a2c7f80b99556db2147c85ca9f625ffb840b276a 创建独立 review worktree。基线分别 a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4 / f9626636c4776d8eb15f9c556775cb2d12c000e5，审查这两个精确 diff，不混入高频 owner 未提交源码。
