@@ -1,5 +1,15 @@
 # P0诊断记录接口独立审查：行为等价、RNG与证据完整性
 
+## 当前执行：已确认四项问题的增量复审
+
+源task8968b7f5新报告 `1ed55ee703ad7bd0bc3c2a37dc850121b59832c5` 已发布，以下新冻结提交取代旧交付作为本轮审查对象：OpenPI `cb861d3824a46d9c243be7ff69159bcec17a0ac7` → `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`；robot-bridge `a2c7f80b99556db2147c85ca9f625ffb840b276a` → `fa62a9febc8fab9098994d0cb8e1894a0590b7e8`。保留你已有独立review workspace，不新建重复树；核对clean后把本任务review分支快进至相应候选，再读新report及代码。
+
+Manager此前已接受四项发现：v1 execute non-ok后record过早关闭、legacy non-ok候选缺record ID形成悬挂、cap在复制/传输后才检查、空complete sidecar可伪装recorded。逐项独立复核真实run_iteration失败/重试/supersede/reset/terminal链，证据未知actual K保持null，不改变动作或默认RNG。检查源新增preflight在host/device copy、msgpack和NPZ之前生效，极小预算+1024²RGB测试须真正经过Policy/codec/recorder链而非只测serializer；容量不足仍不能改变S sampler语义。检查必需schema、missing sampling key以及伪造recorded的校验拒绝。
+
+作者声称OpenPI6、bridge35 CPU通过，synthetic17数组recorded；这不是独立PASS。此前4个read-only transform failures如仍出现，需保留准确旧基线复现来源，不笼统归为环境或新代码错误。检查变更包含的格式化是否隐藏了默认路径行为变动。checkpoint强身份仍由独立run-level权重manifest提供，本任务不扩展逐query权重哈希。
+
+给出精确commits、独立验证和剩余限制、是否准入最小受控GPU验收；不得运行GPU/正式eval/训练或改作者树。HF task0acf仍独立，不把它的未提交修复混入本review。发现实质问题即时报告Manager裁决；完成后publish report并正常结束，无需活跃等待。
+
 使用 gpt-5.6-terra/max 独立审查，Manager 亲自裁决，不改变科学设计。阅读 AGENTS 与本 task 已捕获的源要求、report 和准确交付，mam workspace add 分别从 OpenPI cb861d3824a46d9c243be7ff69159bcec17a0ac7 / robot-bridge a2c7f80b99556db2147c85ca9f625ffb840b276a 创建独立 review worktree。基线分别 a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4 / f9626636c4776d8eb15f9c556775cb2d12c000e5，审查这两个精确 diff，不混入高频 owner 未提交源码。
 
 重点核验：默认关闭是否完全保持现有接口/采样/RNG；开启选中 query 时真实 Policy transform→model→output 路径是否仍动作/状态和最终RNG相等；S details 与原三值API的真实model路径一致；J/T raw坐标不冒称logits；序列/explicit noise/reset；-inf原始数组与严格finite JSON；有界选择/容量、异步设备copy时序、写失败不影响动作但证据缺失可见；记录的参数/input/checkpoint/code/episode/seed/query以及NPZ与JSON关联足以复核，实际K/pending/cancelled/terminal不能伪造；array/namespace是否可以互相覆盖或报告错误完成。报告 I/O 插入动作dispatch之前的实际影响，不要求证明物理实时轨迹等价。
