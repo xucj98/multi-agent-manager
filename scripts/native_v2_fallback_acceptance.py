@@ -31,6 +31,7 @@ EXACT_REJECTION = (
 )
 FAILURE_KIND = "unsupported_multi_agent_v2_direct_input"
 MANAGER_EVENT = "manager_native_followup"
+CHILD_ARCHIVE_NOTE = "native-v2 fallback fixture handled"
 
 
 class FixtureError(RuntimeError):
@@ -55,6 +56,12 @@ def _canonical_agent(value: str, *, field: str) -> str:
         raise FixtureError(f"{field} must be a canonical AGENT-ID") from exc
     if str(parsed) != value:
         raise FixtureError(f"{field} must be a canonical AGENT-ID")
+    return value
+
+
+def _required_string(value: Any, *, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise FixtureError(f"{field} must be a non-empty string")
     return value
 
 
@@ -98,6 +105,142 @@ def _is_within(child: Path, parent: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _prepare_fixture_git_isolation(root: Path) -> Path:
+    """Create the only Git configuration, template, and hook paths we permit."""
+
+    isolation = root / "git-isolation"
+    isolation.mkdir(mode=0o700)
+    template = isolation / "template"
+    hooks = isolation / "hooks"
+    template.mkdir(mode=0o700)
+    hooks.mkdir(mode=0o700)
+    with (isolation / "global.config").open("x", encoding="utf-8"):
+        pass
+    return isolation
+
+
+def _fixture_git_paths(isolation: Path) -> tuple[Path, Path, Path]:
+    global_config = isolation / "global.config"
+    template = isolation / "template"
+    hooks = isolation / "hooks"
+    if (
+        isolation.is_symlink()
+        or not isolation.is_dir()
+        or global_config.is_symlink()
+        or not global_config.is_file()
+        or template.is_symlink()
+        or not template.is_dir()
+        or hooks.is_symlink()
+        or not hooks.is_dir()
+    ):
+        raise FixtureError("fixture Git isolation paths are no longer regular owned paths")
+    return global_config, template, hooks
+
+
+def _fixture_git_env(isolation: Path) -> dict[str, str]:
+    """Drop every caller-supplied GIT_* value before running fixture Git."""
+
+    global_config, template, _hooks = _fixture_git_paths(isolation)
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment.update(
+        {
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": str(global_config),
+            "GIT_TEMPLATE_DIR": str(template),
+        }
+    )
+    return environment
+
+
+def _run_fixture_git(isolation: Path, arguments: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run Git with fixture-owned configuration and no inherited Git context."""
+
+    _global_config, template, hooks = _fixture_git_paths(isolation)
+    return subprocess.run(
+        [
+            "git",
+            "-c",
+            f"core.hooksPath={hooks}",
+            "-c",
+            f"init.templateDir={template}",
+            *arguments,
+        ],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=_fixture_git_env(isolation),
+    )
+
+
+def _source_identity(source: Path, python: Path, git_isolation: Path) -> dict[str, Any]:
+    """Resolve the exact source package and commit under isolated interpreters."""
+
+    try:
+        top_level = _run_fixture_git(
+            git_isolation, ["-C", str(source), "rev-parse", "--show-toplevel"]
+        ).stdout.strip()
+        source_commit = _run_fixture_git(
+            git_isolation, ["-C", str(source), "rev-parse", "--verify", "HEAD^{commit}"]
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise FixtureError("could not verify the source worktree with isolated Git") from exc
+    if top_level != str(source):
+        raise FixtureError("isolated Git did not resolve the source worktree as its exact top-level")
+    if not source_commit:
+        raise FixtureError("isolated Git did not resolve an exact source HEAD commit")
+
+    query = (
+        "import json\n"
+        "import multi_agent_manager\n"
+        "import multi_agent_manager.cli\n"
+        "import multi_agent_manager.wake_runtime\n"
+        "print(json.dumps({\n"
+        "  'multi_agent_manager': multi_agent_manager.__file__,\n"
+        "  'multi_agent_manager.cli': multi_agent_manager.cli.__file__,\n"
+        "  'multi_agent_manager.wake_runtime': multi_agent_manager.wake_runtime.__file__,\n"
+        "}, sort_keys=True))\n"
+    )
+    try:
+        imported = subprocess.run(
+            [str(python), "-I", "-c", query],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        raw_paths = json.loads(imported.stdout)
+    except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+        raise FixtureError("source isolated Python could not import the MAM CLI and wake runtime") from exc
+    if not isinstance(raw_paths, Mapping):
+        raise FixtureError("source isolated Python returned invalid module paths")
+
+    package = source / "multi_agent_manager"
+    if package.is_symlink() or not package.is_dir():
+        raise FixtureError("source worktree has no regular multi_agent_manager package")
+    package_root = package.resolve(strict=True)
+    module_paths: dict[str, str] = {}
+    for module in ("multi_agent_manager", "multi_agent_manager.cli", "multi_agent_manager.wake_runtime"):
+        raw_path = _required_string(raw_paths.get(module), field=f"resolved {module}.__file__")
+        try:
+            resolved = Path(raw_path).resolve(strict=True)
+        except OSError as exc:
+            raise FixtureError(f"resolved {module}.__file__ does not exist") from exc
+        if not resolved.is_file() or not _is_within(resolved, package_root):
+            raise FixtureError(f"resolved {module}.__file__ is outside SOURCE_ROOT/multi_agent_manager")
+        module_paths[module] = str(resolved)
+
+    return {
+        "source_root": str(source),
+        "source_python": str(python),
+        "source_python_resolved": str(python.resolve(strict=True)),
+        "source_cli": [str(python), "-I", "-m", "multi_agent_manager.cli"],
+        "source_git_toplevel": top_level,
+        "source_commit": source_commit,
+        "source_modules": module_paths,
+    }
 
 
 def _fixture_root_for_prepare(value: str) -> Path:
@@ -224,6 +367,43 @@ def _assert_source(source: Mapping[str, Any]) -> None:
         raise FixtureError("native-v2 source was retried after the precise rejection")
 
 
+def _assert_source_event(source: Mapping[str, Any], *, task: str, job: str, child: str) -> None:
+    if (
+        source.get("kind") != "job_stopped"
+        or source.get("task") != task
+        or source.get("job") != job
+        or source.get("executor") != child
+        or source.get("recipient") != child
+    ):
+        raise FixtureError("native-v2 source does not identify the declared fixture task, job, and child")
+    _required_string(source.get("signature"), field="native-v2 source signature")
+    _assert_source(source)
+
+
+def _assert_escalation_event(
+    escalation: Mapping[str, Any], *, task: str, job: str, manager: str, child: str
+) -> None:
+    if (
+        escalation.get("kind") != MANAGER_EVENT
+        or escalation.get("task") != task
+        or escalation.get("job") != job
+        or escalation.get("executor") != child
+        or escalation.get("recipient") != manager
+    ):
+        raise FixtureError("Manager escalation does not identify the declared fixture task, job, Manager, and child")
+    _required_string(escalation.get("signature"), field="Manager escalation signature")
+
+
+def _assert_escalation(source: Mapping[str, Any], escalation: Mapping[str, Any]) -> None:
+    source_signature = _required_string(source.get("signature"), field="native-v2 source signature")
+    if escalation.get("source_event") != source_signature:
+        raise FixtureError("Manager escalation is not tied to the blocked source signature")
+    if escalation.get("error") != EXACT_REJECTION:
+        raise FixtureError("Manager escalation does not contain the exact direct-input rejection")
+    if escalation.get("action") != "use_native_followup_task":
+        raise FixtureError("Manager escalation has the wrong fallback action")
+
+
 def _assert_no_extra_manager_event(events: list[dict[str, Any]], task: str, manager: str, escalation: Mapping[str, Any]) -> None:
     manager_events = [event for event in events if event.get("task") == task and event.get("recipient") == manager]
     if len(manager_events) != 1 or manager_events[0].get("signature") != escalation.get("signature"):
@@ -255,9 +435,9 @@ def _running_fixture_context(
     events = _events(state)
     source = _one(_matching_source(events, task, job, child), label="blocked native-v2 source")
     escalation = _one(_matching_escalation(events, task, job, manager, child), label="Manager native-followup escalation")
-    _assert_source(source)
-    if escalation.get("source_event") != source.get("signature") or escalation.get("action") != "use_native_followup_task":
-        raise FixtureError("Manager escalation is not tied to the blocked source")
+    _assert_source_event(source, task=task, job=job, child=child)
+    _assert_escalation_event(escalation, task=task, job=job, manager=manager, child=child)
+    _assert_escalation(source, escalation)
     _assert_no_extra_manager_event(events, task, manager, escalation)
     counters = state.get("counters")
     if not isinstance(counters, Mapping):
@@ -279,10 +459,15 @@ def _write_receipt(root: Path, value: str, payload: Mapping[str, Any]) -> None:
 
 
 def _load_baseline(root: Path, value: str) -> dict[str, Any]:
-    baseline = _absolute_path(value, field="--baseline")
-    if not _is_within(baseline, root / "receipts"):
-        raise FixtureError("baseline must be inside FIXTURE_ROOT/receipts")
-    return _regular_json(baseline, label="baseline receipt")
+    return _load_fixture_receipt(root, value, label="baseline receipt", field="--baseline")
+
+
+def _load_fixture_receipt(root: Path, value: str, *, label: str, field: str) -> dict[str, Any]:
+    baseline = _absolute_path(value, field=field)
+    receipts = root / "receipts"
+    if not _is_within(baseline, receipts) or baseline.parent != receipts:
+        raise FixtureError(f"{label} must be a direct file inside FIXTURE_ROOT/receipts")
+    return _regular_json(baseline, label=label)
 
 
 def _checkpoint_payload(
@@ -301,13 +486,123 @@ def _checkpoint_payload(
         "service_pid": state.get("pid"),
         "service_cycles": _integer(counters.get("cycles"), field="service cycles"),
         "turn_start_attempts": _integer(counters.get("turn_start_attempts"), field="turn-start attempts"),
-        "source_signature": source.get("signature"),
+        "source_signature": _required_string(source.get("signature"), field="native-v2 source signature"),
+        "source_delivery": source.get("delivery"),
         "source_attempts": _integer(source.get("attempts"), field="source attempts"),
-        "escalation_signature": escalation.get("signature"),
-        "escalation_attempts": _integer(escalation.get("attempts"), field="escalation attempts"),
+        "source_failure_kind": source.get("failure_kind"),
+        "source_block_kind": source.get("block_kind"),
+        "source_error": source.get("last_error"),
+        "source_next_attempt_at": source.get("next_attempt_at"),
+        "escalation_signature": _required_string(escalation.get("signature"), field="Manager escalation signature"),
+        "escalation_source_event": escalation.get("source_event"),
+        "escalation_error": escalation.get("error"),
+        "escalation_action": escalation.get("action"),
         "escalation_delivery": escalation.get("delivery"),
+        "escalation_attempts": _integer(escalation.get("attempts"), field="escalation attempts"),
         "escalation_accepted_at": escalation.get("accepted_at"),
     }
+
+
+def _assert_checkpoint_receipt(
+    receipt: Mapping[str, Any],
+    *,
+    phase: str,
+    task: str,
+    job: str,
+    manager: str,
+    child: str,
+    escalation_delivery: str,
+    escalation_attempts: int,
+) -> None:
+    if receipt.get("kind") != "native-v2-fallback-checkpoint" or receipt.get("phase") != phase:
+        raise FixtureError(f"baseline is not a {phase} native-v2 fallback checkpoint")
+    for field, expected in (("task", task), ("job", job), ("manager", manager), ("child", child)):
+        if receipt.get(field) != expected:
+            raise FixtureError(f"baseline has a different {field}")
+    source_signature = _required_string(receipt.get("source_signature"), field="baseline source signature")
+    escalation_signature = _required_string(receipt.get("escalation_signature"), field="baseline escalation signature")
+    if source_signature == escalation_signature:
+        raise FixtureError("baseline source and escalation signatures must differ")
+    if (
+        receipt.get("source_delivery") != "blocked"
+        or _integer(receipt.get("source_attempts"), field="baseline source attempts") != 1
+        or receipt.get("source_failure_kind") != FAILURE_KIND
+        or receipt.get("source_block_kind") != FAILURE_KIND
+        or receipt.get("source_error") != EXACT_REJECTION
+        or receipt.get("source_next_attempt_at") is not None
+    ):
+        raise FixtureError("baseline does not preserve the exact blocked source")
+    if (
+        receipt.get("escalation_source_event") != source_signature
+        or receipt.get("escalation_error") != EXACT_REJECTION
+        or receipt.get("escalation_action") != "use_native_followup_task"
+        or receipt.get("escalation_delivery") != escalation_delivery
+        or _integer(receipt.get("escalation_attempts"), field="baseline escalation attempts") != escalation_attempts
+    ):
+        raise FixtureError("baseline does not preserve the exact Manager escalation")
+    accepted_at = receipt.get("escalation_accepted_at")
+    if escalation_delivery == "accepted":
+        if not isinstance(accepted_at, str) or not accepted_at:
+            raise FixtureError("accepted baseline has no Manager acknowledgement timestamp")
+    elif accepted_at is not None:
+        raise FixtureError("pending baseline unexpectedly has a Manager acknowledgement timestamp")
+    _integer(receipt.get("service_cycles"), field="baseline service cycles")
+    _integer(receipt.get("turn_start_attempts"), field="baseline turn-start attempts")
+
+
+def _assert_checkpoint_event_snapshot(
+    source: Mapping[str, Any], escalation: Mapping[str, Any], receipt: Mapping[str, Any]
+) -> None:
+    source_fields = {
+        "signature": "source_signature",
+        "delivery": "source_delivery",
+        "attempts": "source_attempts",
+        "failure_kind": "source_failure_kind",
+        "block_kind": "source_block_kind",
+        "last_error": "source_error",
+        "next_attempt_at": "source_next_attempt_at",
+    }
+    escalation_fields = {
+        "signature": "escalation_signature",
+        "source_event": "escalation_source_event",
+        "error": "escalation_error",
+        "action": "escalation_action",
+        "delivery": "escalation_delivery",
+        "attempts": "escalation_attempts",
+        "accepted_at": "escalation_accepted_at",
+    }
+    for event, fields, label in (
+        (source, source_fields, "source"),
+        (escalation, escalation_fields, "Manager escalation"),
+    ):
+        for event_field, receipt_field in fields.items():
+            if event.get(event_field) != receipt.get(receipt_field):
+                raise FixtureError(f"{label} no longer matches the delivered checkpoint {receipt_field}")
+
+
+def _assert_source_checkpoint_snapshot(source: Mapping[str, Any], receipt: Mapping[str, Any]) -> None:
+    for event_field, receipt_field in {
+        "signature": "source_signature",
+        "delivery": "source_delivery",
+        "attempts": "source_attempts",
+        "failure_kind": "source_failure_kind",
+        "block_kind": "source_block_kind",
+        "last_error": "source_error",
+        "next_attempt_at": "source_next_attempt_at",
+    }.items():
+        if source.get(event_field) != receipt.get(receipt_field):
+            raise FixtureError(f"source no longer matches the delivered checkpoint {receipt_field}")
+
+
+def _assert_escalation_identity_snapshot(escalation: Mapping[str, Any], receipt: Mapping[str, Any]) -> None:
+    for event_field, receipt_field in {
+        "signature": "escalation_signature",
+        "source_event": "escalation_source_event",
+        "error": "escalation_error",
+        "action": "escalation_action",
+    }.items():
+        if escalation.get(event_field) != receipt.get(receipt_field):
+            raise FixtureError(f"Manager escalation no longer matches the delivered checkpoint {receipt_field}")
 
 
 def command_plan(_args: argparse.Namespace) -> int:
@@ -336,11 +631,9 @@ def command_prepare(args: argparse.Namespace) -> int:
     source = source.resolve(strict=True)
     if _is_within(root, source) or _is_within(source, root):
         raise FixtureError("fixture root and source worktree must not contain one another")
-    mam = source / ".venv" / "bin" / "mam"
-    if mam.is_symlink() or not mam.is_file() or not os.access(mam, os.X_OK):
-        raise FixtureError("source worktree has no executable .venv/bin/mam")
-    if not (source / "multi_agent_manager" / "wake_runtime.py").is_file():
-        raise FixtureError("source worktree has no wake_runtime source")
+    python = source / ".venv" / "bin" / "python"
+    if not python.is_file() or not os.access(python, os.X_OK):
+        raise FixtureError("source worktree has no executable .venv/bin/python")
     manager = _canonical_agent(args.manager, field="--manager")
     child = _canonical_agent(args.child, field="--child")
     if manager == child:
@@ -360,26 +653,32 @@ def command_prepare(args: argparse.Namespace) -> int:
     state, project, receipts = root / "state", root / "project", root / "receipts"
     for directory in (state, project, receipts):
         directory.mkdir(mode=0o700)
+    git_isolation = _prepare_fixture_git_isolation(root)
     try:
-        subprocess.run(
-            ["git", "init", f"--initial-branch={BRANCH}", str(state)],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        subprocess.run(["git", "-C", str(state), "config", "user.name", "MAM native-v2 fixture"], check=True)
-        subprocess.run(
-            ["git", "-C", str(state), "config", "user.email", "mam-native-v2-fixture@invalid"], check=True
-        )
+        source_identity = _source_identity(source, python, git_isolation)
+        _run_fixture_git(git_isolation, ["init", f"--initial-branch={BRANCH}", str(state)])
+        _run_fixture_git(git_isolation, ["-C", str(state), "config", "user.name", "MAM native-v2 fixture"])
+        _run_fixture_git(git_isolation, ["-C", str(state), "config", "user.email", "mam-native-v2-fixture@invalid"])
         (state / "README.fixture.md").write_text(
             "# Isolated native-v2 fallback fixture\n\nThis Git root is owned only by its marker.\n",
             encoding="utf-8",
         )
-        subprocess.run(["git", "-C", str(state), "add", "README.fixture.md"], check=True)
-        subprocess.run(["git", "-C", str(state), "commit", "-m", "Initialize native-v2 fallback fixture"], check=True)
+        _run_fixture_git(git_isolation, ["-C", str(state), "add", "README.fixture.md"])
+        _run_fixture_git(
+            git_isolation,
+            ["-C", str(state), "commit", "--no-verify", "-m", "Initialize native-v2 fallback fixture"],
+        )
+        fixture_top_level = _run_fixture_git(
+            git_isolation, ["-C", str(state), "rev-parse", "--show-toplevel"]
+        ).stdout.strip()
+        fixture_git_dir = _run_fixture_git(
+            git_isolation, ["-C", str(state), "rev-parse", "--absolute-git-dir"]
+        ).stdout.strip()
     except (OSError, subprocess.CalledProcessError) as exc:
-        raise FixtureError("could not initialize the isolated fixture Git state") from exc
+        raise FixtureError("could not initialize or verify the isolated fixture Git state") from exc
+    expected_fixture_git_dir = str((state / ".git").resolve(strict=True))
+    if fixture_top_level != str(state.resolve(strict=True)) or fixture_git_dir != expected_fixture_git_dir:
+        raise FixtureError("isolated Git did not create the fixture state repository in its owned directory")
     config_dir = project / ".mam"
     config_dir.mkdir(mode=0o700)
     _write_new_json(
@@ -388,7 +687,8 @@ def command_prepare(args: argparse.Namespace) -> int:
         label="fixture project configuration",
     )
     (project / "README.fixture.md").write_text(
-        "Run only the source-worktree .venv/bin/mam from this project directory.\n", encoding="utf-8"
+        "Run only SOURCE_ROOT/.venv/bin/python -I -m multi_agent_manager.cli from this project directory.\n",
+        encoding="utf-8",
     )
     _write_new_json(
         receipts / "prepare.json",
@@ -396,10 +696,16 @@ def command_prepare(args: argparse.Namespace) -> int:
             "kind": "native-v2-fallback-prepare",
             "prepared_at": _now(),
             "root": str(root),
-            "source_mam": str(mam),
+            **source_identity,
+            "fixture_git_toplevel": fixture_top_level,
+            "fixture_git_dir": fixture_git_dir,
             "manager": manager,
             "child": child,
-            "side_effects": ["new isolated fixture directory", "new isolated fixture Git state", "new fixture project config"],
+            "side_effects": [
+                "new isolated fixture directory",
+                "new isolated fixture Git state",
+                "new fixture project config",
+            ],
             "not_done": ["no MAM task", "no scheduler", "no App Server connection", "no Codex thread or follow-up"],
         },
         label="prepare receipt",
@@ -411,7 +717,7 @@ def command_prepare(args: argparse.Namespace) -> int:
                 "project": str(project),
                 "state": str(state),
                 "receipts": str(receipts),
-                "source_mam": str(mam),
+                **source_identity,
                 "next": "Root Manager must manually create/publish/bind the fixture task, then explicitly delegate its existing native child.",
             },
             ensure_ascii=False,
@@ -446,6 +752,91 @@ def command_record_delegation(args: argparse.Namespace) -> int:
     return 0
 
 
+def _fixture_job_archive(fixture_job: Mapping[str, Any]) -> tuple[str, str]:
+    if fixture_job.get("status") != "archived":
+        raise FixtureError("fixture job is not archived")
+    archive = fixture_job.get("archive")
+    if not isinstance(archive, Mapping):
+        raise FixtureError("archived fixture job has no archive record")
+    if archive.get("note") != CHILD_ARCHIVE_NOTE:
+        raise FixtureError("fixture job archive note is not the controlled native-v2 fallback note")
+    archived_at = _required_string(archive.get("at"), field="fixture job archive timestamp")
+    return CHILD_ARCHIVE_NOTE, archived_at
+
+
+def command_record_child_archive(args: argparse.Namespace) -> int:
+    """Record the native child's already-completed, controlled fixture archive."""
+
+    root, marker = _load_fixture(args.root)
+    manager, child = _require_fixture_identities(marker, args)
+    task_record = _task_record(root, args.task)
+    if task_record.get("agent") != child:
+        raise FixtureError("fixture task is not bound to the declared native child")
+    fixture_job = _fixture_job(task_record, args.job)
+    archive_note, archived_at = _fixture_job_archive(fixture_job)
+    attestation = args.attestation.strip()
+    if (
+        "collaboration.followup_task" not in attestation
+        or "mam job archive" not in attestation
+        or args.task not in attestation
+        or args.job not in attestation
+        or archive_note not in attestation
+    ):
+        raise FixtureError(
+            "child archive attestation must name collaboration.followup_task, mam job archive, this TASK-ID/JOB-ID, and the controlled note"
+        )
+    _write_receipt(
+        root,
+        args.receipt,
+        {
+            "kind": "native-v2-fallback-child-archive",
+            "recorded_at": _now(),
+            "task": args.task,
+            "job": args.job,
+            "manager": manager,
+            "child": child,
+            "job_status": fixture_job.get("status"),
+            "job_archive_note": archive_note,
+            "job_archived_at": archived_at,
+            "attestation": attestation,
+        },
+    )
+    print("child archive receipt recorded; this command did not archive a job or send a message")
+    return 0
+
+
+def _assert_child_archive_receipt(
+    receipt: Mapping[str, Any],
+    *,
+    task: str,
+    job: str,
+    manager: str,
+    child: str,
+    fixture_job: Mapping[str, Any],
+) -> None:
+    if receipt.get("kind") != "native-v2-fallback-child-archive":
+        raise FixtureError("child archive receipt has the wrong kind")
+    for field, expected in (("task", task), ("job", job), ("manager", manager), ("child", child)):
+        if receipt.get(field) != expected:
+            raise FixtureError(f"child archive receipt has a different {field}")
+    archive_note, archived_at = _fixture_job_archive(fixture_job)
+    if (
+        receipt.get("job_status") != "archived"
+        or receipt.get("job_archive_note") != archive_note
+        or receipt.get("job_archived_at") != archived_at
+    ):
+        raise FixtureError("child archive receipt does not match the fixture job archive state")
+    attestation = _required_string(receipt.get("attestation"), field="child archive attestation")
+    if (
+        "collaboration.followup_task" not in attestation
+        or "mam job archive" not in attestation
+        or task not in attestation
+        or job not in attestation
+        or archive_note not in attestation
+    ):
+        raise FixtureError("child archive receipt lacks the explicit native follow-up and mam job archive attestation")
+
+
 def command_assert(args: argparse.Namespace) -> int:
     root, marker = _load_fixture(args.root)
     manager, child = _require_fixture_identities(marker, args)
@@ -477,22 +868,47 @@ def command_assert(args: argparse.Namespace) -> int:
         if not args.baseline:
             raise FixtureError("restarted assertion requires --baseline blocked.json")
         baseline = _load_baseline(root, args.baseline)
-        for field in ("task", "job", "manager", "child", "source_signature", "escalation_signature"):
-            if baseline.get(field) != payload.get(field):
-                raise FixtureError(f"restart baseline has a different {field}")
+        _assert_checkpoint_receipt(
+            baseline,
+            phase="blocked",
+            task=args.task,
+            job=args.job,
+            manager=manager,
+            child=child,
+            escalation_delivery="pending",
+            escalation_attempts=0,
+        )
+        _assert_checkpoint_event_snapshot(source, escalation, baseline)
         if payload["service_pid"] == baseline.get("service_pid"):
             raise FixtureError("fixture scheduler PID did not change across the requested restart")
-        if payload["service_cycles"] <= _integer(baseline.get("service_cycles"), field="baseline service cycles"):
-            raise FixtureError("fixture scheduler did not complete a cycle after restart")
+        required_cycles = _integer(baseline.get("service_cycles"), field="baseline service cycles") + 2
+        if payload["service_cycles"] < required_cycles:
+            raise FixtureError("fixture scheduler did not complete two post-restart cycles")
         for field in ("source_attempts", "escalation_attempts", "turn_start_attempts"):
             if payload[field] != _integer(baseline.get(field), field=f"baseline {field}"):
                 raise FixtureError("fixture scheduler retried child input or delivered Manager work during active-root restart")
-        if escalation.get("delivery") != "pending" or escalation.get("accepted_at") is not None:
+        if (
+            escalation.get("delivery") != "pending"
+            or escalation.get("accepted_at") is not None
+            or escalation.get("last_recipient_state") != "active"
+        ):
             raise FixtureError("Manager escalation was delivered during the active-root restart checkpoint")
     elif phase == "delivered":
         if not args.baseline:
             raise FixtureError("delivered assertion requires --baseline restarted.json")
         baseline = _load_baseline(root, args.baseline)
+        _assert_checkpoint_receipt(
+            baseline,
+            phase="restarted",
+            task=args.task,
+            job=args.job,
+            manager=manager,
+            child=child,
+            escalation_delivery="pending",
+            escalation_attempts=0,
+        )
+        _assert_source_checkpoint_snapshot(source, baseline)
+        _assert_escalation_identity_snapshot(escalation, baseline)
         if escalation.get("delivery") != "accepted" or _integer(escalation.get("attempts"), field="escalation attempts") != 1:
             raise FixtureError("idle root did not receive exactly one accepted fallback escalation")
         if not isinstance(escalation.get("accepted_at"), str) or not escalation["accepted_at"]:
@@ -501,8 +917,15 @@ def command_assert(args: argparse.Namespace) -> int:
         if payload["turn_start_attempts"] != expected_turn_starts:
             raise FixtureError("fixture did not have exactly one additional Manager turn/start after root became idle")
         attestation = (args.manager_attestation or "").strip()
-        if "[MAM Message]" not in attestation or args.task not in attestation or args.job not in attestation:
-            raise FixtureError("--manager-attestation must record the received [MAM Message] with this TASK-ID and JOB-ID")
+        if (
+            "[MAM Message]" not in attestation
+            or args.task not in attestation
+            or args.job not in attestation
+            or EXACT_REJECTION not in attestation
+        ):
+            raise FixtureError(
+                "--manager-attestation must record the received [MAM Message] with this TASK-ID, JOB-ID, and exact rejection"
+            )
         payload["manager_attestation"] = attestation
     else:
         raise FixtureError(f"unsupported running-service assertion phase: {phase}")
@@ -516,22 +939,59 @@ def command_assert_archived(args: argparse.Namespace) -> int:
     manager, child = _require_fixture_identities(marker, args)
     task_record = _task_record(root, args.task)
     fixture_job = _fixture_job(task_record, args.job)
-    if fixture_job.get("status") != "archived":
-        raise FixtureError("fixture job was not archived by the native child")
-    report = root / "state" / ".tasks" / args.task / "report.md"
-    if report.is_symlink() or not report.is_file() or not report.read_text(encoding="utf-8").strip():
-        raise FixtureError("fixture child did not leave a non-empty fixture report")
+    if task_record.get("agent") != child:
+        raise FixtureError("fixture task is not bound to the declared native child")
+    _fixture_job_archive(fixture_job)
+    baseline = _load_baseline(root, args.baseline)
+    _assert_checkpoint_receipt(
+        baseline,
+        phase="delivered",
+        task=args.task,
+        job=args.job,
+        manager=manager,
+        child=child,
+        escalation_delivery="accepted",
+        escalation_attempts=1,
+    )
+    child_archive_receipt = _load_fixture_receipt(
+        root,
+        args.child_archive_receipt,
+        label="child archive receipt",
+        field="--child-archive-receipt",
+    )
+    _assert_child_archive_receipt(
+        child_archive_receipt,
+        task=args.task,
+        job=args.job,
+        manager=manager,
+        child=child,
+        fixture_job=fixture_job,
+    )
     state = _service_state(root)
     active = _events(state)
-    if _matching_source(active, args.task, args.job, child) or _matching_escalation(active, args.task, args.job, manager, child):
-        raise FixtureError("archived fixture job still has an active blocked source or escalation")
+    source_signature = baseline["source_signature"]
+    escalation_signature = baseline["escalation_signature"]
+    active_signatures = {event["signature"] for event in active}
+    if source_signature in active_signatures or escalation_signature in active_signatures:
+        raise FixtureError("archived fixture job still has an active baseline source or escalation")
     history = _history(state)
-    source_history = _matching_source(history, args.task, args.job, child)
-    escalation_history = _matching_escalation(history, args.task, args.job, manager, child)
-    source = _one(source_history, label="archived source history")
-    escalation = _one(escalation_history, label="archived escalation history")
-    if source.get("resolution") is None or escalation.get("resolution") is None:
-        raise FixtureError("archived source/escalation history lacks a stale resolution")
+    source = _one(
+        [event for event in history if event.get("signature") == source_signature],
+        label="baseline source history",
+    )
+    escalation = _one(
+        [event for event in history if event.get("signature") == escalation_signature],
+        label="baseline escalation history",
+    )
+    _assert_source_event(source, task=args.task, job=args.job, child=child)
+    _assert_escalation_event(escalation, task=args.task, job=args.job, manager=manager, child=child)
+    _assert_escalation(source, escalation)
+    _assert_checkpoint_event_snapshot(source, escalation, baseline)
+    if (
+        source.get("resolution") != "condition changed or resolved"
+        or escalation.get("resolution") != "condition changed or resolved"
+    ):
+        raise FixtureError("archived source/escalation history lacks the runtime condition-changed resolution")
     payload = {
         "kind": "native-v2-fallback-checkpoint",
         "phase": "archived",
@@ -542,6 +1002,18 @@ def command_assert_archived(args: argparse.Namespace) -> int:
         "child": child,
         "task_status": task_record.get("status"),
         "job_status": fixture_job.get("status"),
+        "source_signature": source_signature,
+        "escalation_signature": escalation_signature,
+        "source_error": source.get("last_error"),
+        "source_attempts": source.get("attempts"),
+        "escalation_source_event": escalation.get("source_event"),
+        "escalation_error": escalation.get("error"),
+        "escalation_action": escalation.get("action"),
+        "escalation_delivery": escalation.get("delivery"),
+        "escalation_attempts": escalation.get("attempts"),
+        "escalation_accepted_at": escalation.get("accepted_at"),
+        "job_archive_note": CHILD_ARCHIVE_NOTE,
+        "job_archived_at": fixture_job["archive"]["at"],
         "source_history_resolution": source.get("resolution"),
         "escalation_history_resolution": escalation.get("resolution"),
     }
@@ -581,7 +1053,11 @@ def parser() -> argparse.ArgumentParser:
 
     prepare = subcommands.add_parser("prepare", help="create only a new marker-owned fixture project/state")
     prepare.add_argument("--root", required=True, help="new, absolute fixture root")
-    prepare.add_argument("--source-root", required=True, help="source worktree whose .venv/bin/mam will run the fixture")
+    prepare.add_argument(
+        "--source-root",
+        required=True,
+        help="source worktree whose .venv/bin/python -I -m multi_agent_manager.cli will run the fixture",
+    )
     prepare.add_argument("--manager", required=True, help="existing root Manager AGENT-ID")
     prepare.add_argument("--child", required=True, help="existing native child AGENT-ID")
     prepare.add_argument("--confirm", required=True, help="must equal CREATE_NATIVE_V2_FIXTURE")
@@ -595,6 +1071,19 @@ def parser() -> argparse.ArgumentParser:
     delegation.add_argument("--attestation", required=True)
     delegation.add_argument("--receipt", required=True)
     delegation.set_defaults(func=command_record_delegation)
+
+    child_archive = subcommands.add_parser(
+        "record-child-archive",
+        help="record the child-owned fixture job archive after a real native follow-up",
+    )
+    child_archive.add_argument("--root", required=True)
+    child_archive.add_argument("--task", required=True)
+    child_archive.add_argument("--job", required=True)
+    child_archive.add_argument("--manager", required=True)
+    child_archive.add_argument("--child", required=True)
+    child_archive.add_argument("--attestation", required=True)
+    child_archive.add_argument("--receipt", required=True)
+    child_archive.set_defaults(func=command_record_child_archive)
 
     assertion = subcommands.add_parser("assert", help="assert blocked/restarted/delivered state from fixture files")
     assertion.add_argument("--root", required=True)
@@ -614,6 +1103,8 @@ def parser() -> argparse.ArgumentParser:
     archived.add_argument("--job", required=True)
     archived.add_argument("--manager", required=True)
     archived.add_argument("--child", required=True)
+    archived.add_argument("--baseline", required=True, help="delivered.json checkpoint to bind history evidence")
+    archived.add_argument("--child-archive-receipt", required=True, help="child-archive.json controlled attestation")
     archived.add_argument("--receipt", required=True)
     archived.set_defaults(func=command_assert_archived)
 
