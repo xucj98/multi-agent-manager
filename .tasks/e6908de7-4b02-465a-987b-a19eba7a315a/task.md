@@ -1,5 +1,21 @@
 # Memory v1 新 checkpoint 评测准备
 
+## 当前执行：高频源码已准入，启动 C3 有限 GPU 工程验证
+
+Manager 已阅读独立 review `8345c8e2d0ac5698cd0b70a38d44ae8df02aea44`，直接核对实际 config→gate→每集收尾、runtime_errors→run失败链以及正式 f401 祖先，接受代码 PASS。此节解除下文旧“HF 不得部署/不准入GPU”的状态；正式36批仍待本轮工程证据核验。
+
+批准部署精确三库：OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`，robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`，RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`（包含正式f401）。源树位于本机 workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939。C1按.local/wuwen-4090.md创建本TASK-ID新的独立部署三树，C3运行；不得checkout/reset当前两条T formal或其他活跃共享路径。复用稳定资产/模型和既有环境入口，保持renderer补丁与system ICD，不复制数据集或随意升级依赖。
+
+优先使用已预留并通过稳定40-reset的 C3 GPU0，实际启动前查资源/端口。已有基线gate receipt SHA565a83ef9e20713a871be9f1c41f5da2b1a94c072420e07a23309b70bb3f273a仅证明稳定基础；新runtime须自身真实smoke。若renderer/ICD环境未变，无需仅因记录器改动机械重做40-reset；有实际环境差异则按既有有界gate确认。P0接口验收另在C2自有树执行，不混分支、不占其卡；原协议C1 GPU1/2 T jobs继续自然收尾。
+
+立即把已核对36条准备矩阵（SHA20e414eb14c7f752b158949fda2c62b678e6c3eab2bd2a56452f315364700adb）和baseline inputs（SHA305250a177196a83bc27464b3c9eec1dc2d60a61d27bad4472a608c8aa4d5610）落实为实际config/manifest/命令，先核对作者as-built参数，不能只改版本字符串或沿旧bridge hash。配置生成在本机、自有位置完成，按原审计入口与源码身份形成可复核提交/工件，不改算法。训练新增0，模型只读既有train0 J/S、rearrange/put-back，H50/K30/r_s5，T不得进HF，random_light=false/crazy_random_light_rate=0。
+
+本次授权有限工程阶段：沿准备清单的4个普通baseline/shadow和4个matched baseline/shadow工程run（各两episode，既有eval0 seeds100000/100001，video/no-video）验证额外观测、状态probe、动作/RNG和任务线索。保留已通过的旧/新默认CPU兼容性结论；真实GPU成对检查需实际action/key/command/progress/cue证据，不能只比成功率。普通baseline默认不产rolling日志，不为凑证据偷偷改其RPC/采样或引入logger；如必要字段现有通路确实不可观测，报告最小观测缺口，由Manager裁定，不用虚构等价。matched baseline无probe，shadow不改cache/动作；多个episode的RNG作用域分别按旧continuous与显式key0-reset验证。
+
+完成成对检查后可在同一冻结runtime跑J hf_fixed、hf_event两任务各自eval0 matching smoke2，另保留合同所需r_s30退化短检查；不扩r_s1网格，不看分数调阈值。核对已完成row时序、event只取消未执行suffix、正常action流replan、probe独立key、真实JSONL完整、terminal与退出、video。报告实际probe/replan/已执行丢弃行、wall与sim时间、infer延迟和显存，不声称物理异步实时性。工程与formal matching目录分开，工程不能代替不同模式的matching smoke。
+
+工程验证完成后发布紧凑report（当前状态置顶，历史保持原位）含精确三树/配置/manifest、实际资源、成对证据hash与比较结论、matching gates、吞吐及下一首批命令。Manager核对后启动既定36批：J matched6+fixed/event12，S matched6+fixed6，再J periodic6，每arm/每eval seed自己的matching smoke2→fresh100；当前不直接启动HF formal100。预计>30分钟的工程/传输进程同样登记MAM真实PID，结束收尾再归档；当前可执行工作结束就结束turn，由MAM通知，勿轮询。代码/接口实际错误保留首因与失败leaf后上报，不修改阈值、拼partial或自行修公共源码。
+
 ## Manager 当前收尾验收与下一批既有模型评测
 
 Manager已独立验收put-back N/S train0缺失eval0：N17/100、S41/100，分别核对final-review及10个artifact hashes、100连续固定seed/terminal/outcome、进程退出、video flags和command/smoke链。原协议N完整17/27/22=66/300，S41/44/51=136/300；当前42批/4200次执行/20模型/11个完整三eval。两job与smoke清理接受，已进入论文latest evidence snapshot，当前编译PDF仍冻结40批。
