@@ -1101,3 +1101,35 @@ video/no-video 和进程记录均保留，供新排期复用。
 已在 `task/e6908de7-c-eval-docs-consolidated` 提交 `a3566f7`（父 `f251d71`）。该提交同步当前
 r3 队列、两条 smoke 的验收/暂停 formal 状态，并说明旧“无运行中 formal”行只是历史快照；`git diff --check`
 通过，树已干净。该文档分支未合入或改写任何活跃 runtime。
+
+## 2026-09-13：九条 stopped formal100 终验与归档
+
+针对发布 task revision `ab324eea674a8d124c23e1d243b3385289c150d6`，已从每个 formal leaf 的
+`diagnostics_summary.json`、`seed_preflight.jsonl`、`episode_diagnostics.jsonl`、
+`processes.jsonl`、`video_checks.jsonl` 与 worker/process logs 逐项复核。九条均为完整可报告的
+100-episode 结果：summary 为 `completed`、target 100、error null；100 个 accepted 且连续的
+固定 seed、100 个 terminal diagnostics、100 个 scheduler exit 0、100 个 video check `ok=true`；
+所有 owned child 已退出，未发现 EOF、ConnectionResetError、traceback、segfault 或 runtime error。
+每个 leaf 新增 `final_review.json`，其中保存上述五份核心 artifact 的 SHA-256、matching-smoke
+provenance、冻结 runtime 和正常任务失败计数。worker 中每份各有一条已知的 SAPIEN
+`Failed to find Vulkan ICD file` warning；健康完成 run 中同样出现，故不作为基础设施失败。
+
+| run | train / eval seed | score | MAM job |
+| --- | --- | ---: | --- |
+| `c_rearrange_serial_lag30_trainseed1_evalseed1_100ep_r3` | 1 / 1 (`200000..200099`) | 38 / 100 | `d626a209-7b69-4042-9427-3c73be8efe0d` |
+| `c_rearrange_serial_lag30_trainseed1_evalseed2_100ep_r3` | 1 / 2 (`300000..300099`) | 37 / 100 | `71767977-6cda-461f-9a7a-6e8537c53e4d` |
+| `c_rearrange_serial_lag30_trainseed2_evalseed0_100ep_r3` | 2 / 0 (`100000..100099`) | 12 / 100 | `b0b0bad2-ed95-4966-bf61-621fb86e701c` |
+| `c_rearrange_serial_lag30_trainseed2_evalseed1_100ep_r3` | 2 / 1 (`200000..200099`) | 14 / 100 | `146e19f0-ed6b-4f4a-8bef-356bca4f665d` |
+| `c_rearrange_serial_lag30_trainseed2_evalseed2_100ep_r3` | 2 / 2 (`300000..300099`) | 15 / 100 | `b9624ab0-9fdd-469e-a5a2-a2d22868dc22` |
+| `c_rearrange_serial_lag30_trainseed0_evalseed1_100ep_r3` | 0 / 1 (`200000..200099`) | 27 / 100 | `977e29ab-e527-4e65-bc84-9b5bb2c03f02` |
+| `c_rearrange_serial_lag30_trainseed0_evalseed2_100ep_r3` | 0 / 2 (`300000..300099`) | 23 / 100 | `a1453162-c880-45d0-b639-e3edf0db3494` |
+| `c_rearrange_full_t_plus_30_trainseed0_evalseed1_100ep_r3` | 0 / 1 (`200000..200099`) | 90 / 100 | `5be8d262-f6f6-45a4-ae0d-5b02e3dfc043` |
+| `c_rearrange_full_t_plus_30_trainseed0_evalseed2_100ep_r3` | 0 / 2 (`300000..300099`) | 94 / 100 | `d7f772a9-1b0e-4d80-9350-a7c794ac03f1` |
+
+证据根目录：
+`/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/<run>/final_review.json`。
+C1 的七条使用 clean、冻结的 RMBench `bf34743334efc98440fa9b05e3f2f05e8303846a`；C2/C3 的两条使用
+RMBench `2e9677ce8ec9f623395184f63f32ddafa66e5e44`；全部 bridge 为
+`f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI 为
+`a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。九个 stopped MAM job 已分别以 score、seed 范围和
+`final_review.json` 路径归档；本 task 当前没有未归档 job。
