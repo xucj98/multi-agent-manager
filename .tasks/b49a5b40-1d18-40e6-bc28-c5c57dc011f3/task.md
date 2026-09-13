@@ -51,3 +51,11 @@ Manager已git fetch origin main。origin/main=2cb7309是本地main=bc8726f的祖
 - stopped.json 已保存 service running=false/disabled 与冻结 cycles=13，现已仅重启 fixture service；下一步核验至少两个新 cycles 并写 restarted.json。未收到真实 idle-root notification，不能提前写 delivered attestation。
 - restarted 后 root 必须结束 turn，实际收到带同 TASK/JOB/精确错误的 MAM Message 才按 runbook 验 delivered；然后 native followup 同 child 仅归档此 fixture job，核 history、停止 fixture、verify-source after-stop、归档 fixture task并将 receipts 保留到 fixture 外再 guarded cleanup。
 - Source author 此期间不得修改 editable 源；生产 daemon、App Server、生产 task/job 均不在本次验收修改范围。
+
+## Manager 完整闭环裁决（2026-09-13 11:22 UTC）
+
+真实 fixture 已 PASS：restarted 从 stopped cycles13 到17且不同daemon PID；Manager随后在实际新turn收到同TASK/JOB/精确拒绝通知，delivered accepted/attempts1；root原生followup同child后真实job archive及child-archive receipt完成，两事件按原signature转history且 resolution 为 condition changed or resolved。child最终回答遇到provider503发生在成功归档/写receipt之后，Manager实读确认，无重复归档。fixture停机、source after-stop身份复核、task archive和guarded cleanup均完成。
+
+14份回执永久外存本任务 native-v2-fallback-evidence.json，SHA256 b87e37cbb0214f53f447f23d13c297863fdf14d753869756c895aead699858bf。临时fixture目录已删除。正式集成和标准安装已委派 a0c09804-1b5b-4df3-abf0-986ff19381af，原source保持干净供版本核对。
+
+对用户表述必须准确：本修复补的是明确v2 direct-input拒绝后的Manager转交与停止无效重试，没有恢复AppServer对原生subagent的直接turn/start，也不代表所有失败均为同一已知原因；一般transient/unknown错误保持原语义，不误报为此unsupported类别。
