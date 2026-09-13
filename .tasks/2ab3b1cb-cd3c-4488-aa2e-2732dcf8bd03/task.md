@@ -14,3 +14,6 @@ Manager已检查 J train0 eval0 episode0：q8 observed_progress completed=240、
 5. 新增 machine-readable episode/query事实表及小CSV摘要、可重复脚本、README。每行原始路径/hash、query和event定位清晰；源码来源固定到实际冻结bridge/RMBench版本。可以 gzip 存机械大表。给两个成功、两个失败的完整对齐例，标明是例证。
 
 交付 report+publish 后结束turn，MAM通知Manager。不要等待其他agent、改造trace logger或生成独立验证数据。先做这项零新增训练的分析，后续是否需要状态干预/新增字段由Manager裁决。
+
+## 已验收审计的稳定路径（2026-09-13）
+审计f987修订版已逐字保存在 /root/Documents/task-state-vla-paper/docs/audits/20260913-trace-inventory/ 。从此引用该目录的trace_index.json（SHA256 3ca213ca9a692028b1fe1583bfa38a7820fb0ab3e3620d389a995825e30d2ef3）与audit.md/build_index.py，不依赖即将归档的f987 workspace；原始run路径/600集合同不变。请给Manager简短确认没有旧workspace读取依赖。
