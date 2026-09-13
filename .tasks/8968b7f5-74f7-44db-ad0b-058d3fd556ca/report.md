@@ -1,10 +1,34 @@
-# P0 选中 query 诊断记录接口：attempt2 结果报告
+# P0 选中 query 诊断记录接口：最终交付报告
 
-## 当前状态
+## Manager 最终裁决
 
-**未通过完整 GPU 诊断验收；S（`serial_lag30`）两集 smoke 与严格 `recorded` 验收已完成。同一已加载 backend 的 logging invariance 通过，但跨进程 saved replay 仍因 actions 数值差异失败；没有自动重试。**
+本报告对应已发布任务 revision `506649777f83d7adbd4f7f9fb482246f525298eb`。**Manager 接受冻结 OpenPI、robot-bridge 与 RMBench 实现的有界诊断能力；结论只覆盖已核验的 J（`full_t_plus_1`）和 S（`serial_lag30`）实际 query-1 示例。**
 
-本报告对应已发布任务 revision `17d74d9151ae1ec53ace8ddf3c9ef9f39256ba68`。授权的 attempt2 已修复并通过 task-private preflight，J（`full_t_plus_1`）两集 smoke 与严格 `recorded` 验收均通过；随后真实 logging off/on pair 在与保存记录的严格输出比较处失败。attempt2 流水线在该首因停止，当时 S（`serial_lag30`）未启动；后续获准的 S-only 接续结果见本报告末尾。
+- J 与 S 各有两条严格 `recorded` 记录。已核验的 Policy action → backend `float32` H50 → execute K30 前缀映射精确；S 的真实 logits、selected IDs 和 action-condition 也彼此一致。
+- 在同一已加载 backend、相同实际输入及恢复起始 key 下，J 与 S 的 logging off/on 普通输出、状态和最终 RNG 都严格相等。这证明本次实际例子的记录及同进程 logging invariance，不证明每个任务或输入上的行为等价，也不证明物理实时等价。
+
+## 未接受的范围与失败证据
+
+跨进程 saved replay 在 J 和 S 中都没有通过：即使在正确的 backend 边界转换为 `float32`，保存的动作仍与另一个进程中的 direct actions 不同。S 的完整实际数组显示 700 个 action 元素中 446 个不同，`max_abs=0.0034926608204841614`、`RMSE=0.0005220882065109197`；其他已比较状态字段和最终 key 相等。J 未保存旧 direct arrays，且 legacy 比较在 action 首差后短路，因此差异量级和其后未比较字段均为 `unavailable`。不得将这项失败归因于 logger、编译器或 HF。
+
+S 的 `actual_k=null` 表示 controller completion 未被观测；30 行 scheduler execute request/trace 只能证明该请求与 trace，不能称为物理完成。上述失败和观测边界保留在下方历史材料及归档中。
+
+## 验收代码与证据归档准备
+
+已在两个主仓库的共享 Git 数据库中保留验收代码分支，未更改任何主工作树 HEAD：
+
+- OpenPI：`codex/p0-query-diagnostics-accepted` → `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`
+- robot-bridge：`codex/p0-query-diagnostics-accepted` → `e147f600dc4329f330a6e2eb0335150b5b3093a3`
+
+任务私有工具和选定 J/S 证据已存入 `/mnt/public/xcj/Projects/multi-agent-manager/.tasks/8968b7f5-74f7-44db-ad0b-058d3fd556ca/artifacts/p0-query-diagnostics-accepted-20260914/`，由 MAM 根提交 `c053f611b5d1e5385ac25e4d78e139bf866bf618` 保留。归档含 120 个索引内容文件、28 个复制的 C2 证据文件，整个目录为 2,663,153 bytes。归档目录中运行 `sha256sum -c SHA256SUMS` 已全部通过；关键索引文件的 SHA-256 为：
+
+- `README.md`：`9c5e49285b9ddb19fad8e02a8b76521856f9a4d41622174b4308abf882509808`
+- `artifact-index.json`：`3b780eff9e980a1476e908d15eb82072c2b0f41d5cb684eada74755b88faeb28`
+- `SHA256SUMS`：`5bad74b7b565bd1ec3dc086310bd50ad42c382e96e3c3db425f25af928d9667d`
+
+原始 C2 run roots 和证据保持原位，并在索引中列出；归档没有复制环境、依赖、模型 checkpoint、cache、视频或完整 C2 runtime tree。两个任务专用代码工作树已复核为 clean，归档已准备好供 Manager 验收。执行者没有调用 `mam task archive`，源任务仍保持未归档状态。
+
+以下各节按实际发生顺序保留早期失败、后续 S 接续和收据；其中的当时状态描述不改变上面的最终裁决。
 
 ## 自匹配 preflight 修复及部署
 
@@ -91,4 +115,4 @@ S pair 收据 `/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-a
 
 外层 pipeline status 为 `failed`、exit code 1、last phase `serial_lag30_logging_invariance_and_saved_replay_pair`，SHA-256 `fc3a869755dc57c3be5f8a2e467ba2d80691efa37e0ef4d85cda8c8a395047ff`；outer log SHA-256 `85887b1e55aa8fef7db25ba6082dbead0ebe33b4b636aa147901a82150d38765`。唯一非零退出由 pair 的合取根结果触发，S smoke、recorded acceptance 和两个独立科学结论均已保留；没有重试或扩大预算。
 
-最终 C2 只读核验显示没有 task-owned 进程、19460/19462 未监听、GPU6 为 4 MiB/0%，三棵冻结树仍 clean。MAM job `a308dc56-192a-456e-8722-bbcedd484943` 已于 `2026-09-13T20:26:18Z` archived；归档仅结束跟踪，未删除任何 S/J artifacts。完整 P0 GPU 准入仍交由 Manager 最终裁决。
+最终 C2 只读核验显示没有 task-owned 进程、19460/19462 未监听、GPU6 为 4 MiB/0%，三棵冻结树仍 clean。MAM job `a308dc56-192a-456e-8722-bbcedd484943` 已于 `2026-09-13T20:26:18Z` archived；归档仅结束跟踪，未删除任何 S/J artifacts。当时完整 P0 GPU 准入仍待 Manager 最终裁决；该最终有界裁决见报告开头。
