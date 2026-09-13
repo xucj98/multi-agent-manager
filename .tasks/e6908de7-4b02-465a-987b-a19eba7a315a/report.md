@@ -1180,3 +1180,22 @@ load_train_config → _runtime_metadata → MemoryContext 确认上述 config ID
 结果根为 `/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/<run>/final_review.json`。put-back 两条使用冻结 RMBench `2e9677ce8ec9f623395184f63f32ddafa66e5e44`；rearrange no-memory 两条使用冻结 RMBench `bf34743334efc98440fa9b05e3f2f05e8303846a`；全部 bridge 为 `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI 为 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。归档前端口 `19410/19412`、`19420/19422`、`19460/19462` 均未监听。
 
 put-back no-memory/serial 的独立 YAML 候选 `f401f5279c95451eb424ac98b831bab5552b2120` 已获 Manager 准入：只补 `put_back_no_memory` 的空 fields/joint_dense 和 `put_back_serial_lag30` 的 phase/origin_mat serial-token `query_selected/query` 路由。它保留在独立 `c-eval-putback-baselines-yaml` tree，bridge/OpenPI 仍冻结为 `f962663`/`a869498`；后续每个 eval seed 仍须先执行自己的 prepare-audit 和 matching smoke，再启动 formal。
+
+## 2026-09-13 16:36 CST：N/S/J seed0 实际 C1 队列
+
+本节记录已实际启动的评测，不把 smoke 成绩当正式结果，也没有新增训练、重启或拼接既有 rollout。
+
+| 项目 | eval seed | C1 GPU / ports | 当前阶段 | MAM job / PID | 固定环境 seed |
+| --- | ---: | --- | --- | --- | --- |
+| rearrange full t+1, train0（J） | 1 | GPU3 / 19430,19432 | formal100 running | `884096c3-f7ad-48f2-b1a7-843bc0c2cb66` | `200000..200099` |
+| rearrange full t+1, train0（J） | 2 | GPU4 / 19440,19442 | formal100 running | `071c8a2e-c00f-46d7-b180-c31c8e91c718` | `300000..300099` |
+| put-back no-memory, train0（P-N） | 1 | GPU1 / 19410,19412 | formal100 running | `30fda7f6-0d1b-440d-857b-85e203dc9963` | `200000..200099` |
+| put-back no-memory, train0（P-N） | 2 | GPU2 / 19420,19422 | formal100 running | `479c266c-7530-404b-9071-2f68344e2190` | `300000..300099` |
+| put-back serial-lag30, train0（P-S） | 1 | GPU5 / 19450,19452 | matching smoke2 running | outer PID `3485974` | `200000,200001` |
+| put-back serial-lag30, train0（P-S） | 2 | GPU6 / 19460,19462 | matching smoke2 running | outer PID `3494949` | `300000,300001` |
+
+J 的两条 matching smoke 都经 `/tmp/e6908_validate_smoke.py` 验证通过：两条 accepted terminal、episode0 视频可解码（371/376 frames）、episode1 no-video、scheduler exit 0，且无基础设施 marker。P-N 的两条 smoke 也均通过同一门禁；eval1 视频为 487 frames，eval2 视频为 326 frames。P-N eval2 的 smoke 有一条正常任务失败，仍保留原始证据并照固定队列接续，未按 smoke 成绩选择或重跑。
+
+P-N/P-S 使用独立、已准入的 YAML runtime：RMBench `f401f5279c95451eb424ac98b831bab5552b2120`（包含 `2e9677c` 与已批准 renderer reuse 修复）、bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。其四份 prepare-audit receipt 均已完成且 checkpoint before/after inventories 一致；P-N 是空 fields/joint-dense，P-S 是 `phase, origin_mat` 的 serial-token query feedback。J 的 frozen runtime 为 RMBench `bf34743334efc98440fa9b05e3f2f05e8303846a`、同一 bridge/OpenPI。所有启动前都核对 formal leaf 不存在、端口空闲及三库 tracked 状态干净；C1 首次启动按约两分钟间隔错开。
+
+当前本轮已新增并登记 4 条 formal100；P-S 的两个短 smoke 尚待完成各自完整门禁，随后才会启动对应 formal 并登记。所有结果位于 `/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/` 的各 run leaf。
