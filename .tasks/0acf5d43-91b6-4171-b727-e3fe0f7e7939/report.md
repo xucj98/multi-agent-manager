@@ -1,5 +1,13 @@
 # 交付报告
 
+## 原入口首 query 准备（仅 CPU，未执行）
+
+已在任务私有目录准备保持原 `BenchmarkRunner` 启动、metadata、reset/preflight 和首 query 路线的有界诊断入口：[runner](/mnt/public/xcj/Projects/multi-agent-manager/.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/first_query_diagnostic/tools/original_entry_first_query_runner.py)（SHA-256 `376dd1fd087a5e79a9cbda4e83d1ff5b8534dc9c59429a60acbdf8ed2a0abf34`）仅替换其生成的 scheduler child；[scheduler](/mnt/public/xcj/Projects/multi-agent-manager/.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/first_query_diagnostic/tools/original_entry_first_query_scheduler.py)（`0561e295e644bee882c7abaee9d08e856b9e5ad00aeafbb4ed480ad7f3179ae2`）在首个同步 RPC 返回后才于 RAM 深拷贝完整 request/response，并在原 `run_iteration()`、`after_execute`、clear 和无 drain status 后写入收据。完整行为、边界和 8 MiB 单数组上限见[说明](/mnt/public/xcj/Projects/multi-agent-manager/.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/first_query_diagnostic/original_entry_first_query.md)（`c11656f94b8d2ef043964465d8ecca9a0d83575fc7ff25bf1c5e3499f2d9d6db`）。
+
+[CPU seam tests](/mnt/public/xcj/Projects/multi-agent-manager/.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/first_query_diagnostic/tools/test_original_entry_first_query.py)（`3f9653c70525febdf2b7167696539cc9e3c535f728974bef214dd48bdf756a5c`）当前复跑为 `11 passed`，并通过 Python 编译；覆盖一次 infer 上限、post-send ambiguity 不重试、预检拒绝不进入 seed `100001`、execute 后 clear/status 顺序和诊断 child 的 episode-0 failure leaf。默认 launcher 只打印计划，未执行 `--execute`，因此本次准备没有启动 GPU、正常 policy server、真实 reset、replay、warmup 或完整轨迹，也没有消耗剩余 action samples。
+
+该捕获是 `WebSocketClient.call()` 返回后的对象观察，不能称作原始 wire bytes；真实 PRNG key 仍不可得。任何诊断 receipt 都是独立失败/有界收据，不能用作 matching smoke 或 formal 成功证据；当前正式评测仍暂停，生产源码树保持只读。
+
 ## 当前增量修复
 
 已按 Manager 对复审 `27b16d899cf0220986a7531ad04989b227270f61` 的裁决，完成 rolling evidence 的 formal 准入链窄修；未改算法、默认 baseline、OpenPI、P0 logger、训练或运行中的 C 环境。
