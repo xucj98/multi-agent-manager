@@ -1247,3 +1247,13 @@ C3 GPU0 的稳定基础 renderer 40-reset gate 仍在运行：MAM `9325bb73-243c
 | `c_put_back_serial_lag30_trainseed0_evalseed2_100ep_r3` | `c_put_back_serial_lag30_trainseed0_evalseed2_smoke2_r3` | 51 / 1,854,277 | `f645bb09afcbe7816e9dcb91a37c511c12191e7a1998d864ecfdd23815153161` |
 
 因此前节“smoke raw artifact 均保留”仅应理解为 formal 验收前的留存状态；最终清理状态以本节回执为准。
+
+## 2026-09-13 19:41 CST：C3 highfreq-base 40-reset renderer gate PASS
+
+已验收并归档 MAM job `9325bb73-243c-405f-b9af-bf719d7ade20`。这是 C3 GPU0 的**稳定基础 runtime renderer 生命周期门禁**，只运行 `put_back_block/demo_clean_eval` 的 reset，不启动 policy 或写入 `eval_result`；它不代表高频状态推理源码已部署、review 通过或准入。
+
+receipt 为 `/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c-eval-highfreq-base/records/renderer_reset_gate_c3_gpu0_highfreq_base.json`，SHA-256 `565a83ef9e20713a871be9f1c41f5da2b1a94c072420e07a23309b70bb3f273a`：`passed=true`、`completed_count=requested_count=40`、`error=null`，固定 seed `100000..100039` 和 episode id `0..39` 连续。每行均为 `accepted=true`、`state=ready`、`terminal=false`、`logical_step=0`、`failure_reason=null`。receipt 的 ConnectionResetError、EOFError、renderer/driver、segfault、core dump 和 traceback marker 都为零；独立扫描 worker/outer logs 的 RPC/runtime marker 亦为零。outer log 记录 `passed=true, completed_count=40`。
+
+核验时 outer PID `1270746` 已停止，19400/19402 无监听，GPU0 为 1 MiB used / 24,080 MiB free / 0% utilization。冻结 runtime 三树保持 clean：RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。
+
+审计回执为 `records/renderer_reset_gate_c3_gpu0_highfreq_base.review.json`，SHA-256 `c88645dd60cef7eec14537d297c963a3116fffa54a574554a1360c77a02b4159`；它保存 receipt/worker/outer SHA、逐项门禁结论及进程释放状态。高频源码 task `0acf5d43-91b6-4171-b727-e3fe0f7e7939` 仍未收到 code review PASS 和 Manager 部署准入，本 task 未接入或启动任何新的 highfreq smoke/formal。
