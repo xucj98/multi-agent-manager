@@ -1,5 +1,19 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## 当前接续：准备原入口两样本验证，先完成 CPU/源代码核对
+
+Manager 已独立验收 report 240caf91cdab0aa8fc91b198424495bf00237969 的离线数值部分：重哈希其 34 个引用文件，逐项重读两集旧 baseline H50 / shadow K30 和新 NPZ，确认新 H50 vs 旧 baseline 为 511/700 不同，历史 K30 为 299/420 不同，报告数值准确。接受“新结果不等于任一旧侧”；**不接受仅凭下一组两样本便能区分 wrapper、启动顺序等具体原因的表述**。同时改变入口/缓存/插桩后一次复现或不复现只能给有边界的证据，不能独立作因果归因。
+
+Manager 的下一步设计：保留旧 BenchmarkRunner 启动/metadata/reset/episode prompt/首 query 路线、正常 policy server、冻结源码和 checkpoint。put-back train0 / env100000，matched baseline、matched shadow 各一次 action infer，共用剩余 2/8 的预算。**本次通知只授权任务私有工具准备及 CPU 检查，GPU 待 Manager 审阅独立工程核查后明确通知。** 不等待 reviewer 才开始准备。
+
+与此前建议的区别：必须保存本次实际 policy 请求的完整 RGB/state/memory/prompt/请求选项、post-wire H50 响应、真实 execute K30 和 reset/命令/环境身份。优先在 scheduler 的同步 policy RPC 返回后、将结果交回原逻辑之前才复制/写盘请求和响应；请求可沿原 call 参数取得，禁止新增 get_obs/reset/infer、模型/transform/JAX wrapper 或 pre-infer host copy/fsync。Manager 已读 WebSocketClient.call：packb→同步 send/recv→unpackb，本身不修改请求；仍请核对实际 scheduler 请求/返回值的后续复用。保留正常 execute 请求后，在下一次会推进队列的 get_obs 之前 step0 clear，记录 queued=30、dropped=30、完成步数0。实际请求仅引用到 RPC 返回后取值的局限如实说明，不伪称直接截取实际 wire bytes。
+
+沿原 robot/policy 启动及握手、reset 请求；正常 policy server 不使用前次 diagnostic_policy_server.py，不改 Policy.infer/input transforms/random.split，不追加 replay/warmup。保留原环境可确认部分并完整记录当前 JAX/WARP/CUDA/XLA/缓存配置，不新建一套 runtime/模型/通用日志框架，不人为声称旧未记录环境已相同。本次可保留新的 scheduler 小型 wrapper及第一 query 后截停；若沿原 runner 必须通过明确的 diagnostic stop / 非零 child 退出避免第二集，保留原异常语义和 failure leaf，另写诊断完成收据，不能把截停伪装为 successful smoke。
+
+CPU/源码检查应证明：一次 infer 上限且不重试，不开始第二 episode；返回后才捕获输入/响应；execute 后 clear 不推进动作；完整请求字段留存且不修改原值。预先列明最小 hook/命令差异、停止与失败资源释放路径、新产物路径和字节上限。比较本次两臂完整输入、H50/K30，以及旧两侧和前次新捕获；未观测到的真实 PRNG key仍写 unavailable，不能拿 stream/call 当 key。无论相等与否，均不凭两次首 query 自动解除全轨迹匹配/HF formal 暂停，也不调容差。
+
+独立核查 TASK-ID 655416db-f379-4793-878d-b2538ad26d81 正与 Manager 并行核对上述接入点；你先准备小型工具并发布准备报告，保持原 source trees只读。无需改生产源码或重新 review 整个算法。
+
 ## 当前接续：旧工程与新首query捕获的离线差异定位
 
 已收到报告18f786b49c3461fb2b2fc766b2afa8febe234e26：新捕获6次正常action sample没有复现历史差异。Manager正在独立核验wrapper与原始数组。请与Manager并行做下面的离线定位，不增加GPU采样、reset、完整轨迹或修改生产源码，剩余2次采样暂保留。
