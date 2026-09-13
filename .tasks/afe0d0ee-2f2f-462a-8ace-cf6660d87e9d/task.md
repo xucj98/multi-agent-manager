@@ -1,5 +1,9 @@
 # P0诊断记录接口独立审查：行为等价、RNG与证据完整性
 
+## 当前仅做验收后的缓存清理和归档
+
+Manager已验收report2fb0db33并放行P0 C2最小GPU工程；本review完成。首次mam archive被任务自有.pytest_cache和__pycache__阻止。当前仅清理本review两树内测试产生的可再生缓存，不跟随symlink、不删除.venv/共享环境/源码/报告/有价值证据；若unknown ignored不是明显生成物先报告。核对git tracked/untracked clean及来源后，从MAM根执行mam task archive本TASK-ID，note写Manager已验收上述report和精确bc760/e147，仅代码准入，源实现树仍保留供部署。不得重新审查、修改report或源树。归档成功即结束；真实障碍具体报告，不请求用户常规清理许可。
+
 ## 当前复审：live descriptor 集中修复已交付，精确候选冻结
 
 源 report `a217779ac9683cacd8c25d426597e9b78b32d9f0` 已发布，Manager 已核对两树 HEAD/clean。恢复增量复审：bridge `b1695f7f04050836a764c1e85a6db163e3526ada` → `e147f600dc4329f330a6e2eb0335150b5b3093a3`；OpenPI `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6` 保持不变。复用独立 review 树，clean 后只快进 bridge。
