@@ -2,6 +2,8 @@
 
 ## 当前轮次：修复已交付，按新精确版本增量复审
 
+Manager已直接核对真实recorder与runner，接受新增P1：rolling_evidence kind不被真实RMBenchResultRecorder支持，调用在accepted episode try外；你复现的episode引用字段丢失也须修。已发布源任务要求最小真实接口接线及真实recorder seam测试，必要时许可独立RMBench f401f527窄改。继续其他增量审查，最终报告明确所有冻结库版本；作者下一clean提交到达再复核此项，不读取dirty diff替代正式结论。
+
 Manager已核对两作者树clean，新的准确交付为：OpenPI `4529a91c1f49a50c8710a7182e31ca5a32dfa05a` → `0ce566bd34f99cb4775422f012ab67c16aa53885`；robot-bridge `53f853aa71b80a7eadd9fb3092abe39c64df1149` → `a0f1d5035d77cea7cb300eb511ceb5cf3fd1a93d`。源报告ebbde890已发布。复用你现有独立review worktree，clean后将review分支快进至候选；不要重建重复树，不混P0 logger实现。
 
 优先验证之前两个已接受P1及新matched协议：普通baseline真实infer/reset默认字段与跨episode action RNG保持旧行为；显式reset_episode_rng配置的baseline保持原SchedulerBase/MemoryContext/K30且不做probe，matched shadow不改cache/动作、独立probe RNG，与matched baseline多episode实际action/key相同。HF始终显式reset与正式合同一致，T拒绝维持，不拿新baseline/shadow互比代替旧默认兼容性。
