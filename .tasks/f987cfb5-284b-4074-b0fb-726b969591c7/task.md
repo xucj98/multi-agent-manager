@@ -10,3 +10,10 @@
 5. 交付一份小的machine-readable索引（model/run/episode ID/env seed/原始路径/hash/available fields）和中文audit.md。若必须增加只读日志才能做P0，提出最小hook位置与输出合同供Manager裁决，不改生产。无需复现所有历史结果。
 
 将成果写本任务独立workspace并在MAM report发布；没有修改业务代码则不需建业务worktree，如需实现先报告再按mam workspace流程。不得修改论文正文/科学设计、不能独立宣布瓶颈或改进结论。不等待长进程/高频轮询；当前可做完成后结束。
+
+## Manager 初审后事实修正（2026-09-13）
+继续只读审计，修订并发布audit/report：
+1. J/T表的“训练只在episode first frame读reference offset0”疑似把normal input和first-frame override颠倒。沿冻结config与实际输入构造函数核实：普通query训练当前reference、首帧initial、推理cache；给commit/文件/行。
+2. “完成但未按”统一改成“未记录有效按压（终态标签）”，明确不表示整个任务完成；索引complete_no_press为机械分类别名，不额外推出动作机制。
+3. 沿真实compute_loss/reduction确认Memory-v1是否实际使用key_state_loss_weight，区分遗留metadata与有效权重，列出N/J/S/T各项有效系数及分母。不要仅把保存的0.1/1.0当实际不同权重。
+4. 给actual K、qpos/TOPP时间与RNG等关键判断的确切冻结代码路径/commit定位。无需扩大1500集重复扫描；只补事实和来源。仍不实现hook、不训练/rollout、不修改论文，科学判断由Manager完成。
