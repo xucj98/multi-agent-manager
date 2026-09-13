@@ -1,75 +1,84 @@
-# P0 选中 query 诊断记录接口：增量独立审查报告（等待窄修）
+# P0 选中 query 诊断记录：b169 增量独立复审报告（仍有 P2）
 
 ## 审查对象与隔离
 
-- OpenPI 增量：`cb861d3824a46d9c243be7ff69159bcec17a0ac7..bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`
-- robot-bridge 增量：`a2c7f80b99556db2147c85ca9f625ffb840b276a..fa62a9febc8fab9098994d0cb8e1894a0590b7e8`
-- 原始冻结基线：OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`、bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`
-- review worktree：`/mnt/public/xcj/Projects/workspace/afe0d0ee-2f2f-462a-8ace-cf6660d87e9d/openpi` 与 `/mnt/public/xcj/Projects/workspace/afe0d0ee-2f2f-462a-8ace-cf6660d87e9d/robot-bridge`
+- OpenPI 保持 `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`，未修改。
+- robot-bridge 仅从 `fa62a9febc8fab9098994d0cb8e1894a0590b7e8` 快进到冻结候选 `b1695f7f04050836a764c1e85a6db163e3526ada`。
+- 原始冻结基线仍为 OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`、bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`。
+- review worktree：`/mnt/public/xcj/Projects/workspace/afe0d0ee-2f2f-462a-8ace-cf6660d87e9d/openpi` 和 `/mnt/public/xcj/Projects/workspace/afe0d0ee-2f2f-462a-8ace-cf6660d87e9d/robot-bridge`；两棵树在复审结束时均干净。
 
-未修改作者源码；未运行 GPU、rollout、训练、正式评测或部署。临时基线 archive 已清理。
+已阅读本任务发布修订 `a77e8ca5d4303f58eda931849254f0bed64aba3a` 和源交付报告 `e5ec1cdd0017dd7a01ba3b29cc9d2035ec4e3bc0`。未修改作者源码，未运行 GPU、rollout、训练、正式评测或部署。
 
-## 已独立核验
+## 已独立确认的修复
 
-- Memory-v1 execute 非 `ok` 后，record 会跨 retry 保留，直至后续 supersede、terminal 或 reset 写出明确 discarded；unknown `actual_k.value` 保持 `null`。legacy full-state candidate 在 execute 前已带 record ID，失败路径不再 orphan。相关 query/simulation 窄测通过。
-- 1024×1024 RGB、小数组预算的真实 Policy→codec→recorder seam 在 Policy 快照前得到 cap，产生小型 `not_recorded_array_limit` 记录，不传输完整图像 sidecar；Policy 侧 6 项诊断测试通过。
-- 额外构造的 serial 小预算反例确认仍调用普通三值 sampler，未调用 details sampler；actions、condition IDs 与最终 JAX RNG 均和关闭记录相等。
-- 默认关闭的最小 Policy 调用在原 logger `cb861` 与候选 `bc760` 得到相同输出键、state、actions 和最终 RNG 指纹。
-- strict JSON/NPZ dry-run 成功写入并校验一条含 `-inf` serial logits 的记录（17 arrays）。候选的 JSON/NPZ link、hash、文件名、strict-finite 与初始发布保护也由 bridge 窄测覆盖。
-- checkpoint 只提供位置/运行引用而非权重内容身份的边界已在 `docs/reference/query-diagnostic.md` 及 scheduler record 明确：正式诊断仍须关联独立核验、且含权重内容 hash 的 run-level manifest。
+1. **Memory-v1 evidence 合同。** 合法 serial 和 joint-dense sidecar 能写成 `recorded` 并通过离线校验；真实 CPU `Policy.infer` 路径配合完整 resolved Memory-v1 metadata 也分别成功写入并验证（joint 17 arrays，serial 20 arrays）。`metadata_incomplete` 和 `missing_key_state_output` 的真实 Policy sidecar 均改写为可见的 `policy_sidecar_incomplete`。`none` 在 metadata 声明 Memory-v1 时不能绕过合同；旧 serial sampler 的未单独观测 selected IDs 也保持 incomplete。
 
-## 已接受但仍阻塞的 P2
+2. **materialized NPZ 语义复查。** 独立篡改后，serial 越界 selected ID、serial condition 与 selected ID 不一致、joint decoded ID/label 不一致，以及 joint raw coordinate 与 raw action 的声明 slice 不一致，都由 `validate_record()` 拒绝。Memory evidence 中结构错误的 `array_ref` 会在录入时得到明确 incomplete，而不会导致 recorder 抛异常或伪造 memory 完整性。
 
-1. **Memory 证据可被部分 sidecar 伪装为完整。**  
-   `robot_bridge/scheduler/query_diagnostic.py:489-492` 的 `_complete_sidecar_error()` 仅要求 `memory.representation` 为非空字符串。将一个有效 serial sidecar 的 memory 替换为 `{"representation":"serial_token"}` 后，`record_policy_response()` 返回 true，JSON 写为 `status="recorded"`，`validate_record()` 仍通过（10 arrays）；缺少真实 `key_state_logits`、selected IDs 与 action-condition IDs。joint-dense 的 raw/decoded memory 证据同样未被该检查要求。Manager 已接受此 P2；下轮须按 representation 验证必需 evidence，并让录入侧与离线 validator 共享拒绝逻辑。
+3. **preflight 顺序。** 分别把会拒绝复制的 1024×1024 ndarray 放入 `episode_info`、episode status、runtime provenance 与 selected scheduler input，并将 cap 设为 1 byte。四例都在任何诊断复制前写出小型 `not_recorded_array_limit` / `scheduler_input_preflight` 记录，未把 cap 作为 writer failure，且没有向普通 policy input 加入诊断 context。
 
-2. **scheduler context 在容量预检前复制。**  
-   `robot_bridge/scheduler/openpi_simulation.py:883-890` 在 `begin_query()` 前对诊断专用的 `episode_info` 执行 `copy.deepcopy()`。以 1024×1024 RGB 的 ndarray 子类在 `__deepcopy__` 中报错、cap=1 触发时，recorder 状态为 `begin_query` write failure，且没有小型 cap record，证明复制发生在 preflight 之前。Manager 已接受此 P2；应把该 context 的容量估算移到复制前，并使超限明确可见且不影响正常调度。
+4. **此前已通过的行为证据仍适用。** 默认关闭的输出、动作、state 和 RNG；serial cap 时保持普通三值 sampler；生命周期 retry/supersede/reset/terminal；以及 strict JSON/`-inf` NPZ 路径均沿用上轮独立结论。本轮 dry-run 重新写出并校验了 17-array 的 strict JSON/NPZ serial 记录。
 
-这两项修复并经独立复核前，当前冻结候选**不可进入最小受控 GPU smoke**。
+## 新发现：P2，live `array_ref` 可伪造 `recorded`
 
-## 四项 read-only transform failure 的准确归类
+`b169` 只要求 Memory-v1 特定字段在录入时已经 materialize；完整 sidecar 的其他必需 array evidence 仍可携带一个结构上正确、但没有任何 policy-side NPZ 可解析的 `array_ref`。
 
-对同一 `tests/scheduler/test_openpi_memory_transform_contract.py` 最小输入，分别强制加载：
+精确复现：以合法 serial sidecar 为起点，只将
+`policy.outputs.model_actions_before_output_transform` 替换为：
 
-- 原始 `a869/f962`
-- 原 logger `cb861/a2c7`
-- 当前 `bc760/fa62`
+```python
+{
+    "array_ref": {
+        "key": "not-on-policy-wire",
+        "dtype": "<f4",
+        "shape": [2, 4],
+        "nonfinite": False,
+    }
+}
+```
 
-三组均为 4 个相同失败，均在 `src/openpi/transforms.py:246` 的 `AbsoluteActions` 原地写入只读 action 数组处报 `ValueError: output array is read-only`。bridge 测试文件在三个 commit 的 blob 相同；Policy 输出转换边界也未被本 logger 增量修改。因此这四例明确**早于整个 logger**，不是本轮修复引入，也不是 fixture 合同导致的误报。它们是独立既有问题，未计入本审查的 logger 阻塞项。
+在 `b169` 上，`record_policy_response()` 返回 `True`，JSON 被写为 `status="recorded"`；生成的 NPZ 不含 `not-on-policy-wire`。随后 `validate_record()` 才以 `references missing array 'not-on-policy-wire'` 拒绝该文件。该 raw model action chunk 是完成记录的必需证据。
 
-## 独立验证记录
+根因是 `_Externalizer.convert()` 对 mapping 原样递归，无法为传入的 descriptor 创建数组（`robot_bridge/scheduler/query_diagnostic.py:263-285`）；`_complete_sidecar_error()` 对 raw 与 transformed action 允许 descriptor（同文件 `:904-924`）；而 `record_policy_response()` 随即写入 `recorded`（`:1210-1224`）。离线校验在 `:1024-1044` 才发现缺 key。该差异也适用于其他 live sidecar 的非-memory 必需数组，例如 RNG key、三种 input view、explicit noise 或 transformed actions。
+
+这违反本轮要求的“录入侧与离线 validator 共享完整性合同”，并留下一个文件状态已经声称完整、但无法离线校验的记录。建议将 live Policy sidecar 的全部必需 array evidence 统一要求为 materialized host arrays（或在录入前以等价方式可靠 materialize/绑定），对任何 ingress `array_ref` 写明确 incomplete；修复后复测上述 raw-action 反例、Memory 字段反例、合法 real serial/joint 以及 preflight 路径。
+
+## 独立验证
 
 ```bash
 # OpenPI candidate
-JAX_PLATFORMS=cpu .venv/bin/pytest -q src/openpi/policies/policy_diagnostic_test.py
+JAX_PLATFORMS=cpu .venv/bin/python -m pytest -q \
+  src/openpi/policies/policy_diagnostic_test.py
 # 6 passed
 
-# candidate OpenPI + bridge source
-JAX_PLATFORMS=cpu PYTHONPATH=<review-bridge> .venv/bin/python -m pytest -q \
-  <review-bridge>/tests/scheduler/test_query_diagnostic.py \
-  <review-bridge>/tests/scheduler/test_openpi_simulation.py
-# 35 passed
+# OpenPI environment + reviewed bridge candidate
+JAX_PLATFORMS=cpu \
+PYTHONPATH=/mnt/public/xcj/Projects/workspace/afe0d0ee-2f2f-462a-8ace-cf6660d87e9d/robot-bridge \
+.venv/bin/python -m pytest -q \
+  /mnt/public/xcj/Projects/workspace/afe0d0ee-2f2f-462a-8ace-cf6660d87e9d/robot-bridge/tests/scheduler/test_query_diagnostic.py \
+  /mnt/public/xcj/Projects/workspace/afe0d0ee-2f2f-462a-8ace-cf6660d87e9d/robot-bridge/tests/scheduler/test_openpi_simulation.py
+# 57 passed
 
-# strict JSON/NPZ standalone dry-run
+# bridge serializer dry-run plus validator
 .venv/bin/python scripts/query_diagnostic_dry_run.py --directory <temporary-directory>
 .venv/bin/python scripts/validate_query_diagnostic.py <temporary-directory>/records/*.json
-# recorded, 17 arrays
+# status=recorded, array_count=17
+
+.venv/bin/ruff check robot_bridge/scheduler/query_diagnostic.py \
+  robot_bridge/scheduler/openpi_simulation.py tests/scheduler/test_query_diagnostic.py \
+  scripts/query_diagnostic_dry_run.py
+.venv/bin/ruff format --check robot_bridge/scheduler/query_diagnostic.py \
+  robot_bridge/scheduler/openpi_simulation.py tests/scheduler/test_query_diagnostic.py \
+  scripts/query_diagnostic_dry_run.py
+# all passed
 ```
 
-还以显式 `PYTHONPATH` 验证 archive 实际导入路径后，在 baseline、original logger 与 candidate 各执行 transform-contract 测试；三次均为上述同一 4 failed。该失败用于归类，不可表述为当前候选新增回归。
+还独立执行了：真实 Policy serial/joint → recorder → validator；真实 `metadata_incomplete` / `missing_key_state_output` sidecar；四个 copy-forbidden scheduler source 的 cap 反例；以及上述 NPZ 语义篡改与 live raw-action descriptor 反例。前四类均按预期通过或拒绝，最后一例复现本报告 P2。
 
-## 未裁决观察
+## 保留边界与结论
 
-4096 行、4 维 mock action 的 Policy→codec→recorder 反例显示：在 action-dispatch 证据加入总额后，record 可能在 bridge 端才成为 array-limit。该 mock 不符合本轮 RMBench 的 H50/K30/robot_dim=14 合同，且其 packed-byte 数含普通 RPC/容器开销；Manager 未将其裁决为本轮阻塞。下轮如需扩大容量审查，应先以合法合同构造相同问题。
+上轮对四个 read-only transform failures 的归类保持不变：同一测试 blob 在原始 `a869/f962`、原 logger `cb861/a2c7` 和旧候选均在 `src/openpi/transforms.py:246` 相同失败，早于整个 logger，不计为本候选回归。
 
-## 下轮复审门槛
+4096×4 action-dispatch 容量观察仍未用合法 H50/K30/robot_dim=14 合同证实，未作为 blocker。
 
-收到作者精确 clean commit 后，仅复核：
-
-- representation-specific memory completeness，包括真实 `metadata_incomplete`、`missing_key_state_output`、旧 sampler selected-ID 缺失、伪造 `recorded` 与 offline validator；
-- scheduler context 的 preflight-before-copy 反例、最小 cap record 和不影响动作/RNG；
-- 受影响的 query/simulation、Policy seam 与 strict JSON/NPZ 窄测试。
-
-当前结论：**不通过，等待两项 P2 窄修；不可进入 GPU smoke。**
-
+`b169` 已修复此前的 memory-completeness 与 scheduler-copy-preflight P2，但上述新的 evidence-ingress P2 仍会生成伪完整记录。因此当前候选**不具备进入最小受控 GPU smoke 的条件**；等待窄修和独立复核。GPU 验收从未执行，最终裁决仍由 Manager 作出。
