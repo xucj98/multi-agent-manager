@@ -1,5 +1,15 @@
 # P0诊断记录接口：状态原始输出、动作和RNG的无行为改动采集
 
+## 当前裁决：补齐已验收的首次 infer 90 秒配置，再做一次有界工程验收
+
+Manager 已核对报告 `2c2996f8fc8b850b4ec68822ec90dc3f255cfc72`、C2 实际 command/scheduler config、policy log，以及 failure receipt 和其中 19 份引用文件的 SHA。接受此次失败是首个 policy RPC 在 30 秒 deadline 前没有返回，记录为 `policy_response_missing`，不构成接口 GPU 准入。旧失败及所有记录保留。已通过的 renderer gate/替代 CUDA smoke 不重跑。
+
+实际 J/S scheduler_config.yaml 都漏了 `params.policy_first_infer_timeout`，因此落回 30 秒；已验收 bridge f962 的这项功能在当前 e147 中仍完整存在，P0 override 调用父类路径。原评估 task e690 的既有独立准入为首个 infer 90 秒、后续 30 秒，并已有冷启动 XLA compile 27.232 秒和成功 smoke 证据。这是此次诊断入口遗漏已接受运行设置；当前 PTX 日志仍不足以证明全部耗时根因。
+
+授权 terra/max 执行者在本机准备本 task 的 v2 配置/launcher，只补 `params.policy_first_infer_timeout: 90.0` 及必要的新输出位置/证据身份，保存相对 v1 的 diff/hash。使用全新 result、diagnostics、manifest/config 副本目录，保留 v1 原件及失败 receipt；不得让新记录覆盖同名 episode/query。三库冻结版本、C2 GPU6/ports、环境/权重、H50/K30、episode 0/1、seed 100000/100001、query 1、2 records/64 MiB 均保持。核实 launcher 实际传入新 config，首个请求日志明确 90 秒，后续仍 30 秒，不额外 infer 预热或改 RNG，不新增 timeout API/依赖/共享 cache 改动。
+
+在资源预检后允许 J 一次新的两集 smoke；完整 J recorded 验收通过后，继续原已授权的 J 同输入/实际 key/noise off/on 配对及 S 两集 smoke/配对，S 也使用相同首次 90 秒设置。各阶段保持原有完整性/行为等价合同。新失败保留首因，不循环增加 timeout 或重跑；实际完成后归档 jobs、发布紧凑报告。预计超过 30 分钟的程序登记 MAM，等待长进程时结束 turn。此次是明确配置修正后的有限恢复，取代此前“J 不重试”的停止边界；不启动 HF、formal100 或机制采样。
+
 ## 当前继续：Manager已核实uv软链来源，替换错误路径断言后恢复工程验收
 
 Manager已亲自只读核对C共享部署及稳定installer，确认旧worktree_env_smoke.py以解析后路径含site-packages判来源，与C installer显式--link-mode symlink不兼容。P0 task环境中的nvidia_curobo0.7.8安装在本task venv，geom_cu词法路径在该venv/lib/python3.10/site-packages，真实实体在uv/archive-v0/UYbDTNQF-bGDe1JmV92NN。扩展13,367,808 bytes，SHA256 `874b95cb65d84eeb0a84562482de7551638f7c9974d3323b152142476f8abb01`，与installed RECORD的SHA256以及稳定wheel内同名成员逐字节内容一致。稳定wheel `/mnt/public/xcj/Projects/state-vla/.cache/curobo/wheel/nvidia_curobo-0.7.8-cp310-cp310-linux_x86_64.whl` SHA256 `780a878713cad48043b4537268c860e52393ddeb46709a6377409f9c65f4f988`。原smoke脚本SHA256 `589733e0d89f16880303a6bb02c4573348496e7f53805537def5e1cafaab9b21`。因此这一次路径字符串拒绝是环境检查误报，尚未执行的真实cuRobo CUDA distance仍必须完成，不能把来源核对当成CUDA运算通过。
