@@ -2,6 +2,8 @@
 
 ## 当前执行：已确认四项问题的增量复审
 
+Manager已核对fa62a9fe._complete_sidecar_error和bc7603c5真实memory生成器，接受你新发现的P2：只检查representation导致缺S/J核心memory证据仍recorded。已发布源task窄修要求，含真实metadata_incomplete/missing_key_state_output分支、录入与离线validator共享规则、合法不完整标记及有效/无效样本。继续其余增量审查，报告精确候选和剩余发现；等作者下一提交再核实该项，不需要中断其他工作或重复已完成验证。
+
 源task8968b7f5新报告 `1ed55ee703ad7bd0bc3c2a37dc850121b59832c5` 已发布，以下新冻结提交取代旧交付作为本轮审查对象：OpenPI `cb861d3824a46d9c243be7ff69159bcec17a0ac7` → `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`；robot-bridge `a2c7f80b99556db2147c85ca9f625ffb840b276a` → `fa62a9febc8fab9098994d0cb8e1894a0590b7e8`。保留你已有独立review workspace，不新建重复树；核对clean后把本任务review分支快进至相应候选，再读新report及代码。
 
 Manager此前已接受四项发现：v1 execute non-ok后record过早关闭、legacy non-ok候选缺record ID形成悬挂、cap在复制/传输后才检查、空complete sidecar可伪装recorded。逐项独立复核真实run_iteration失败/重试/supersede/reset/terminal链，证据未知actual K保持null，不改变动作或默认RNG。检查源新增preflight在host/device copy、msgpack和NPZ之前生效，极小预算+1024²RGB测试须真正经过Policy/codec/recorder链而非只测serializer；容量不足仍不能改变S sampler语义。检查必需schema、missing sampling key以及伪造recorded的校验拒绝。
