@@ -29,3 +29,13 @@ Manager已git fetch origin main。origin/main=2cb7309是本地main=bc8726f的祖
 - stop→start之间以fixture service status确认running false后再start；restart验证明确至少2 cycles的增量，不能仅>baseline。
 - escalation精确error和source linkage都校验；delivered attestation含精确错误；archive history按delivered baseline绑定同signature/error/attempts/accepted事实，child归档用明确原生工具回传留证，不从非空report猜操作者。
 以上以最小修订和有界无模型临时验证实现，不扩成新产品功能/通用测试框架，不重复核心215测试；README保持简短。修正后提交、发布report，再原生followup同reviewer复核新diff/关键负例。仍不运行真实fixture/production install/restart。root独立验收后会立即派真实fixture步骤。
+
+## Manager对 fda59da 复审的裁决（2026-09-13）
+接受 reviewer ad8df989efb6ce953b096474729ec4684b61124b 的三项具体问题；Manager已直接核对代码，且只读 service status 独立复现 `-m` 的 `Store requires a project configuration`。核心 runtime46af8c2条件PASS不变，本次仅修验收脚本/操作文档。之前Manager指定的 `-I -m multi_agent_manager.cli` 在本库循环导入下不成立，本节明确替代该旧要求。
+
+请在原worktree最小修正：
+1. 全部controlled CLI argv统一为 `[SOURCE_PYTHON, "-I", "-c", "from multi_agent_manager.cli import main; raise SystemExit(main())"]`，receipt、README/helper帮助和runbook一致。保留真实module-path核验，不通过改产品Store/isinstance或导入结构绕过验收工具错误。必须在临时独立项目以shadow PYTHONPATH实际执行task show、service status、service stop和task archive验证；仅--help/语法检查不够，不能启动真实scheduler/App Server。
+2. 在fixture stop且status running=false后、start前记录专用stopped receipt或相等冻结counter。restarted必须相对该stopped counter至少+2，仍绑定原blocked的source/escalation/task/job/Manager/child/旧daemon身份与attempts；不能用最初blocked的旧计数。最小负例覆盖blocked10→旧daemon12→stop12→新daemon13必须拒绝、达到14才满足周期数。停止receipt必须有停机观测与来源身份，不能接受任意人为counter。
+3. `_source_identity`用现有隔离Git helper拒绝非空 `git status --porcelain`，记录clean状态及HEAD/modulepaths。提供最小可调用核验，在首次fixture start前、最终停机后再次核对与prepare同一HEAD/clean/modulepaths；dirty tracked、untracked importable source和HEAD改变需被拒绝。测试在独立临时clone/venv中进行，不能污染真实author tree或production。运行中editable源不能改动，任何漂移使验收失败并保留现场。
+
+只补三个针对性正负例，测试新增调用的真实入口和时序，避免再用与实现相同假设的合成case替代行为检查；原核心215无新runtime变更无需重跑。不新增通用框架/超出三项的重构。提交干净版本、publish report、原生followup同reviewer复审差异与上述证据。仍未准入真实fixture或生产安装/重启。当前可做工作完成正常结束turn。
