@@ -23,3 +23,9 @@
 ## 验收和交付
 提供最小 CPU tests，验证相同实际输入与相同初始 RNG 下 logging on/off 的动作/状态输出及最终 RNG 相等；多 query、J/T 与 S 路径、显式 noise、默认关闭、写入失败和 -inf roundtrip/严格 JSON、序号文件链接覆盖根据实现组织为有意义的测试。mock sample 必须保留真实 policy 的输入变换/RNG split/输出变换调用链；不能仅测试 serializer 后声称已验证 policy 行为。
 发布 report，包含干净 commit、完整 diff 范围、验证命令/结果、示例记录和校验脚本、存储/开销界限、后续最小 GPU smoke 方案与尚未验证的界限。短 CPU smoke 无需登记 job，任何预计超过 30 分钟的程序按 MAM 登记。完成可执行工作后正常结束 turn，不轮询。Manager review 之后才决定 GPU 验收和诊断实验。
+
+## 独立审查 P1 的 Manager 裁决
+
+Reviewer afe0d0ee 已真实复现 J/T execute RPC 非ok后，diagnostic record 被下一retry obs提前关闭。Manager直接核对 SchedulerBase.run_iteration 的失败return不调用after_execute，以及 OpenPiSimulationScheduler._refresh_query_diagnostics 在 requires_execution_progress 且 next_consumption=None 时无accepted判断便close，接受此问题。当前 cb861d38/a2c7f80b 不准入GPU。
+
+请仅修生命周期缺口：未被accepted的candidate不得因没有next_consumption就被当作已完成关闭；execute失败/后续discard必须被明确记录，或正确保留pending直到已知终止。不能记录actualK=0作为未知结果，也不能改变原retry/动作语义。添加保留真实run_iteration和controller非ok路径的回归，覆盖选中J/T、下一retry obs、下一build_act_request discard及terminal/reset时记录不丢失。协调reviewer给精确复现，完成干净commit、窄测试、report再由其续审；其他独立发现一并按具体证据处理，不扩展logger产品范围。
