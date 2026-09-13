@@ -1,5 +1,13 @@
 # P0诊断记录接口：状态原始输出、动作和RNG的无行为改动采集
 
+## 当前接续：修正任务自有 preflight 的自匹配，恢复尚未开始的90秒试跑
+
+Manager已独立核对52edad76报告、远端preflight/terminal receipt及其SHA；失败是e6cf1ebac7c61b801588189bfdf3370ae4ee69fbe9e8684f0a6020fb51a4f855脚本第83–86行按RUN子串筛ps时，将自身PID2550668及task venv解释器路径当作残留。pipeline仅运行约1秒，last_phase=preflight；没有J/S runner或90秒模型请求。本次接受为任务自有启动检查的确定缺陷，不是算法、CUDA或模型响应故障。
+
+授权同一terra/max执行者在本机修复该检查：按实际解析的PID精确排除当前os.getpid()，保留其他匹配任务进程的拒绝；不按脚本名、Python命令或所有祖先作宽泛豁免，也不删除资源/端口/源码/新输出检查。对真实自命令行与另一个同RUN的残留PID做小型CPU复核（自进程不阻塞，另一个PID仍阻塞），通过后直接继续已批准J→验收→pair→S→验收→pair流水线，无需再次等待Manager。
+
+保留v2旧preflight、部署清单、失败receipt/log/status原件及hash；新检查脚本和必要的pipeline引用/新receipt/log/status使用独立修正版文件，记录小diff及新的工具内容身份。不需要复制整个runtime、重新安装依赖或新建通用检查框架。J/S正式模型试跑输出尚不存在，核实仍不存在后可沿既有v2 fresh result/diagnostics/manifests和相同90/30秒配置；不能覆盖任何已存在产物。固定C2 GPU6和原协议/样本/容量预算，模型试跑失败仍保留真实首因，不扩timeout或按分数重跑。继续登记长job、收尾/归档并发布报告。此次明确修正取代v2 preflight失败后的暂停；未更改科研合同或生产三库版本。
+
 ## 当前裁决：补齐已验收的首次 infer 90 秒配置，再做一次有界工程验收
 
 Manager 已核对报告 `2c2996f8fc8b850b4ec68822ec90dc3f255cfc72`、C2 实际 command/scheduler config、policy log，以及 failure receipt 和其中 19 份引用文件的 SHA。接受此次失败是首个 policy RPC 在 30 秒 deadline 前没有返回，记录为 `policy_response_missing`，不构成接口 GPU 准入。旧失败及所有记录保留。已通过的 renderer gate/替代 CUDA smoke 不重跑。
