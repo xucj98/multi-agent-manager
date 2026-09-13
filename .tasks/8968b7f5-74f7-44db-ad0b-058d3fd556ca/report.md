@@ -10,9 +10,10 @@
   - 冻结基线：`f9626636c4776d8eb15f9c556775cb2d12c000e5`
   - 原接口提交：`a2c7f80b99556db2147c85ca9f625ffb840b276a`
   - P1/容量修复提交：`fa62a9febc8fab9098994d0cb8e1894a0590b7e8` (`Fix selected-query diagnostic lifecycle and bounds`)
-  - 本次 Memory-v1 完整性修复：`b1695f7f04050836a764c1e85a6db163e3526ada` (`Validate Memory-v1 diagnostic evidence`)
+  - Memory-v1 完整性修复：`b1695f7f04050836a764c1e85a6db163e3526ada` (`Validate Memory-v1 diagnostic evidence`)
+  - 本次 live ingress 修复：`e147f600dc4329f330a6e2eb0335150b5b3093a3` (`Reject live diagnostic array descriptors`)
 
-两个 worktree 均位于 `task/8968b7f5-74f7-44db-ad0b-058d3fd556ca`；OpenPI 停在 `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`，bridge 停在 `b1695f7f04050836a764c1e85a6db163e3526ada`，工作树干净。
+两个 worktree 均位于 `task/8968b7f5-74f7-44db-ad0b-058d3fd556ca`；OpenPI 停在 `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`，bridge 停在 `e147f600dc4329f330a6e2eb0335150b5b3093a3`，工作树干净。
 
 ## 修复内容
 
@@ -46,6 +47,13 @@
 - scheduler 在保存 episode status、episode info、runtime provenance 或 scheduler input 前做数组预算预检；超限只留下小型 `not_recorded_array_limit` 记录，不提前深拷贝这些诊断来源。
 - 新增 CPU 回归覆盖有效 serial/joint 样本、各类局部缺失/错误维度、descriptor-only 伪 evidence、NPZ ID/label 篡改、`none` 伪装、真实 legacy serial 生成器和预检无复制路径。dry-run fixture 也更新为完整 serial 合同。
 
+### 本次 live `array_ref` ingress 窄修
+
+- live Policy sidecar 进入 recorder 时，集中遍历 mapping/list 结构并拒绝任何预先 externalized 的 `{"array_ref": ...}`。它只读取结构，不复制数组、不会触碰 Policy/RNG 路径。
+- 拒绝结果写成小型 `policy_sidecar_incomplete`，不会把不存在于本次 NPZ bundle 的 key 留在 policy record 中；scheduler/action-dispatch 自己的合法数组仍可保留。
+- 离线 JSON/NPZ 的 `array_ref` 解析没有改变：只有 recorder 生成并绑定到该 `record_id` 的 descriptors 才在 `validate_record()` 中使用。文档已明确这个边界。
+- 回归复现 raw model-action descriptor 与另一个必需 RNG key descriptor，并验证真实 CPU `Policy.infer → recorder → validate_record` 的 joint-dense 和 serial-token materialized sidecar 都仍为 `recorded`。
+
 ## CPU 验证
 
 以下均为 CPU-only 命令；未启动 GPU rollout、训练、正式评测、部署、仿真控制或真机控制。
@@ -72,7 +80,7 @@ PYTHONPATH=/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556
 .venv/bin/python -m pytest \
   /mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge/tests/scheduler/test_query_diagnostic.py \
   /mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge/tests/scheduler/test_openpi_simulation.py -q
-# 57 passed
+# 61 passed
 
 # robot-bridge worktree
 .venv/bin/ruff check robot_bridge/scheduler/query_diagnostic.py \
@@ -88,7 +96,7 @@ PYTHONPATH=/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556
 ```
 
 ```bash
-# CPU-only final check after the Memory-v1 completion fix
+# CPU-only final check after the Memory-v1 and live-ingress fixes
 OUT="$(mktemp -d /tmp/query-diagnostic.XXXXXX)"
 .venv/bin/python scripts/query_diagnostic_dry_run.py --directory "$OUT"
 .venv/bin/python scripts/validate_query_diagnostic.py "$OUT"/records/*.json
