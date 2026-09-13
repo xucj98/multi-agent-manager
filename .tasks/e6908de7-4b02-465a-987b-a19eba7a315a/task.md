@@ -266,3 +266,11 @@ Manager随后发布精确arms/触发阈值/试验计数。代码未验收前可�
 
 ## Manager接受smoke合同核实后的更正
 保留既有正式门禁，撤销900000/900001要求，不为它新增engineering seed CLI。baseline/shadow成对工程smoke使用既有eval0的100000/100001，独立目录标明工程等价检查，不据分数改阈值；不作为不同HF模式的matching gate。每个新正式配置/每eval seed仍跑严格匹配的smoke2→formal100，source/manifest/hash规则不放宽。明确random_light=false与crazy_random_light_rate=0留痕；先核对原baseline实际设置，若改变了原环境条件则补同条件baseline，不沿用不匹配成绩。新增试验数24批不含短工程smoke和因必要环境对齐追加的baseline，后者需明确单列原因和数量。
+
+## Manager 六批终验与缺失 eval0 的接续
+
+Manager 已从 C 原始记录独立复核最新六批的 final-review/30 artifact hashes、600 连续固定 seed 与 terminal/outcome、scheduler/自有进程退出、video flags 和 command/smoke 链接，并核对 stable C3 40-reset receipt。论文 commit 913b086 的 evening snapshot 现为40批/4000集/20个已评测模型，其中9个完成三eval seed；不能沿用18模型或误算为11个完整300模型。实际视频解码/全日志扫描仍为 owner 的验收范围。
+
+put-back N/S train0 在此快照只有 eval1/2，eval0 尚未计入。请立即核实是否已有完整、未汇报的合规 eval0（只认连续100，不拼 partial、不把工程smoke算入）；若没有，沿已准入的 f401f527 RMBench / f9626636 bridge / a869498f OpenPI 基线和实际既有 checkpoint，用可用GPU接续两条缺失的 eval0：各自 matching video/no-video smoke2 → fresh formal100，原固定100000..100099，独立run/ports，登记真实job。此为已授权三eval baseline 队列的补齐，无新增训练或新模式，不需等待 HF 源码 review。先核对既有 run leaf，避免重复评测已完整结果；若原失败叶存在，保留并使用新名字。
+
+HF 源码仍未准入，不部署 HF。其余既有排期维持；只运行当前 frozen runtime 实际兼容且已授权的项目，不为占满GPU改变模型/协议。发布实际进度后正常结束，不轮询。
