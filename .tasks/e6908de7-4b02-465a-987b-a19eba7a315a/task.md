@@ -1,5 +1,15 @@
 # Memory v1 新 checkpoint 评测准备
 
+## 当前收尾与 HF 审计口径更正
+
+MAM升级通知中两条原协议T formal已stopped：eval1 JOBda058195-ff39-49ed-8e83-be5e1a8aaa7e、eval2 JOB3191f8c6-4c53-48a3-9ab7-8b44216ab2c0。先按既有完整100/连续seed/terminal/video/source/hash/进程合同收尾、出final_review并archive及smoke清理receipt，不能因HF工程失败漏掉原队列；结果未验收前不增加当前42批。
+
+Manager已独立读8leaf失败证据与hf_engineering.py：evidence_summary将matched_baseline_action_query.result.actions的50×14与action_plan.queued_actions的30×14直接放同结构；compare_matched_pair再按整个列表比较。这是确定的比较口径问题。T收尾后在自己的离线审计工具做窄修：以query_id/actions_from_query匹配真实accepted queued事件、按queued_rows取实际发送前缀，并按source_step/已执行完成边界比较；区分预测H与下发K，query count不要叫action row count。缺失关联明确失败，不靠固定截30掩盖取消/异常。保留原工具、失败record及review原hash，新增版本和重算receipt，不覆盖旧证据，不重跑GPU。
+
+Manager同时直接重算首个30×14前缀，rearrange两个episode仍max_abs约0.003873，put-back两集约0.003493；所以口径修正不自动解除暂停，不能放宽容差或用小数值宣称无害。现有input不含图像/语言，OpenPI0ce的policy_rng也只有stream/call而非实际key；更正后结论不得称完整输入或实际随机状态相同。真实首因已交源owner task0acf作有界首query诊断，C3 GPU0暂交该owner，HF新matching/r_s30/formal仍暂停；你无需重复诊断或改公共源码。
+
+完成T验收及离线重算后发布当前状态置顶的紧凑report并正常结束。MAM direct-v2按既定Manager转交，不重开兼容性研究。
+
 ## 环境已知误报的具体裁决（不影响既定HF工程执行）
 
 Manager已亲自只读核对C共享部署及稳定installer，确认旧worktree_env_smoke.py以解析后路径含site-packages判来源，与C installer显式--link-mode symlink不兼容。P0 task环境中的nvidia_curobo0.7.8安装在本task venv，geom_cu词法路径在该venv/lib/python3.10/site-packages，真实实体在uv/archive-v0/UYbDTNQF-bGDe1JmV92NN。扩展13,367,808 bytes，SHA256 `874b95cb65d84eeb0a84562482de7551638f7c9974d3323b152142476f8abb01`，与installed RECORD的SHA256以及稳定wheel内同名成员逐字节内容一致。稳定wheel `/mnt/public/xcj/Projects/state-vla/.cache/curobo/wheel/nvidia_curobo-0.7.8-cp310-cp310-linux_x86_64.whl` SHA256 `780a878713cad48043b4537268c860e52393ddeb46709a6377409f9c65f4f988`。原smoke脚本SHA256 `589733e0d89f16880303a6bb02c4573348496e7f53805537def5e1cafaab9b21`。因此这一次路径字符串拒绝是环境检查误报，尚未执行的真实cuRobo CUDA distance仍必须完成，不能把来源核对当成CUDA运算通过。
