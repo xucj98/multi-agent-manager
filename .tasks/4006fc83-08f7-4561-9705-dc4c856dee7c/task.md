@@ -1,5 +1,11 @@
 # 高频状态与replan独立审查：先核对实验合同，后验代码准入
 
+## Manager 对 report 27b16d899 的裁决及下一轮边界
+
+Manager 已直接检查 552ea/c99 真实调用链，接受 formal gate 缺 evidence 校验为 P1；early-child 悬空引用按 P2 处理，因为原 terminal_scheduler_error/runtime_error 已使 run 失败，此项单独不证明错误成功率。源任务已发布最小修复：明确 unavailable/missing/incomplete（无需伪造未执行推理记录），以实际 rolling/matched 配置要求证据、共享窄 validator 贯通 matching smoke 及 formal episode 收尾。默认无需 evidence，既有门禁不放宽。
+
+本轮报告保留为未准入记录。现在无需重跑或继续扩展任意边界；作者 clean 新 commits 发布后 Manager 会通知你对以上增量独立复核，再裁决 GPU。保留此前真实 recorder/identity/reset 和算法/RNG 已通过结论。当前不要读取作者 dirty diff 或活跃等待。
+
 ## 当前增量复审：真实 recorder 与 child 身份修复已冻结（取代下文旧候选）
 
 源 report `aac1cbd563f7a7aaf83fc0b161ee3dc4463f2959` 已发布；Manager 已核对作者三树 clean、准确 HEAD 和正式 f401 祖先，并直接检查 recorder/CLI 窄改。现在恢复独立增量复审：
