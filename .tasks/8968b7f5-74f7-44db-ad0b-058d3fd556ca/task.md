@@ -1,5 +1,10 @@
 # P0诊断记录接口：状态原始输出、动作和RNG的无行为改动采集
 
+## 归档缓存收尾
+
+Manager已接受清理report26ddc701及收据bb881bc21c6e33a1288c92f9c903acc99b37b31a67f28693166e37a512410397，5组重复目录已移除，证据与持久refs仍正确。再次mam archive被源码树中ignored测试缓存拒绝。授权原terra/max执行者只移除两个登记worktree内普通非软链的.pytest_cache、.ruff_cache，以及实际源码/tests/scripts/packages目录内的__pycache__和pyc；仅限本TASK-ID，使用不跟随软链的遍历，跳过.venv、.local和所有shared assets/logs/checkpoints等链接，不用git clean -fdx。不改tracked源码、持久refs、MAM artifacts或C证据。核对git status --short --ignored仅余受控env/共享链接，并回传清理数和最后状态；将此次紧凑收据另存task artifacts并发布report，结束后Manager再归档。无需新验证测试（测试会再次生成缓存）或GPU操作。
+
+
 ## 归档最后收尾：清除已保留的workspace重复工具目录
 
 Manager已独立验收最终report df9e51e558a53e6c9d1e42662113edb6de6f0bd4：两持久codex分支精确指向bc7603c5/e147f600，两worktree clean；SHA256SUMS通过，120条索引内容和实际122个文件逐个匹配归档提交c053f611b5d1e5385ac25e4d78e139bf866bf618。索引local_snapshot_sources中全部5组源目录非bytecode文件均与对应保留副本一致，无未保留项。
