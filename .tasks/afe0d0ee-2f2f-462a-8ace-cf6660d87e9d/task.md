@@ -1,5 +1,11 @@
 # P0诊断记录接口独立审查：行为等价、RNG与证据完整性
 
+## 当前复审：live descriptor 集中修复已交付，精确候选冻结
+
+源 report `a217779ac9683cacd8c25d426597e9b78b32d9f0` 已发布，Manager 已核对两树 HEAD/clean。恢复增量复审：bridge `b1695f7f04050836a764c1e85a6db163e3526ada` → `e147f600dc4329f330a6e2eb0335150b5b3093a3`；OpenPI `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6` 保持不变。复用独立 review 树，clean 后只快进 bridge。
+只核对新增 live ingress 的集中 array_ref 检查：原 raw-action/RNG descriptor 反例明确 incomplete、缺 key 不写成 recorded；真实 materialized serial/joint Policy→recorder→validator 仍有效；离线正常 NPZ descriptor 行为不变、无新增 Policy/RNG/数组复制路径。作者61 tests和17-array dry-run不是独立验收；选择此次必要窄检查，不重复不变OpenPI全库或此前完整回归，不扩任意非法输入空间。
+保留 d1fffd760 所有已通过结论、原始 a869/f962 同blob四个 transform 失败的准确归类，以及 Manager 对人为非法 descriptor 的边界裁决。交精确版本代码是否可准入最小受控GPU验收的最终报告；CPU only，不改作者树、不混HF；完成 publish report 并正常结束。
+
 ## Manager 对 report d1fffd760 的裁决与下一轮边界
 
 接受已独立通过的真实 J/S 路径、Memory-v1 完整性、preflight 和此前生命周期/RNG结论。Manager 已检查真实 Policy capture 与 b169 录入/Externalizer，确认人为替换 raw actions 为 array_ref 会产生 recorded/offline-invalid；按 P2 录入一致性小修处理。但报告并未证明当前真实 producer 可输出该 descriptor，因此不采纳“此反例本身阻止一切最小受控 GPU 验证”的泛化。GPU 调度仍以 Manager 明确的运行/证据合同为准，当前尚未派发。
