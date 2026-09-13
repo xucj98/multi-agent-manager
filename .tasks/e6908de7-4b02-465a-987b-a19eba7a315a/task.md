@@ -1,5 +1,13 @@
 # Memory v1 新 checkpoint 评测准备
 
+## Manager 当前收尾验收与下一批既有模型评测
+
+Manager已独立验收put-back N/S train0缺失eval0：N17/100、S41/100，分别核对final-review及10个artifact hashes、100连续固定seed/terminal/outcome、进程退出、video flags和command/smoke链。原协议N完整17/27/22=66/300，S41/44/51=136/300；当前42批/4200次执行/20模型/11个完整三eval。两job与smoke清理接受，已进入论文latest evidence snapshot，当前编译PDF仍冻结40批。
+
+接续此前已批准的既有T/U队列，下一步明确先补put-back T(endpoint) train0的eval1/2两批：先核对完整结果去重；确实缺失时，在原已验收RMBench f401f527/bridge f9626636/OpenPI a869498协议和现有T train0 checkpoint上，逐批matching video/no-video smoke2→fresh formal100，固定200000..200099及300000..300099。优先用刚释放且实测可用的C1 GPU1/2，自有ports/目录，按既有错峰启动纪律；登记真实jobs。不能复用新HF reset协议、不能为此新增训练或改代码、不能拼partial/覆盖有效结果。T接口或资产若与runtime不兼容，明确报告实际原因，不能私改。
+
+保留已验收C3 GPU0供HF工程准入，不因HF仍在修复就停掉所有已就绪的原协议工作。HF最新候选还因真实recorder接口不匹配被挡在review，未准入任何HF GPU。T两批启动或确认已完成后发布实际结果/job并正常结束，无需活跃等待。
+
 ## 目标、范围与工作区
 
 准备新memory_config checkpoint的RMBench评测，使首批20k结束后可立即按“对应smoke2→正式100”开跑。兼顾列清旧drawer两个模型的offline回归入口，当前只做CPU准备；GPU时段由Manager另行分配。不要修改模型、数据转换、controller、scheduler或MAM，不新建通用launcher/队列框架，不派agent。
