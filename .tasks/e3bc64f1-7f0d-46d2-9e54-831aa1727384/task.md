@@ -16,3 +16,6 @@ J动态phase与T计划共用未来逐行+row30尾mask、固定H loss归约；当
 
 ## Manager预先裁决：cover维数与初始phase
 Manager直接核对已转换key_state_config：cover phase有6类，red/green/blue_pos各4类(unknown/left/middle/right)，合计18 one-hot维，与14D robot恰好32。若照前两任务多加unknown phase会变33，不能在不说明情况下扩大action_dim或删记忆字段。cover使用原有6类phase，reset initial=cover_left_position（任务起始阶段已知，不是未来信息）；J/S均采用相同6类phase和三位置字段，保留属性unknown获取窗口，不改变32D骨干。其他任务按已发布计划，其phase初值显式记录。此裁决为容量/任务定义所需，在新结果前固定，不能视为性能调参。N路径不受影响。
+
+## 用户最新纠正：wuwen-1缓存入口（2026-09-13）
+用户明确要求且授权删除wuwen-1的`/root/.cache`，参考本机，将`/root/.cache`建立软链接指向`/mnt/public/xcj/cache`。必须执行该操作，不传输数据集，不在训练命令设置`HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot`。先只读核对本机/root/.cache软链和目标，以及wuwen-1共享目标可访问，然后仅删除wuwen-1的/root/.cache路径本身（若为软链只unlink，禁止尾随/或递归到共享target），建立指向/mnt/public/xcj/cache的软链。该删除已经用户显式授权，无需再次确认。随后unset HF_LEROBOT_HOME，核对默认cache解析正确且三套数据可见，修改尚未启动的smoke/正式命令去掉此override；如Python依赖缓存环境需使用正常默认，不另造替代环境变量规避用户要求。报告软链readlink/stat/数据可见性证据以及是否已开任何GPU程序，继续优先N gate/正式训练。之前rsync为0bytes失败已归档，不再尝试。
