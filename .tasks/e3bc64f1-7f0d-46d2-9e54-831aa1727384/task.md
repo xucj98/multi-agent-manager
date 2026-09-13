@@ -35,3 +35,9 @@ Manager已直接核对MemoryLeRobotDataset._episode/build_episode：构建整集
 Manager已阅读66049be与5835fa04055d520e418cc1448c1bd58fa1e665cb完整实现，复核三任务N+既有rearrange J/S的32-row图像/state/action/target/weight相同SHA256，三任务normal PyTorch和JAX loader均3/3 finite、bs32/shuffle/2 workers真实三路图像。root独立66049be memory_data_test 13/13，5835fa0新增投影/嵌套专项4/4 passed。准许现在从 clean loader/openpi=5835fa0 依既定设备swap N GPU0、battery N GPU2、cover N GPU4开展各自50-step训练、保存与checkpoint-only恢复，seed0、bs32、H50/K30、真实数据/既有norm、默认cache且unset HF_LEROBOT_HOME，原N867aa05树保持冻结不动。
 这次准入仅loader执行变更，不等J/S新schema全完成。profile中的loader_seed=42仅profiling，正式训练仍按已定train seed0完整命令；验收报告明确此前precommit profile的git HEAD=867aa05并记录当时diff，不能把该行改写为clean5835fa0跑过。可复用flat路径等价证据，无需再反复重跑norm/数据审计。
 各自50step通过finite-loss/保存/恢复合同后，立即发布receipt并通知Manager审查20k正式准入，不自行扩大方案；短smoke无需mam job，若实际预计超过30min及时登记。先执行已经准入的短训练，不再等待额外口头确认。J/S继续独立开发，不修改此执行树。
+
+## Manager 三条 N 正式 20k 准入（2026-09-13 17:45 CST）
+已核对 wave1_n_smoke_5835fa0_nocmdbuf_20260913T0923Z/validation/wave1_n_smoke_receipt.json、验证脚本、六份 CPU/GPU restore 日志哈希和内容、三份训练日志、各 checkpoint metadata，以及干净执行树 HEAD=5835fa04055d520e418cc1448c1bd58fa1e665cb。三条 50-step loss 有限并保存成功，CPU 全参数 BF16/shape/finite、GPU checkpoint-only [50,14] 动作恢复通过。接受这三条 N gate。
+现在按已分配 wuwen-1 GPU0 swap N、GPU2 battery N、GPU4 cover N 启动各自正式 20k，train seed0、bs32、H50/K30、save_interval20k、BF16 model-only，使用 clean5835fa0 和验收 norm。允许沿 smoke 使用 XLA_FLAGS=--xla_gpu_enable_command_buffer= 的 CUDA12.2 兼容设置；在独立启动 receipt/环境记录中显式保存 XLA_FLAGS 和 driver/jaxlib，不改写旧 checkpoint command.txt 来掩盖其 allowlist 缺项。不能从 smoke50 权重续训冒充从 pi05_base 的既定训练。
+先核对设备可用和输出路径不存在，启动后立即本机 mam job add 登记 wuwen-1 真实 PID；交付 step100 有限 loss、实际占卡、启动命令与 job receipt。其他 J/S 仍候选，不随此准入正式开跑。
+请立即补全并发布当前 report（旧草稿仍称首batch阻塞），包含 N 的最终 receipt 和 J/S afb7a4d0ac20f2cba3c6bb0d5a25c96f792479c3 候选证据，以便建立独立 review。先发布已有事实并启动已放行 N，不因写完整 J/S 报告延迟训练。
