@@ -1,0 +1,8 @@
+source_commit=3f2738abcfc9cbe50b25222562fc58b2bac0a7ff
+source_wake_runtime_path=/mnt/public/xcj/Projects/workspace/a0c09804-1b5b-4df3-abf0-986ff19381af/multi-agent-manager/multi_agent_manager/wake_runtime.py
+source_wake_runtime_is_regular=True
+source_wake_runtime_sha256=c926e9d9d9d916ad80bbb37219be8e26f52f0700fe6a88171669390691f55de2
+installed_wake_runtime_path=/root/.local/share/pipx/venvs/multi-agent-manager/lib/python3.12/site-packages/multi_agent_manager/wake_runtime.py
+installed_wake_runtime_is_regular=True
+installed_wake_runtime_sha256=c926e9d9d9d916ad80bbb37219be8e26f52f0700fe6a88171669390691f55de2
+installed_parent_is_worktree=False

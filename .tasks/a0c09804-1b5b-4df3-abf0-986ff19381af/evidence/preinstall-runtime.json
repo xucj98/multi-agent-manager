@@ -1,0 +1,109 @@
+{
+  "captured_at": "2026-09-13T11:28:51Z",
+  "mam_bin": "/root/.local/bin/mam",
+  "service": {
+  "status": "healthy",
+  "running": true,
+  "healthy": true,
+  "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+  "mode": "active",
+  "pending": {
+    "count": 0,
+    "events": []
+  },
+  "counters": {
+    "accepted": 54,
+    "cycles": 8172,
+    "observed": 53999,
+    "queued": 176,
+    "turn_start_attempts": 117
+  },
+  "heartbeat_at": "2026-09-13T11:28:44+00:00",
+  "ready_at": "2026-09-12T17:22:14+00:00",
+  "diagnostics": [
+    {
+      "kind": "unknown_executor",
+      "message": "executor 01a096ab-e5f3-7672-8ff3-36328d3fcfb7 is systemError",
+      "task": "4006fc83-08f7-4561-9705-dc4c856dee7c"
+    }
+  ]
+}
+,
+  "pipx": {
+    "pipx_spec_version": "0.1",
+    "venvs": {
+        "multi-agent-manager": {
+            "metadata": {
+                "injected_packages": {},
+                "main_package": {
+                    "app_paths": [
+                        {
+                            "__Path__": "/root/.local/share/pipx/venvs/multi-agent-manager/bin/mam",
+                            "__type__": "Path"
+                        }
+                    ],
+                    "app_paths_of_dependencies": {},
+                    "apps": [
+                        "mam"
+                    ],
+                    "apps_of_dependencies": [],
+                    "include_apps": true,
+                    "include_dependencies": false,
+                    "man_pages": [],
+                    "man_pages_of_dependencies": [],
+                    "man_paths": [],
+                    "man_paths_of_dependencies": {},
+                    "package": "multi-agent-manager",
+                    "package_or_url": "/mnt/public/xcj/Projects/workspace/d5cb66d7-36d9-4bfc-9d01-d56befd32de4/installer-main",
+                    "package_version": "0.1.0",
+                    "pip_args": [
+                        "--force-reinstall"
+                    ],
+                    "suffix": ""
+                },
+                "pipx_metadata_version": "0.3",
+                "python_version": "Python 3.12.3",
+                "venv_args": []
+            }
+        },
+        "nvitop": {
+            "metadata": {
+                "injected_packages": {},
+                "main_package": {
+                    "app_paths": [
+                        {
+                            "__Path__": "/root/.local/share/pipx/venvs/nvitop/bin/nvisel",
+                            "__type__": "Path"
+                        },
+                        {
+                            "__Path__": "/root/.local/share/pipx/venvs/nvitop/bin/nvitop",
+                            "__type__": "Path"
+                        }
+                    ],
+                    "app_paths_of_dependencies": {},
+                    "apps": [
+                        "nvisel",
+                        "nvitop"
+                    ],
+                    "apps_of_dependencies": [],
+                    "include_apps": true,
+                    "include_dependencies": false,
+                    "man_pages": [],
+                    "man_pages_of_dependencies": [],
+                    "man_paths": [],
+                    "man_paths_of_dependencies": {},
+                    "package": "nvitop",
+                    "package_or_url": "nvitop",
+                    "package_version": "1.7.1",
+                    "pip_args": [],
+                    "suffix": ""
+                },
+                "pipx_metadata_version": "0.3",
+                "python_version": "Python 3.12.3",
+                "venv_args": []
+            }
+        }
+    }
+}
+
+}

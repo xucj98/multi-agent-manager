@@ -1,0 +1,45 @@
+{
+  "cleanup_contract": {
+    "installer_temp_semantics": "the installer owns a mktemp root and EXIT trap removes it (scripts/install.sh:1725-1737).",
+    "post_install_observation": "No mam-install.* fixture directory remained under /tmp after installer exit.",
+    "result_semantics": "run_live_delivery returns success only after fixture cleanup and marker-owned root removal; cleanup errors change the result to failed (liveprobe.py:923-959).",
+    "source_file": "/mnt/public/xcj/Projects/workspace/a0c09804-1b5b-4df3-abf0-986ff19381af/multi-agent-manager/multi_agent_manager/liveprobe.py",
+    "source_sha256": "64b4e271d4f447c982f7e305ca3807dbfe40ff602af20d09315baf882a77f42d"
+  },
+  "observed_installer_result": {
+    "installer_exit": 0,
+    "pass_lines": [
+      "Ran 215 tests in 82.068s",
+      "The current verified listener already has JSON trace logging.",
+      "MAM optional wait: live App Server trace compatibility PASS",
+      "MAM proactive wakeup: non-model App Server API compatibility PASS",
+      "MAM proactive wakeup: isolated real delivery PASS (6 model turns)",
+      "MAM proactive wakeup installation: PASS (scheduler healthy)"
+    ],
+    "transcript": "/mnt/public/xcj/Projects/multi-agent-manager/.tasks/a0c09804-1b5b-4df3-abf0-986ff19381af/evidence/resume-install-transcript.log",
+    "transcript_sha256": "ac8b86d21527b935f637d6e94dba53deaf56d2cb583541b615f4fd4bf17fb21a"
+  },
+  "raw_per_run_json_reason": "The unmodified standard installer stores liveprobe-evidence.json inside its owned temporary directory and removes that directory on exit. This derived receipt deliberately does not claim the deleted per-run JSON still exists.",
+  "raw_per_run_json_retained": false,
+  "receipt_kind": "installer-derived ordinary persistent-thread liveprobe receipt",
+  "scope": "This records the completed standard installer gate. It is not the separately approved native-v2 fixture.",
+  "source_commit": "3f2738abcfc9cbe50b25222562fc58b2bac0a7ff",
+  "validated_liveprobe_contract": {
+    "execution_order": "wait compatibility -> non-model API compatibility -> isolated real delivery -> production service stop/start (scripts/install.sh:2015-2020)",
+    "required_checks_true": [
+      "all_roles_baselined_before_service",
+      "baseline_history_read_after_idle",
+      "job_delivery",
+      "manager_delivery",
+      "manager_is_fixture_only",
+      "turn_budget",
+      "quiet_window_no_duplicate_starts",
+      "idle_executors_received_no_turn"
+    ],
+    "required_model_turns": 6,
+    "required_status": "passed",
+    "source_file": "/mnt/public/xcj/Projects/workspace/a0c09804-1b5b-4df3-abf0-986ff19381af/multi-agent-manager/scripts/install.sh",
+    "source_sha256": "e8bc2e0e118c08e6c659a72c95bbc247404da0854844761ce8144e314893fa2d",
+    "validation_function": "validate_liveprobe_evidence (scripts/install.sh:1826)"
+  }
+}

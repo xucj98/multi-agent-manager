@@ -1,0 +1,43 @@
+{
+  "observed_at": "2026-09-13T12:15:28Z",
+  "targets": {
+    "evaluation_task": {
+      "job_identity_added": [],
+      "job_identity_missing": [],
+      "post_task_row": "Memory v1新checkpoint评测准备：仿真入口、留痕与offline回归排期\tpending\te6908de7-4b02-465a-987b-a19eba7a315a\t01a096ac-c435-7972-b1b0-d7e1b0cc94f4\tactive",
+      "present_after": true,
+      "present_before": true,
+      "task_id": "e6908de7-4b02-465a-987b-a19eba7a315a",
+      "unarchived_job_ids_after": [],
+      "unarchived_job_ids_before": []
+    },
+    "training_task": {
+      "job_identity_added": [],
+      "job_identity_missing": [],
+      "post_task_row": "九任务覆盖首波：wuwen-1八卡seed0训练与三任务Memory-v1接入\tpending\te3bc64f1-7f0d-46d2-9e54-831aa1727384\t01a0986a-1c71-79e3-a10e-2fbe9ccfb3bd\tnotLoaded",
+      "present_after": true,
+      "present_before": true,
+      "task_id": "e3bc64f1-7f0d-46d2-9e54-831aa1727384",
+      "unarchived_job_ids_after": [
+        "081f64c5-ae21-4062-b7ea-1dd281ddaa1f",
+        "1495a251-7d9e-4f68-8afc-0a7cee6360f9",
+        "191b644f-f116-4f0b-a096-1dab6da41ade",
+        "443b3b93-57ba-425e-bbce-f4903fea33c1",
+        "4ea24e85-d5f4-40cc-8409-44beb7237e8f",
+        "86f8ee1f-3d30-40f5-ba98-973b18232897",
+        "a6eeac71-c0e2-4701-9530-521362c34083",
+        "cb3e5246-fa74-40df-8325-0431f9587f73"
+      ],
+      "unarchived_job_ids_before": [
+        "081f64c5-ae21-4062-b7ea-1dd281ddaa1f",
+        "1495a251-7d9e-4f68-8afc-0a7cee6360f9",
+        "191b644f-f116-4f0b-a096-1dab6da41ade",
+        "443b3b93-57ba-425e-bbce-f4903fea33c1",
+        "4ea24e85-d5f4-40cc-8409-44beb7237e8f",
+        "86f8ee1f-3d30-40f5-ba98-973b18232897",
+        "a6eeac71-c0e2-4701-9530-521362c34083",
+        "cb3e5246-fa74-40df-8325-0431f9587f73"
+      ]
+    }
+  }
+}

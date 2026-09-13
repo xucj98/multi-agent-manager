@@ -1,0 +1,256 @@
+MAM proactive wakeup: running checkout tests with /mnt/public/xcj/Projects/workspace/a0c09804-1b5b-4df3-abf0-986ff19381af/multi-agent-manager/.venv/bin/python
+test_batch_query_handles_ping_and_fragmented_response (test_job_runtime.AgentProbeTests) ... ok
+test_rpc_error_is_limited_to_its_agent (test_job_runtime.AgentProbeTests) ... ok
+test_timeout_marks_all_agents_unknown (test_job_runtime.AgentProbeTests) ... ok
+test_explicit_rpc_rejection_has_a_distinct_compatible_error_type (test_job_runtime.EventStreamTests) ... ok
+test_idle_resume_does_not_page_turn_history (test_job_runtime.EventStreamTests) ... ok
+test_resume_accepts_a_snapshot_larger_than_the_legacy_four_megabyte_cap (test_job_runtime.EventStreamTests) ... ok
+test_resume_preserves_notification_received_before_its_snapshot (test_job_runtime.EventStreamTests) ... ok
+test_resume_rechecks_metadata_when_the_active_turn_finishes_during_paging (test_job_runtime.EventStreamTests) ... ok
+test_start_turn_uses_existing_thread_without_runtime_overrides (test_job_runtime.EventStreamTests) ... ok
+test_targeted_not_loaded_resume_can_be_rechecked_without_hydrating_history (test_job_runtime.EventStreamTests) ... ok
+test_local_lifecycle_and_identity_mismatch (test_job_runtime.ProcessProbeTests) ... ok
+test_remote_missing_and_unreadable_processes_are_distinguished (test_job_runtime.ProcessProbeTests) ... ok
+test_remote_timeout_is_unknown_and_host_is_not_injected (test_job_runtime.ProcessProbeTests) ... ok
+test_zombie_is_stopped (test_job_runtime.ProcessProbeTests) ... ok
+test_active_baseline_waits_for_metadata_idle_before_paged_history (test_liveprobe.LiveProbeTests) ... ok
+test_cli_failure_is_nonzero_without_contacting_real_app_server (test_liveprobe.LiveProbeTests) ... ok
+test_failure_writes_bounded_evidence_and_removes_marker_owned_root (test_liveprobe.LiveProbeTests) ... ok
+test_fixture_materializes_all_roles_before_service_and_cleans_its_own_resources (test_liveprobe.LiveProbeTests) ... ok
+test_idle_metadata_does_not_replace_the_baseline_completion_event (test_liveprobe.LiveProbeTests) ... ok
+test_idle_paging_unsupported_compares_include_turns_on_same_fixture_without_extra_baseline (test_liveprobe.LiveProbeTests) ... ok
+test_nonempty_or_symlink_fixture_root_is_refused_before_any_resource_creation (test_liveprobe.LiveProbeTests) ... ok
+test_archive_protects_code_and_shared_entities (test_task.TaskTests) ... ok
+test_archived_records_keep_historical_paths (test_task.TaskTests) ... ok
+test_attention_marks_stopped_job_with_unknown_agent (test_task.TaskTests) ... ok
+test_bind_and_empty_archive_have_no_accept_gate (test_task.TaskTests) ... ok
+test_configuration_resolves_path_aliases_and_keeps_linked_mam_root_distinct (test_task.TaskTests) ... ok
+test_git_removal_failure_is_retryable (test_task.TaskTests) ... ok
+test_job_and_workspace_are_top_level_only (test_task.TaskTests) ... ok
+test_job_archive_skips_unknown_remote_probe_and_preserves_history (test_task.TaskTests) ... ok
+test_job_identity_attention_and_history (test_task.TaskTests) ... ok
+test_job_list_filters_before_probes_and_keeps_realtime_status (test_task.TaskTests) ... ok
+test_job_status_refreshes_only_the_requested_job (test_task.TaskTests) ... ok
+test_legacy_revision_metadata_is_ignored_when_querying_records (test_task.TaskTests) ... ok
+test_missing_or_invalid_nearest_configuration_does_not_fall_back_or_change_records (test_task.TaskTests) ... ok
+test_parallel_publications_preserve_drafts_and_index (test_task.TaskTests) ... ok
+test_partial_creation_retry_and_no_foreign_branch_adoption (test_task.TaskTests) ... ok
+test_project_configuration_discovers_subdirectories_uses_nearest_and_isolates_projects (test_task.TaskTests) ... ok
+test_publish_keeps_concurrent_edit_as_unstaged_draft (test_task.TaskTests) ... ok
+test_publish_rejects_wrong_configured_branch_without_changing_existing_job (test_task.TaskTests) ... ok
+test_publish_unchanged_repairs_only_its_index_entry (test_task.TaskTests) ... ok
+test_real_stdlib_environment_entry_and_linked_defaults (test_task.TaskTests) ... ok
+test_rebind_accepts_readonly_not_loaded_threads (test_task.TaskTests) ... ok
+test_rebind_preserves_workspace_jobs_publications_and_audits_handoff (test_task.TaskTests) ... ok
+test_rebind_rejects_active_optional_wait_even_with_idle_thread_metadata (test_task.TaskTests) ... ok
+test_rebind_rejects_busy_or_unverifiable_executor_or_replacement (test_task.TaskTests) ... ok
+test_rebind_rejects_conflicts_manager_invalid_archived_and_unbound_tasks (test_task.TaskTests) ... ok
+test_rebind_same_target_is_a_non_mutating_retry (test_task.TaskTests) ... ok
+test_regular_install_runs_without_source_or_git_cwd (test_task.TaskTests) ... ok
+test_reports_track_delivery_and_review_reads_latest_publications (test_task.TaskTests) ... ok
+test_running_process_archive_stops_tracking_without_stopping_process (test_task.TaskTests) ... ok
+test_source_cli_launcher_needs_no_adjacent_mam_or_site_package (test_task.TaskTests) ... ok
+test_status_preserves_saved_job_observation_without_probing (test_task.TaskTests) ... ok
+test_tampered_paths_and_symlink_workspace_rejected (test_task.TaskTests) ... ok
+test_task_archive_requires_all_jobs_archived_without_probing (test_task.TaskTests) ... ok
+test_task_list_text_has_header_and_status_keeps_records (test_task.TaskTests) ... ok
+test_task_show_text_is_published_markdown (test_task.TaskTests) ... ok
+test_two_manual_wait_records_are_independent (test_task.TaskTests) ... ok
+test_wait_list_and_manual_stop_preserve_the_wait_process (test_task.TaskTests) ... ok
+test_wait_stop_manager_isolated_by_project_configuration (test_task.TaskTests) ... ok
+test_wait_stop_manager_requires_unique_verifiable_unbound_waiter (test_task.TaskTests) ... ok
+test_workspace_add_accepts_project_repo_names_and_rejects_path_inputs (test_task.TaskTests) ... ok
+test_worktree_entry_rejects_non_python_with_diagnostic (test_task.TaskTests) ... ok
+test_bashrc_update_preserves_unmarked_conditional_config_and_is_idempotent (test_wait_compat.InstallerScriptTests) ... ok
+test_changed_target_after_confirmation_never_calls_kill (test_wait_compat.InstallerScriptTests) ... ok
+test_concurrent_valid_replacement_never_signals_or_launches (test_wait_compat.InstallerScriptTests) ... ok
+test_ensure_runtime_logging_restarts_only_for_missing_trace_environment (test_wait_compat.InstallerScriptTests) ... ok
+test_existing_startup_lock_is_released_after_use (test_wait_compat.InstallerScriptTests) ... ok
+test_incomplete_markers_leave_bashrc_unchanged (test_wait_compat.InstallerScriptTests) ... ok
+test_isolated_restart_recreates_the_captured_node_wrapper (test_wait_compat.InstallerScriptTests) ... ok
+test_launch_plan_preflight_failure_never_calls_term (test_wait_compat.InstallerScriptTests) ... ok
+test_launch_same_style_replays_wrapper_command_and_environment (test_wait_compat.InstallerScriptTests) ... ok
+test_noninteractive_restart_refusal_never_calls_kill (test_wait_compat.InstallerScriptTests) ... ok
+test_post_term_exit_guard_reports_recovery_and_nonzero (test_wait_compat.InstallerScriptTests) ... ok
+test_post_term_launch_failure_preserves_private_recovery_command (test_wait_compat.InstallerScriptTests) ... ok
+test_post_term_signal_preserves_recovery_command_and_releases_lock (test_wait_compat.InstallerScriptTests) ... ok
+test_replacement_match_preserves_captured_environment_except_trace_values (test_wait_compat.InstallerScriptTests) ... ok
+test_restart_confirmation_accepts_only_exact_yes (test_wait_compat.InstallerScriptTests) ... ok
+test_restart_orders_revalidation_stop_relaunch_and_unlock (test_wait_compat.InstallerScriptTests) ... ok
+test_runtime_logging_missing_environment_returns_one (test_wait_compat.InstallerScriptTests) ... ok
+test_runtime_logging_unreadable_pid_returns_two (test_wait_compat.InstallerScriptTests) ... ok
+test_success_cleanup_removes_recovery_artifacts_and_traps (test_wait_compat.InstallerScriptTests) ... ok
+test_unrecognized_complete_marker_block_leaves_bashrc_unchanged (test_wait_compat.InstallerScriptTests) ... ok
+test_changed_or_unknown_versions_pass_when_behavior_passes (test_wait_compat.WaitCompatibilityTests) ... ok
+test_cli_version_does_not_change_the_behavioral_fingerprint (test_wait_compat.WaitCompatibilityTests) ... ok
+test_disconnected_running_runtime_is_an_actionable_error (test_wait_compat.WaitCompatibilityTests) ... ok
+test_every_call_revalidates_instead_of_accepting_a_stale_certificate (test_wait_compat.WaitCompatibilityTests) ... ok
+test_failed_no_model_behavior_is_rejected (test_wait_compat.WaitCompatibilityTests) ... ok
+test_missing_event_delivery_is_rejected (test_wait_compat.WaitCompatibilityTests) ... ok
+test_missing_trace_request_is_rejected (test_wait_compat.WaitCompatibilityTests) ... ok
+test_missing_turn_mapping_is_rejected (test_wait_compat.WaitCompatibilityTests) ... ok
+test_restart_or_configuration_change_revalidates_and_changes_fingerprint (test_wait_compat.WaitCompatibilityTests) ... ok
+test_server_cli_version_difference_is_diagnostic_only (test_wait_compat.WaitCompatibilityTests) ... ok
+test_stop_closes_pipes_after_an_already_exited_process (test_wait_compat.WaitCompatibilityTests) ... ok
+test_stop_closes_pipes_after_termination_timeout (test_wait_compat.WaitCompatibilityTests) ... ok
+test_stop_closes_pipes_when_termination_errors (test_wait_compat.WaitCompatibilityTests) ... ok
+test_cli_json_retains_reason_and_required_identifiers_for_each_exit (test_wait_runtime.CliWaitOutputTests) ... ok
+test_compatibility_gate_is_called_without_arguments_and_supplies_runtime_paths (test_wait_runtime.CliWaitOutputTests) ... ok
+test_default_wait_accepts_no_wait_options_or_jobs_subcommand (test_wait_runtime.CliWaitOutputTests) ... ok
+test_python_module_entry_invokes_cli_main (test_wait_runtime.CliWaitOutputTests) ... ok
+test_session_boundary_captures_native_input_written_during_compatibility (test_wait_runtime.CliWaitOutputTests) ... ok
+test_trace_boundary_captures_input_written_during_compatibility (test_wait_runtime.CliWaitOutputTests) ... ok
+test_wait_caller_requires_a_canonical_thread_id (test_wait_runtime.CliWaitOutputTests) ... ok
+test_session_lookup_window_captures_input_written_between_discovery_and_open (test_wait_runtime.SessionMessagesTests) ... ok
+test_session_messages_are_targeted_stale_safe_and_deduplicated (test_wait_runtime.SessionMessagesTests) ... ok
+test_session_messages_require_the_current_session_metadata (test_wait_runtime.SessionMessagesTests) ... ok
+test_session_scan_to_open_replacement_rejects_old_offset (test_wait_runtime.SessionMessagesTests) ... ok
+test_initial_timestamp_floor_rejects_a_late_old_same_turn_span (test_wait_runtime.TraceMessagesTests) ... ok
+test_trace_is_targeted_deduplicated_stale_safe_and_handles_rotation (test_wait_runtime.TraceMessagesTests) ... ok
+test_ambiguous_binding_and_review_cycle_fail_explicitly (test_wait_runtime.WaitRuntimeTests) ... ok
+test_archived_review_exposes_source_inactive_task_again (test_wait_runtime.WaitRuntimeTests) ... ok
+test_completed_owner_hands_stopped_job_to_executor_without_probe (test_wait_runtime.WaitRuntimeTests) ... ok
+test_completed_owner_probes_live_job_stop_and_returns_handoff (test_wait_runtime.WaitRuntimeTests) ... ok
+test_completed_owner_with_running_job_keeps_waiting (test_wait_runtime.WaitRuntimeTests) ... ok
+test_dynamic_task_registration_is_reconciled_without_global_scope (test_wait_runtime.WaitRuntimeTests) ... ok
+test_executor_excludes_archived_job_without_probing (test_wait_runtime.WaitRuntimeTests) ... ok
+test_executor_ignores_other_bound_agent_lifecycle_before_its_snapshot (test_wait_runtime.WaitRuntimeTests) ... ok
+test_executor_scope_ignores_unrelated_tasks_and_returns_empty (test_wait_runtime.WaitRuntimeTests) ... ok
+test_inactive_reviewer_is_current_pending_work (test_wait_runtime.WaitRuntimeTests) ... ok
+test_initial_reconciliation_cannot_reset_the_fixed_timeout (test_wait_runtime.WaitRuntimeTests) ... ok
+test_manager_all_archived_jobs_for_inactive_owner_returns_completion (test_wait_runtime.WaitRuntimeTests) ... ok
+test_manager_current_inactive_task_returns_completion_before_wait (test_wait_runtime.WaitRuntimeTests) ... ok
+test_manager_mixed_running_and_stopped_jobs_returns_stopped_handoff (test_wait_runtime.WaitRuntimeTests) ... ok
+test_manager_returns_stopped_job_for_inactive_owner_with_note (test_wait_runtime.WaitRuntimeTests) ... ok
+test_manager_running_only_inactive_owner_waits_until_cancelled (test_wait_runtime.WaitRuntimeTests) ... ok
+test_manager_scope_never_subscribes_unregistered_threads (test_wait_runtime.WaitRuntimeTests) ... ok
+test_manual_stop_is_distinct_and_cleans_only_its_wait (test_wait_runtime.WaitRuntimeTests) ... ok
+test_native_manager_input_item_wakes_only_matching_current_wait (test_wait_runtime.WaitRuntimeTests) ... ok
+test_native_manager_input_turn_start_wakes_matching_wait (test_wait_runtime.WaitRuntimeTests) ... ok
+test_native_session_message_wakes_only_matching_current_wait (test_wait_runtime.WaitRuntimeTests) ... ok
+test_review_delegates_source_to_active_reviewer (test_wait_runtime.WaitRuntimeTests) ... ok
+test_review_does_not_hide_stopped_source_job (test_wait_runtime.WaitRuntimeTests) ... ok
+test_subscription_race_preserves_completion_queued_during_resume (test_wait_runtime.WaitRuntimeTests) ... ok
+test_targeted_user_steer_wakes_only_matching_current_wait (test_wait_runtime.WaitRuntimeTests) ... ok
+test_timeout_has_fixed_one_hour_reason_and_field (test_wait_runtime.WaitRuntimeTests) ... ok
+test_unknown_status_and_unknown_probe_are_explicit_errors (test_wait_runtime.WaitRuntimeTests) ... ok
+test_unresolvable_caller_and_notification_disconnect_are_explicit_errors (test_wait_runtime.WaitRuntimeTests) ... ok
+test_verified_active_wait_owner_keeps_stopped_job_out_of_manager_scope_after_completion (test_wait_runtime.WaitRuntimeTests) ... ok
+test_bound_project_without_manager_is_nonzero_with_remediation (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_checkout_test_environment_reaches_current_source_in_detached_daemon (test_wake_compat.InstallerScriptTests)
+A fresh checkout must outrank an older package for the daemon child. ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_checkout_tests_remove_manager_control_value (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_fresh_bootstrap_is_awaiting_manager_without_capturing_installer_thread (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_fresh_project_still_requires_live_app_server_before_service_status (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_install_upgrade_failure_does_not_touch_probes_or_scheduler (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_installed_launcher_uses_project_context_and_explicit_manager_only (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_installer_does_not_implement_a_background_shell_supervisor (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_installer_fixture_does_not_inherit_manager_control_value (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_live_delivery_failure_happens_before_existing_scheduler_stop (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_optional_wait_compatibility_failure_happens_before_wake_or_scheduler (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_same_repository_sibling_checkout_is_installed_and_path_persists (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_start_failure_retains_specific_reason_and_redacts_secret (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_unrecognized_trace_block_stops_install_without_mutating_user_content (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_upgrade_stops_then_restarts_only_the_existing_project_singleton (test_wake_compat.InstallerScriptTests) ... Preparing worktree (new branch 'fixture-installer')
+ok
+test_bound_project_missing_manager_has_explicit_remediation (test_wake_compat.WakeCompatibilityTests) ... ok
+test_compatible_json_cli_output_is_machine_readable (test_wake_compat.WakeCompatibilityTests) ... ok
+test_control_socket_environment_rejects_line_breaks (test_wake_compat.WakeCompatibilityTests) ... ok
+test_fresh_project_awaiting_manager_is_an_acknowledged_idle_state (test_wake_compat.WakeCompatibilityTests) ... ok
+test_healthy_service_status_is_accepted (test_wake_compat.WakeCompatibilityTests) ... ok
+test_known_empty_thread_rejections_are_distinguished_from_unsupported_methods (test_wake_compat.WakeCompatibilityTests) ... ok
+test_module_failure_is_stdout_and_nonzero (test_wake_compat.WakeCompatibilityTests) ... ok
+test_socket_replacement_during_probe_is_rejected (test_wake_compat.WakeCompatibilityTests) ... ok
+test_socket_unavailable_is_a_bounded_actionable_failure (test_wake_compat.WakeCompatibilityTests) ... ok
+test_transport_error_does_not_echo_remote_secret (test_wake_compat.WakeCompatibilityTests) ... ok
+test_unknown_thread_rpc_sequence_uses_no_model_request (test_wake_compat.WakeCompatibilityTests) ... ok
+test_unrelated_service_error_keeps_useful_category_and_redacts_assignment_secret (test_wake_compat.WakeCompatibilityTests) ... ok
+test_unsupported_rpc_rejection_is_not_compatible (test_wake_compat.WakeCompatibilityTests) ... ok
+test_accepted_task_ready_survives_unknown_source_without_duplicate_manager_turn (test_wake_runtime.WakeRuntimeTests) ... ok
+test_accepted_turn_with_lost_reply_becomes_ambiguous_not_a_second_model_turn (test_wake_runtime.WakeRuntimeTests) ... ok
+test_active_optional_wait_holds_delivery_then_archived_task_prevents_redundant_wake (test_wake_runtime.WakeRuntimeTests) ... ok
+test_agent_reassignment_invalidates_accepted_task_ready_event (test_wake_runtime.WakeRuntimeTests) ... ok
+test_archived_task_invalidates_accepted_task_ready_event (test_wake_runtime.WakeRuntimeTests) ... ok
+test_automated_wake_payload_labels_batched_content_once (test_wake_runtime.WakeRuntimeTests) ... ok
+test_busy_executor_retains_stopped_job_until_idle (test_wake_runtime.WakeRuntimeTests) ... ok
+test_concurrent_starts_share_one_detached_daemon (test_wake_runtime.WakeRuntimeTests) ... ok
+test_crash_after_persisted_attempt_recovers_as_uncertain_before_retry (test_wake_runtime.WakeRuntimeTests) ... ok
+test_existing_bound_project_without_manager_fails_instead_of_guessing (test_wake_runtime.WakeRuntimeTests) ... ok
+test_explicit_rpc_rejection_retries_without_response_loss_ambiguity (test_wake_runtime.WakeRuntimeTests) ... ok
+test_fresh_daemon_process_confirms_readiness_and_stops_without_app_server_delivery (test_wake_runtime.WakeRuntimeTests) ... ok
+test_fresh_project_awaits_manager_then_first_manager_action_registers_it (test_wake_runtime.WakeRuntimeTests) ... ok
+test_interrupted_event_recovers_only_after_new_completed_turn_and_idle_recipient (test_wake_runtime.WakeRuntimeTests) ... ok
+test_interrupted_latest_turn_requires_explicit_action (test_wake_runtime.WakeRuntimeTests) ... ok
+test_isolated_source_checkout_daemon_ignores_mam_root_shadow_and_pythonpath (test_wake_runtime.WakeRuntimeTests) ... ok
+test_live_awaiting_service_becomes_pending_until_its_first_active_cycle (test_wake_runtime.WakeRuntimeTests) ... ok
+test_live_bound_project_without_manager_fails_instead_of_reusing_stale_daemon_state (test_wake_runtime.WakeRuntimeTests) ... ok
+test_multiple_projects_keep_pending_state_isolated (test_wake_runtime.WakeRuntimeTests) ... ok
+test_native_v2_blocked_delivery_is_pending_while_service_process_is_alive (test_wake_runtime.WakeRuntimeTests) ... ok
+test_native_v2_escalation_is_stale_after_rebind (test_wake_runtime.WakeRuntimeTests) ... ok
+test_native_v2_escalation_rejection_does_not_recurse (test_wake_runtime.WakeRuntimeTests) ... ok
+test_native_v2_escalation_requires_a_manager (test_wake_runtime.WakeRuntimeTests) ... ok
+test_native_v2_escalation_waits_for_manager_unknown_paused_and_optional_wait (test_wake_runtime.WakeRuntimeTests) ... ok
+test_native_v2_escalations_batch_and_a_new_stopped_job_stays_meaningful (test_wake_runtime.WakeRuntimeTests) ... ok
+test_native_v2_rejection_escalates_once_when_manager_becomes_idle_and_clears_after_archive (test_wake_runtime.WakeRuntimeTests) ... ok
+test_native_v2_rejection_to_manager_recipient_does_not_self_escalate (test_wake_runtime.WakeRuntimeTests) ... ok
+test_no_repeated_turn_start_or_global_job_scan_for_unchanged_state (test_wake_runtime.WakeRuntimeTests) ... ok
+test_not_loaded_deleted_thread_stays_visible_without_creating_a_replacement (test_wake_runtime.WakeRuntimeTests) ... ok
+test_not_loaded_no_job_executor_exposes_manager_work (test_wake_runtime.WakeRuntimeTests) ... ok
+test_not_loaded_stopped_owner_is_targetedly_resumed_then_started (test_wake_runtime.WakeRuntimeTests) ... ok
+test_optional_wait_appearing_during_preflight_blocks_final_turn_start (test_wake_runtime.WakeRuntimeTests) ... ok
+test_persisted_native_v2_rejection_is_upgraded_without_one_more_executor_retry (test_wake_runtime.WakeRuntimeTests) ... ok
+test_quiet_monitoring_never_resumes_historical_threads (test_wake_runtime.WakeRuntimeTests) ... ok
+test_rebind_and_wait_stop_manager_share_the_bindings_boundary_without_deadlock (test_wake_runtime.WakeRuntimeTests) ... ok
+test_rebind_invalidates_accepted_old_stopped_job_delivery_before_new_delivery (test_wake_runtime.WakeRuntimeTests) ... ok
+test_rebind_invalidates_uncertain_old_stopped_job_delivery_before_new_delivery (test_wake_runtime.WakeRuntimeTests) ... ok
+test_rebind_waits_for_scheduler_cycle_then_routes_stopped_job_to_replacement (test_wake_runtime.WakeRuntimeTests) ... ok
+test_review_cycle_and_unknown_executor_are_visible_without_turn_start (test_wake_runtime.WakeRuntimeTests) ... ok
+test_review_suppression_and_reexposure (test_wake_runtime.WakeRuntimeTests) ... ok
+test_review_suppression_invalidates_accepted_task_ready_event (test_wake_runtime.WakeRuntimeTests) ... ok
+test_routing_matrix_mixed_jobs_and_empty_task (test_wake_runtime.WakeRuntimeTests) ... ok
+test_running_only_job_never_wakes_manager_after_executor_ends (test_wake_runtime.WakeRuntimeTests) ... ok
+test_start_waits_for_child_identity_readiness_and_reports_starting_as_pending (test_wake_runtime.WakeRuntimeTests) ... ok
+test_startup_compatibility_failure_is_visible_in_service_status (test_wake_runtime.WakeRuntimeTests) ... ok
+test_task_mutation_under_store_lock_wins_over_stale_probe (test_wake_runtime.WakeRuntimeTests) ... ok
+test_task_ready_pre_send_unknown_source_retains_pending_event (test_wake_runtime.WakeRuntimeTests) ... ok
+test_transient_unknown_probe_never_becomes_stopped (test_wake_runtime.WakeRuntimeTests) ... ok
+test_uncertain_delivery_survives_restart_and_retries_with_backoff (test_wake_runtime.WakeRuntimeTests) ... ok
+test_unverifiable_existing_service_never_spawns_a_second_daemon (test_wake_runtime.WakeRuntimeTests) ... ok
+
+----------------------------------------------------------------------
+Ran 215 tests in 83.319s
+
+OK
+MAM proactive wakeup: installing current checkout through pipx
+creating virtual environment...
+determining package name from '/mnt/public/xcj/Projects/workspace/a0c09804-1b5b-4df3-abf0-986ff19381af/multi-agent-manager'...
+creating virtual environment...
+installing multi-agent-manager from spec '/mnt/public/xcj/Projects/workspace/a0c09804-1b5b-4df3-abf0-986ff19381af/multi-agent-manager'...
+done! ✨ 🌟 ✨
+Installing to existing venv 'multi-agent-manager'
+  installed package multi-agent-manager 0.1.0, installed using Python 3.12.3
+  These apps are now globally available
+    - mam
+Updated /root/.bashrc; backup: /root/.bashrc.mam-install.20260913T113053Z.1032930.bak
+Rollback: cp -p -- /root/.bashrc.mam-install.20260913T113053Z.1032930.bak /root/.bashrc
+The current verified listener already has JSON trace logging.
+MAM proactive wakeup: persistent PATH updated in /root/.bashrc (backup: /root/.bashrc.mam-path.20260913T113053Z.1032930.bak)
+MAM optional wait: running live App Server trace compatibility probe
+MAM optional wait: live App Server trace compatibility PASS
+MAM proactive wakeup: running non-model App Server API compatibility probe
+MAM proactive wakeup: non-model App Server API compatibility PASS
+MAM proactive wakeup: running isolated real delivery acceptance

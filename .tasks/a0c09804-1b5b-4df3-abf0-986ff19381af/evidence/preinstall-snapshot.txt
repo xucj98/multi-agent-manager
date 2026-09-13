@@ -1,0 +1,76 @@
+2026-09-13T11:26:03Z
+git:
+751bd01525ead44451840fec7d02cad448551201
+project/state-vla
+ M docs/wash-cup-shared-memory-token-usage-audit.zh-CN.md
+?? .tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/report.md
+?? .tasks/838bfe79-ab08-4c58-9843-f8e84423f0e1/report.md
+?? .tasks/a0c09804-1b5b-4df3-abf0-986ff19381af/evidence/
+?? .tasks/a0c09804-1b5b-4df3-abf0-986ff19381af/report.md
+?? .tasks/afe0d0ee-2f2f-462a-8ace-cf6660d87e9d/report.md
+?? .tasks/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/native-v2-fallback-evidence.json
+service:
+{
+  "status": "pending",
+  "running": true,
+  "healthy": true,
+  "manager": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+  "mode": "active",
+  "pending": {
+    "count": 1,
+    "events": [
+      {
+        "accepted_at": null,
+        "attempts": 0,
+        "created_at": "2026-09-13T11:24:56+00:00",
+        "delivery": "pending",
+        "kind": "task_unbound",
+        "last_error": null,
+        "last_observed_at": "2026-09-13T11:25:52+00:00",
+        "last_recipient_state": "active",
+        "next_attempt_at": 0.0,
+        "observed_count": 6,
+        "recipient": "01a09657-e0f3-7352-b726-aba5bbd5d498",
+        "task": "afe0d0ee-2f2f-462a-8ace-cf6660d87e9d",
+        "task_title": "P0诊断记录接口独立审查：行为等价、RNG与证据完整性"
+      }
+    ]
+  },
+  "counters": {
+    "accepted": 54,
+    "cycles": 8157,
+    "observed": 53976,
+    "queued": 176,
+    "turn_start_attempts": 117
+  },
+  "heartbeat_at": "2026-09-13T11:25:52+00:00",
+  "ready_at": "2026-09-12T17:22:14+00:00",
+  "diagnostics": [
+    {
+      "kind": "unknown_executor",
+      "message": "executor 01a096ab-e5f3-7672-8ff3-36328d3fcfb7 is systemError",
+      "task": "4006fc83-08f7-4561-9705-dc4c856dee7c"
+    }
+  ]
+}
+tasks:
+标题	任务状态	TASK-ID	AGENT-ID	agent状态
+高频状态推理与偏差触发replan：复用checkpoint的推理实现	working	0acf5d43-91b6-4171-b727-e3fe0f7e7939	01a09a02-4a6f-7df0-a336-01f990980742	active
+高频状态与replan独立审查：先核对实验合同，后验代码准入	pending	4006fc83-08f7-4561-9705-dc4c856dee7c	01a096ab-e5f3-7672-8ff3-36328d3fcfb7	systemError
+P0诊断记录接口：状态原始输出、动作和RNG的无行为改动采集	pending	8968b7f5-74f7-44db-ad0b-058d3fd556ca	01a0988b-8474-7092-91d7-2be005e81ab9	idle
+MAM native-v2 fallback：已验收版本集成、安装与生产验收	working	a0c09804-1b5b-4df3-abf0-986ff19381af	01a096ab-b7ba-7ce2-bd31-b38f1803b789	active
+P0诊断记录接口独立审查：行为等价、RNG与证据完整性	working	afe0d0ee-2f2f-462a-8ace-cf6660d87e9d	未绑定	未绑定
+修复MAM对Codex multi-agent v2唤醒拒绝的Manager升级通知	pending	b49a5b40-1d18-40e6-bc28-c5c57dc011f3	01a0987f-a898-74f2-bd20-5da60b4db526	idle
+九任务覆盖首波：wuwen-1八卡seed0训练与三任务Memory-v1接入	pending	e3bc64f1-7f0d-46d2-9e54-831aa1727384	01a0986a-1c71-79e3-a10e-2fbe9ccfb3bd	notLoaded
+Memory v1新checkpoint评测准备：仿真入口、留痕与offline回归排期	pending	e6908de7-4b02-465a-987b-a19eba7a315a	01a096ac-c435-7972-b1b0-d7e1b0cc94f4	active
+jobs:
+描述	job状态	开始时间	JOB-ID	任务描述	TASK-ID
+formal 20k N swap_blocks seed0 bs32 clean5835fa0 GPU0	running	2026-09-13T09:38:55Z	443b3b93-57ba-425e-bbce-f4903fea33c1	九任务覆盖首波：wuwen-1八卡seed0训练与三任务Memory-v1接入	e3bc64f1-7f0d-46d2-9e54-831aa1727384
+formal 20k N battery_try seed0 bs32 clean5835fa0 GPU2	running	2026-09-13T09:38:55Z	86f8ee1f-3d30-40f5-ba98-973b18232897	九任务覆盖首波：wuwen-1八卡seed0训练与三任务Memory-v1接入	e3bc64f1-7f0d-46d2-9e54-831aa1727384
+formal 20k N cover_blocks seed0 bs32 clean5835fa0 GPU4	running	2026-09-13T09:38:55Z	1495a251-7d9e-4f68-8afc-0a7cee6360f9	九任务覆盖首波：wuwen-1八卡seed0训练与三任务Memory-v1接入	e3bc64f1-7f0d-46d2-9e54-831aa1727384
+formal 20k J swap_blocks full_t_plus_1 seed0 bs32 clean34002dce GPU1	running	2026-09-13T10:17:57Z	4ea24e85-d5f4-40cc-8409-44beb7237e8f	九任务覆盖首波：wuwen-1八卡seed0训练与三任务Memory-v1接入	e3bc64f1-7f0d-46d2-9e54-831aa1727384
+formal 20k J battery_try full_t_plus_1 seed0 bs32 clean34002dce GPU3	running	2026-09-13T10:17:57Z	a6eeac71-c0e2-4701-9530-521362c34083	九任务覆盖首波：wuwen-1八卡seed0训练与三任务Memory-v1接入	e3bc64f1-7f0d-46d2-9e54-831aa1727384
+formal 20k J cover_blocks full_t_plus_1 seed0 bs32 clean34002dce GPU5	running	2026-09-13T10:17:57Z	191b644f-f116-4f0b-a096-1dab6da41ade	九任务覆盖首波：wuwen-1八卡seed0训练与三任务Memory-v1接入	e3bc64f1-7f0d-46d2-9e54-831aa1727384
+formal 20k S swap_blocks serial_lag30 seed0 bs32 clean34002dce GPU6	running	2026-09-13T10:17:57Z	cb3e5246-fa74-40df-8325-0431f9587f73	九任务覆盖首波：wuwen-1八卡seed0训练与三任务Memory-v1接入	e3bc64f1-7f0d-46d2-9e54-831aa1727384
+formal 20k S cover_blocks serial_lag30 seed0 bs32 clean34002dce GPU7	running	2026-09-13T10:17:57Z	081f64c5-ae21-4062-b7ea-1dd281ddaa1f	九任务覆盖首波：wuwen-1八卡seed0训练与三任务Memory-v1接入	e3bc64f1-7f0d-46d2-9e54-831aa1727384
+C3 GPU0 highfreq-base stable renderer host gate: fixed 40 resets 100000–100039, put_back_block/demo_clean_eval, no policy or eval_result; frozen f401f527/f962663/a869498 runtime; receipt and logs in c-eval-highfreq-base/records; expected about 31 minutes.	running	2026-09-13T11:02:31Z	9325bb73-243c-405f-b9af-bf719d7ade20	Memory v1新checkpoint评测准备：仿真入口、留痕与offline回归排期	e6908de7-4b02-465a-987b-a19eba7a315a
