@@ -41,3 +41,15 @@ Manager已阅读66049be与5835fa04055d520e418cc1448c1bd58fa1e665cb完整实现�
 现在按已分配 wuwen-1 GPU0 swap N、GPU2 battery N、GPU4 cover N 启动各自正式 20k，train seed0、bs32、H50/K30、save_interval20k、BF16 model-only，使用 clean5835fa0 和验收 norm。允许沿 smoke 使用 XLA_FLAGS=--xla_gpu_enable_command_buffer= 的 CUDA12.2 兼容设置；在独立启动 receipt/环境记录中显式保存 XLA_FLAGS 和 driver/jaxlib，不改写旧 checkpoint command.txt 来掩盖其 allowlist 缺项。不能从 smoke50 权重续训冒充从 pi05_base 的既定训练。
 先核对设备可用和输出路径不存在，启动后立即本机 mam job add 登记 wuwen-1 真实 PID；交付 step100 有限 loss、实际占卡、启动命令与 job receipt。其他 J/S 仍候选，不随此准入正式开跑。
 请立即补全并发布当前 report（旧草稿仍称首batch阻塞），包含 N 的最终 receipt 和 J/S afb7a4d0ac20f2cba3c6bb0d5a25c96f792479c3 候选证据，以便建立独立 review。先发布已有事实并启动已放行 N，不因写完整 J/S 报告延迟训练。
+
+## Manager J/S 资产与逐项启动准入（2026-09-13）
+用户指出仍空闲5卡，必须消除可并行步骤的人为串行等待。Manager已直接阅读 afb7a4d 的 adapter/config/新增schema及关键边界测试；独立 reviewer b35a15ba 已回报无P1/P2阻止生成资产/50-step gate，并独立54项测试通过、六配置serialize/reload模型合同一致。接受新增 J/S 代码进入资产与真实短训练阶段；不必等各任务一起完成。三 N 正式仍在0/2/4卡，禁止修改其运行树/资产。
+
+现在继续执行：
+1. 在独立 J/S 执行树从 afb7a4d 合入已被Manager验收的loader优化66049be3e2a629998c5af1fec20493723ff63687和5835fa04055d520e418cc1448c1bd58fa1e665cb，保留stats优化；原N clean5835fa0运行树不动。发布最终干净执行commit，检查合入只引入既定loader变化。若有语义冲突或额外算法更改，报告Manager裁决；普通无冲突cherry-pick与既有loader定向CPU验证可直接执行。
+2. 生成三任务各一份semantic sidecar（供J/S共用），沿冻结current-truth/availability/robot-action合同，50episode逐项验证并保留命令/metadata。新产物不得覆盖N robot-only sidecar、既有模型或旧实验。复用已验收三份robot-only14D norm，不重跑无变化的统计。若默认semantic路径已有文件，先核对身份，不直接覆盖。
+3. 五条路径分别通过真实图像、多worker bs32的有限batch检查后，在原预留卡启动50-step save/restore：GPU1 swap J，GPU3 battery J，GPU5 cover J，GPU6 swap S，GPU7 cover S。可并行，避免某个task阻塞其余task。seed0/H50K30/default cache/HF unset/XLA CUDA12.2兼容项保持，GPU占用启动前再核对；battery S不在本批，不增加其他seed。
+4. 每条独立满足有限loss、成功保存、完整BF16/finite/shape参数、metadata与norm及字段schema正确、checkpoint-only policy动作[50,14]及该schema的memory输出恢复后，准许立即从pi05_base按既定20k正式合同开对应卡；不用再等Manager在线逐条重复批准。此为Manager现在作出的有条件准入，仅适用于上述五条和上述冻结语义/代码，不能用smoke权重续训。任一检查不通过则仅停该路径，回报具体证据；不得自改语义绕过检查。
+5. 每条正式启动立即mam job add登记，发布各自gate与启动receipt，含最终code、数据/sidecar/norm身份、命令、GPU/PID/job和step100有限loss。Manager随后抽查原始证据并最终验收；短训练通过不能计作正式训练完成。若reviewer完整报告随后出现具体阻塞项，按影响范围暂停相关新启动并通知Manager，其余已通过路径继续。
+
+尽快先回报资产/五卡smoke的实际状态与日志位置；不要仅回复将执行后结束turn。当前可执行准备完成、仅剩已登记长进程时再正常结束turn，禁止自建轮询/cron。
