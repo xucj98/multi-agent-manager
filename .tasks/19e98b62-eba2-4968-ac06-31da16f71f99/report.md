@@ -105,3 +105,29 @@ serial seed1（PID 593965，MAM `1261e32e-293c-49b9-b4bc-cda02fe42413`）在 16:
 `R`/PPID 1、占用 GPU5；最后一次读取日志为 Step19800、loss 0.0073，最终目录尚未出现 `20000`。
 它保持自然运行，未被终止、重启或重复登记。本任务的预算重排暂停规则仍生效：不会新开训练、smoke、
 formal、offline 或额外 eval；该模型完成后才按同一验收与归档流程处理。
+
+## 2026-09-13 17:02 CST：serial seed1 完成，四模型收尾
+
+serial seed1 的 PID 593965 已自然消失，GPU5 在验收后为 1 MiB、0% 利用率。其 attempt3 日志记录
+Step20000（loss 0.0093、grad_norm 0.1776、param_norm 1807.0801）和成功的 Orbax finalization；没有
+将先前 Step19800 当作最终结果。唯一 checkpoint
+`pi05_x1pro_wash_cup_s2m_serial_lag30/memory20k_19e98b62_wash_serial_s1/20000` 只含
+`_CHECKPOINT_METADATA`、`params`、`assets`、`metadata`，无 `train_state`。
+
+CPU 完整参数验收通过：56 leaves、3,353,454,358 elements，全部 BF16、finite 且与模型完整 shape
+匹配。GPU5 checkpoint-only restore 也以 exit 0 通过，actions 为 `(50,14)`，memory IDs 为 `(1,1)`；
+同样拒绝原训练数据、base weights、外部 norm 和 memory YAML 读取，未执行 offline rollout 或其他评测。
+验收日志和 `formal_20000_acceptance.json` 位于该 run 根的 `training_acceptance/`，params disk bytes 为
+5,257,150,891、metadata file count 为 185。原 PID 在检查前已回收，故不虚报数字训练 exit code，只依据
+finalization 日志描述完成。
+
+MAM job `1261e32e-293c-49b9-b4bc-cda02fe42413` 已归档；本任务现有 12 条 job 均已归档。最终 20k
+模型为：full seed1 loss 0.0050、full seed2 loss 0.0048、serial seed1 loss 0.0093、serial seed2 loss
+0.0163。RMBench 训练台账已更新为最终四模型清单并提交为 `c886ff2d58117b3f35de76fb7dbfcd8bfa07ee89`
+（`docs: finalize wash seed repeat results`）；
+它同时明确 checkpoint 可复用但当前预算重排暂停新增训练、smoke、formal、offline 和额外 eval。
+
+attempt1 中断与 attempt2 启动拒绝的全部证据仍保留在
+`/mnt/public/xcj/Projects/openpi/logs/attempt_history/19e98b62-eba2-4968-ac06-31da16f71f99/`，
+其 SHA256 清单未变；这些失败/中断 run 没有被重训、丢弃或纳入任何结果。当前没有未归档 job 或可执行
+实验事项，保留 worktree、checkpoint 和证据供 Manager 验收与后续排期。
