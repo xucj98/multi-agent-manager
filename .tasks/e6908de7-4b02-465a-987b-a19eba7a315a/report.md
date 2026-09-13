@@ -1,3 +1,22 @@
+## 当前状态：C3 高频工程验证被 matched action gate 阻断（2026-09-14 CST）
+
+C3 GPU0 上的获批有限工程验证已完成 8 个两集 leaf，**没有启动 HF matching smoke、r_s30 控制或任何 HF formal100**。运行根为 `/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914`，三库仍干净且精确固定为 RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`。冻结矩阵、baseline inputs 与 run matrix SHA 分别为 `20e414eb…700adb`、`305250a1…4a69`、`f5e5dc56…8a69`；任务私有工具 SHA 为 `dcf93891de82adaf21e676c55ee30901309f9c9a6097841ff4be4c7ba7f29c87`。
+
+四个普通 baseline/shadow 与四个 matched baseline/shadow 均使用环境 seed `100000,100001`，每个 leaf 都完整终态、launcher/scheduler exit 0、episode0 video/episode1 no-video、端口释放，并实际记录 `random_light=false`、`crazy_random_light_rate=0`。普通 baseline 按合同没有 rolling action/probe RNG 日志；该可观测缺口保留，未被当成动作等价证据。
+
+| profile | 审计 review SHA-256 |
+| --- | --- |
+| ordinary rearrange baseline / shadow | `0b3b0ec3053d76db967377fc8fca41bcbb5bc5e51b9d3004b1e0d41aef98083f` / `e06818739af8a68864e7e0ed970eb3b6b151b0da3b8154b657742557edcaa1a4` |
+| ordinary put-back baseline / shadow | `49395fed252948f7ebe09ee79cbfc9ea2ead835c8430a4f3c481e57deab826aa` / `4595c78ee8cdf26cc4445728e4c9d98b4115fe1c6dcdfd6fced2e79118687926` |
+| matched rearrange baseline / shadow | `3dfaa6716e8e7b589be1f34506bdb1a31962afa1dac446723e2b9c26f816bf45` / `61bb190ee46934954cf8a7b10dcdea3df0d743f310bb1049e9e53f4fed48f256` |
+| matched put-back baseline / shadow | `a33b40b14ece0525b673265b1c6fb2858986468f41c4bf27501b9029e4ffb162` / `f595423190643ceaeefef7a0e2efbcbf8e513ac0cc984efea9a0fc3b51e2b93d` |
+
+两个 matched pair 审计均以 `matched baseline/shadow action evidence differs` 退出，因而不满足 shadow 不改变动作流的准入条件。四个 accepted episode 都有每集 action RNG reset；matched baseline probe 数为 0，shadow 有 54–67 个 probe。两任务、两集中第一个 action query 都在 `source_step=0`、相同记录的 action RNG `{stream: action, call: 1}` 和相同记录的语义 state/memory 输入下出现不同 action 数组；put-back 随后从 baseline 17 次 action query 与 shadow 11 次 action plan 进一步分叉。记录的语义输入有意不含 camera payload，因此现有证据不能把首个差异归因于未记录视觉观测差异或 policy/runtime 行为中的任一方；没有猜测首因、调阈值、重跑或修改源码。
+
+完整失败记录在 `.local/highfreq_engineering/audits/failures/matched_action_equivalence_failure.json`，SHA-256 `c6519c947782001a07295daf7aeed4a6a1d2295669c17ececd8acb537e2c26f4`；其中有每集首分歧 action 摘要、pair audit log/review hash 和未启动清单。扫描 93 个 outer/process/result 文件未发现 traceback、EOF、renderer、CUDA 或 runtime-error marker。收尾时 C3 GPU0 为 1 MiB used / 24080 MiB free / 0% util，19400/19402 无监听；未触碰 C1 正式任务、源码树或 checkpoint。下一步需要由源码 owner/Manager 针对 matched action 等价与完整输入可观测性裁定或修复后，再建立新的独立 runtime/leaf；当前不能把任何 engineering leaf 视为 matching gate。
+
+---
+
 ## C 迁移评测准备（2026-09-12 03:02 CST）
 
 文档提交 `13192bb5ee4be7c18fe149996a17b18772826811`，在既有安全 docs tree
