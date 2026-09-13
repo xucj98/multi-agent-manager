@@ -1,67 +1,93 @@
-# 第一波 N 训练与 J/S Memory-v1 接入进展
+# 第一波 N / J / S 训练与 RMBench Memory-v1 交付进展
 
-## N：已接受的 50-step gate
+## 执行树与共同运行合同
 
-N 的冻结实现树保持不变：
+- N 的已接受正式执行树保持为 `/mnt/public/xcj/Projects/workspace/e3bc64f1-7f0d-46d2-9e54-831aa1727384/loader/openpi`，clean `5835fa04055d520e418cc1448c1bd58fa1e665cb`；它没有被 J/S 修改。
+- J/S 使用独立执行树 `/mnt/public/xcj/Projects/workspace/e3bc64f1-7f0d-46d2-9e54-831aa1727384/js/openpi`，clean `34002dce65962734c59725a0f6d982ae2c438a2d`。它相对已审核 J/S candidate `afb7a4d` 只合入已经验收的 episode-cache projection / nested binding loader 改动。
+- 全部 run 使用默认 `/root/.cache -> /mnt/public/xcj/cache`，不设置 `HF_LEROBOT_HOME`，seed 0、batch 32、H50/K30、model-only BF16。wuwen-1 的 driver 为 535.54.03 / CUDA 12.2，jax/jaxlib 为 0.5.3；launcher、`pids.tsv` 和 receipt 显式保存 `XLA_FLAGS=--xla_gpu_enable_command_buffer=`。checkpoint `command.txt` 的既有 allowlist 不记录该变量，未改写 checkpoint metadata 来掩盖此限制。
 
-- `/mnt/public/xcj/Projects/workspace/e3bc64f1-7f0d-46d2-9e54-831aa1727384/openpi`：`867aa05e428d6ce259fba99f55def3b5b4fce951`，未修改。
-- 实际训练使用独立 loader 执行树 `/mnt/public/xcj/Projects/workspace/e3bc64f1-7f0d-46d2-9e54-831aa1727384/loader/openpi`：clean `5835fa04055d520e418cc1448c1bd58fa1e665cb`。
+## N：已接受的 gate 与运行中的正式 20k
 
-Manager 已独立复核 loader projection 修复及真实 loader 证据，并接受三条 N 的 50-step gate。最终成功 smoke 结果根：
+N 的 smoke gate 根为：
 
 `/mnt/public/xcj/Projects/openpi/checkpoints/wave1_n_smoke_5835fa0_nocmdbuf_20260913T0923Z`
 
-| task | GPU | config | step-50 loss | checkpoint-only 恢复 |
-| --- | ---: | --- | ---: | --- |
-| swap_blocks N | 0 | `pi05_rmbench_swap_blocks_no_memory` | 0.0375 | CPU params + GPU policy 通过 |
-| battery_try N | 2 | `pi05_rmbench_battery_try_no_memory` | 0.0431 | CPU params + GPU policy 通过 |
-| cover_blocks N | 4 | `pi05_rmbench_cover_blocks_no_memory` | 0.0356 | CPU params + GPU policy 通过 |
-
-三个 smoke 都使用真实数据、seed 0、batch 32、H50/K30、现有 robot-only norm、model-only BF16、default cache，且 `HF_LEROBOT_HOME` 未设置。每个 checkpoint 只有 `_CHECKPOINT_METADATA`、`assets`、`metadata`、`params`，没有 `train_state`。独立 CPU 恢复均验证 51 leaves、3,353,433,872 elements、6,706,867,744 bytes、完整 shape、BF16 和 finite；独立 GPU `create_trained_policy_from_checkpoint` 恢复均产生 finite `[50,14]` actions，且审计钩子拒绝读取训练 dataset/base checkpoint/source assets。
-
-完整 receipt（含日志哈希、配置和 validation script 哈希）：
+三条真实数据 smoke 都完成 step 50，保存 model-only checkpoint，并通过 CPU 全参数 BF16/shape/finite 与 checkpoint-only GPU policy `[50,14]` finite 恢复。详细 receipt：
 
 `/mnt/public/xcj/Projects/openpi/checkpoints/wave1_n_smoke_5835fa0_nocmdbuf_20260913T0923Z/validation/wave1_n_smoke_receipt.json`
 
-wuwen-1 的 NVIDIA driver 为 535.54.03（CUDA 12.2），jax/jaxlib 为 0.5.3。默认 CUDA command-buffer 路径在首次 smoke 的第一步报 CUDA <12.3 不支持，未产生 checkpoint；最终 smoke 和正式 run 均使用 `XLA_FLAGS=--xla_gpu_enable_command_buffer=`。该兼容项保存在各 run 的 `pids.tsv` 和 launcher script 中；现有 `checkpoint_metadata` 环境 allowlist 不保存 `XLA_FLAGS`，因此不把旧 `command.txt` 改写成包含它的记录。
-
-## N：已启动的正式 20k
-
-2026-09-13 17:38:55 CST 已在 wuwen-1 启动三条独立正式训练。它们从 `pi05_base` 初始化，**不**从 smoke checkpoint 续训；使用 clean `5835fa0`、seed 0、batch 32、H50/K30、`save_interval=20000`、model-only BF16、default cache、`HF_LEROBOT_HOME` unset 和上述 XLA 兼容项。
-
-正式结果根：
+N 的正式 root 为：
 
 `/mnt/public/xcj/Projects/openpi/checkpoints/wave1_n_formal20k_5835fa0_nocmdbuf_20260913T0940Z`
 
-| task | GPU | PID | MAM job | exp name |
+| task | GPU | PID | MAM job |
+| --- | ---: | ---: | --- |
+| swap_blocks N | 0 | 2621614 | `443b3b93-57ba-425e-bbce-f4903fea33c1` |
+| battery_try N | 2 | 2621615 | `86f8ee1f-3d30-40f5-ba98-973b18232897` |
+| cover_blocks N | 4 | 2621616 | `1495a251-7d9e-4f68-8afc-0a7cee6360f9` |
+
+它们从 `pi05_base` 独立初始化，未从 smoke 续训；N 的正式 step-100 receipt 已保存在该 root 的 `formal_step100_receipt.json`。
+
+## J/S：semantic sidecar 与 loader gate
+
+三份新 semantic sidecar 与 N 的 action-only sidecar 并列存放，未覆盖 `robot_only/`：
+
+`/mnt/public/xcj/Projects/openpi/data/memory_v1/rmbench/{swap_blocks,battery_try,cover_blocks}_demo_clean_state_shared_memory/episode_memory.json`
+
+每份都逐集验证 50 episodes：Parquet `action[:14]` 的 q(t+1) 对齐、M+1 repeated tail、从 `demo_clean_state` source metadata 重算的 current truth、availability、events、field vocabulary、manifest 和 copied provenance 全部精确相等，且数值有限。
+
+| task | query rows | semantic sidecar SHA-256 | manifest SHA-256 |
+| --- | ---: | --- | --- |
+| swap_blocks | 29,920 | `ba697b8c93dd3034d93ae2032efce22ea7b496023abb0a6d8dd2e5d8defef5c1` | `777e3cecb7299dd9ac0798e37427caeb489da4610d00b1d91409239cc3119bc0` |
+| battery_try | 32,626 | `75bf188165027a06bf68e2924590f540252af78a0b099ace9cf40f4595de69cb` | `c8cd9c122734460b313e58748fd318f73be52945e2d296185b1c0c7b69138c4a` |
+| cover_blocks | 50,904 | `573b0a5e02aec8f16cf5800348e883ab9951dc5d0f8febeabef931e5e47886ea` | `1b2a189e5c078fec45855ddf4e8be1b9fbe10acd920770ae40b0342cc65f7517` |
+
+验证日志和生成前 robot-only 哈希位于：
+
+`/mnt/public/xcj/Projects/openpi/assets/memory_v1/js_execution_34002dce_20260913T1005Z/semantic_generation/`
+
+`/mnt/public/xcj/Projects/openpi/assets/memory_v1/js_execution_34002dce_20260913T1005Z/semantic_validation/`
+
+定向 CPU suite 通过 68 项：`memory_data_test.py`、`test_rmbench_memory_adapter.py`、`config_memory_test.py`、`config_test.py`。五条 J/S config 的真实三相机、shuffle、`num_workers=2`、batch 32、三批 loader gate 也全部有限；full 动作/状态为 `[32,50,32]`，serial 的 token fields 分别为 swap `[32,3]`、cover `[32,4]`。日志：
+
+`/mnt/public/xcj/Projects/openpi/assets/memory_v1/js_execution_34002dce_20260913T1005Z/loader_gate/`
+
+## J/S：完成的 50-step smoke 与 checkpoint-only gate
+
+五条真实数据 smoke root：
+
+`/mnt/public/xcj/Projects/openpi/checkpoints/wave1_js_smoke_34002dce_nocmdbuf_20260913T1015Z`
+
+每条完成 50 次更新、保存且通过独立 checkpoint-only gate：
+
+- CPU：完整参数 key/shape，BF16、finite；full 为 51 leaves，serial 为 56 leaves。
+- GPU：有限机器人动作 `[50,14]`；full memory output 为 `[50,F]`，serial 为 `[1,F]`。
+- checkpoint metadata、copy-in norm、schema、sidecar binding/provenance 均匹配；audit hook 拒绝 dataset、`pi05_base`、source sidecar/assets 与原 YAML 的读取。
+
+具体 restore JSON 日志和 validator 位于 smoke root 的 `validation/`；`validate_js_checkpoint.py` 及其 SHA-256 也保存在该目录。
+
+| GPU | config | smoke memory output |
+| ---: | --- | --- |
+| 1 | `pi05_rmbench_swap_blocks_full_t_plus_1` | `[50,3]` |
+| 3 | `pi05_rmbench_battery_try_full_t_plus_1` | `[50,1]` |
+| 5 | `pi05_rmbench_cover_blocks_full_t_plus_1` | `[50,4]` |
+| 6 | `pi05_rmbench_swap_blocks_serial_lag30` | `[1,3]` |
+| 7 | `pi05_rmbench_cover_blocks_serial_lag30` | `[1,4]` |
+
+## J/S：已启动的正式 20k
+
+所有 J/S 正式训练在完成各自 smoke + CPU/GPU restore gate 后，从 `pi05_base` 独立初始化，未从 smoke checkpoint 续训。正式 root：
+
+`/mnt/public/xcj/Projects/openpi/checkpoints/wave1_js_formal20k_34002dce_nocmdbuf_20260913T1020Z`
+
+`validation/formal_start_receipt.json` 记录每条 smoke gate、sidecar/manifest、robot-only 哈希、运行命令合同与 MAM job。五个正式 run 已实际出现在 wuwen-1 GPU pmon，MAM 亦以真实远端 PID 登记：
+
+| task | GPU | PID | MAM job | config |
 | --- | ---: | ---: | --- | --- |
-| swap_blocks N | 0 | 2621614 | `443b3b93-57ba-425e-bbce-f4903fea33c1` | `memory20k_5835fa0_nocmdbuf_swap_blocks_n_s0` |
-| battery_try N | 2 | 2621615 | `86f8ee1f-3d30-40f5-ba98-973b18232897` | `memory20k_5835fa0_nocmdbuf_battery_try_n_s0` |
-| cover_blocks N | 4 | 2621616 | `1495a251-7d9e-4f68-8afc-0a7cee6360f9` | `memory20k_5835fa0_nocmdbuf_cover_blocks_n_s0` |
+| swap J | 1 | 2646142 | `4ea24e85-d5f4-40cc-8409-44beb7237e8f` | `pi05_rmbench_swap_blocks_full_t_plus_1` |
+| battery J | 3 | 2646143 | `a6eeac71-c0e2-4701-9530-521362c34083` | `pi05_rmbench_battery_try_full_t_plus_1` |
+| cover J | 5 | 2646144 | `191b644f-f116-4f0b-a096-1dab6da41ade` | `pi05_rmbench_cover_blocks_full_t_plus_1` |
+| swap S | 6 | 2646145 | `cb3e5246-fa74-40df-8325-0431f9587f73` | `pi05_rmbench_swap_blocks_serial_lag30` |
+| cover S | 7 | 2646146 | `081f64c5-ae21-4062-b7ea-1dd281ddaa1f` | `pi05_rmbench_cover_blocks_serial_lag30` |
 
-三个 job 已以真实远端 PID 登记为 running。下一项验收是 step 100 的有限 loss、实际 GPU 占用和日志 receipt；完成 20k 后再验收 params/metadata/shape/BF16/finite 和独立 checkpoint-only 恢复，并归档 job。尚未启动 J/S 正式训练。
-
-## J/S：待独立 review 的 clean candidate
-
-J/S 在独立开发树 `/mnt/public/xcj/Projects/workspace/e3bc64f1-7f0d-46d2-9e54-831aa1727384/js/openpi`，commit：
-
-`afb7a4d0ac20f2cba3c6bb0d5a25c96f792479c3` (`feat(rmbench): add swap battery cover memory schemas`)
-
-该候选添加 swap/battery/cover 的 full per-frame 与 serial lag-30 Memory-v1 YAML、current-truth adapter、config builders 及覆盖测试。语义固定为：swap 的四 phase 与 tray permutation 约束；battery 只使用 phase 并允许 optional `try_11`/`try_01`；cover 的 6 phase 和 red/green/blue 各 4 值，共 18D，保持 14+18=32。full 使用 future per-row phase、offset +1、row-30 tail mask、`fixed_horizon` 和 `last_executed` feedback；serial 使用 lag 30、query target 和 selected/query feedback。
-
-验证：
-
-```text
-unset HF_LEROBOT_HOME
-JAX_PLATFORMS=cpu .venv/bin/python -m pytest -q \
-  examples/rmbench/test_rmbench_memory_adapter.py \
-  src/openpi/training/config_memory_test.py \
-  src/openpi/training/config_test.py
-# 54 passed in 68.61s
-```
-
-`ruff check`、`ruff format --check` 和 `git diff --check` 均通过。真实 50 集 source validation 在 candidate 上通过：swap 29,920、battery 32,626、cover 50,904 query rows；三者 state/robot target 均 finite，且 M+1 最后一行重复最后 action。证据目录：
-
-`/mnt/public/xcj/Projects/openpi/assets/memory_v1/js_validation/afb7a4d0ac20f2cba3c6bb0d5a25c96f792479c3/`
-
-该候选尚未生成 semantic sidecar，也未开 J/S 正式训练，等待独立 review。
+下一项运行验收为每条 step-100 的有限 loss、GPU占用、日志和 receipt；20k 完成后再按 task 合同做最终参数/metadata/shape/BF16/finite 与 checkpoint-only 恢复，随后归档对应 MAM job。
