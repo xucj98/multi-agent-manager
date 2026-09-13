@@ -37,3 +37,6 @@ Manager 01a09657-e0f3-7352-b726-aba5bbd5d498 将用 mam task rebind 将本任务
 
 ## 用户预算重排：暂停新增开跑（2026-09-13）
 用户否决普遍每配置3训练seed的旧预算，要求优先RMBench九任务覆盖，Manager正在重写论文主张/文献定位/最小实验清单。自此不再按旧队列启动新的训练、smoke、formal或追加eval seed；此节覆盖所有此前自动扩展授权。已经运行的job自然收尾，正常核验/记录/归档，保留checkpoint和完整结果；不杀训练、不丢弃不利结果、不重启失败项。已训练未评模型只整理可复用清单，等待新排期，不自行开跑。当前可执行收尾完成后正常结束turn，MAM自动唤醒。
+
+## 用户批准新计划与本次收尾（2026-09-13 09:35 CST）
+用户已批准/root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN.zh-CN.md实施。Manager实查wuwen-1八卡均空闲；MAM六条U均stopped，但turn/start被Codex拒绝：direct app-server input is not allowed for multi-agent v2 sub-agents。因此使用当前collaboration followup手动唤醒你。优先验收六条最终20k：完整性、元数据、BF16/finite、checkpoint-only恢复，按原验收脚本复用；本机GPU1/7可在启动前确认空闲后用于顺序恢复，不占wuwen-1（已全部分配新覆盖训练）。验收每项后归档对应job，汇总可评manifest与失败原因，发布report及时通知Manager/evaluation_owner。不要重训既有U，不要占新八卡。此项是补收尾不是新seed扩张。
