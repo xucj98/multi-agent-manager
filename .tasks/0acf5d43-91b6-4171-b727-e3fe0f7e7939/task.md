@@ -1,5 +1,22 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## Manager新对照设计：同实例probe副作用检查（本次仅CPU准备）
+
+Manager已独立验收最后pair报告f2d2d63fb941f0c1c9075aaa15050506f9ea0855的诊断事实：v2分析SHA be1382272b3cbae2454b17e3bcedaf2656c6693da88fffdfccbde3bf6473c5c7及45个不同绝对路径引用文件已重哈希。两侧actual request（包括cmd、三图像、state、memory、prompt）/call args/kwargs逐字段同dtype值相同；实际metadata/checkpoint校验和服务命令、当前记录环境一致。两臂各一次accepted reset episode0/env100000、infer/execute各一次、原iteration后clear30/logical_step0、exit70成立；自身H50→实际execute.actions.arms K30精确。跨臂H50有532/700不同（maxabs0.0036021433770656586，RMSE0.0006788336719106482）；K30有314/420不同（maxabs0.002218961715698242，RMSE0.0006341486370427415）。Manager额外检查memory_prediction_ids(50,2)及memory_prediction精确相等，memory_raw_actions(50,32)有1230个元素不同。实际PRNG key仍未观测，不作数值/编译/RNG根因推断。当前8/8诊断阶段完成，不把失败改为PASS，不增加正式计数。
+
+Manager的判断：跨进程首query比较把重放可复现性与“执行probe是否改变后续action”混在一起；本次无任何probe便有差异，该比较不能单独裁定probe副作用。下一检查应显式有同实例自身重复对照。以下设计是未来有限检查的准备合同，不是自动解除8/8上限或GPU执行授权。
+
+请完成上节只读source audit后，如未发现与合同矛盾的实际调用点，按此准备一个最小task-private检查脚本与CPU seam tests；若有矛盾，报告具体位置，不自行改实验或运行GPU：
+- 只复用冻结HF三库和put-back J train0/20k，已有原入口baseline完整policy request。服务传输的cmd从payload按真实server相同规则剥离；不改普通输入数值/dtype/结构。只加载一次真实OpenPiBackend，调用真实backend.reset_episode_rng、infer_audited和probe_forecast，不替换Policy/model/transform/JAX随机函数。
+- 顺序为C0：reset→一次infer_audited；C1：reset→一次infer_audited；只有C0/C1的完整ordinary action/state/raw输出（剔除timing）与最终action key严格相等才进行P：reset→同一个固定保存输入上5次真实probe_forecast→一次infer_audited。C1是同实例无probe的重复控制，P检验probe对正常action的副作用。五次固定输入probe只是隔离副作用，不是模拟五帧观测，不声称验证HF效果。
+- 未来运行上限明确为3次ordinary action inference+5次joint forecast probe（共8次完整sampler计算），无额外warmup、重试、环境reset、仿真轨迹、episode或formal。本次仅CPU准备，尚未使用这些预算；旧8/8阶段不改记账。任一控制失败即停止后续并保留已用调用数/首因，不为了pass调整容差或增加重复。
+- 用实际Policy不可变JAX key引用记录每次reset后、infer前后、probe前后的action/probe key与序号；真正数组内容转换在对应正常调用返回后或本次检查末尾进行，不在模型热路径新增全局wrapper/split/同步复制。所有probe前后action key和action序号必须不变；probe自身stream按实际前进。P的初始action key等于C0/C1，最终action key与C1相等；比较采样key如需从保存初始key离线重构，明确派生身份而非直接截获sampler内部noise。
+- 普通outputs保存完整小型数组，状态和raw联合输出均检查，shape/dtype/值严格；保留每一项比较结果和实际key/调用数。旧跨进程saved output仅可额外对照且与本检查结论分开，不用它使本次同实例结论短路。推理输入不得被probe或比较工具改写；保存输入身份前后核对。
+- CPU tests只覆盖控制不等时不执行probe、probe改变action key/序号或ordinary输出时拒绝、正常固定输入/key与合法probe序列通过、精确调用预算/无重试；用seam替代GPU但调用顺序和判定使用真工具。保留输入路径/hash、参数/三库身份、输出位置与最小diff，不建设新框架。默认脚本是plan/CPU，不得因工具完成自行加载模型执行。
+
+Manager同时依据source audit裁定controller30-row与分次5-row推进等价的范围，另行安排所需验证。该同实例检查即使通过也只支持probe软件副作用边界；完整scheduler/环境及效果的准入仍单列，跨进程历史失败原件保留。交干净小型工具/测试与source audit后结束turn，由Manager验收再发未来有限GPU授权。当前任务三库源码/现有HF正式状态完全不变。
+
+
 ## 当前CPU接续：核对同一policy实例内的对照边界
 
 已收到最后shadow报告f2d2d63fb941f0c1c9075aaa15050506f9ea0855；正常action预算8/8耗尽，当前仍不增加GPU/reset/replay/完整轨迹。Manager正在亲自核对两臂原始证据，并重新判断跨进程逐位相等能否承担“shadow无副作用”的准入作用，不把已发现差异自动归因于HF算法或浮点执行。
