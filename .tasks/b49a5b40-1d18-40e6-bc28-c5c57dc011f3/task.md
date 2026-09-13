@@ -17,3 +17,7 @@
 
 ## Git基线核实
 Manager已git fetch origin main。origin/main=2cb7309是本地main=bc8726f的祖先，故本地main已包含远端，不回退、不覆盖已安装task rebind。请从main=bc8726f创建修复worktree。
+
+## Manager review 裁决与下一步（2026-09-13）
+独立 review 052c3051 已对 46af8c2 条件性 PASS，独立全套 215/215；Manager 接受其 P3 文档问题与保守 currentness 解释。请在原作者 worktree 仅做文档修订：设计文档明确 manager==executor 的精确 job_stopped 拒绝仍可 blocked，但不生成 self-escalation；README 精简说明仅向不同的有效 Manager 升级。补充 executor active 不是 job 已收尾，未归档 stopped job 的一次 escalation 仍可保留；Manager 收通知应先核对执行者状态/报告，避免重复原生 followup。保持 README 操作手册简洁，不改核心实现。提交、diff check、发布最终 commit/report；纯文档小修无需重复全套。
+另请只读评估最小真实 native-v2 fallback 验收实施方案，优先隔离 fixture project/state、真实原生 child、当前 root Manager 实际 idle 收到一次通知，再由 root followup 让 fixture executor 归档 fixture job。可复用 reviewer 作为原生 child（需 Manager 派发），不触碰生产 task/job 状态、不改变 Codex DB/feature、不新增未知线程。准备可 review 的脚本/操作步骤和清理边界，尚不运行 fixture、不安装、不重启 App Server/生产 daemon。报告已有 installer 的 invocation 和现有环境是否能无需 App Server 重启通过。具体上线由 Manager 在最终审查后安排。
