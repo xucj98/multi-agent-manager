@@ -1,5 +1,17 @@
 # Memory v1 新 checkpoint 评测准备
 
+## 当前执行：原协议 put-back J/T train1/2 补齐三组 eval，新增训练 0
+
+Manager 已验收报告 `638fb6acc42f0079f74cf35bb60eda15c2325e90` 的 T train0 eval1/2：66/100、74/100，重算两批各10份artifact hash、连续seed/terminal/outcomes、记录进程退出及smoke链。T train0合计210/300（70%），J为213/300（71%）；当前44批/4400执行/20模型/12个完整3eval。离线HF比较修正仍FAIL，与Manager首query原复算一致，不解除HF暂停；C3 GPU0仍给source owner的有限诊断，C2 GPU6给P0。
+
+继续复用已有模型补齐缺失评估：put-back J(full_t_plus_1)与T(full_t_plus_30)，各training seed1/2，补evaluation seed1/2，共最多8个新formal100，新增训练0。只使用已在C验收的现有20000 checkpoint和原协议，不混HF reset或诊断分支。先去重完整结果；既有eval0和任何已完整有效批次不重跑，历史partial不拼接。若发现待Manager验收的完整批次，先提交该证据而不重复启动。
+
+优先使用刚释放的C1 GPU1/2及19410/19412、19420/19422；实测资源安全后，GPU1排J、GPU2排T，第一轮train1/eval1，随后train1/eval2，再train2/eval1、train2/eval2。每项自己的matching video/no-video smoke2通过后才从新leaf跑完整100，固定eval1为200000..200099、eval2为300000..300099。不按成功率筛选smoke或改变顺序。没有新的训练/转换/数据集传输；checkpoint缺失或来源不符则报告而不猜路径。
+
+沿冻结runtime `c-eval-putback-baselines-yaml` 的RMBench f401f5279c95451eb424ac98b831bab5552b2120 / bridge f9626636c4776d8eb15f9c556775cb2d12c000e5 / OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4，保持H50/K30、原环境与RNG生命周期。首infer显式90秒、后续30秒，保留此前准入配置，不能漏回默认30秒。不改运行树代码、依赖或共享cache；必要的manifest/config准备在本机独立路径完成后同步冻结副本，核对实际命令、metadata/schema/train_seed/eval_seed及hash。
+
+本节授权按上述固定队列连续收尾/接续，不要求Manager在每批已通过相同合同后再次放行。每条长进程登记MAM；停止后按完整100合同核验、final_review、archive、smoke清理receipt，基础设施失败保留首因且暂停该项，不循环重跑。每次处理完可执行事项后发布当前状态置顶的紧凑report并结束turn，由MAM唤醒；不要轮询GPU或其他owner。HF source诊断仍独立进行，本任务不重复其工作。
+
 ## 当前收尾与 HF 审计口径更正
 
 MAM升级通知中两条原协议T formal已stopped：eval1 JOBda058195-ff39-49ed-8e83-be5e1a8aaa7e、eval2 JOB3191f8c6-4c53-48a3-9ab7-8b44216ab2c0。先按既有完整100/连续seed/terminal/video/source/hash/进程合同收尾、出final_review并archive及smoke清理receipt，不能因HF工程失败漏掉原队列；结果未验收前不增加当前42批。
