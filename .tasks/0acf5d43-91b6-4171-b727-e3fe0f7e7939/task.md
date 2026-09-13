@@ -1,5 +1,16 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## Manager 工具验收：两处实测缺口，先窄修 CPU（尚未授权 GPU）
+
+Manager 已亲自阅读 report c17983bba05513737c9188efc1dd185947e9e477、完整1000行helper、8个测试、说明和source audit，并核对工具 SHA fa9bf3292a09e39dd1d2421d4276c16b76034deeb22794ed61cd1681b95ae9e1、tests SHA f881cde072d2518413ee21ba1cb8ab0bd8bc816cfa865efc3e8cd29c1489f6aa。独立复跑现有8个CPU测试全部通过，但另外两个使用真实工具和既有FakeBackend的有界CPU反例发现以下必须修复项；不能凭原8项通过运行GPU。
+
+1. **调用前发生实际key物化，与明确合同冲突。** default_key_snapshot 直接 np.array(jax.random.key_data(key))，_state 又在 run 开始、_reset 和 _invoke 的 policy_state_before 中同步调用。Manager 的计数seam观测到第一次 infer 前调用了10次key_snapshot，首次甚至在reset前。改为仅捕获真实不可变key对象引用和Python序号，在对应正常backend调用返回（包括异常返回）后才物化这些前后引用，不在首次infer/reset后至调用前读GPU数组。C0/C1完整结果比较后才进入P，P reset到首probe之前也不新增实际key物化；必要的前置reset一致性检查可用已冻结源码支持的对象引用关系和序号，实际key内容在对应调用后核验。不要为了修时序牺牲实际key/初始key一致性检查、停止边界或偷偷推迟到全部调用后才发现第一个probe修改action。保留来源固定输入deepcopy，无全局patch/split/wrapper。增加一次真实工具CPU时序测试，明确拒绝上述pre-call物化，覆盖保存的旧key引用没有被后续新key覆盖。
+2. **收尾异常可把实际8次调用记成0并丢失产物。** Manager 注入key_snapshot在第三次action返回后失败，run 的finally再次读取key时抛出，execute的外层catch把它当precheck_or_backend_initialization_failure并生成新CallBudget；实测backend已调用3action+5probe，最终receipt却写0+0且无任何pickle。把checker及已用budget/calls/artifacts保留到外层，收尾、key物化、恢复或序列化失败均不得清零或误标尚未加载。保存已有完整输出；恢复用独立保护的finally保证仍尝试执行；保留首因与另外的收尾错误，不让后者覆盖前者。无需建新框架，只修现有控制流并增加覆盖实际反例的CPU测试。
+
+另外更正 README/report 中“policy state 在收据后恢复”的表达：现代码在 run finally 内恢复，磁盘receipt由外层随后写；区分恢复前状态已经记录与磁盘写入时间，按修正后的真实顺序说明。
+
+本轮只修改task-private helper/tests/说明与报告，不动冻结三库，不运行GPU/模型/reset环境，不新增采样预算。保持原设计3 action+5 probe上限、无warmup/retry及普通输出严格比较；不因失败放宽条件、不扩大为环境等价或效果实验。交修复diff、新hash、CPU结果和新plan（旧plan保留）后正常结束turn，Manager验收再发布有限执行授权。
+
 ## Manager新对照设计：同实例probe副作用检查（本次仅CPU准备）
 
 Manager已独立验收最后pair报告f2d2d63fb941f0c1c9075aaa15050506f9ea0855的诊断事实：v2分析SHA be1382272b3cbae2454b17e3bcedaf2656c6693da88fffdfccbde3bf6473c5c7及45个不同绝对路径引用文件已重哈希。两侧actual request（包括cmd、三图像、state、memory、prompt）/call args/kwargs逐字段同dtype值相同；实际metadata/checkpoint校验和服务命令、当前记录环境一致。两臂各一次accepted reset episode0/env100000、infer/execute各一次、原iteration后clear30/logical_step0、exit70成立；自身H50→实际execute.actions.arms K30精确。跨臂H50有532/700不同（maxabs0.0036021433770656586，RMSE0.0006788336719106482）；K30有314/420不同（maxabs0.002218961715698242，RMSE0.0006341486370427415）。Manager额外检查memory_prediction_ids(50,2)及memory_prediction精确相等，memory_raw_actions(50,32)有1230个元素不同。实际PRNG key仍未观测，不作数值/编译/RNG根因推断。当前8/8诊断阶段完成，不把失败改为PASS，不增加正式计数。
