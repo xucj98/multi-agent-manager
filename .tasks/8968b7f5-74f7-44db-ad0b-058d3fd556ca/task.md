@@ -1,5 +1,21 @@
 # P0诊断记录接口：状态原始输出、动作和RNG的无行为改动采集
 
+## 归档最后收尾：清除已保留的workspace重复工具目录
+
+Manager已独立验收最终report df9e51e558a53e6c9d1e42662113edb6de6f0bd4：两持久codex分支精确指向bc7603c5/e147f600，两worktree clean；SHA256SUMS通过，120条索引内容和实际122个文件逐个匹配归档提交c053f611b5d1e5385ac25e4d78e139bf866bf618。索引local_snapshot_sources中全部5组源目录非bytecode文件均与对应保留副本一致，无未保留项。
+
+Manager调用mam task archive被操作保护拒绝：workspace还存在5个未登记的任务私有目录。它们是已复制的工具/收据重复件，不是新科研阻塞。本次授权原terra/max执行者做最后本机清理，保持报告和MAM artifacts以及C远端证据不动：
+- /mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic
+- 同workspace的c2-query-diagnostic-timeout90-v2-preflight-selfpid-attempt2
+- 同workspace的c2-query-diagnostic-timeout90-v2
+- 同workspace的tools
+- 同workspace的c2-query-diagnostic-invariance-replay-s-continuation
+
+删除前复核仅以上直接目录且非symlink，所有需保留文件仍匹配artifact-index的源→副本映射；__pycache__/pyc可清理。c2-query-diagnostic/transfer两个git bundle是已有验收commit的传输副本：用git bundle list-heads及当前主库持久ref确认其head已保留，然后可删除，不复制整bundle到artifacts。若发现范围外/未保留新文件先保留并报告，不跟随软链，不删源码登记worktree/branch，由mam archive处理它们。
+
+完成后workspace顶层应只剩登记的openpi与robot-bridge，两树仍clean；以紧凑清理receipt记录各目录删除与保留依据（放MAM task artifacts新独立文件，不改旧已验明包/SHA256SUMS）。发布report并结束；不要自行归档task。无GPU、无远端清理、无其他任务变更。
+
+
 ## Manager最终裁决与归档准备（2026-09-14）
 
 Manager已独立核对最终报告43170b46a4c4632734aab7d34a2de79db7215eae及J/S原始记录：接受冻结bc7603c5/e147f600/f401f527的有界诊断能力验收。J/S各两条query1均严格recorded，动作Policy→backend float32 H50→execute K30前缀映射精确；S logits/selected/action-condition一致。同一加载实例、相同实际输入和恢复起始key的off/on普通动作/状态及最终RNG在各一次pair严格相等。仅接受这些实际例子所支持的记录和同进程日志不变性，不作所有输入/任务上的行为等价或物理实时等价声明。
