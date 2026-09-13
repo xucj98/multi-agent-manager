@@ -1,5 +1,14 @@
 # 高频状态与replan独立审查：先核对实验合同，后验代码准入
 
+## 当前复审：证据 gate 窄修已交付，精确候选冻结
+
+源 report `2d3e0f7ba2fa61b9db83aa4550410e370af1a4b9` 已发布，Manager 已直接确认作者三库 HEAD/clean。恢复本任务增量复审：
+- OpenPI 保持 `0ce566bd34f99cb4775422f012ab67c16aa53885`。
+- bridge `552ea78f73e62fddc747d5d26e7e6c365fa00339` → `ffa122494c19e1c0154e877010f7b470967ccfc6`。
+- RMBench `c99ec6a2c6df96ec8705b106b125935fce862052` → `6abebf08d084d0be43aa56ebe158dc8395fa58e4`，保留 f401 正式祖先。
+复用现有三库独立 review 树，clean 后将 bridge/RMBench 快进至上述候选，不改 OpenPI。只复核上一报告 gate P1/引用 P2 的修复与受影响回归：是否从真实显式 rolling/matched 配置要求 evidence（不能缺 path 自动豁免），共享 validator 是否贯通 matching smoke 和 formal episode 收尾，缺失/截断/身份不符/无收尾不能获 completed；early failure 明确 unavailable/missing，已有原始运行错误不能被证据错误覆盖；默认 baseline 无要求及额外 I/O。
+作者报告 RMBench5、bridge lifecycle26/full524+2skip；均非独立 PASS。定向测试真实 gate/recorder/child seam，检查关键数据链而非机械重跑全库。保留前轮算法/RNG/单reset和旧默认等价的已通过结论，不合 P0 logger，不拓展任意防御。最终列精确三个commits及能否进入有限GPU工程验收；若无实际新问题及时给结论，不为了留在 turn 继续搜索无关边界。CPU only，publish report 后结束。
+
 ## Manager 对 report 27b16d899 的裁决及下一轮边界
 
 Manager 已直接检查 552ea/c99 真实调用链，接受 formal gate 缺 evidence 校验为 P1；early-child 悬空引用按 P2 处理，因为原 terminal_scheduler_error/runtime_error 已使 run 失败，此项单独不证明错误成功率。源任务已发布最小修复：明确 unavailable/missing/incomplete（无需伪造未执行推理记录），以实际 rolling/matched 配置要求证据、共享窄 validator 贯通 matching smoke 及 formal episode 收尾。默认无需 evidence，既有门禁不放宽。
