@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-**未通过完整 GPU 诊断验收；S（`serial_lag30`）尚未启动，当前仅完成 CPU/离线准备，等待 Manager 与独立 reviewer 验收。**
+**未通过完整 GPU 诊断验收；S（`serial_lag30`）两集 smoke 与严格 `recorded` 验收已完成。同一已加载 backend 的 logging invariance 通过，但跨进程 saved replay 仍因 actions 数值差异失败；没有自动重试。**
 
-本报告对应已发布任务 revision `0d1576069c7d6f90b765be6ca3b190368cbb69bf`。授权的 attempt2 已修复并通过 task-private preflight，J（`full_t_plus_1`）两集 smoke 与严格 `recorded` 验收均通过；随后真实 logging off/on pair 在与保存记录的严格输出比较处失败。流水线在该首因停止，S（`serial_lag30`）未启动。
+本报告对应已发布任务 revision `17d74d9151ae1ec53ace8ddf3c9ef9f39256ba68`。授权的 attempt2 已修复并通过 task-private preflight，J（`full_t_plus_1`）两集 smoke 与严格 `recorded` 验收均通过；随后真实 logging off/on pair 在与保存记录的严格输出比较处失败。attempt2 流水线在该首因停止，当时 S（`serial_lag30`）未启动；后续获准的 S-only 接续结果见本报告末尾。
 
 ## 自匹配 preflight 修复及部署
 
@@ -60,8 +60,35 @@ output.actions: dtype/shape float32/(50, 14) != float64/(50, 14)
 - **跨进程 saved replay 仍失败。** 保存的 Policy `after_output_transform.actions` 是 H50 `float64`；只在冻结的 `OpenPiBackend.infer` 输出边界执行 `np.asarray(..., dtype=np.float32)` 后，期望 identity 为 `28dd865d2ca69883f8120850c383ce2d2c2b7b26178270857e775acbba4356ac`，而旧 pair 的 ordinary action identity 为 `e7520d71939c2b297f3d2ffe9bd3ccc17ff5fb4dafcee4078ab38f537f2442e1`，仍不相等。保存的 post-wire H50 与该 backend cast 后结果严格相等，实际 execute K30 也严格等于 H50 的前 30 行；因此失败属于保存结果跨进程重放检查，不能归因于同进程 logging 改变了调用行为。
 - 旧 pair 没有保存完整 direct off/on 数组，无法离线补算 `max_abs` 或 RMSE；递归 saved-output 比较在 actions mismatch 后停止，后续字段为 `unavailable`，不能写为通过。
 
-S-only 接续已准备并部署，尚未获准执行。本地准备收据 `/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-invariance-replay-s-continuation/invariance_replay_s_preparation.json` 的 SHA-256 为 `ca94e5fd0b9f0ea5dcf507474c49d6c73462abe097b9d025a897aab18c2f9a96`；C2 部署收据 `passed=true`，SHA-256 `385d504c4874215506eee54c3c305e3a922b7a8e770dc65133e18f85b0e157d6`。工具 manifest 的 SHA-256 为 `46cb62aad57e883d849b37d5871547656fb0469c6ec8b8e3d87df5a236e86443`，相对旧 pair 脚本的 diff 为 `tools/pair_query_diagnostic_logging-to-invariance-replay.diff`，SHA-256 `6bface9d305e426cb24983034baa5e62017b3dd38c5810cf66688dd54048f452`。
+S-only 接续当时已准备并部署、尚未获准执行；后续获准后的实际运行结果见本报告末尾。本地准备收据 `/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-invariance-replay-s-continuation/invariance_replay_s_preparation.json` 的 SHA-256 为 `ca94e5fd0b9f0ea5dcf507474c49d6c73462abe097b9d025a897aab18c2f9a96`；C2 部署收据 `passed=true`，SHA-256 `385d504c4874215506eee54c3c305e3a922b7a8e770dc65133e18f85b0e157d6`。工具 manifest 的 SHA-256 为 `46cb62aad57e883d849b37d5871547656fb0469c6ec8b8e3d87df5a236e86443`，相对旧 pair 脚本的 diff 为 `tools/pair_query_diagnostic_logging-to-invariance-replay.diff`，SHA-256 `6bface9d305e426cb24983034baa5e62017b3dd38c5810cf66688dd54048f452`。
 
 新 pair 工具只对 saved replay 的 `actions` 应用上述明确的 backend `float32` 转换；其他字段继续按 dtype、shape 和值严格比较。未来 S pair 会在每次推理后保存实际 off/on 普通输出的小型 NPZ 和字段 identity，未压缩上限为 8 MiB，不增加模型调用。CPU/static 核验均通过：7 个 pair strictness/bundle unittest、2 个 S preflight process-boundary unittest、3 个 S static-contract unittest，以及两个 shell 工具的 `bash -n`。
 
-若获准，入口为 `/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2-invariance-replay-s-continuation/run_serial_lag30_continuation.sh`，仍固定 C2 GPU6、端口 19460/19462、首个/后续 RPC 90/30 秒、episodes 0/1、seeds 100000/100001、query 1、H50/K30、2 records/64 MiB。准备与末次只读核验均显示 S result、diagnostic 和 pair leaf 不存在；19460/19462 未监听且没有 task-owned 进程。完整 GPU 验收仍未通过，S 继续必须等待 Manager 与独立 reviewer 验收该准备结果。
+若获准，入口为 `/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2-invariance-replay-s-continuation/run_serial_lag30_continuation.sh`，仍固定 C2 GPU6、端口 19460/19462、首个/后续 RPC 90/30 秒、episodes 0/1、seeds 100000/100001、query 1、H50/K30、2 records/64 MiB。准备与末次只读核验均显示 S result、diagnostic 和 pair leaf 不存在；19460/19462 未监听且没有 task-owned 进程。完整 GPU 验收当时仍未通过，S 接续需等待 Manager 与独立 reviewer 验收该准备结果；该等待已由后续授权解除，实际结果见下节。
+
+## 已授权 S-only 两集结果与收尾
+
+Manager 发布 task revision `17d74d9151ae1ec53ace8ddf3c9ef9f39256ba68` 后，按冻结入口执行一次 S-only continuation。启动前收据 `/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-query-diagnostic-timeout90-v2-invariance-replay-s-launch-evidence.json` 的 SHA-256 为 `2890157cd563f6e4a20af073330cc745842b975567e4d9e1e60e27f404161461`：GPU6 为 4 MiB、0%，19460/19462 未监听，S result/diagnostic/pair/status/log leaf 均不存在，三棵运行树为 clean 且冻结在 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、bridge `e147f600dc4329f330a6e2eb0335150b5b3093a3`、OpenPI `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`。旧完整部署链中的 `validate_timeout90_config.py` 再次匹配 SHA-256 `2e84d49ae71d605f411b5b4ab0ec845d729ef857e024e35838abfc4fb8d35f09`。
+
+S continuation preflight 通过，receipt SHA-256 `1b9ffa6d3246d21c8e7a2c36ec8bd6aac2d577fc99ad9a99d137c1f371c5507a`；serial config validation 通过，receipt SHA-256 `b418732a60aee9fd95bc79a01a52cdf7c04e284a6a24f5ec7a38e797bc54cadc`。运行保持 C2 GPU6、端口 19460/19462、episodes 0/1、seeds 100000/100001、query 1、H50/K30、2 records/64 MiB，以及首个/后续 RPC 90/30 秒；没有重跑 J、renderer、HF、formal100 或训练。
+
+### S smoke 与记录证据
+
+S acceptance 为 `passed=true`，SHA-256 `9434636de6f48fae6eb51d4932a5dbe08c1877e817c37cb466300baa6879a1ac`。result summary 为 `completed`、2 episodes；两个 scheduler 都以 `episode_terminal` / return code 0 退出，stdout 保留 `First policy inference uses 90.0s RPC budget.`，后续 RPC 为 30 秒。这个两集技术 smoke 产生 1 success、1 step-limit terminal failure，不能作为性能或正式评测结论。
+
+`validate_query_diagnostic` 对两条 query-1 记录均返回 `recorded`、各 43 个数组：
+
+- episode 0 / seed 100000：JSON SHA-256 `6be8b9aaaae38eb8204cdbb9d1c3de7f011fee67377553f02bbb4b950f896e64`，NPZ SHA-256 `6b4fcfa71a8346db3c67f3d7402b9aa7e58dee52c1658a647b3f387411da1c67`。
+- episode 1 / seed 100001：JSON SHA-256 `a75f18c79e14c56c6e933209c5324e4da3bfdbcc3af6eab976ad8ac9a889e2b7`，NPZ SHA-256 `19f3155845991dcdc13f02334f5085768e96414fab79edc767b21a6d6fce92a1`。
+
+两条记录都含真实 `serial_token` memory evidence：`key_state_logits` 是带 `-inf` 的 `float32 (2, 5)`，两行实际值分别为 `[-8.96746, 12.10175, -8.54587, -9.55490, -inf]` 与 `[-4.12119, -5.84397, 15.04182, -5.93992, -3.80765]`；`selected_ids=[1,2]`，`action_condition_source=selected_ids`，且 `action_condition_state_ids=[1,2]`。两条记录均 `accepted=true`。Policy `after_output_transform` 的 H50 actions 是 `float64 (50,14)`；明确 backend cast 后与 scheduler post-wire `float32 (50,14)` 严格相等，scheduler 的 execute request `float32 (30,14)` 严格等于其前 30 行。记录还保留 30 条 memory-trace executed rows；但 `actual_k.value` 为 `null`、status 为 `not_recorded_for_query_selected_feedback`，因此这只能证明 scheduler 的 30 行 execute request/trace，不声称 controller 内部或物理动作已观测完成。
+
+### 同一加载实例不变性与跨进程保存重放
+
+S pair 收据 `/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/pairs-timeout90-v2-invariance-replay/serial_lag30/episode-000000-query-000001-seq-000001.json` 的 SHA-256 为 `fc2286159227dc3e931f44f8eb266907bdc65b362f8ba7f0b8f53e4e6c7ba6a0`，根 `passed=false`。这不是 logger 改变同一次调用的证据：在一个已加载 backend、相同恢复起始 key 和 ordinary pre-transport input 下，logging-off/on 的 `actions`、`key_state_logits`、`key_state_prediction`、`memory_prediction_ids` 全部严格相等；diagnostic context 只加入 logging-on，最终 RNG 与保存的 split 后 key 也都相等（threefry2x32 key identity `e98d82da3870b8e15c37fa90d06bfefb61fe4f0307c421fd604f2a0499ee7538`）。故 `logging_invariance.passed=true`。
+
+根失败来自独立的 `cross_process_saved_replay`：保存的 Policy H50 `float64` actions 在唯一允许的 `np.asarray(..., dtype=np.float32)` backend 边界后 identity 为 `6b2829a11609339ceee5943ff508f08e36ea9697ac5f2708b782148da4a3bca4`，而实际 direct off/on actions identity 均为 `08c59917e10e35b3a6ef3ef7c8a559b4b4be01d3fe28937c6f81c37d85487610`。两侧与保存 backend output 的 actions 均不相等；其余 `key_state_logits`、`key_state_prediction`、`memory_prediction_ids` 均严格相等。新保存的 ordinary-output NPZ 为 7,064 bytes、未压缩数组共 5,712 bytes，SHA-256 `725c19b73fe9768c8ac3216ad85d8cda86a87a959c1475791653a582de9a81cb`；据此离线计算 actions 的 `max_abs=0.0034926608204841614`、`RMSE=0.0005220882065109197`。因此 `cross_process_saved_replay.passed=false`，且该数值差异保留为证据，不自动归因为 logging 副作用。
+
+外层 pipeline status 为 `failed`、exit code 1、last phase `serial_lag30_logging_invariance_and_saved_replay_pair`，SHA-256 `fc3a869755dc57c3be5f8a2e467ba2d80691efa37e0ef4d85cda8c8a395047ff`；outer log SHA-256 `85887b1e55aa8fef7db25ba6082dbead0ebe33b4b636aa147901a82150d38765`。唯一非零退出由 pair 的合取根结果触发，S smoke、recorded acceptance 和两个独立科学结论均已保留；没有重试或扩大预算。
+
+最终 C2 只读核验显示没有 task-owned 进程、19460/19462 未监听、GPU6 为 4 MiB/0%，三棵冻结树仍 clean。MAM job `a308dc56-192a-456e-8722-bbcedd484943` 已于 `2026-09-13T20:26:18Z` archived；归档仅结束跟踪，未删除任何 S/J artifacts。完整 P0 GPU 准入仍交由 Manager 最终裁决。
