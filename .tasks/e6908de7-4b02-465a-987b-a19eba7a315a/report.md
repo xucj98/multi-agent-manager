@@ -1310,3 +1310,15 @@ matching smoke `c_put_back_no_memory_trainseed0_evalseed0_smoke2_r3` 也从 raw 
 ### P-N archive 与 matching-smoke 清理已完成
 
 MAM job `d40eb04a-0ad4-421b-a74a-7734d6f3c9db` 已于终验后归档，archive note 固定记录完整 `100000..100099`、17/100、final review SHA 和 PID/端口释放。正式 leaf 已保留 `smoke_cleanup_receipt.json`，SHA-256 为 `688aff3ad62f52427b9f058cb69937a79deb008ad654abbf75a862f6ec6f86fb`：删除前 matching smoke 为 51 个文件 / 1,844,435 bytes，receipt 保留 smoke review SHA、completed/2、accepted terminal、video/no-video、scheduler exit、核心 raw artifact SHA、formal command 引用及 formal final-review SHA。随后只删除 `c_put_back_no_memory_trainseed0_evalseed0_smoke2_r3`；P-N formal raw artifacts、lineage、副本和 `final_review.json` 均保留。本节没有对 P-S 做任何操作。
+
+## 2026-09-13：P-S eval0 formal100 终验、归档与 smoke 清理
+
+按 Manager 的接续要求，本节完成 C1 GPU2 put-back serial-lag30 / trainseed0 / evalseed0（P-S）的已停止 formal；没有重启、拼接 partial 或改动 frozen runtime。MAM job `a2f4bc51-5791-4e7d-96df-f9f26f6a6313` 已归档，outer PID `139655` 已释放，端口 `19420/19422` 无监听。
+
+正式 run `c_put_back_serial_lag30_trainseed0_evalseed0_100ep_r3` 的独立 raw-artifact validator 已完整通过：100 个 accepted preflight 与连续固定 seed `100000..100099`、100 个 terminal diagnostics、100 个 episode JSON、100 个 scheduler `episode_terminal` / exit 0、102 个 start 与 102 个 matching exit 记录，以及 100 个 `video_checks ok=true`。episode0–4 用 cv2 逐帧解码，帧数依次为 320、500、358、359、500。104 份 formal log 全量扫描的 EOF、ConnectionResetError、traceback、segfault、driver、RPC/runtime 及 scheduler-before-terminal marker 均为零；仅有一条已知、非致命的 SAPIEN `Failed to find Vulkan ICD file` warning。
+
+结果为 **41 / 100（41.0%）**；59 条正常任务失败完整保留，其中 `button_not_pressed_after_center=46`、`button_press_insufficient=13`，没有按分数筛选或重跑。运行时三树均 clean 并固定为 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。formal copied input manifest / audit SHA-256 分别为 `e4cfa333b77db30f942e502bf176b1fddcb730095faf44e8624d2825a486f60b` / `8eb767a16f46078059af78080625a7896028b4baf819cab27b9999182c39b523`，31 份继承 metadata 也均逐项重算。
+
+matching smoke `c_put_back_serial_lag30_trainseed0_evalseed0_smoke2_r3` 同样从 raw artifact 重验：`100000/100001` accepted terminal、两条 scheduler exit 0、episode0 解码 330 帧、episode1 no-video、零基础设施 marker；其既有 smoke review SHA-256 为 `a0d9948549c5ecd9d23a3b36a1e81e793146dce51aebf5f19487e24c0d6ecee1`。formal command 保留 smoke 引用和 input audit/manifest 副本。
+
+稳定正式路径为 `/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/c_put_back_serial_lag30_trainseed0_evalseed0_100ep_r3/`。其中 `final_review.json` SHA-256 为 `ba49592d1d914c2cf49e997b1b7f09f69f5e66157751316e5353d3d6b29e5a68`，保存所有核心 raw artifact、配置、command、scheduler 和 lineage 哈希。matching smoke 已依实验规范删除；formal leaf 的 `smoke_cleanup_receipt.json` SHA-256 为 `0547d40468bb1f0d200d81ea5c4af99b94c80091dee8ebf3d9e6f983d9ccc7c4`，保留删除前 51 个文件 / 1,849,489 bytes、smoke core hash、验收结论、formal command 引用和 final-review SHA。formal raw artifacts、lineage 和 final review 均保留。
