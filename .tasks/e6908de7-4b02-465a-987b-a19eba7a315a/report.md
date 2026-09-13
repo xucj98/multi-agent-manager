@@ -1163,3 +1163,20 @@ load_train_config → _runtime_metadata → MemoryContext 确认上述 config ID
 
 两项均在 CUDA 空、JAX_PLATFORMS=cpu 条件下通过 --prepare-audit、smoke dry-run 和 formal dry-run；formal 命令含 matching smoke directory。checkpoint 的逐文件 path/size/mtime inventory 前后一致，git diff --check 通过，候选三树干净且没有生成 eval leaf。已立即提交 focused-review 请求；review 通过前不部署该树、不启动其 GPU smoke/formal，也不改动 c-eval-renderer-r3 或 c-eval-renderer-r3-2e9677c。
 
+
+## 2026-09-13：四条 r3 formal100 终验、归档与 YAML 准入状态
+
+依据当前发布 task revision `c81ef808b7324b373ad7402a3c4110ce1f5a716d`，本节仅收尾此前已自然停止的四条 formal；未重启、拼接或筛选任何 rollout。每条均从原始 `diagnostics_summary.json`、`seed_preflight.jsonl`、`episode_diagnostics.jsonl`、`processes.jsonl`、`video_checks.jsonl` 和 worker/outer 日志复核：summary 为 `completed`（target 100、error null），100 个 accepted 的连续固定 seed，100 个 terminal diagnostics，100 个 scheduler `episode_terminal` / exit 0，100 个 video check `ok=true`，前五个视频实际解码。robot/policy 均以 `runner_shutdown` 退出；EOF、ConnectionReset、traceback、segfault、runtime-error、worker-RPC 和 scheduler-before-terminal marker 均为零。
+
+每个 matching smoke 也重新核验：两条连续 seed 都 accepted terminal，episode0 视频可读、episode1 明确 no-video，两个 scheduler exit 0，且日志零基础设施 marker。各 formal 的 `command.txt` 引用该 smoke，且保留 `checkpoint_metadata/lineage/config_source/input_audit.json` 与 `input_manifest.json`。每份 worker log 有一条已知、非致命的 SAPIEN `Failed to find Vulkan ICD file` warning；健康完成 run 同样出现，未将其视为基础设施失败。
+
+| run | train / eval seed | fixed environment seeds | score | MAM job | final review SHA-256 |
+| --- | --- | --- | ---: | --- | --- |
+| `c_put_back_full_t_plus_1_trainseed0_evalseed1_100ep_r3` | 0 / 1 | `200000..200099` | 68 / 100 | `cb9080c2-b615-40de-8a15-69a7eed3d3f9` archived | `941ce208451ae2ce4679186f7ba0ff010fb6d867b7af4524f84349236df220b0` |
+| `c_put_back_full_t_plus_1_trainseed0_evalseed2_100ep_r3` | 0 / 2 | `300000..300099` | 76 / 100 | `873c5bb0-c8fc-462c-8f40-8bbbe21747b6` archived | `a8578f54235112d82a4a9536cb60c202d3059031e75942683c27d57c2f1a5628` |
+| `c_rearrange_no_memory_trainseed0_evalseed1_100ep_r3` | 0 / 1 | `200000..200099` | 27 / 100 | `fad91d99-98b0-4545-ad14-ff90abfc16f1` archived | `824290051d964392cc1b1a8631163c4019810f84a3b1eba03c1ede0330e964cf` |
+| `c_rearrange_no_memory_trainseed0_evalseed2_100ep_r3` | 0 / 2 | `300000..300099` | 20 / 100 | `305e6344-cb44-4634-9c45-66de5afe3691` archived | `3d1c253163016edb9fe00cbc74e668d71b8c4611baf83fe834608197d458318d` |
+
+结果根为 `/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/<run>/final_review.json`。put-back 两条使用冻结 RMBench `2e9677ce8ec9f623395184f63f32ddafa66e5e44`；rearrange no-memory 两条使用冻结 RMBench `bf34743334efc98440fa9b05e3f2f05e8303846a`；全部 bridge 为 `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI 为 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。归档前端口 `19410/19412`、`19420/19422`、`19460/19462` 均未监听。
+
+put-back no-memory/serial 的独立 YAML 候选 `f401f5279c95451eb424ac98b831bab5552b2120` 已获 Manager 准入：只补 `put_back_no_memory` 的空 fields/joint_dense 和 `put_back_serial_lag30` 的 phase/origin_mat serial-token `query_selected/query` 路由。它保留在独立 `c-eval-putback-baselines-yaml` tree，bridge/OpenPI 仍冻结为 `f962663`/`a869498`；后续每个 eval seed 仍须先执行自己的 prepare-audit 和 matching smoke，再启动 formal。
