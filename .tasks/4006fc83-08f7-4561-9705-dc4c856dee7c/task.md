@@ -1,5 +1,21 @@
 # 高频状态与replan独立审查：先核对实验合同，后验代码准入
 
+## 当前增量复审：真实 recorder 与 child 身份修复已冻结（取代下文旧候选）
+
+源 report `aac1cbd563f7a7aaf83fc0b161ee3dc4463f2959` 已发布；Manager 已核对作者三树 clean、准确 HEAD 和正式 f401 祖先，并直接检查 recorder/CLI 窄改。现在恢复独立增量复审：
+
+- OpenPI 不变：`0ce566bd34f99cb4775422f012ab67c16aa53885`。
+- robot-bridge：`a0f1d5035d77cea7cb300eb511ceb5cf3fd1a93d` → `552ea78f73e62fddc747d5d26e7e6c365fa00339`。
+- RMBench：实际正式基线 `f401f5279c95451eb424ac98b831bab5552b2120` → `c99ec6a2c6df96ec8705b106b125935fce862052`。
+
+复用本任务已有 OpenPI/bridge review worktree，clean 后只快进 bridge；用 mam workspace add 为本任务创建独立 RMBench review worktree，固定 c99ec6a2。源 workspace 创建时的 base 元数据为 2e，但最终 c99 确实包含 f401；按实际 commit 图审查，不把创建元数据当最终基线。无需重跑未变 OpenPI 全库，也不要合入 P0 logger。
+
+复核上一报告 7d153938 的剩余 P1：真实 RMBenchResultRecorder 支持 rolling_evidence 路径、episode_diagnostics 保留文件引用；benchmark 已接受的 episode_id/seed 穿过真实 child CLI 到 writer header；身份只用于记录，不进入 reset_args，不增加第二次环境 reset。检查正常/异常 child 收尾实际留档、episode 引用可解析、header 与 accepted identity 一致，以及默认关闭不生成文件/新增开销。作者 seam 使用真实 recorder 加 child，独立检查其覆盖与边界，不以 fake recorder 或测试数量代替结论。
+
+保留已通过的 RNG/时序/队列合同判断，按本次窄改核对回归。作者 bridge 522 passed/2 skipped、RMBench 4 passed 并非独立 PASS。证据仍须包含 truncated/incomplete 与最终收尾，完整性不足不能进入正式统计。最终报告列三库精确版本、独立验证、剩余限制及能否准入有限 GPU 工程 smoke。发现实质缺陷及时报 Manager；完成发布报告并结束，不追逐 dirty diff 或活跃等待。未经 Manager 裁决，不启动 GPU/部署/正式评测。
+
+正式设计维持两任务 train0、H50/K30、interval5、0 训练；每 episode action 初始 key0 的 matched baseline12 加 HF24，共36个正式100批。旧 baseline/shadow 保持历史默认，不能将旧成绩当新 reset 协议直接对照；每 arm/环境 eval seed 有自身 matching smoke2。下文旧24批计划已被此36批合同取代。
+
 ## 当前轮次：修复已交付，按新精确版本增量复审
 
 Manager已直接核对真实recorder与runner，接受新增P1：rolling_evidence kind不被真实RMBenchResultRecorder支持，调用在accepted episode try外；你复现的episode引用字段丢失也须修。已发布源任务要求最小真实接口接线及真实recorder seam测试，必要时许可独立RMBench f401f527窄改。继续其他增量审查，最终报告明确所有冻结库版本；作者下一clean提交到达再复核此项，不读取dirty diff替代正式结论。
