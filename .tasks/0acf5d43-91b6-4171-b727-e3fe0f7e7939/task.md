@@ -1,5 +1,17 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## 当前CPU接续：核对同一policy实例内的对照边界
+
+已收到最后shadow报告f2d2d63fb941f0c1c9075aaa15050506f9ea0855；正常action预算8/8耗尽，当前仍不增加GPU/reset/replay/完整轨迹。Manager正在亲自核对两臂原始证据，并重新判断跨进程逐位相等能否承担“shadow无副作用”的准入作用，不把已发现差异自动归因于HF算法或浮点执行。
+
+请原terra/max执行者只做一次有界、只读的源码核对，与Manager证据审阅并行：
+1. 对冻结0ce566bd/ffa12249，逐项追踪两个scheduler首个infer_audited到真实backend/Policy的调用与episode reset。列出影响action推理的可变状态（实际action/probe PRNG、计数、缓存等），区分此次receipt实际观测的值和仅由源码可推断的生命周期；不要再把stream/call当实际key。
+2. Manager正在考虑用“同一已加载policy实例、固定已保存的完整输入与起始action key，在真实shadow probe之前/之后比较action/state/最终key”隔离probe副作用。只核对这个对照在现有代码上是否可实施、需要复位哪些实际状态、真实probe是否改变action路径、最少需经过哪些生产调用点；给具体源码位置和任何会使对照误判的边界。当前不实现工具、不设计新大框架、不运行模型；完整实验合同与预算由Manager决定。
+3. 同时只读核对原30-row drain与shadow分次5-row drain的controller路径是否逐行执行相同传入actions，是否每次drain会额外规划/平滑/改变物理推进；给具体路径，不凭query计数或相同K声称环境推进等价。
+
+交紧凑source audit即可，保持源码/runtime与已保存证据不变。无需外部调查、再次review全库或复跑测试。科研结论与下一步准入由Manager独立裁决。
+
+
 ## Manager裁决：修正shadow来源路径，补做剩余一次首query
 
 Manager已独立核对报告61bf6a18627ad3644febdfcadd0a0478a814ce9a、原入口两侧launcher、baseline实际result config和policy身份链，以及冻结BenchmarkRunner在_require_sources之后才创建recorder/启动服务的源代码。baseline实际MemoryCheckpoint source root正确，与旧baseline命令一致；其get_metadata.policy_dir与manifest解析checkpoint、metadata/params/norm-stats加载日志吻合。此前口头推测baseline也用了错误root不成立，以实际原件为准。shadow实际root是错误的.../pi05_rmbench_put_back_block_full_t_plus_1_s0，不能解析MemoryCheckpoint/20000/metadata；failure receipt64ee0c7c9f4e4d77a99e20af55ed830bc06b42455cbe820ca34e98ceb0a89d21记录InputNotReady、preflight event_count0、scheduler_exits空、run_dir=null，属于任务私有launcher路径错误，未消耗action sample。
