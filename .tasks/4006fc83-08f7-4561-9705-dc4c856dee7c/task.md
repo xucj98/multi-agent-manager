@@ -25,3 +25,9 @@ Manager接受你提出的pending旧forecast覆盖/旧chunk取消后误完成、i
 Manager 初读发现需优先核查默认关闭等价：Policy.reset 新增无条件回到 initial action RNG，而旧 Policy 没有 reset override；infer 对所有J请求新增 raw action copy/sidecar，对所有JAX请求新增policy_rng。请沿实际 backend/server reset 与多episode runner 调用链确认是否改变原 baseline 的随机流/协议/开销，不能只比“新代码baseline”与“新代码shadow”便宣称等价。此为待复现问题，不预设修复或PASS。RNG留痕目前 stream/call 是否足以关联实际采样key也需明确。
 
 交付独立报告：精确commits、发现及严重级别/复现、通过和未覆盖边界、是否准入有限GPU smoke。任何实质问题及时发Manager和作者，先由Manager裁决再修，不修改作者源码，不启动GPU、不部署。可执行审查完成后发布report并正常结束，不活跃等待。
+
+## Manager 已确认 P1 与正式对照裁决
+
+默认reset改变跨episode action RNG的P1已由Manager真实Policy路径复现并接受，作者正在窄修。Manager另直接确认benchmark在100集循环外启动policy server，历史action RNG连续消费；故HF逐episode reset不能直接使用历史baseline成绩。按源task最新裁决，普通baseline/shadow保持历史默认行为；显式matched baseline/shadow使用与HF完全相同的每episode initial key0重置协议，probe流独立。新对照J/S各两任务×3eval共12批，总量从24增至36正式批、0训练，旧结果不失效但不作为新协议的直接对照。
+
+增量复审最小显式配置：baseline仍原K30/MemoryContext，不引入中间状态消费；matched baseline无probe，matched shadow probe不改cache/动作；普通默认与旧版本、matched baseline与matched shadow分别做跨episode action key/动作等价。标清eval环境种子与固定policy初始key的区别。不要反复复现已接受的P1或因新配置等待而停止其他冻结代码审查；最后针对作者精确新commits给代码准入结论。
