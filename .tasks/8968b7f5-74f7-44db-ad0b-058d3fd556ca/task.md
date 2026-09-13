@@ -8,6 +8,10 @@
 
 同一schema规则必须覆盖录入侧与离线validate_record；伪造status=recorded不能绕过。补最小S/J局部缺失/错误维度和有效样本回归，至少一条覆盖真实生成器的incomplete输出。不要全面重写记录器或扩展无关字段，不依赖HF分支、不运行GPU。提交下一组精确clean commits并发布report；reviewer继续检查本轮其他路径，不需等待整个review结束才动这项已确认修复。
 
+Manager已另外直接核对fa62a9fe._attach_query_diagnostic：episode_info/episode_status/provenance在begin_query容量预检前已deepcopy，接受这个顺序遗漏为需窄修的P2。沿现有同步记录路径先做array预算检查再复制；不限制真实正常输入、不扩展记录框架。数组超限应显式小型cap记录，不伪装成写失败。至于action-dispatch预算是否需要Policy侧额外预留，暂待reviewer用本轮合法H50/K30/robot_dim14输入确认，不能把非合同4096行fixture或msgpack容器开销直接作为实质超限结论。
+
+Reviewer对未提交草稿的tuple返回/array_ref、representation none与metadata匹配、ID/label字段关联提示属于已有完整性合同的复查点，尚不是冻结版本独立结论。作者在本轮定稿前自查并一次性提交；reviewer后续只按精确clean commits复核，不以持续观察dirty diff延长本轮。
+
 ## 目标与职责
 你使用 gpt-5.6-terra / max，负责实现和验证。Manager 负责论文主张、实验设计和最终裁决。先读 MAM AGENTS、README、.local/README，再 mam task show 本 TASK-ID 和相关库 AGENTS、开发/环境说明。原审计任务 f987cfb5 已归档，其交付现保存于 /root/Documents/task-state-vla-paper/docs/audits/20260913-trace-inventory/；不要使用已删除的旧 workspace。
 
