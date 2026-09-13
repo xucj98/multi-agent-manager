@@ -198,3 +198,15 @@ Manager 归档前必须保留整个 workspace 及以下任务独有材料：
 未删除 workspace 根、checkpoint、模型、共享数据、branch 或三个已登记 worktree。`openpi`、
 `robot-bridge` 和 `RMBench` worktree 均仍在 `task/cbbba844-d96a-45d5-9b2f-c8a3c6f393b1` 且 clean；六个
 训练 job 仍 archived。Manager 现在可执行 task archive；本执行者没有运行 `mam task archive`。
+
+## Archive 前置缓存清理（2026-09-13）
+
+Manager 发现 archive 被遗漏缓存阻塞后，本次按 `git status --short --ignored` 逐项检查三库，并直接复用
+MAM 的 `dirty()` 与 `outer_check()` 做实际 archive 前置验证。只删除了 worktree 代码路径中未跟踪、非软链、
+明确可再生的 Python/pytest/ruff cache：OpenPI 12 个根、robot-bridge 7 个根，共 1,248,483 bytes；RMBench
+没有此类缓存。`.venv` 内 bytecode、`.local` 和所有共享 assets/data/checkpoints/log/eval 链接均保留，未发现
+其他未知 ignored 普通内容或 tracked diff。
+
+清理后三个 repo 的 MAM `dirty()` 均通过，余下 ignored 项均为其允许的 `.venv`、受控 `.local` 或 ignored
+symlink；workspace `outer_check()` 通过且仅余三个已登记 worktree。稳定 provenance manifest 仍为
+`f47e064642d5c4d519b491c9220e0725724f2b2bd18561bfdd284f528a7ff18a`。本执行者未调用 `mam task archive`。
