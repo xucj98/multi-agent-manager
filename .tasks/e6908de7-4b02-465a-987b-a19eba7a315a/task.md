@@ -237,3 +237,6 @@ Manager 01a09657-e0f3-7352-b726-aba5bbd5d498 将用 mam task rebind 将本任务
 
 ## 用户预算重排：暂停新增开跑（2026-09-13）
 用户否决普遍每配置3训练seed的旧预算，要求优先RMBench九任务覆盖，Manager正在重写论文主张/文献定位/最小实验清单。自此不再按旧队列启动新的训练、smoke、formal或追加eval seed；此节覆盖所有此前自动扩展授权。已经运行的job自然收尾，正常核验/记录/归档，保留checkpoint和完整结果；不杀训练、不丢弃不利结果、不重启失败项。已训练未评模型只整理可复用清单，等待新排期，不自行开跑。当前可执行收尾完成后正常结束turn，MAM自动唤醒。
+
+## 用户批准九任务计划并恢复评测（2026-09-13 09:35 CST）
+用户已批准/root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN.zh-CN.md实施，覆盖优先，默认每个模型3个eval seed各100。此节替代此前全面冻结。Manager已发现Codex拒绝MAM直接turn/start唤醒multi-agent v2 subagent，现用原生collaboration手工触发收尾。先核验九条stopped formal的完整100、固定seeds、terminal/exit/基础设施错误，回传可复核结果并归档job，不拼接不重跑valid结果。随后授权在已验收C runtime和实际空闲GPU上，按固定顺序补已存在模型缺失eval：先seed0的N/S/J覆盖rearrange+put-back，再补已有T/U六seed各自缺失的批次并保留原seed0/1/2，不新训练；已存在J/N/S额外training seed的300补齐用于预算判断。U必须先收到训练owner的验收manifest。已通过的matching smoke能复用则复用，不为评測seed重复训练。用独立/冻结runtime，不改活跃shared tree；不占wuwen-1。完成本轮收尾先发布紧凑报告，再开展合理并发续跑；长进程全部登记MAM。
