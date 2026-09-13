@@ -1,5 +1,9 @@
 # 高频状态与replan独立审查：先核对实验合同，后验代码准入
 
+## 当前仅做验收后的缓存清理和归档
+
+Manager已验收report8345c8e2并放行C3有限GPU工程；本review完成。首次mam archive被任务自有.pytest_cache和__pycache__阻止。当前仅清理本review三树内测试产生的可再生缓存，不跟随symlink、不删除.venv/共享环境/源码/报告/有价值证据；若unknown ignored不是明显生成物先报告。核对git tracked/untracked clean及来源后，从MAM根执行mam task archive本TASK-ID，note写Manager已验收上述report和精确0ce/ffa/6ab，仅代码准入，源实现树仍保留供部署。不得重新审查、修改report或源树。归档成功即结束；真实障碍具体报告，不请求用户常规清理许可。
+
 ## 当前复审：证据 gate 窄修已交付，精确候选冻结
 
 源 report `2d3e0f7ba2fa61b9db83aa4550410e370af1a4b9` 已发布，Manager 已直接确认作者三库 HEAD/clean。恢复本任务增量复审：
