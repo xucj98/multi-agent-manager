@@ -1,5 +1,15 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## 当前执行授权：原入口两次首 query 验证
+
+Manager 已验收准备 report32da353ec1da3b386cfd6fe8e1b1b67806fb4d60，亲自阅读两个工具及依赖，重算runner SHA376dd1fd087a5e79a9cbda4e83d1ff5b8534dc9c59429a60acbdf8ed2a0abf34、scheduler SHA0561e295e644bee882c7abaee9d08e856b9e5ad00aeafbb4ed480ad7f3179ae2、capture_common SHAf6e80912a2d40f9298bf0060e92c7e5126d5a476d94c6a3e6c33eeed2265cc2f；在真实冻结bridge依赖上独立复跑11个CPU seam tests全部通过。结合先前独立方案核查88976c0，现明确授权同一terra/max执行者运行，不再等待另一轮许可。
+
+将上述精确工具的小型冻结副本部署到本TASK-ID C3证据目录，复用旧C3 HF工程runtime只读源。固定C3GPU0、put_back_block J train0/20000、env100000、matched baseline和matched shadow各一次正常action request，两臂顺序执行，最多使用剩余2/8样本，无warmup/replay/probe/第二episode。核对GPU及原独占端口空闲、三库精确HEAD/clean、实际checkpoint、工具hash；根据旧工程manifest/config/command构成原入口CLI，先保存其无--execute的plan并核对旧reset/语言/配置/环境可确认部分，再在同一参数上添加--execute。不能把本次未记录或旧不可观测条件声称已相同，不新增cache/JAX/renderer override，不重装/重传模型或复制整套runtime。
+
+每臂独立全新result与diagnostic root，max array bytes保持8MiB/每snapshot。工具保持原完整iteration/after_execute后clear和status，完成step0、queued30/dropped30且只一次infer；exit70是明确的诊断截停，必须与完整收据及原failed benchmark leaf一起验，不能单凭exit70认成功。第一臂完整有界捕获成功才进入第二臂；失败或sample-ambiguous停止，禁止自动重试/补样本。完成后检查两臂完整request各字段、H50/K30，以及与旧两侧/之前插桩捕获的精确数组差异；K30对本次H50前30需独立比较（工具只检查shape/type）。留全量输入/调用参数/输出/身份、失败叶及哈希，不把诊断当smoke成功，不解冻HF formal、不调容差。
+
+若预计>30min登记MAM实际长进程，正常结束turn由MAM唤醒；否则完成两样本、归档已有job、资源收尾并发布紧凑report。本次只准入该明确两样本，源算法/阈值/其他任务不变。
+
 ## Manager 已接受独立方案核查：补齐两个停止边界后交工具验收
 
 独立工程核查 report 88976c0165e29956838f62d50df7e55f0ecce66e 已完成。Manager 亲自核对冻结 transport/codec、worker execute/clear、runner _wait/_loop 源码，接受其可行性和以下增量要求；这是设计准入，**尚不是未交付工具的 GPU 准入**。作者继续准备，不扩大工作范围。
