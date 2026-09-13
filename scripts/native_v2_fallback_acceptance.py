@@ -32,6 +32,18 @@ EXACT_REJECTION = (
 FAILURE_KIND = "unsupported_multi_agent_v2_direct_input"
 MANAGER_EVENT = "manager_native_followup"
 CHILD_ARCHIVE_NOTE = "native-v2 fallback fixture handled"
+CONTROLLED_CLI = "from multi_agent_manager.cli import main; raise SystemExit(main())"
+SOURCE_IDENTITY_FIELDS = (
+    "source_root",
+    "source_python",
+    "source_python_resolved",
+    "source_cli",
+    "source_git_toplevel",
+    "source_commit",
+    "source_clean",
+    "source_git_status",
+    "source_modules",
+)
 
 
 class FixtureError(RuntimeError):
@@ -185,12 +197,25 @@ def _source_identity(source: Path, python: Path, git_isolation: Path) -> dict[st
         source_commit = _run_fixture_git(
             git_isolation, ["-C", str(source), "rev-parse", "--verify", "HEAD^{commit}"]
         ).stdout.strip()
+        source_git_status = _run_fixture_git(
+            git_isolation,
+            [
+                "-C",
+                str(source),
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=all",
+                "--ignore-submodules=none",
+            ],
+        ).stdout
     except (OSError, subprocess.CalledProcessError) as exc:
         raise FixtureError("could not verify the source worktree with isolated Git") from exc
     if top_level != str(source):
         raise FixtureError("isolated Git did not resolve the source worktree as its exact top-level")
     if not source_commit:
         raise FixtureError("isolated Git did not resolve an exact source HEAD commit")
+    if source_git_status:
+        raise FixtureError("source worktree is not clean under isolated Git")
 
     query = (
         "import json\n"
@@ -236,9 +261,11 @@ def _source_identity(source: Path, python: Path, git_isolation: Path) -> dict[st
         "source_root": str(source),
         "source_python": str(python),
         "source_python_resolved": str(python.resolve(strict=True)),
-        "source_cli": [str(python), "-I", "-m", "multi_agent_manager.cli"],
+        "source_cli": [str(python), "-I", "-c", CONTROLLED_CLI],
         "source_git_toplevel": top_level,
         "source_commit": source_commit,
+        "source_clean": True,
+        "source_git_status": source_git_status,
         "source_modules": module_paths,
     }
 
@@ -260,7 +287,7 @@ def _load_fixture(value: str) -> tuple[Path, dict[str, Any]]:
     marker = _regular_json(root / MARKER_NAME, label="fixture ownership marker")
     if marker.get("kind") != MARKER_KIND or marker.get("root") != str(root):
         raise FixtureError("fixture ownership marker does not match this root")
-    for field in ("source_root", "manager", "child", "branch"):
+    for field in ("source_root", "source_python", "manager", "child", "branch"):
         if not isinstance(marker.get(field), str) or not marker[field]:
             raise FixtureError(f"fixture ownership marker lacks {field}")
     if marker["branch"] != BRANCH:
@@ -268,6 +295,35 @@ def _load_fixture(value: str) -> tuple[Path, dict[str, Any]]:
     _canonical_agent(marker["manager"], field="fixture Manager")
     _canonical_agent(marker["child"], field="fixture child")
     return root, marker
+
+
+def _fixture_source(marker: Mapping[str, Any]) -> tuple[Path, Path]:
+    source = _absolute_path(_required_string(marker.get("source_root"), field="fixture source root"), field="fixture source root")
+    if source.is_symlink() or not source.is_dir():
+        raise FixtureError("fixture source worktree is no longer a regular directory")
+    source = source.resolve(strict=True)
+    python = _absolute_path(_required_string(marker.get("source_python"), field="fixture source Python"), field="fixture source Python")
+    if python != source / ".venv" / "bin" / "python":
+        raise FixtureError("fixture ownership marker has an unexpected source Python path")
+    if not python.is_file() or not os.access(python, os.X_OK):
+        raise FixtureError("fixture source Python is no longer executable")
+    return source, python
+
+
+def _prepare_source_identity(root: Path, marker: Mapping[str, Any]) -> dict[str, Any]:
+    prepare = _regular_json(root / "receipts" / "prepare.json", label="prepare receipt")
+    if prepare.get("kind") != "native-v2-fallback-prepare" or prepare.get("root") != str(root):
+        raise FixtureError("prepare receipt does not belong to this fixture")
+    source, python = _fixture_source(marker)
+    if prepare.get("source_root") != str(source) or prepare.get("source_python") != str(python):
+        raise FixtureError("prepare receipt does not match the fixture source marker")
+    return prepare
+
+
+def _assert_source_identity_matches_prepare(current: Mapping[str, Any], prepare: Mapping[str, Any]) -> None:
+    for field in SOURCE_IDENTITY_FIELDS:
+        if current.get(field) != prepare.get(field):
+            raise FixtureError(f"source identity drifted from prepare receipt: {field}")
 
 
 def _require_fixture_identities(marker: Mapping[str, Any], args: argparse.Namespace) -> tuple[str, str]:
@@ -445,6 +501,41 @@ def _running_fixture_context(
     return task_record, fixture_job, state, source, escalation
 
 
+def _service_process_identity(
+    state: Mapping[str, Any],
+    *,
+    field: str = "fixture service",
+    pid_field: str = "pid",
+    identity_field: str = "identity",
+) -> tuple[int, dict[str, Any]]:
+    pid = state.get(pid_field)
+    identity = state.get(identity_field)
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+        raise FixtureError(f"{field} has no valid PID")
+    if not isinstance(identity, Mapping) or not identity:
+        raise FixtureError(f"{field} has no persisted process identity")
+    return pid, dict(identity)
+
+
+def _service_status_observation(value: str, *, manager: str) -> tuple[dict[str, Any], int]:
+    try:
+        status = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise FixtureError("--service-status is not valid JSON") from exc
+    if not isinstance(status, Mapping):
+        raise FixtureError("--service-status is not a JSON object")
+    if status.get("running") is not False:
+        raise FixtureError("--service-status does not show the fixture scheduler stopped")
+    if status.get("mode") != "disabled":
+        raise FixtureError("--service-status does not show the fixture scheduler disabled")
+    if status.get("status") != "disabled" or status.get("manager") != manager:
+        raise FixtureError("--service-status does not belong to the disabled fixture service")
+    counters = status.get("counters")
+    if not isinstance(counters, Mapping):
+        raise FixtureError("--service-status has no counter mapping")
+    return dict(status), _integer(counters.get("cycles"), field="stopped service-status cycles")
+
+
 def _receipt_path(root: Path, value: str) -> Path:
     receipt = _absolute_path(value, field="--receipt")
     receipts = root / "receipts"
@@ -475,6 +566,7 @@ def _checkpoint_payload(
 ) -> dict[str, Any]:
     counters = state.get("counters")
     assert isinstance(counters, Mapping)
+    service_pid, service_identity = _service_process_identity(state)
     return {
         "kind": "native-v2-fallback-checkpoint",
         "phase": phase,
@@ -483,7 +575,8 @@ def _checkpoint_payload(
         "job": job,
         "manager": manager,
         "child": child,
-        "service_pid": state.get("pid"),
+        "service_pid": service_pid,
+        "service_identity": service_identity,
         "service_cycles": _integer(counters.get("cycles"), field="service cycles"),
         "turn_start_attempts": _integer(counters.get("turn_start_attempts"), field="turn-start attempts"),
         "source_signature": _required_string(source.get("signature"), field="native-v2 source signature"),
@@ -548,6 +641,145 @@ def _assert_checkpoint_receipt(
         raise FixtureError("pending baseline unexpectedly has a Manager acknowledgement timestamp")
     _integer(receipt.get("service_cycles"), field="baseline service cycles")
     _integer(receipt.get("turn_start_attempts"), field="baseline turn-start attempts")
+    _service_process_identity(
+        receipt,
+        field="baseline service",
+        pid_field="service_pid",
+        identity_field="service_identity",
+    )
+
+
+_STOPPED_BLOCKED_FIELDS = (
+    "task",
+    "job",
+    "manager",
+    "child",
+    "service_pid",
+    "service_identity",
+    "service_cycles",
+    "turn_start_attempts",
+    "source_signature",
+    "source_delivery",
+    "source_attempts",
+    "source_failure_kind",
+    "source_block_kind",
+    "source_error",
+    "source_next_attempt_at",
+    "escalation_signature",
+    "escalation_source_event",
+    "escalation_error",
+    "escalation_action",
+    "escalation_delivery",
+    "escalation_attempts",
+    "escalation_accepted_at",
+)
+
+
+def _assert_stopped_receipt(
+    receipt: Mapping[str, Any],
+    *,
+    blocked: Mapping[str, Any],
+    task: str,
+    job: str,
+    manager: str,
+    child: str,
+) -> None:
+    if receipt.get("kind") != "native-v2-fallback-stopped" or receipt.get("phase") != "stopped":
+        raise FixtureError("stopped baseline is not a native-v2 fallback stopped receipt")
+    for field, expected in (("task", task), ("job", job), ("manager", manager), ("child", child)):
+        if receipt.get(field) != expected:
+            raise FixtureError(f"stopped baseline has a different {field}")
+    stopped_blocked = receipt.get("blocked_checkpoint")
+    if not isinstance(stopped_blocked, Mapping):
+        raise FixtureError("stopped baseline has no blocked checkpoint binding")
+    for field in _STOPPED_BLOCKED_FIELDS:
+        if stopped_blocked.get(field) != blocked.get(field):
+            raise FixtureError(f"stopped baseline is not bound to blocked checkpoint {field}")
+    stopped_pid, stopped_identity = _service_process_identity(
+        receipt,
+        field="stopped fixture service",
+        pid_field="stopped_service_pid",
+        identity_field="stopped_service_identity",
+    )
+    if (
+        stopped_pid != stopped_blocked.get("service_pid")
+        or stopped_identity != stopped_blocked.get("service_identity")
+    ):
+        raise FixtureError("stopped baseline does not preserve the blocked daemon PID and identity")
+    status = receipt.get("service_status")
+    if (
+        not isinstance(status, Mapping)
+        or status.get("status") != "disabled"
+        or status.get("running") is not False
+        or status.get("mode") != "disabled"
+        or status.get("manager") != manager
+    ):
+        raise FixtureError("stopped baseline has no disabled running:false service observation")
+    status_counters = status.get("counters")
+    if not isinstance(status_counters, Mapping):
+        raise FixtureError("stopped baseline service observation has no counter mapping")
+    stopped_cycles = _integer(receipt.get("stopped_cycles"), field="stopped service cycles")
+    if stopped_cycles < _integer(stopped_blocked.get("service_cycles"), field="blocked service cycles"):
+        raise FixtureError("stopped baseline cycle predates its blocked checkpoint")
+    if _integer(status_counters.get("cycles"), field="stopped service-status cycles") != stopped_cycles:
+        raise FixtureError("stopped baseline counter does not match its service-status observation")
+    if _integer(receipt.get("stopped_turn_start_attempts"), field="stopped turn-start attempts") != stopped_blocked.get(
+        "turn_start_attempts"
+    ):
+        raise FixtureError("stopped baseline changed the blocked daemon turn-start count")
+    if receipt.get("state_enabled") is not False or receipt.get("state_mode") != "disabled":
+        raise FixtureError("stopped baseline has no disabled fixture state observation")
+
+
+def _record_stopped_payload(
+    *,
+    task: str,
+    job: str,
+    manager: str,
+    child: str,
+    blocked: Mapping[str, Any],
+    state: Mapping[str, Any],
+    service_status: Mapping[str, Any],
+) -> dict[str, Any]:
+    counters = state.get("counters")
+    if not isinstance(counters, Mapping):
+        raise FixtureError("fixture service state has no counters")
+    service_pid, service_identity = _service_process_identity(state)
+    status_counters = service_status.get("counters")
+    if not isinstance(status_counters, Mapping) or dict(status_counters) != dict(counters):
+        raise FixtureError("stopped service-status counters do not match fixture service state")
+    stopped_cycles = _integer(counters.get("cycles"), field="stopped service cycles")
+    if _integer(status_counters.get("cycles"), field="stopped service-status cycles") != stopped_cycles:
+        raise FixtureError("stopped service-status cycle does not match fixture service state")
+    if service_pid != blocked.get("service_pid") or service_identity != blocked.get("service_identity"):
+        raise FixtureError("stopped fixture service PID or identity drifted from blocked checkpoint")
+    turn_start_attempts = _integer(counters.get("turn_start_attempts"), field="stopped turn-start attempts")
+    if turn_start_attempts != blocked.get("turn_start_attempts"):
+        raise FixtureError("stopped fixture service changed the blocked turn-start count")
+    return {
+        "kind": "native-v2-fallback-stopped",
+        "phase": "stopped",
+        "recorded_at": _now(),
+        "task": task,
+        "job": job,
+        "manager": manager,
+        "child": child,
+        "blocked_checkpoint": {field: blocked.get(field) for field in _STOPPED_BLOCKED_FIELDS},
+        "stopped_service_pid": service_pid,
+        "stopped_service_identity": service_identity,
+        "stopped_cycles": stopped_cycles,
+        "stopped_turn_start_attempts": turn_start_attempts,
+        "state_enabled": state.get("enabled"),
+        "state_mode": state.get("mode"),
+        "service_status": {
+            "status": service_status.get("status"),
+            "running": service_status.get("running"),
+            "healthy": service_status.get("healthy"),
+            "manager": service_status.get("manager"),
+            "mode": service_status.get("mode"),
+            "counters": dict(status_counters),
+        },
+    }
 
 
 def _assert_checkpoint_event_snapshot(
@@ -644,6 +876,7 @@ def command_prepare(args: argparse.Namespace) -> int:
         "kind": MARKER_KIND,
         "root": str(root),
         "source_root": str(source),
+        "source_python": str(python),
         "manager": manager,
         "child": child,
         "branch": BRANCH,
@@ -687,7 +920,7 @@ def command_prepare(args: argparse.Namespace) -> int:
         label="fixture project configuration",
     )
     (project / "README.fixture.md").write_text(
-        "Run only SOURCE_ROOT/.venv/bin/python -I -m multi_agent_manager.cli from this project directory.\n",
+        "Run only SOURCE_ROOT/.venv/bin/python -I -c " + CONTROLLED_CLI + " from this project directory.\n",
         encoding="utf-8",
     )
     _write_new_json(
@@ -724,6 +957,80 @@ def command_prepare(args: argparse.Namespace) -> int:
             indent=2,
         )
     )
+    return 0
+
+
+def command_verify_source(args: argparse.Namespace) -> int:
+    """Recheck that the editable source has not drifted since fixture prepare."""
+
+    root, marker = _load_fixture(args.root)
+    source, python = _fixture_source(marker)
+    prepare = _prepare_source_identity(root, marker)
+    current = _source_identity(source, python, root / "git-isolation")
+    _assert_source_identity_matches_prepare(current, prepare)
+    payload = {
+        "kind": "native-v2-fallback-source-verification",
+        "phase": args.phase,
+        "verified_at": _now(),
+        "root": str(root),
+        "prepare_receipt": "prepare.json",
+        "manager": marker["manager"],
+        "child": marker["child"],
+        **current,
+    }
+    _write_receipt(root, args.receipt, payload)
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def command_record_stopped(args: argparse.Namespace) -> int:
+    """Freeze the verified stopped service counter before the fixture restart."""
+
+    root, marker = _load_fixture(args.root)
+    manager, child = _require_fixture_identities(marker, args)
+    blocked = _load_baseline(root, args.baseline)
+    _assert_checkpoint_receipt(
+        blocked,
+        phase="blocked",
+        task=args.task,
+        job=args.job,
+        manager=manager,
+        child=child,
+        escalation_delivery="pending",
+        escalation_attempts=0,
+    )
+    task_record = _task_record(root, args.task)
+    if task_record.get("agent") != child:
+        raise FixtureError("fixture task is not bound to the declared native child")
+    fixture_job = _fixture_job(task_record, args.job)
+    if fixture_job.get("status") != "stopped":
+        raise FixtureError("fixture job is not recorded as stopped before restart verification")
+    state = _service_state(root)
+    if state.get("manager") != manager or state.get("mode") != "disabled" or state.get("enabled") is not False:
+        raise FixtureError("fixture service state is not disabled after the requested stop")
+    status, _status_cycles = _service_status_observation(args.service_status, manager=manager)
+    events = _events(state)
+    source = _one(_matching_source(events, args.task, args.job, child), label="blocked native-v2 source")
+    escalation = _one(
+        _matching_escalation(events, args.task, args.job, manager, child),
+        label="Manager native-followup escalation",
+    )
+    _assert_source_event(source, task=args.task, job=args.job, child=child)
+    _assert_escalation_event(escalation, task=args.task, job=args.job, manager=manager, child=child)
+    _assert_escalation(source, escalation)
+    _assert_no_extra_manager_event(events, args.task, manager, escalation)
+    _assert_checkpoint_event_snapshot(source, escalation, blocked)
+    payload = _record_stopped_payload(
+        task=args.task,
+        job=args.job,
+        manager=manager,
+        child=child,
+        blocked=blocked,
+        state=state,
+        service_status=status,
+    )
+    _write_receipt(root, args.receipt, payload)
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -865,8 +1172,8 @@ def command_assert(args: argparse.Namespace) -> int:
         if _integer(counters.get("turn_start_attempts"), field="turn-start attempts") != 1:
             raise FixtureError("blocked checkpoint observed more than the one rejected child turn/start")
     elif phase == "restarted":
-        if not args.baseline:
-            raise FixtureError("restarted assertion requires --baseline blocked.json")
+        if not args.baseline or not args.stopped_baseline:
+            raise FixtureError("restarted assertion requires --baseline blocked.json and --stopped-baseline stopped.json")
         baseline = _load_baseline(root, args.baseline)
         _assert_checkpoint_receipt(
             baseline,
@@ -878,10 +1185,24 @@ def command_assert(args: argparse.Namespace) -> int:
             escalation_delivery="pending",
             escalation_attempts=0,
         )
+        stopped = _load_fixture_receipt(
+            root,
+            args.stopped_baseline,
+            label="stopped baseline receipt",
+            field="--stopped-baseline",
+        )
+        _assert_stopped_receipt(
+            stopped,
+            blocked=baseline,
+            task=args.task,
+            job=args.job,
+            manager=manager,
+            child=child,
+        )
         _assert_checkpoint_event_snapshot(source, escalation, baseline)
-        if payload["service_pid"] == baseline.get("service_pid"):
-            raise FixtureError("fixture scheduler PID did not change across the requested restart")
-        required_cycles = _integer(baseline.get("service_cycles"), field="baseline service cycles") + 2
+        if payload["service_pid"] == stopped.get("stopped_service_pid"):
+            raise FixtureError("fixture scheduler PID did not change from the stopped daemon")
+        required_cycles = _integer(stopped.get("stopped_cycles"), field="stopped service cycles") + 2
         if payload["service_cycles"] < required_cycles:
             raise FixtureError("fixture scheduler did not complete two post-restart cycles")
         for field in ("source_attempts", "escalation_attempts", "turn_start_attempts"):
@@ -893,6 +1214,14 @@ def command_assert(args: argparse.Namespace) -> int:
             or escalation.get("last_recipient_state") != "active"
         ):
             raise FixtureError("Manager escalation was delivered during the active-root restart checkpoint")
+        payload["blocked_checkpoint"] = {field: baseline.get(field) for field in _STOPPED_BLOCKED_FIELDS}
+        payload["stopped_checkpoint"] = {
+            "service_pid": stopped.get("stopped_service_pid"),
+            "service_identity": stopped.get("stopped_service_identity"),
+            "service_cycles": stopped.get("stopped_cycles"),
+            "turn_start_attempts": stopped.get("stopped_turn_start_attempts"),
+            "service_status": stopped.get("service_status"),
+        }
     elif phase == "delivered":
         if not args.baseline:
             raise FixtureError("delivered assertion requires --baseline restarted.json")
@@ -1056,12 +1385,35 @@ def parser() -> argparse.ArgumentParser:
     prepare.add_argument(
         "--source-root",
         required=True,
-        help="source worktree whose .venv/bin/python -I -m multi_agent_manager.cli will run the fixture",
+        help=f"source worktree whose .venv/bin/python -I -c {CONTROLLED_CLI} will run the fixture",
     )
     prepare.add_argument("--manager", required=True, help="existing root Manager AGENT-ID")
     prepare.add_argument("--child", required=True, help="existing native child AGENT-ID")
     prepare.add_argument("--confirm", required=True, help="must equal CREATE_NATIVE_V2_FIXTURE")
     prepare.set_defaults(func=command_prepare)
+
+    verify_source = subcommands.add_parser(
+        "verify-source",
+        help="recheck the clean source identity against prepare before start or after stop",
+    )
+    verify_source.add_argument("--root", required=True)
+    verify_source.add_argument("--phase", required=True, choices=("before-start", "after-stop"))
+    verify_source.add_argument("--receipt", required=True)
+    verify_source.set_defaults(func=command_verify_source)
+
+    stopped = subcommands.add_parser(
+        "record-stopped",
+        help="freeze a verified stopped fixture-service counter before restart",
+    )
+    stopped.add_argument("--root", required=True)
+    stopped.add_argument("--task", required=True)
+    stopped.add_argument("--job", required=True)
+    stopped.add_argument("--manager", required=True)
+    stopped.add_argument("--child", required=True)
+    stopped.add_argument("--baseline", required=True, help="blocked.json checkpoint to bind source and old daemon")
+    stopped.add_argument("--service-status", required=True, help="JSON emitted by the stopped fixture service status command")
+    stopped.add_argument("--receipt", required=True)
+    stopped.set_defaults(func=command_record_stopped)
 
     delegation = subcommands.add_parser("record-delegation", help="record a root's already-sent native delegation")
     delegation.add_argument("--root", required=True)
@@ -1093,6 +1445,7 @@ def parser() -> argparse.ArgumentParser:
     assertion.add_argument("--child", required=True)
     assertion.add_argument("--phase", required=True, choices=("blocked", "restarted", "delivered"))
     assertion.add_argument("--baseline", help="blocked or restarted receipt for comparison")
+    assertion.add_argument("--stopped-baseline", help="stopped.json receipt required for restarted comparison")
     assertion.add_argument("--manager-attestation", help="required only for delivered after the root saw the message")
     assertion.add_argument("--receipt", required=True)
     assertion.set_defaults(func=command_assert)

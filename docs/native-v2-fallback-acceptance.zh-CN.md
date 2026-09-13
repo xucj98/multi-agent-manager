@@ -20,10 +20,12 @@ child direct `turn/start` 已恢复。
   global config、空 template 和 hooks 目录；commit 同时使用 `--no-verify`。随后它以同一环境核验
   `state` 的 top-level 和 absolute git-dir 都精确属于 fixture。它不修改用户 Git 配置、外部仓库、外部
   index 或 hook。
-- 所有 fixture CLI 都固定为 `SOURCE_ROOT/.venv/bin/python -I -m multi_agent_manager.cli`，不使用
-  console script。`prepare` 会在 `-I` 下实际导入 `multi_agent_manager`、`.cli` 和 `.wake_runtime`，
-  要求三个 resolved `__file__` 都在 `SOURCE_ROOT/multi_agent_manager`；它也以净化 Git 环境核验 source
-  worktree top-level 并把 source Python、受控 CLI、三个 module path 与准确 `HEAD` 写入
+- 所有 fixture CLI 都固定为 `SOURCE_ROOT/.venv/bin/python -I -c 'from multi_agent_manager.cli import main;
+  raise SystemExit(main())'`，不使用 console script 或 `-m multi_agent_manager.cli`。`prepare` 会在 `-I`
+  下实际导入 `multi_agent_manager`、`.cli` 和 `.wake_runtime`，要求三个 resolved `__file__` 都在
+  `SOURCE_ROOT/multi_agent_manager`；它也以净化 Git 环境核验 source worktree top-level、准确 `HEAD` 与
+  `git status --porcelain=v1 --untracked-files=all --ignore-submodules=none` 的空输出，并把 source Python、
+  受控 CLI、三个 module path、`source_clean: true`、空 `source_git_status` 与准确 `HEAD` 写入
   `receipts/prepare.json`。执行前将其中的 `source_commit` 与本任务报告的待测交付 commit 核对。
 - 当前验收由 root Manager `01a09657-e0f3-7352-b726-aba5bbd5d498` 执行；仅在 root 已明确以
   `collaboration.followup_task` 委派后，才使用既有原生 child
@@ -42,7 +44,10 @@ restart checkpoint 都通过。`FIXTURE_ROOT` 必须是新目录：
 ```bash
 SOURCE_ROOT=/mnt/public/xcj/Projects/workspace/b49a5b40-1d18-40e6-bc28-c5c57dc011f3/multi-agent-manager
 SOURCE_PYTHON="$SOURCE_ROOT/.venv/bin/python"
-MAM=("$SOURCE_PYTHON" -I -m multi_agent_manager.cli)
+MAM=(
+  "$SOURCE_PYTHON" -I -c
+  'from multi_agent_manager.cli import main; raise SystemExit(main())'
+)
 FIXTURE_ROOT=/mnt/public/xcj/Projects/.native-v2-fallback-fixture-$(date -u +%Y%m%dT%H%M%SZ)
 ROOT_MANAGER=01a09657-e0f3-7352-b726-aba5bbd5d498
 NATIVE_CHILD=01a096ab-e5f3-7672-8ff3-36328d3fcfb7
@@ -57,24 +62,26 @@ CHILD_ARCHIVE_NOTE='native-v2 fallback fixture handled'
 
 在继续前读取 `FIXTURE_ROOT/receipts/prepare.json`：`source_cli` 必须是上面的 `MAM` 命令，三个
 `source_modules` 必须都在 `SOURCE_ROOT/multi_agent_manager`，`source_git_toplevel` 必须精确等于
-`SOURCE_ROOT`，且 `source_commit` 是待验收的交付 commit。`fixture_git_toplevel` 和
+`SOURCE_ROOT`，`source_clean` 必须为 `true`、`source_git_status` 必须为空，且 `source_commit` 是待验收的
+交付 commit。`fixture_git_toplevel` 和
 `fixture_git_dir` 分别必须精确为 `FIXTURE_ROOT/state` 与 `FIXTURE_ROOT/state/.git`。
 
 下面的本地函数只查询当前 fixture project 的 service state；它会在 60 秒后明确失败。每次 `service stop`
 之后、`service start` 或删除 fixture 之前都要调用它：
 
 ```bash
+FIXTURE_STOP_STATUS=''
 wait_fixture_service_stopped() {
   local deadline=$((SECONDS + 60))
-  local status running
+  local running
   while true; do
-    if ! status="$("${MAM[@]}" service status)"; then
+    if ! FIXTURE_STOP_STATUS="$("${MAM[@]}" service status)"; then
       printf '%s\n' 'fixture service status failed while waiting for stop' >&2
       return 1
     fi
     if ! running="$("$SOURCE_PYTHON" -I -c \
       'import json,sys; print("false" if json.load(sys.stdin).get("running") is False else "other")' \
-      <<<"$status")"; then
+      <<<"$FIXTURE_STOP_STATUS")"; then
       printf '%s\n' 'fixture service status was not valid JSON' >&2
       return 1
     fi
@@ -120,8 +127,14 @@ root 接着以自身的 parent-native `collaboration.followup_task` 明确委派
 
 ```bash
 cd "$FIXTURE_ROOT/project"
+"$SOURCE_PYTHON" -I "$SOURCE_ROOT/scripts/native_v2_fallback_acceptance.py" verify-source \
+  --root "$FIXTURE_ROOT" --phase before-start \
+  --receipt "$FIXTURE_ROOT/receipts/source-before-start.json"
 "${MAM[@]}" service start --manager "$ROOT_MANAGER"
 ```
+
+`verify-source` 会以 prepare 时相同的隔离 Git 和 `-I` import 检查 source 的完整 identity；任何 HEAD、
+clean 状态、module path 或受控 CLI 漂移都会失败并保留 fixture，不能继续启动 scheduler。
 
 ## 必须按顺序留下的证据
 
@@ -138,19 +151,27 @@ cd "$FIXTURE_ROOT/project"
      --phase blocked --receipt "$FIXTURE_ROOT/receipts/blocked.json"
    ```
 
-2. root 仍保持 active。停止**fixture** scheduler，等待其 `service status` 的 `running: false`，再启动它；
-   这不是 App Server restart。启动后等待至少两个**post-restart** scheduler cycles。`assert --phase restarted`
-   会要求 service PID 变化、cycle 至少比 `blocked.json` 多 2，并重验 source/escalation signature、精确
-   payload、attempts 和 pending delivery；它不从任何 pre-stop cycle 推断证据。
+2. root 仍保持 active。停止**fixture** scheduler，等待其 `service status` 的 `running: false` 后，先记录
+   stopped receipt，再启动它；这不是 App Server restart。stopped receipt 将 `blocked.json` 的 TASK/JOB、
+   Manager/child、source/escalation signature、精确 payload、attempts 与旧 daemon PID/identity 绑定到
+   `enabled: false`、`mode: disabled` 的实际 service-status observation 和冻结 cycle。启动后等待至少两个
+   **post-restart** scheduler cycles。`assert --phase restarted` 同时读取 blocked 与 stopped receipt，要求
+   新 PID 不同，并以 stopped 的冻结计数为基准要求至少 `+2`；它不从 stop 前的旧 daemon cycle
+   推断 post-restart 证据。
 
    ```bash
    "${MAM[@]}" service stop
    wait_fixture_service_stopped
+   "$SOURCE_PYTHON" -I "$SOURCE_ROOT/scripts/native_v2_fallback_acceptance.py" record-stopped \
+     --root "$FIXTURE_ROOT" --task "$TASK_ID" --job "$JOB_ID" --manager "$ROOT_MANAGER" --child "$NATIVE_CHILD" \
+     --baseline "$FIXTURE_ROOT/receipts/blocked.json" --service-status "$FIXTURE_STOP_STATUS" \
+     --receipt "$FIXTURE_ROOT/receipts/stopped.json"
    "${MAM[@]}" service start --manager "$ROOT_MANAGER"
    # Root remains active. Wait until at least two post-restart scheduler cycles have run.
    "$SOURCE_PYTHON" -I "$SOURCE_ROOT/scripts/native_v2_fallback_acceptance.py" assert \
      --root "$FIXTURE_ROOT" --task "$TASK_ID" --job "$JOB_ID" --manager "$ROOT_MANAGER" --child "$NATIVE_CHILD" \
      --phase restarted --baseline "$FIXTURE_ROOT/receipts/blocked.json" \
+     --stopped-baseline "$FIXTURE_ROOT/receipts/stopped.json" \
      --receipt "$FIXTURE_ROOT/receipts/restarted.json"
    ```
 
@@ -210,6 +231,9 @@ cd "$FIXTURE_ROOT/project"
    cd "$FIXTURE_ROOT/project"
    "${MAM[@]}" service stop
    wait_fixture_service_stopped
+   "$SOURCE_PYTHON" -I "$SOURCE_ROOT/scripts/native_v2_fallback_acceptance.py" verify-source \
+     --root "$FIXTURE_ROOT" --phase after-stop \
+     --receipt "$FIXTURE_ROOT/receipts/source-after-stop.json"
    "${MAM[@]}" task archive "$TASK_ID" --note 'native-v2 fallback fixture completed and receipts retained'
    "$SOURCE_PYTHON" -I "$SOURCE_ROOT/scripts/native_v2_fallback_acceptance.py" cleanup \
      --root "$FIXTURE_ROOT" --task "$TASK_ID" --job "$JOB_ID" \
