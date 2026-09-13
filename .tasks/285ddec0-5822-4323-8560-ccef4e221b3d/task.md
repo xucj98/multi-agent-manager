@@ -14,3 +14,6 @@
 ## 执行与交付
 
 先读 AGENTS.md、mam task show；必要独立只读 worktree 用 mam workspace add 创建，禁止改运行树。可直接读取固定 git 对象/已验收证据；不启动 GPU、rollout、正式训练、数据生成或传输。实质结果写 workspace/audit.md，发布 report，注明可验收稳定文件。预计短 CPU 分析无需 job。事实审计完成即可结束 turn，由 MAM 通知。其他已在跑训练不受影响。
+
+## 最新用户授权后的紧急事实接口
+用户要求不重训，实施高频推理+状态预测偏差触发replan。工程任务0acf5d43独立推进。请尽快先向Manager和putback_trace_alignment回报：S是否可只调prefix，J row0=t+1与原chunk row d的绝对时间对齐，metadata可辨认J/T/current类型否；scheduler/controller是否允许chunk内观测、原动作按小段执行是否改变TOPP/物理时序。无需等全九任务报告才发送此部分。现有S lag30作为推理分布变化注明，不以新训练作为前置门禁。你仍只读。
