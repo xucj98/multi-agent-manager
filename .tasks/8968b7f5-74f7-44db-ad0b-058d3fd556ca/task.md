@@ -1,5 +1,19 @@
 # P0诊断记录接口：状态原始输出、动作和RNG的无行为改动采集
 
+## 当前执行：P0代码已验收，C2 最小 GPU 验收
+
+Manager 已接受独立 report `2fb0db335606ce18e2590c3be35e002f9f4c8046`，并直接核对 live ingress 集中检查及既有真实J/S路径。代码准入版本：OpenPI `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`、bridge `e147f600dc4329f330a6e2eb0335150b5b3093a3`；本轮不再改功能。此节取代之前CPU-only范围，授权你（terra/max）接续本TASK-ID的最小GPU验收，不派其他agent。
+
+先读 .local/wuwen-4090.md、C稳定根README、相关库AGENTS。C1仅创建本TASK-ID的全新独立部署三树，实际GPU优先 C2 GPU0；若该卡不满足显存/资源要求，可同主机选择实际空闲且满足既有renderer条件的卡，固定映射后执行并记录。不得占用 C1 GPU1/2 的T formal或C3 GPU0的HF工程；C共享文件系统，不能改任何活跃运行树。RMBench沿已验收 `f401f5279c95451eb424ac98b831bab5552b2120`，不混 HF 的3库版本。沿稳定worktree环境/renderer/systemICD，检查C2既有gate证据；不匹配时按既有有界生命周期gate确认，不自行改驱动/依赖。所有代码/配置/验收脚本在本机准备，C仅运行冻结副本。
+
+Manager冻结工程样本为 put_back_block train0 的现有 J(full_t_plus_1) 与 S(serial_lag30) 20000 checkpoint。从eval task e6908de7的已验收路径和C现存清单只读定位，核对metadata/训练来源；不新训练、不改模型、不重传已存在资产。本次只验证记录接口，不用于成功率或机制结论。
+
+每个模型最多一个新的2episode技术smoke，环境种子100000/100001、有/无视频，H50/K30原协议、无HF/reset新协议或状态干预。只对episode_ids [0,1]的query_ids [1]采集、max_records=2、每条64MiB，独立空目录。按真正已接受的episode身份传审计信息，不触发二次环境reset。另在同模型同一实际输入上做logging off/on的有界GPU配对（同初始action key、同显式noise或同采样key），比对actions/state/最终RNG，不能对两个随机执行轨迹只比成功率。允许任务自有小型验收脚本，不扩公共接口或新建框架；无须循环重放或增加episode直到满意。
+
+每条产物运行既有validate_query_diagnostic：要求真正recorded、JSON/NPZ链接和内容验证通过，检查S真实logits/selected/action-condition、J原始坐标/decoded/实际execute slice以及真实生命周期。建立或复用经重算的run-level checkpoint权重内容manifest（不能仅目录/mtime/metadata哈希），链接运行源码/参数/episode/query；权重哈希只做run级，不在query热路径做。记录模型推理与诊断复制/IO延迟、容量峰值、缺失边界，仿真暂停不代表真机实时等价。
+
+结果放本TASK-ID隔离的技术结果组，工程产物保留，不混入原42批正式结果或HF36批。失败只保留证据并报告首因，不自动加大资源上限/重启formal；若需要变更已review源码，先向Manager提供最小复现。预计>30min的部署传输/GPU程序登记MAM真实PID，最终核对owned children/ports退出并归档jobs，发布当前状态置顶的紧凑report与artifacts/hash后结束。完整GPU证据交Manager验收，再另行设计机制采样；这次不启动正式100或写科学结论。
+
 ## 当前窄修：live array_ref 的录入与离线状态不一致
 
 独立 report d1fffd76062e9b8b0ec36dd3b9506df9be18b892 已确认 b169 的真实 J/S Policy→recorder→validator 有效、Memory-v1 完整性和 scheduler 预算预检修复。Manager 已直接核对 _Externalizer/sidecar checks 与真实 Policy.capture：reviewer 将 raw action ndarray 手工替换成 array_ref，录入为 recorded、离线缺 NPZ key 后拒绝的现象成立；尚无证据表明当前真实 Policy producer 会生成这种 descriptor。将其按 P2 录入校验一致性窄修处理，不作算法失败或无限硬化依据。
