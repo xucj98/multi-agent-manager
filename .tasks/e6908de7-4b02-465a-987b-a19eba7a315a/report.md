@@ -15,6 +15,21 @@ C3 GPU0 上的获批有限工程验证已完成 8 个两集 leaf，**没有启�
 
 完整失败记录在 `.local/highfreq_engineering/audits/failures/matched_action_equivalence_failure.json`，SHA-256 `c6519c947782001a07295daf7aeed4a6a1d2295669c17ececd8acb537e2c26f4`；其中有每集首分歧 action 摘要、pair audit log/review hash 和未启动清单。扫描 93 个 outer/process/result 文件未发现 traceback、EOF、renderer、CUDA 或 runtime-error marker。收尾时 C3 GPU0 为 1 MiB used / 24080 MiB free / 0% util，19400/19402 无监听；未触碰 C1 正式任务、源码树或 checkpoint。下一步需要由源码 owner/Manager 针对 matched action 等价与完整输入可观测性裁定或修复后，再建立新的独立 runtime/leaf；当前不能把任何 engineering leaf 视为 matching gate。
 
+## 本轮收尾：原协议 T 终验与 HF 离线口径更正（2026-09-14 CST）
+
+两条已停止的原协议 put-back T formal 已按完整 100 集合同验收并归档，运行树仍精确固定为 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，三树 clean。`episode_diagnostics.jsonl` 的真实终态字段为 `diagnostics.episode_status.terminal`，两叶均为 100/100；各自还核对了 100 条 accepted preflight、连续固定 seed、100 份可解析 episode JSON、100 条 video check、100 个 scheduler exit 0、102 start/102 exit 记录、全部自有子进程退出、端口与 outer PID 释放。每叶只出现一次已知非致命 SAPIEN Vulkan ICD warning，基础设施 marker 为零。
+
+| formal | 结果与固定 seed | final review SHA-256 | smoke 清理 |
+| --- | --- | --- | --- |
+| `c_put_back_full_t_plus_30_trainseed0_evalseed1_100ep_r3` | **66/100**，`200000..200099`；`button_not_pressed_after_center=17`，`button_press_insufficient=17` | `8fa19754e9339331cb1fdac287b2c4795ca5d0fdbec3dcaa9633571682ab15ec` | receipt 已保存，51 文件 / 2,350,262 bytes 的 matching smoke 已删除 |
+| `c_put_back_full_t_plus_30_trainseed0_evalseed2_100ep_r3` | **74/100**，`300000..300099`；`block_not_moved_to_center=1`，`button_not_pressed_after_center=16`，`button_press_insufficient=9` | `1d841274165849390a7c0e7cf08882a01532a89d893f3a8885217de555d65d78` | receipt 已保存，51 文件 / 2,226,369 bytes 的 matching smoke 已删除 |
+
+前五个实际解码视频帧数分别为 eval1 `330/500/357/363/500`、eval2 `330/361/360/359/361`。最终 review、保留的 smoke review 和 cleanup receipt 位于对应 formal leaf；任务私有复核器为 `c-eval-putback-baselines-yaml/records/finalize_t_evals_20260914.py`（SHA-256 `c85e6eb4c8fda5f2af11550854e1427fbc8fca7b4ce99ecc6064cf5584b1b71a`）。MAM jobs `da058195-ff39-49ed-8e83-be5e1a8aaa7e` 与 `3191f8c6-4c53-48a3-9ab7-8b44216ab2c0` 已 archived。
+
+HF 的原 pair failure 和原工具未被覆盖，SHA-256 仍为 `c6519c947782001a07295daf7aeed4a6a1d2295669c17ececd8acb537e2c26f4` 与 `dcf93891de82adaf21e676c55ee30901309f9c9a6097841ff4be4c7ba7f29c87`。新增纯离线工具 `.local/highfreq_engineering/hf_queued_event_audit_v2.py`（SHA-256 `1be44b9bd3cd02235833707e40022d0690361efae60b131dcbeb287daeb02151`）和派生 receipt `audits/recomputed/matched_action_equivalence_queued_event_v2.json`（SHA-256 `bc30cf2ee8bfe7130cc68c1f8eff2862928e5baee1564b6841ffb29d0187d1fb）。它以 `query_id/actions_from_query` 关联 baseline 的 `H=50` prediction 和真实 `queued_rows=K=30` 下发前缀，再用 shadow `action_plan` 的相同 query、`execute_response.queued`、`source_step` 及两侧已完成行边界重建实际对象；query event 数与 action row 数分开记录，缺失关联会显式失败，没有固定截 30。
+
+四集的关联错误为 0；rearrange 有 28 个配对 query event，put-back 有 22 个，后者另有 12 个 baseline query 在 shadow 提前终态后未配对。**50/50 已配对的 K-row 队列和共同已执行前缀都不精确相等**：两个任务每集首个 `source_step=0` query 的最大绝对差仍为 rearrange `0.0038730204/0.0038729906`、put-back `0.0034926604/0.0034926604`；后续已分叉轨迹的最大差达到 `0.2075123787` 和 `1.3522526920`，不能据此归因于单一首因。记录仅有 RNG `stream/call`，没有实际 key；输入快照也没有完整视觉或 prompt payload。因此形状口径修正不构成 PASS：没有启动 GPU、服务、HF matching smoke、r_s30 或 formal100，阈值未变，仍等待源码 owner/Manager 的有界诊断与裁定。
+
 ---
 
 ## C 迁移评测准备（2026-09-12 03:02 CST）
