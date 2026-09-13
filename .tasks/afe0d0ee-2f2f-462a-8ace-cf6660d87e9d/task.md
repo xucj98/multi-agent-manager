@@ -1,5 +1,20 @@
 # P0诊断记录接口独立审查：行为等价、RNG与证据完整性
 
+## 当前增量复审：Memory-v1 完整性和 preflight 修复已冻结（取代下文旧候选）
+
+源 report `e5ec1cdd0017dd7a01ba3b29cc9d2035ec4e3bc0` 已发布。Manager 已核对作者 clean HEAD，现在恢复本任务独立增量复审：
+
+- OpenPI 不变：`bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`。
+- robot-bridge：`fa62a9febc8fab9098994d0cb8e1894a0590b7e8` → `b1695f7f04050836a764c1e85a6db163e3526ada`。
+
+复用现有 review worktree，clean 后只快进 bridge。主要复核上一 report 2cde8123 两项已接受 P2：缺失/错误的 S logits、selected/condition IDs 或 J 原始/decoded memory 不能伪装 recorded；episode_info/status/provenance/input 应在诊断复制前统一预算预检。确认合法真实 serial/joint 输出仍可记录，插入与离线校验共享必需证据合同，NPZ materialization 后能验证对应关系，不依赖 descriptor 或非空 representation 字符串。新改动较大，按实际生产 diff 验证相关路径，但不扩展成任意输入防御或通用记录框架。
+
+保留此前已通过的生命周期、默认路径/RNG、1024² input-cap 和 JSON/NPZ 结论；针对本次增量跑有意义窄检查。作者 bridge57、policy6和17数组 dry-run 不是独立 PASS。保留已更正的四个 read-only transform 失败：同测试 blob 在原始 a869/f962、原 logger 及前轮候选均复现，早于整个 logger。
+
+4096×4 action-dispatch 容量观察仍未裁决为 blocker；如继续提出，请用实际 H50/K30/robot_dim14 合法数据证明诊断专用未压缩数组超额，排除普通 RPC 和容器开销，否则明确未确认即可。checkpoint 内容身份继续由 run-level 权重 manifest 支持，不增加逐 query 权重哈希。
+
+最终发布精确版本独立结论、复现/通过项和未覆盖边界，能否准入最小受控 GPU 验收由 Manager 裁决。HF 分支独立，不要求组合部署，不启动 GPU/训练/正式评测，不改作者树。发现实质缺陷及时报告；完成 publish report 后正常结束，不轮询或审查 dirty diff。
+
 ## 当前执行：已确认四项问题的增量复审
 
 Manager已核对fa62a9fe._complete_sidecar_error和bc7603c5真实memory生成器，接受你新发现的P2：只检查representation导致缺S/J核心memory证据仍recorded。已发布源task窄修要求，含真实metadata_incomplete/missing_key_state_output分支、录入与离线validator共享规则、合法不完整标记及有效/无效样本。继续其余增量审查，报告精确候选和剩余发现；等作者下一提交再核实该项，不需要中断其他工作或重复已完成验证。
