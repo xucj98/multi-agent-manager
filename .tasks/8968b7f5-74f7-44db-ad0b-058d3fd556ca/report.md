@@ -9,9 +9,10 @@
 - robot-bridge worktree：`/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge`
   - 冻结基线：`f9626636c4776d8eb15f9c556775cb2d12c000e5`
   - 原接口提交：`a2c7f80b99556db2147c85ca9f625ffb840b276a`
-  - 本轮修复提交：`fa62a9febc8fab9098994d0cb8e1894a0590b7e8` (`Fix selected-query diagnostic lifecycle and bounds`)
+  - P1/容量修复提交：`fa62a9febc8fab9098994d0cb8e1894a0590b7e8` (`Fix selected-query diagnostic lifecycle and bounds`)
+  - 本次 Memory-v1 完整性修复：`b1695f7f04050836a764c1e85a6db163e3526ada` (`Validate Memory-v1 diagnostic evidence`)
 
-两个 worktree 均位于 `task/8968b7f5-74f7-44db-ad0b-058d3fd556ca`，本轮提交后工作树干净。
+两个 worktree 均位于 `task/8968b7f5-74f7-44db-ad0b-058d3fd556ca`；OpenPI 停在 `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`，bridge 停在 `b1695f7f04050836a764c1e85a6db163e3526ada`，工作树干净。
 
 ## 修复内容
 
@@ -36,6 +37,14 @@
 - recorder 对残缺 sidecar 写显式 `policy_sidecar_incomplete`；`validate_record()` 对手工改成 `recorded` 的残缺 JSON 也会拒绝。回归覆盖空 complete sidecar 和缺失 sampling-key data。
 - 每条 scheduler policy identity 都标明 `policy_dir`、runtime provenance 和可能的 step 只是位置或运行引用。接口不提供逐 query 权重内容哈希；正式诊断结论仍需关联独立核验的 run-level checkpoint manifest。没有权重内容哈希的 manifest 不可称为强内容身份。
 - 文档已更新 cap 范围、超限语义、同步 I/O 边界、完整性合同和 checkpoint 限制；synthetic dry-run fixture 已补足 P2 必需 evidence。
+
+### 本次 Memory-v1 完整性窄修
+
+- recorder 只有在 sidecar 的实际 representation 具备必需 evidence 时才写 `recorded`：serial 要求浮点 logits、选中 IDs、实际 condition IDs/来源及字段 domain 对应；joint dense 要求原始连续坐标、整数 decoded IDs、可读 labels、action-row 数和 raw-action slice 对应。joint 坐标明确保持为非 logits。
+- 录入和 `validate_record()` 使用同一语义合同。离线校验会重新 materialize NPZ `array_ref`，再核对 IDs、labels、condition source 与 raw-action slice，手工把残缺文件改成 `recorded` 不能绕过。
+- `metadata_incomplete`、`missing_key_state_output`、不支持 representation、Memory metadata 下的 `none`，以及 legacy sampler 未单独观测 selected IDs 都写成可见 `policy_sidecar_incomplete`；不保存伪造的完整 memory。incomplete 记录保留有界 memory 摘要和 legacy selected-ID 状态。
+- scheduler 在保存 episode status、episode info、runtime provenance 或 scheduler input 前做数组预算预检；超限只留下小型 `not_recorded_array_limit` 记录，不提前深拷贝这些诊断来源。
+- 新增 CPU 回归覆盖有效 serial/joint 样本、各类局部缺失/错误维度、descriptor-only 伪 evidence、NPZ ID/label 篡改、`none` 伪装、真实 legacy serial 生成器和预检无复制路径。dry-run fixture 也更新为完整 serial 合同。
 
 ## CPU 验证
 
@@ -63,7 +72,7 @@ PYTHONPATH=/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556
 .venv/bin/python -m pytest \
   /mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge/tests/scheduler/test_query_diagnostic.py \
   /mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/robot-bridge/tests/scheduler/test_openpi_simulation.py -q
-# 35 passed
+# 57 passed
 
 # robot-bridge worktree
 .venv/bin/ruff check robot_bridge/scheduler/query_diagnostic.py \
@@ -79,6 +88,7 @@ PYTHONPATH=/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556
 ```
 
 ```bash
+# CPU-only final check after the Memory-v1 completion fix
 OUT="$(mktemp -d /tmp/query-diagnostic.XXXXXX)"
 .venv/bin/python scripts/query_diagnostic_dry_run.py --directory "$OUT"
 .venv/bin/python scripts/validate_query_diagnostic.py "$OUT"/records/*.json
