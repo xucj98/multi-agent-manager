@@ -1,4 +1,4 @@
-## 当前状态：put-back J/T train1 已完成 eval1/eval2；train2/eval1 待启动（2026-09-14 CST）
+## 当前状态：put-back J/T train1 已完成 eval1/eval2；train2/eval1 formal100 运行中（2026-09-14 CST）
 
 固定原协议队列已完成 train1 的两个 evaluation seed：运行树始终 clean 且固定为 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，保持 H50/K30、原始 RNG 生命周期、首次 infer 90 秒和后续 infer 30 秒。新增训练、转换、传输、源码、依赖、checkpoint 与共享 cache 变更均为 0。
 
@@ -9,9 +9,16 @@
 | J `full_t_plus_1` / eval2 `300000..300099` | `c_put_back_full_t_plus_1_trainseed1_evalseed2_100ep_r3` | **58/100**；`block_not_returned_to_origin_mat=1`，`button_not_pressed_after_center=25`，`button_press_insufficient=16` | `be14b50e2d1b4834a37349921a7b83fe2eb3721f7262a5d0273cbbdcf2ccca78` | job `0f7daad0-ba87-41dc-8efd-57431d03a289` archived；receipt `2cebc82e1a47fc3b90b4da5b05808e1607b539f7e4ff8214ca9cca51c668dcb1`；matching smoke 已清理 |
 | T `full_t_plus_30` / eval2 `300000..300099` | `c_put_back_full_t_plus_30_trainseed1_evalseed2_100ep_r3` | **62/100**；`button_not_pressed_after_center=21`，`button_press_insufficient=17` | `a5bbb1ae0c73326326ead750b46c63ddf805d8e5c8fdaffc9ff2c93ef45ffd75` | job `8883cf5e-9fd9-4255-b120-eac472a20c40` archived；receipt `79f2141bf0e859a947a6217b47105ab93062df85b9fe0b21bb716a4ec0d26f1d`；matching smoke 已清理 |
 
-eval2 的两个 formal 均经 100 条连续 seed/preflight/terminal diagnostics、100 个 episode JSON、视频、scheduler exit、完整子进程退出、端口/outer PID 释放、source/checkpoint/hash 合同和零基础设施 marker 复核。终验器的实际 SHA-256 为 `6368b249c1615ac35f87a813accaf1dfdcc895cf425e76fc442988cb4eb4c885`；写入前已将其仅 task-local 的 eval2 MAM provenance 更正为实际 job ID，未覆盖任何运行产物。
+train1/eval2 的两个 formal 均经 100 条连续 seed/preflight/terminal diagnostics、100 个 episode JSON、视频、scheduler exit、完整子进程退出、端口/outer PID 释放、source/checkpoint/hash 合同和零基础设施 marker 复核。终验器的实际 SHA-256 为 `6368b249c1615ac35f87a813accaf1dfdcc895cf425e76fc442988cb4eb4c885`；写入前已将其仅 task-local 的 eval2 MAM provenance 更正为实际 job ID，未覆盖任何运行产物。
 
-train2/eval1 的全结果去重已完成，目标 J/T leaf 均不存在；下一步分别用 C1 GPU1 / `19410,19412` 和 GPU2 / `19420,19422` 执行各自 matching video/no-video smoke2，然后从新的 formal leaf 运行固定 `200000..200099`。随后继续 train2/eval2 `300000..300099`。
+train2/eval1 的完整结果去重已完成，J/T 两项 matching video/no-video smoke2 均通过技术合同；J 的任务成功数为 1/2、review SHA-256 `d0e6436dda5fafa02ac744c7a76bf3b114893224da9f2eb250c9f7315867918a`，T 为 0/2、review SHA-256 `6b600146c965b924b0ebf70eefd87b4fb3b644bfef12234ed0ee3bf67fb9f1cf`。任务成功率不用于选择或阻断该技术门禁。
+
+| arm | running formal100 | fixed seeds / C1 resource | outer PID | MAM job |
+| --- | --- | --- | ---: | --- |
+| J `full_t_plus_1`, train2/eval1 | `c_put_back_full_t_plus_1_trainseed2_evalseed1_100ep_r3` | `200000..200099`; GPU1; ports `19410,19412` | `1301506` | `0ccf5f61-bd19-4df7-88dc-9ec2f49d79c4` |
+| T `full_t_plus_30`, train2/eval1 | `c_put_back_full_t_plus_30_trainseed2_evalseed1_100ep_r3` | `200000..200099`; GPU2; ports `19420,19422` | `1301571` | `1ae7a228-0a13-4074-88ba-8b12886e1676` |
+
+两条 formal 已以实际 outer PID 登记为 running，尚无正式分数。本 turn 不主动轮询其进度；MAM 停止事件到达后，按 train2/eval1 派生终验器依次执行 check-only、写 final review、核对实际 MAM ID/连续 seed/terminal/video/process/source/hash、归档 job、写 cleanup receipt，并且只删除对应 smoke leaf。两项均成功收尾后，继续既定 train2/eval2 的完整去重、smoke2 与 fresh formal100（固定 `300000..300099`）。
 
 ---
 
