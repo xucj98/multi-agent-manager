@@ -274,3 +274,11 @@ Manager 已从 C 原始记录独立复核最新六批的 final-review/30 artifac
 put-back N/S train0 在此快照只有 eval1/2，eval0 尚未计入。请立即核实是否已有完整、未汇报的合规 eval0（只认连续100，不拼 partial、不把工程smoke算入）；若没有，沿已准入的 f401f527 RMBench / f9626636 bridge / a869498f OpenPI 基线和实际既有 checkpoint，用可用GPU接续两条缺失的 eval0：各自 matching video/no-video smoke2 → fresh formal100，原固定100000..100099，独立run/ports，登记真实job。此为已授权三eval baseline 队列的补齐，无新增训练或新模式，不需等待 HF 源码 review。先核对既有 run leaf，避免重复评测已完整结果；若原失败叶存在，保留并使用新名字。
 
 HF 源码仍未准入，不部署 HF。其余既有排期维持；只运行当前 frozen runtime 实际兼容且已授权的项目，不为占满GPU改变模型/协议。发布实际进度后正常结束，不轮询。
+
+## Manager HF 正式对照补充：统一 episode RNG 协议
+
+作者默认reset P1修复及独立review尚未完成，不准入新runtime。Manager已核实历史policy server跨100集持久运行并连续消费action RNG，而HF合同逐episode回到initial key0；因此不再直接复用历史J/S成绩作为HF对照。保留当前已运行P-N/P-S eval0自然收尾，它们属于原协议，不能更换代码或混合新协议。
+
+新增显式matched baseline配置，由HF作者提供窄接线并独立review：同checkpoint/H50/K30、同每episode action key0 reset、同random_light=false/crazy_random_light_rate=0，baseline自身不执行中途probe或改变MemoryContext。matched shadow采用相同RNG协议、增加probe但不改cache/动作，只用于工程等价。普通默认baseline和普通shadow的历史行为也须验证保留；不要用两条新路径的互比代替默认兼容性。
+
+正式排期改为：第一阶段J matched baseline两任务×3eval=6批，与J HF-fixed/event12批共同构成18批；第二阶段S matched baseline6批与S HF-fixed6批构成12批；第三阶段J HF-periodic6批。合计36新批/3600正式episode executions/0训练，优先J，工程smoke不计入正式数。每配置每eval seed仍matching smoke2→fresh formal100。所有臂policy初始key固定0且逐episode恢复，probe独立流；eval0/1/2仅对应环境100000/200000/300000列表，不是三次policy seed。旧baseline继续留在原九任务台账，不跨协议拼接，不用旧高分挑新baseline，不改冻结阈值。待精确code PASS与Manager准入后再开新GPU工作；现在可以更新准备清单和实际配置/manifest记录需求，无需轮询。
