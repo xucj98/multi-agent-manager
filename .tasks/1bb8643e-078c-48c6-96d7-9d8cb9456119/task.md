@@ -14,3 +14,6 @@
 5. 写清哪些问题可通过论文修订解决，哪些必须新增实验。独立判断所提改进是否足够受控、有无遗漏的混杂。
 
 不要改论文，不发外部消息。提交中文详细review到本任务workspace/review.zh-CN.md；MAM_ROOT/.tasks/TASK-ID/report.md写摘要与路径，并mam task publish --file report。完成当前工作后正常结束turn，不轮询等待Manager。你无需创建子agent。
+
+## Manager验收与保存（2026-09-13）
+独立审稿已完成，原始review未修改并保存到论文docs/reviews/20260913-independent-review.zh-CN.md；Manager逐项裁决与正文修订在14993b9。原5页审稿PDF和当前6页修订稿分开标识，未声称获得重新审稿通过。整个冻结packet+原review+算术核验共32文件已保存到/root/Documents/task-state-vla-paper/docs/reviews/20260913-frozen-review-materials.tar.gz，SHA256 4276c2a7e09cf62ced40aa9681995abc7a5bbd99d336e78e7b7035ff60e0768f；Manager逐文件读取tar并校验与源相同，可清理task workspace后归档。GPT-6 ultra仅完成此独立审稿，后续工程仍terra max。
