@@ -245,3 +245,12 @@ Manager已独立重算新增9批raw 100 terminal/连续固定seeds/成功数并�
 
 ## Manager准入：put-back N/S YAML（2026-09-13）
 Manager已直接SSH读取f401f5279c95451eb424ac98b831bab5552b2120的完整17行diff。N空字段joint_dense、S phase/origin_mat serial_token且query_selected/query与已报checkpoint合同一致；改动限独立准备tree、不动在跑runtime。准入该候选继续每新路径必要GPU gate，gate通过按现有seed0三eval优先队列正式启动并登记，不再等第二次代码审批。保持bridge/openpi冻结、禁止覆盖结果；报告可追溯metadata与receipt。
+
+## 当前用户新增授权：高频状态推理与事件replan评测（2026-09-13 晚）
+用户已授权复用checkpoint、仅修改推理、在4090集群开展高频状态更新与偏差触发replan评测，不重训。源码工程task0acf5d43-91b6-4171-b727-e3fe0f7e7939由putback_trace_alignment负责，独立review由Manager安排。先继续立即处理当前两个stopped rearrange J eval1/2，完整核验并归档，4条仍运行的N/S自然收尾；不因新方案覆盖或丢掉旧结果。
+
+同时准备新评测：只读核对C1/C2/C3当前GPU、已验收host gate、冻结runtime、现有rearrange/put-back J0/S0/T0 checkpoint可用性，资源状态用实际memory/利用率/自有job判断。为独立新runtime准备精确run配置/命令和manifest，schema/权重不变；不能在活跃r3目录checkout/cherry-pick。第一轮rearrange+put-back已有模型可以立即做开发评估，不等待cover/swap-T新模型；后两者作为后续跨任务验证保留，不算已完成泛化。
+
+Manager随后发布精确arms/触发阈值/试验计数。代码未验收前可做CPU/dry-run/资源及checkpoint准备，不能将新模式当已上线。源实现+独立review通过、Manager准入后，每模式匹配必要smoke2（video/no-video），通过即可按冻结清单正式3 eval seed×100，无需逐批重复问许可。首先跑小规模预先固定seed的诊断/吞吐gate，不按成功率挑阈值；任何性能pilot单列且不拼正式结果。把推理probe数、action replan数、K分布、事件/偏差触发、实际执行/丢弃行、wall/sim时间、峰值显存及失败类别加入原始记录验收。任务继续承担所有长job登记、完成收尾与结果报告。
+
+在新模式准入前不为此空置全部4090；原有已授权eval可接续，但至少明确下一张可用于新smoke的卡和预计释放时间，避免全部排满数日。预计>30分钟的传输/正式程序都登记MAM。本轮不创建新通用调度框架、不自行改算法合同。
