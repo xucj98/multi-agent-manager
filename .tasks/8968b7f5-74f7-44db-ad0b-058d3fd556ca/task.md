@@ -29,3 +29,12 @@
 Reviewer afe0d0ee 已真实复现 J/T execute RPC 非ok后，diagnostic record 被下一retry obs提前关闭。Manager直接核对 SchedulerBase.run_iteration 的失败return不调用after_execute，以及 OpenPiSimulationScheduler._refresh_query_diagnostics 在 requires_execution_progress 且 next_consumption=None 时无accepted判断便close，接受此问题。当前 cb861d38/a2c7f80b 不准入GPU。
 
 请仅修生命周期缺口：未被accepted的candidate不得因没有next_consumption就被当作已完成关闭；execute失败/后续discard必须被明确记录，或正确保留pending直到已知终止。不能记录actualK=0作为未知结果，也不能改变原retry/动作语义。添加保留真实run_iteration和controller非ok路径的回归，覆盖选中J/T、下一retry obs、下一build_act_request discard及terminal/reset时记录不丢失。协调reviewer给精确复现，完成干净commit、窄测试、report再由其续审；其他独立发现一并按具体证据处理，不扩展logger产品范围。
+
+## 追加两项独立发现的裁决
+
+Manager 已直接核对冻结 cb861d38/a2c7f80b 的调用链，接受 reviewer 的另外两项问题，和前项一起修复后续审：
+
+1. 数组上限目前只在 bridge 的 record_policy_response 复制、externalize 后应用；begin_query 已复制 scheduler_input，OpenPI 也在无容量参数的情况下复制多个输入/输出快照并传回 sidecar。这不能限制诊断采集和传输开销。将预算传到实际采集端，在诊断专用复制/设备取回前按 shape/dtype/nbytes 累计预检；超限返回体积受控且明确 incomplete 的记录。明确定义预算涵盖范围及必要元数据开销，不将正常推理必需的输入传输算成诊断新增开销。用真实 Policy 路径和大图像/小上限验证超限时没有先生成巨大的 sidecar，同时保持 input、action、state 与 RNG 语义不变。
+2. legacy full-state J/T 的 diagnostic_record_id 仅在 after_execute 才接到 dense candidate；execute 非 ok 后，下一 build_act_request 的 discard 收到 None ID，随后清掉 candidate ID，导致已选中记录永留 pending。需在 candidate 阶段正确关联、记录已知拒绝/丢弃并收尾；actual K 未知仍为 null。回归保留真实 legacy F0/full-state 调用链，覆盖 execute 非 ok、下一观测/重试、supersede 和 episode 结束，不改变控制器 retry 语义。
+
+请与 reviewer 复用其精确复现；本次仍仅 CPU 修复和独立 review，未获 GPU 准入。
