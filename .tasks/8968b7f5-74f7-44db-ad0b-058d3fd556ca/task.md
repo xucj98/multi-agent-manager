@@ -1,5 +1,13 @@
 # P0诊断记录接口：状态原始输出、动作和RNG的无行为改动采集
 
+## Manager 增量复审裁决：memory 部分完整性仍需窄修
+
+你已交付OpenPI bc7603c5 / bridge fa62a9fe，独立review afe0仍在进行。Reviewer复现：把有效serial sidecar的memory缩成仅{"representation":"serial_token"}，recorder仍返回True、写status=recorded且validate_record通过。Manager直接核对fa62a9fe的_complete_sidecar_error只检查非空representation，并与bc7603c5的真实memory evidence生成器比较，确认遗漏。该生成器还会自然返回metadata_incomplete/missing_key_state_output等不完整状态，不能因为总sidecar写了complete就称完整。
+
+接受为P2，但它阻塞本任务完整证据准入。请只在必要路径按实际representation核验必需memory证据：S的key_state_logits、selected_ids、action_condition_state_ids及condition来源；J/T的raw joint memory坐标、decoded IDs及可读decoded状态/字段合同。数组类型、维度和字段关联按真实wire验证，不用类别坐标伪装logits。明确缺失/unsupported/metadata_incomplete或旧sampler无法独立提供selected IDs时，保留可见的incomplete状态和原因，不虚构值、不改变原动作/RNG。
+
+同一schema规则必须覆盖录入侧与离线validate_record；伪造status=recorded不能绕过。补最小S/J局部缺失/错误维度和有效样本回归，至少一条覆盖真实生成器的incomplete输出。不要全面重写记录器或扩展无关字段，不依赖HF分支、不运行GPU。提交下一组精确clean commits并发布report；reviewer继续检查本轮其他路径，不需等待整个review结束才动这项已确认修复。
+
 ## 目标与职责
 你使用 gpt-5.6-terra / max，负责实现和验证。Manager 负责论文主张、实验设计和最终裁决。先读 MAM AGENTS、README、.local/README，再 mam task show 本 TASK-ID 和相关库 AGENTS、开发/环境说明。原审计任务 f987cfb5 已归档，其交付现保存于 /root/Documents/task-state-vla-paper/docs/audits/20260913-trace-inventory/；不要使用已删除的旧 workspace。
 
