@@ -1294,3 +1294,15 @@ P-S 正式 leaf `c_put_back_serial_lag30_trainseed0_evalseed0_100ep_r3` 已于 2
 | independent CPU validation | `8afd7013ab166a0e011c2e195839e725a9e38aa0286d8cf52c720b4933012a1f` |
 
 独立 JSON 校验复核 36 个唯一 smoke/formal 名、`100000/200000/300000` 三个完整固定环境 seed 组、所有 formal 的 reset RNG scope、12 条 matched baseline 无 probe/replan、原 24 条 mode 合同、工程 scope 4 legacy + 4 reset，以及没有 `c_hf_*` 结果 leaf。highfreq-base 的 RMBench、bridge、OpenPI tracked 状态仍 clean；HF 作者实现仍未取得 code PASS 或 Manager 部署准入。
+
+## 2026-09-13：P-N eval0 formal100 终验完成，待归档
+
+本节只处理 C1 GPU1 的 put-back no-memory / trainseed0 / evalseed0（P-N）；未修改、轮询或判定 P-S。MAM job `d40eb04a-0ad4-421b-a74a-7734d6f3c9db` 的 outer PID `137091` 已停止，终验前确认端口 `19410/19412` 无监听。
+
+正式 run `c_put_back_no_memory_trainseed0_evalseed0_100ep_r3` 已由独立 Python 校验器从原始产物完整复核：100 个 accepted preflight 和连续固定环境 seed `100000..100099`、100 个 terminal diagnostics、100 个 episode JSON、100 个 scheduler `episode_terminal` / exit 0、102 个 start 与 102 个 matching exit 记录、100 个 `video_checks ok=true`。episode0–4 五个 MP4 均用 cv2 逐帧解码，各为 500 帧；104 个 formal log 全量扫描的 EOF、ConnectionResetError、traceback、segfault、driver、RPC/runtime 和 scheduler-before-terminal marker 均为零。worker 仅有一条已知、非致命的 SAPIEN `Failed to find Vulkan ICD file` warning。
+
+结果为 **17 / 100（17.0%）**；83 条均保留为正常任务失败，未重跑、拼接或按分数筛选。formal 的 copied input audit / manifest SHA-256 分别为 `6b86e8906a180eb1d5ef89fb345543bf20d0ccd7ef77f744355b5cb54e82121f` / `7c211eda03bf7743d63f9657a32c296fb24c93d5cbd683caff0aa7c05de7b02b`，31 份继承 metadata 均逐项复算。运行时三树均 clean 并固定为 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。
+
+matching smoke `c_put_back_no_memory_trainseed0_evalseed0_smoke2_r3` 也从 raw artifact 重验：`100000/100001` accepted terminal、两条 scheduler exit 0、episode0 解码 500 帧、episode1 no-video、日志零基础设施 marker；其既有 review SHA-256 为 `7b47b1980562e9224c4f0cc2cb16e9e3f6d3f18be45dc29f4275ded2477cd1f3`。formal command 保留该 smoke 引用，并保留 input audit/manifest 副本。
+
+正式验收记录为 `/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/c_put_back_no_memory_trainseed0_evalseed0_100ep_r3/final_review.json`，SHA-256 `d1a50ca1c31b861520ba2e12908babcd2dd5370e05998aaa1dde514e5626ce47`；其中保存核心 raw artifact、配置、command、scheduler 和 lineage 的 SHA-256。下一步仅归档该已完成 MAM job，再将 matching smoke 以 cleanup receipt 留痕后删除；formal raw artifact 与 final review 保留。
