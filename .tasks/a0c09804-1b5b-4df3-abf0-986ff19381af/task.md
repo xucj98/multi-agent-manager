@@ -20,3 +20,13 @@ SHA-256 b87e37cbb0214f53f447f23d13c297863fdf14d753869756c895aead699858bf。
 ## 用户最新方向：暂缓生产更新
 
 用户要求优先核实 MAM 是否能直接使用原生 followup 接口或其他直达 subagent 的途径，避免经 Manager 的模型 turn 转交。立即在下一个安全边界暂停生产更新；准备/测试未进入安装则不再 pipx install 或替换生产 daemon。若收到通知时已有 installer/live fixture 在运行，按其所有权范围完成安全清理，报告准确已完成变更，不粗暴中断持久 fixture，不追加安装尝试。先发布实际进度与剩余步骤，保持原worktree和证据供后续续办。
+
+## 用户明确选择降级转 Manager：恢复生产发布并收尾
+
+用户最新原话：“先作降级处理，把信息转到你这里，这个问题先close。”本节取代上一节暂停要求。恢复本任务已验收 3f2738a 的标准安装和生产切换；不再调查或实现原生直达、预挂起 wait、普通 thread 迁移等替代方案，不更改 Codex runtime。
+
+直接复用当前精确 3f2738a 的安装 worktree；main/project 的集成已完成，不重复创建 workspace 或合并。先核对实际现场和 source identity，然后非交互执行标准安装器到成功收尾。上次143退出的普通线程验收没有最终 PASS，不能据此跳过本次安装器必需门禁。保留前次 pause evidence，本次使用新的 transcript/receipt 文件名。不要重跑已经完整验收的 native-v2 fixture。
+
+本次允许替换本项目生产 MAM singleton；既有训练/评测进程、task/job 身份和 Manager binding 必须保持。新 daemon 遇到精确 native-v2 direct-input 拒绝时，应停止盲重试并转 Manager；如无现成 stopped native job，以已保留原生 fixture + 新 daemon 加载身份和真实状态核验，不制造生产假 job 来证明。
+
+标准 installer 若遇到 App Server 重启需求或真实门禁失败，按原边界保留现有服务并报告具体原因；不得自动确认或绕过门禁。安装成功后清理本任务临时文件，仅保留可复核且不含凭据的 evidence 和干净安装树供 Manager 验收。报告前后 PID、加载的包路径/哈希、source、门禁、退出0、生产 healthy 与路由状态，确认安装包无需本 task worktree 持续存在。Manager 独立验收后归档安装与源任务，以“降级处理完成”关闭本问题，不宣称原生直达已恢复。
