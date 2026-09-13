@@ -1,5 +1,20 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## 当前 Manager 执行授权：一次同实例 C0/C1/P 对照（2026-09-14）
+
+现正式授权原 terra/max 执行者在 C3 GPU0 运行已经验收的同实例工具一次，无需再交一轮准备报告等待许可。Manager 已验收修订报告 cc13734159384e2151b799e8c871a6b92a7ff9e9、亲自阅读实际调用/比较/收尾/写盘控制流、复跑11个CPU测试与上次两个反例（包含持续key读取失败）；首infer前key物化0次，异常保留实际3+5账本、8份输出和恢复状态。独立身份报告5a85ad21fa8d171ce781b89867e85fcc468701c3及receipt bf20b8ec6603d3d138d8c180843757e34405cae92ad78a0ff36125a052ff7924通过；Manager另在C3重哈希13个文件、验证三库clean HEAD、按模板PathFinder确认实际导入树，并核对原baseline真实config.policy_command。
+
+本授权覆盖下方历史“仅CPU/尚未授权”的阶段状态，具体设计仍沿已冻结C0/C1/P合同，历史8/8首query诊断不改记账。本次是单独的新有界检查，最多3次普通action+5次joint forecast probe，共8次完整sampler计算；不是追加8个episode或完整轨迹。
+
+1. 使用C3真实部署工具 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/probe_side_effect_check/tools/probe_side_effect_check.py`，SHA `6edd0ba2ce04c6ba70c9efa239cd5f603e9097ad7079f10dce013a660850491c`；不得照抄README中MAM本机TOOL路径。工具/tests/冻结源码均不再修改。运行树仍为 `.../workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914`，三库 OpenPI0ce566bd34f99cb4775422f012ab67c16aa53885 / bridgeffa122494c19e1c0154e877010f7b470967ccfc6 / RMBench6abebf08d084d0be43aa56ebe158dc8395fa58e4，保持clean。
+2. 固定沿plan_20260914_v4/plan.json的request、YAML、checkpoint和三个root，plan SHA4408a8732f3fa259f5224de6dfe7c40add97e40e5a7fc511a076f8f4fb5a9916。保存request SHA8e642b353b0a2bfd6e7569f1f4c52aa9490aad92df4102ffda73ecf47091ac48，只剥离顶层cmd。checkpoint为 `/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s0/20000`。使用冻结OpenPI `.venv/bin/python` 和冻结bridge/openpi-client PYTHONPATH，RB_OPENPI_POLICY_DIR精确指该checkpoint。
+3. 将已记录的原baseline环境值明确用于本次单进程：CUDA_VISIBLE_DEVICES=0、SAPIEN_RENDER_DEVICE=cuda:0、VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json、XLA_PYTHON_CLIENT_MEM_FRACTION=0.40。保存实际完整命令、cwd、解释器和相关CUDA/JAX/XLA/WARP/cache变量（未设置则如实记unset），不新增编译/数值优化/cache override，不清缓存、不重装/重传模型。这里只复制既有环境设置，不启动renderer、policy server或robot。执行前再查GPU0可用；不终止他人进程。
+4. 以全新task-private输出目录直接执行工具--execute，例如部署根下 `run_20260914_c0_c1_p_v1`。launcher/外层stdout-stderr/退出码留在独立父目录，避免提前使工具输出目录非空；旧plan和失败原件保留。加载一次真实backend，C0 reset/action，C1 reset/action；严格控制相等才P reset/5固定输入probe/action。调用前仅保存key引用，真实key数组读取在调用后；工具任何失败/检查不等即停止，不能为pass调整容差、额外warmup/重试/样本/第二模型。没有环境reset、simulation rollout、第二episode、matching smoke或formal授权。
+5. 保存receipt、全部实际已完成输出、source/input/工具/结果hash、预算、首因及恢复/序列化错误；核对是否有cleanup_errors/serialization_errors，不能仅凭exit0认定证据完整。报告C0/C1、每次probe key/序号、P最终普通action/state/raw输出及key的真实结果。如果普通输出不等，只离线从保留数组重算各字段形状/dtype/不同元素数/maxabs/RMSE；不额外推理。历史跨进程输出比较如复用，必须与本次结论分开。
+6. 按实际预计时长判断：预计>30min登记本次真实长进程MAM job并正常结束turn；短检查可直接收尾。结束后确认自有进程退出/释放GPU，不触碰C1正式评测；归档本次job（如有），发布置顶精简结果报告后结束turn，由Manager验收与另行决定scheduler/环境/效果阶段。
+
+本次即使PASS也仅说明这一个固定输入、同一加载实例的probe软件副作用检查通过；不是五帧新观测、完整环境等价、HF有效或正式准入。论文台账46批保持，0新增训练。
+
 ## Manager 工具验收：两处实测缺口，先窄修 CPU（尚未授权 GPU）
 
 Manager 已亲自阅读 report c17983bba05513737c9188efc1dd185947e9e477、完整1000行helper、8个测试、说明和source audit，并核对工具 SHA fa9bf3292a09e39dd1d2421d4276c16b76034deeb22794ed61cd1681b95ae9e1、tests SHA f881cde072d2518413ee21ba1cb8ab0bd8bc816cfa865efc3e8cd29c1489f6aa。独立复跑现有8个CPU测试全部通过，但另外两个使用真实工具和既有FakeBackend的有界CPU反例发现以下必须修复项；不能凭原8项通过运行GPU。
