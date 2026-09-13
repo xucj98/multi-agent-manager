@@ -1,5 +1,17 @@
 # P0诊断记录接口：状态原始输出、动作和RNG的无行为改动采集
 
+## Manager最终裁决与归档准备（2026-09-14）
+
+Manager已独立核对最终报告43170b46a4c4632734aab7d34a2de79db7215eae及J/S原始记录：接受冻结bc7603c5/e147f600/f401f527的有界诊断能力验收。J/S各两条query1均严格recorded，动作Policy→backend float32 H50→execute K30前缀映射精确；S logits/selected/action-condition一致。同一加载实例、相同实际输入和恢复起始key的off/on普通动作/状态及最终RNG在各一次pair严格相等。仅接受这些实际例子所支持的记录和同进程日志不变性，不作所有输入/任务上的行为等价或物理实时等价声明。
+
+跨进程saved replay在J/S均未通过，正确backend cast后动作仍不同。S由完整实际数组重算为446/700元素不同、maxabs0.0034926608204841614、RMSE0.0005220882065109197；其他状态字段和最终key相等。J缺旧direct数组，幅度与短路后未比较的saved字段仍unavailable。S actual_k=null是未观测controller completion，不能拿30行execute request/trace作物理完成。保留原failed状态和独立review原non-pass报告；原因未定位，不据此归因logger、编译器或HF。今后干预实验须带同一加载实例的未干预对照；另行设计与授权。正式计数仍44批，HF正式0。
+
+本次只安排CPU/文件收尾，不开GPU或新机制/正式实验：
+1. 保留验收代码为各主仓库的新持久分支codex/p0-query-diagnostics-accepted（若同名存在先核对，禁止覆盖不同内容），分别指向已验收OpenPI bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6与bridge e147f600dc4329f330a6e2eb0335150b5b3093a3。不更改主工作树HEAD，不混入HF或正在运行的正式评测。该版本作为独立opt-in诊断实现保留；公共集成不属本次归档条件。
+2. 盘点本task workspace内未入git的必要验证工具、差异、部署/失败/最终收据与说明。归档会删登记worktree、task分支和workspace；需要保留者迁存到MAM .tasks/本TASK-ID/artifacts/下新目录，核对内容hash并给简短索引。保留本地/远端原始J/S记录、失败证据和实际ordinary数组，不删C运行树或证据，不复制环境/依赖/模型/cache。优先少量必要文件，避免制造多份整个runtime备份。可对大件给准确远端持久路径/hash及归档不影响说明。
+3. 收尾报告置顶改为以上有界验收结论（保留历史失败经过），给持久分支实际commit、保留索引、工作树clean和归档准备状态。不要自行归档source task；Manager先核对持久化再归档。无需新增review、GPU复验或PDF重编译。
+
+
 ## 当前执行授权：S 两集诊断与同输入/key 配对
 
 Manager 已验收作者准备报告8bdc77b08c10badcd1049561428ff535e1b1eb01，并对独立审查768bf719242695554959b9ac96c5ee48e86cdb0d逐项裁决。准备收据ca94e5fd0b9f0ea5dcf507474c49d6c73462abe097b9d025a897aab18c2f9a96、本机12个引用文件、远端新部署10文件均已重哈希；Manager独立复跑12项CPU/static检查全部通过。冻结新pair仍acabef4d10f45f4e5ade67b85d5d5b79d8a5c9a9550a85c25723354337336272、S入口a2b6147af7118ce5b6a91862fdc37ccbde7a7356ed752f54479bba546488e168。
