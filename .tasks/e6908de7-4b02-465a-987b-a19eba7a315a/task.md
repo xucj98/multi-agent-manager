@@ -1,5 +1,11 @@
 # Memory v1 新 checkpoint 评测准备
 
+## 环境已知误报的具体裁决（不影响既定HF工程执行）
+
+Manager已亲自只读核对C共享部署及稳定installer，确认旧worktree_env_smoke.py以解析后路径含site-packages判来源，与C installer显式--link-mode symlink不兼容。P0 task环境中的nvidia_curobo0.7.8安装在本task venv，geom_cu词法路径在该venv/lib/python3.10/site-packages，真实实体在uv/archive-v0/UYbDTNQF-bGDe1JmV92NN。扩展13,367,808 bytes，SHA256 `874b95cb65d84eeb0a84562482de7551638f7c9974d3323b152142476f8abb01`，与installed RECORD的SHA256以及稳定wheel内同名成员逐字节内容一致。稳定wheel `/mnt/public/xcj/Projects/state-vla/.cache/curobo/wheel/nvidia_curobo-0.7.8-cp310-cp310-linux_x86_64.whl` SHA256 `780a878713cad48043b4537268c860e52393ddeb46709a6377409f9c65f4f988`。原smoke脚本SHA256 `589733e0d89f16880303a6bb02c4573348496e7f53805537def5e1cafaab9b21`。因此这一次路径字符串拒绝是环境检查误报，尚未执行的真实cuRobo CUDA distance仍必须完成，不能把来源核对当成CUDA运算通过。
+
+若你的HF新runtime遇到相同旧路径断言，可使用同样的任务自有验证副本：仅以本runtime真实venv/distribution归属、RECORD与上述稳定wheel/扩展hash核验替换字符串判断，其他实际render/CUDA distance检查原样保留，保存原脚本与diff/hash/新receipt，不修改冻结源码、共享环境或绕过真正计算。先重新核对自己runtime确为相同wheel和扩展内容；不匹配则不得套用该结论。无需等待P0工程结束，也无需因此机械重跑已验收40-reset。此为预先解决具体安装检查不兼容，不要求无此故障时新增无关检查或改运行方案。C2GPU6仍给P0，HF沿C3GPU0和原已发布工程合同。
+
 ## 当前执行：高频源码已准入，启动 C3 有限 GPU 工程验证
 
 Manager 已阅读独立 review `8345c8e2d0ac5698cd0b70a38d44ae8df02aea44`，直接核对实际 config→gate→每集收尾、runtime_errors→run失败链以及正式 f401 祖先，接受代码 PASS。此节解除下文旧“HF 不得部署/不准入GPU”的状态；正式36批仍待本轮工程证据核验。
