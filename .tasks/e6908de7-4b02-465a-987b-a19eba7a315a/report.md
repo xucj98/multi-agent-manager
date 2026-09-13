@@ -1272,3 +1272,25 @@ P-N 正式 leaf `c_put_back_no_memory_trainseed0_evalseed0_100ep_r3` 已于 20:1
 P-S smoke 同样已完成独立验收：连续 `100000/100001` accepted/terminal、两条 scheduler `episode_terminal` / exit 0、episode0 视频解码 330 frames、episode1 no-video、零基础设施 marker，且 smoke/formal 的 manifest、source、GPU2/19420/19422 与解析后的共享 leaf 一致。其 review 为 `records/c_put_back_serial_lag30_trainseed0_evalseed0_smoke2_r3.smoke_review.json`，SHA-256 `a0d9948549c5ecd9d23a3b36a1e81e793146dce51aebf5f19487e24c0d6ecee1`。
 
 P-S 正式 leaf `c_put_back_serial_lag30_trainseed0_evalseed0_100ep_r3` 已于 20:20 CST 在 C1 GPU2 实际启动，outer PID `139655`，日志为 runtime `records/c_put_back_serial_lag30_trainseed0_evalseed0_100ep_r3.outer_20260913.log`，MAM job `a2f4bc51-5791-4e7d-96df-f9f26f6a6313` 已登记为 running。此刻 P-N/P-S 两个 eval0 formal 都在运行；matching smoke 和 audit 输入暂保留，待各自 100 条完整终验、final review 和 MAM archive 后才按实验规范清理。
+
+## 2026-09-13 22:24 CST：HF matched-baseline RNG 作用域 CPU 准备
+
+按发布 revision `a3c123524199886457c8a9ea87aacda258b2ac30`，只更新 C1 私有 highfreq 准备清单，未接入作者当前候选、未创建高频 manifest/结果 leaf、未启动 GPU，也未修改阈值、任务、checkpoint、活跃 P-N/P-S runtime 或其 MAM job。
+
+准备目录为 `/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c-eval-highfreq-base/.local/highfreq_preparation/`。正式矩阵现有 36 条 formal100 / 3600 episode executions / 0 新训练：J matched baseline 6 + J HF-fixed/event 12 为第一层 18；S matched baseline 6 + S HF-fixed 6 为第二层 12；J HF-periodic K10 6 为第三层。12 条 matched baseline 均使用各自 J/S checkpoint、H50/K30、原 task/environment/MemoryContext 行为，无中途 probe、replan 或 cache replacement；它们仅显式采用新的 RNG 协议，不能与历史普通 baseline 成绩跨协议拼接。
+
+所有 36 条 future formal profile 冻结为 `episode_reset_key0_independent_probe_v1`：action 初始为 `jax.random.key(0)` 且每个 accepted episode 边界恢复；probe 使用独立 `jax.random.fold_in(jax.random.key(0), 0x50524F42)` 流并逐 episode 恢复，绝不消费 action stream。matched baseline 保留独立 probe stream 身份但要求 `probe_count=0`。普通 baseline/shadow 保持 `legacy_run_continuous_action_v1`：一个 policy server 在 run 内跨 episode 连续消费 action RNG，普通 reset 仍为 no-op。工程清单现有四条普通 legacy baseline/shadow 与四条 J matched baseline/shadow 对；工程 run 永不充当 formal matching smoke。
+
+未来实际 manifest 的语义绑定要求已写入：`profile_kind`、`rng_scope_id`、action/probe 初始 key 表达式和 episode 生命周期、probe consumption expectation、checkpoint/H50/K30/domain-randomization 合同；matching smoke/formal identity 还必须绑定这些字段、精确 source hash、manifest hash、checkpoint、环境 seed 组和 smoke identity。原 24 条 HF 的 fixed/event/periodic mode 合同逐项保持不变；event threshold、K 与 probe interval 未改。只有精确源码记录该显式接线、独立 code review PASS 和 Manager 部署准入后才能产生实际 manifest。
+
+更新后的 artifact SHA-256：
+
+| artifact | SHA-256 |
+| --- | --- |
+| `checkpoint_inventory_and_frozen_matrix.json` | `20e414eb14c7f752b158949fda2c62b678e6c3eab2bd2a56452f315364700adb` |
+| `baseline_manifest_inputs.json` | `305250a177196a83bc27464b3c9eec1dc2d60a61d27bad4472a608c8aa4d5610` |
+| `frozen_run_matrix.md` | `f5e5dc56d13acea26d339387b790bec167f486fa3931f7041822ed7120684a69` |
+| update receipt | `3c0eaf7f5105c3bd6351b35ba5cd79e6beaf135e5a546a85769e96b83bf39f69` |
+| independent CPU validation | `8afd7013ab166a0e011c2e195839e725a9e38aa0286d8cf52c720b4933012a1f` |
+
+独立 JSON 校验复核 36 个唯一 smoke/formal 名、`100000/200000/300000` 三个完整固定环境 seed 组、所有 formal 的 reset RNG scope、12 条 matched baseline 无 probe/replan、原 24 条 mode 合同、工程 scope 4 legacy + 4 reset，以及没有 `c_hf_*` 结果 leaf。highfreq-base 的 RMBench、bridge、OpenPI tracked 状态仍 clean；HF 作者实现仍未取得 code PASS 或 Manager 部署准入。
