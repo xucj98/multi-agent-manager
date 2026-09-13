@@ -1,17 +1,32 @@
 # P0 选中 query 诊断记录接口：P1/P2 窄修复交付报告
 
-## C2 最小 GPU 验收（停止于首个必需 smoke 失败）
+## C2 最小 GPU 验收（J 首个真实 runner/diagnostic 失败后停止）
 
-**状态：未准入。** 固定的 renderer 生命周期 gate 已通过；紧随其后的 C2 worktree smoke 在真正的模型 rollout 前失败。因此没有启动 J/S 的两 episode 诊断 smoke、没有写 query record，也没有执行 logging off/on 配对。
+**状态：未准入。** renderer 生命周期 gate 与 Manager 授权的替代 worktree smoke 均已通过；随后唯一的 J `full_t_plus_1` 两 episode smoke 在首个选中 query 的 policy RPC 超时处失败。该失败没有产生任务要求的完整 J 记录，因此 S smoke 和任何 logging off/on 配对均未执行。
+
+### 源与环境准入
 
 - C2 固定映射为 `CUDA_VISIBLE_DEVICES=6`、`SAPIEN_RENDER_DEVICE=cuda:0`、`VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json`。GPU0 已有约 16.9 GiB 外部占用，未触碰 GPU0–5、C1 GPU1/2 或 C3 GPU0。
-- 任务隔离部署位于 `/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic`，三树干净：RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、bridge `e147f600dc4329f330a6e2eb0335150b5b3093a3`、OpenPI `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`。
-- C1 的首次 RMBench installer 调用因系统缺少 `/usr/bin/time` 在启动前失败，原始证据保留在 `records/install-RMBench.log`；改用 shell `time` 的同参数 retry 成功，日志为 `records/install-RMBench-retry1.log`。没有修改安装器、依赖或源码。
-- 40-reset gate 在 C2 GPU6 完整通过：`passed=true`、`completed_count=40`、seed `100000..100039` 全部 accepted/ready、`error=null`，且所有 renderer/RPC marker 为零。receipt 为 `records/renderer_gate_gpu6.json`，SHA-256 `f67665446952f080f43e20a8219942d584fe448da55e49f0b66543c0f1d95451`；对应 MAM job `d1d00246-929f-420b-ae5c-d2d287a4b71d` 已在进程退出后归档。
-- 同一环境下的唯一 worktree smoke 命令为 `RMBench/.venv/bin/python RMBench/script/worktree_env_smoke.py`，退出码 1。它已先完成 SAPIEN render，再在 `worktree_env_smoke.py:35` 以 `RuntimeError: cuRobo extension is not from the venv` 停止；`geom_cu.__file__` 的词法路径在 task `.venv` 内，但解析到共享 uv archive `/mnt/public/xcj/cache/uv/archive-v0/.../curobo/...`，其中不含 `site-packages`，触发该 provenance 断言，尚未执行 cuRobo CUDA distance。原始日志 `records/c2-gpu6-worktree-env-smoke.log` 的 SHA-256 为 `cfe2d0e9f68d4407cc1026968509db89cc0403c8639eeea5c1ce2bc26f8702ba`。
-- 按失败即停止约束，未重试该 smoke、未改环境或已 review 源码，也未启动 `rmbench_benchmark.py`、端口 `19460/19462`、结果组 `query_diagnostic_c2_20260914`，或任何 policy/RNG diagnostic pair。失败后无 task-owned child、无上述端口，GPU6 为 4 MiB/0%，三树仍干净。
-- 预生成的 run-level 内容证据仍完整但未被执行：J `full_t_plus_1` 为 60 files / 5,258,412,876 bytes / aggregate `9bac89f2d41a09c5cec138acd0274d5bd0c8a5f21bb5cad0ac825f069defc22f`；S `serial_lag30` 为 63 files / 5,258,483,478 bytes / aggregate `00f414d08fbfdb395a02a824c6137fe93a40f6fd4ae68371477600a0efa1ad2e`。两份 scheduler config 均固定 `episode_ids [0,1]`、`query_ids [1]`、`max_records 2`、`max_array_bytes 67108864`。
-- 总证据 manifest：`/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-query-diagnostic-run-evidence.json`，SHA-256 `f83efd753546825b3df2a09f006b0674cc1994ee6efeabe0908df5c9fe7ab23f`。它链接权重内容、输入 manifests、gate、失败日志、命令、清理状态和未执行边界。
+- 隔离部署位于 `/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic`。运行时三树均干净并固定为 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、bridge `e147f600dc4329f330a6e2eb0335150b5b3093a3`、OpenPI `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`。
+- C1 首次 RMBench installer 因系统缺少 `/usr/bin/time` 在启动前失败；同参数改用 shell `time` 后成功。原始与 retry 日志分别为 `records/install-RMBench.log`、`records/install-RMBench-retry1.log`，没有修改安装器、依赖或源码。
+- 40-reset renderer gate 在 C2 GPU6 完整通过：`passed=true`、`completed_count=40`、seed `100000..100039` 均 accepted/ready、`error=null`，renderer/RPC marker 均为零。receipt `records/renderer_gate_gpu6.json` 的 SHA-256 为 `f67665446952f080f43e20a8219942d584fe448da55e49f0b66543c0f1d95451`；对应 MAM job `d1d00246-929f-420b-ae5c-d2d287a4b71d` 已归档。
+- 原 `worktree_env_smoke.py` 先完成 SAPIEN render，随后把 task venv 内的 cuRobo 软链解析到共享 uv archive，因路径字符串不含 `site-packages` 在 `worktree_env_smoke.py:35` 报 provenance 断言。原日志 `records/c2-gpu6-worktree-env-smoke.log`（SHA-256 `cfe2d0e9f68d4407cc1026968509db89cc0403c8639eeea5c1ce2bc26f8702ba`）仍保留，不能被称为通过。
+- Manager 对该确定的软链误报授权了冻结副本：只把路径字符串断言替换为词法 venv 路径、已安装 distribution/RECORD 和稳定 wheel 内容核验，保留实际 SAPIEN render、cuRobo CUDA distance、同步、finite 和距离阈值。替代 smoke receipt `records/c2-gpu6-worktree-env-smoke-validation-receipt-v2.json` 已 `passed=true`，SHA-256 `7496adfd40ed35ce1a5b32119b9b3fe3a86c1498e9fc7758962c6a8596c08b61`。这只证明该环境准入步骤通过，不证明模型或诊断验收。
+- 随后使用的 task-owned 冻结 launcher、pair 脚本与 tools manifest SHA-256 分别为 `61e3e8ce80bbe0f17fd8d1b56472038189b5be3931bca16b476c2d70b0c1d732`、`cdf577911a203994be50fd423b522e95cd5604f43c94e15b0ea247c18f8bce42`、`36d913b151db2fc624783d856266ae06f6b6493d8b89ee00b14af084d5e5a442`。J 输入 manifest SHA-256 为 `7109aec53ea9f42bb64f4772b1bda3433dc04c889100c694385be5394bff9a41`；预生成但未运行的 S manifest 为 `2cf5b99fb952a2ed244e8f1de77b515b09a19fe70341f33d8ed4e0db2ff738a3`。
+
+### J runner 失败证据
+
+- `query_diagnostic_full_t_plus_1_smoke_20260914` 只接受了 episode 0 / env seed `100000`；episode 1 / `100001` 从未启动。选中 record 为 episode 0、query 1、sequence 1，固定 H50/K30、`max_records=2`、`max_array_bytes=67108864`。
+- 该 scheduler 已连接 robot/policy，policy server 已加载 checkpoint 并监听端口。首个选中 query 等待 policy response 时，`WebSocketClient.call()` 在 30.0 秒后抛出 `TimeoutError: timed out in 30.0s`；scheduler 以 returncode 1 退出，runner 报 `EpisodeFailure: episode 0: scheduler_exited_before_terminal: scheduler exited with returncode 1`。scheduler stdout SHA-256 为 `ecb2dc2e568c88b36915af79a0af5fe4ca19bd26e542035ec6cb36f167175815`，policy stdout 为 `6cfd96082461fb5266e15d929ce0d76f6613d2e8c26866a137436864cb7e2ac5`，runner log 为 `4e23c03d75b58fcf9ad9ac335ec9d1e77ecfdb4b81c9828649fd9d00d556290d`。policy 日志在请求后记录了由 driver 执行 PTX 编译的提示，但该观察不足以归因超时根因。
+- 结果 leaf 为 `/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic/RMBench/eval_result/query_diagnostic_c2_20260914/query_diagnostic_full_t_plus_1_smoke_20260914`。`diagnostics_summary.json` 的 benchmark 为 `failed`，目标 2、实际 episode count 1、failure reason 为 `scheduler_exited_before_terminal`。
+- 记录 JSON `records/diagnostics/full_t_plus_1/records/episode-000000-query-000001-seq-000001.json`（SHA-256 `7ccb86e357790d2ac8d48af35a0d092ebbc54802fdea994f910a3ab8419acaef`）明确为 `status=policy_response_missing`、`policy.status=not_received`，reason 是该 RPC timeout。相关 NPZ SHA-256 为 `74147ab0897a5f6f3177e534b6ba9f3c41ead69d6e52037fbe57e44c6e69e4e0`，只含 policy 前输入证据；没有 policy response、J 原始 memory 坐标、decoded IDs、动作 chunk/execute slice、action-dispatch 映射或可接受的生命周期完成证据。
+- `validate_query_diagnostic` 对这份内部一致的**不完整**记录退出 0，并输出 `status=policy_response_missing`（validation log SHA-256 `71f20184e5c2da55169ac92e2f083e2570da5f6d813e156b1f944ce66cb37d94`）。这不满足 task 所要求的 `recorded` J evidence，不能被解释为诊断验收通过。
+
+### 停止边界、清理与证据链
+
+- J acceptance 未通过，故没有重启 J；没有运行 J 的 logging off/on pair；没有启动 S `serial_lag30` smoke 或其 pairing；没有增加 episode、GPU/内存预算，也没有修改已 review 源码、依赖、共享 cache、checkpoint 或 RPC timeout。J 未收到 policy response，pair 工具也不应在这种不完整输入上运行。
+- 失败后 postflight（SHA-256 `fc2265553acc175007b888a9d887b5c51dcba15df1bcc343485bd3126c02c46f`）以及最终只读复核均显示：task-owned child 为空、端口 `19460/19462` 无监听、GPU6 为 4 MiB/0%，三树 clean。MAM job `9f76c2b1-f66f-4a63-a23c-a7e78b8fd88a` 已归档，注明 30 秒 policy RPC timeout 和清理状态。
+- 新 failure receipt 为 `records/c2-query-diagnostic-full_t_plus_1-failure-receipt.json`，SHA-256 `681a5b4b5dc29069d69d1821190cb52e961be4f7009152b27b148533d8a67ad2`；它链接 runner、result leaf、process logs、record/NPZ、validation、pre/postflight 与 no-retry 边界。更新后的 run-evidence manifest 为 `records/c2-query-diagnostic-run-evidence.json`，SHA-256 `4c7991530ce13cf681151dbe93d556344d5dede4f0f098e1b0e42fd3ad5f8d84`；原 J 启动前版本保存在 `records/c2-query-diagnostic-run-evidence-before-j-smoke.json`，SHA-256 `f83efd753546825b3df2a09f006b0674cc1994ee6efeabe0908df5c9fe7ab23f`。
 
 ## 交付
 
@@ -69,7 +84,7 @@
 
 ## CPU 验证
 
-以下均为 CPU-only 命令；未启动 GPU rollout、训练、正式评测、部署、仿真控制或真机控制。
+以下均为 CPU-only 验证命令；这些命令未启动 GPU rollout、训练、正式评测、部署、仿真控制或真机控制。C2 GPU smoke 的结果见报告开头。
 
 ```bash
 # OpenPI worktree
@@ -131,4 +146,5 @@ incomplete，不带 NPZ。
 
 选中 JSON/NPZ 写入仍在 policy response 后、execute dispatch 前同步进行，可能增加该 query 的
 本地 dispatch 延迟。JAX 设备异步和 controller 内部队列、TOPP、SDK、物理 tick、相机内部状态均未由
-此 CPU 修复验证。C2 renderer gate 已通过，但必需 worktree smoke 在 cuRobo provenance 断言处停止，未获得模型 rollout 或 query/RNG pairing 证据；详情见报告开头。
+此 CPU 修复验证。C2 的 renderer gate 和 Manager 授权的替代 CUDA worktree smoke 已通过，但真实 J runner
+在首个 policy RPC 的 30 秒 deadline 前未收到 response；因此没有完整 J evidence、S evidence 或同输入 RNG 配对，不能据此作模型、记录接口的 GPU 验收或机制结论。
