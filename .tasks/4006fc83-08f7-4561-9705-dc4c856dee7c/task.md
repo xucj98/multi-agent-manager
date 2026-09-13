@@ -1,5 +1,15 @@
 # 高频状态与replan独立审查：先核对实验合同，后验代码准入
 
+## 当前轮次：修复已交付，按新精确版本增量复审
+
+Manager已核对两作者树clean，新的准确交付为：OpenPI `4529a91c1f49a50c8710a7182e31ca5a32dfa05a` → `0ce566bd34f99cb4775422f012ab67c16aa53885`；robot-bridge `53f853aa71b80a7eadd9fb3092abe39c64df1149` → `a0f1d5035d77cea7cb300eb511ceb5cf3fd1a93d`。源报告ebbde890已发布。复用你现有独立review worktree，clean后将review分支快进至候选；不要重建重复树，不混P0 logger实现。
+
+优先验证之前两个已接受P1及新matched协议：普通baseline真实infer/reset默认字段与跨episode action RNG保持旧行为；显式reset_episode_rng配置的baseline保持原SchedulerBase/MemoryContext/K30且不做probe，matched shadow不改cache/动作、独立probe RNG，与matched baseline多episode实际action/key相同。HF始终显式reset与正式合同一致，T拒绝维持，不拿新baseline/shadow互比代替旧默认兼容性。
+
+新增持久化穿过benchmark→run_scheduler→episode writer：核对实际result目录/path引用、进程退出后可解析、raw/decoded/target/current-input/key/action/progress/trigger/clear/terminal/exception证据、frame/plan关联。容量4096事件的truncated+最终incomplete必须真实可见，正式验收不得把它视为完整；不能只凭样例JSON或get_status证明落盘。与作者沟通最小必要样例/解析即可，不建立记录框架。确认普通路径没有额外持久化开销；显式fsync延迟与仿真暂停边界如实说明。
+
+作者报告bridge519+2skip，probe7，wire2+8deselected；这不是独立PASS。围绕增量风险做有意义窄CPU/实际文件路径验证，保留之前已通过合同结论，不机械重跑全库。代码通过只准入有限GPU工程smoke，正式eval还需Manager裁决及自身matching门禁。发现问题即报Manager；完成发布报告并正常结束。
+
 ## 职责与范围
 你以gpt-5.6-terra/max独立核对源工程0acf5d43-91b6-4171-b727-e3fe0f7e7939的已发布算法合同及之后代码，不设计论文主张；Manager亲自裁决。源工程仍在写代码，暂未发布report，因此本任务先创建独立审查准备，不伪造已存在代码review快照。先读AGENTS、mam task show源task最新c2818247及eval task e6908de7最新da1715e8；已有S/J/T baseline为OpenPI a869498、bridge f962，按需独立worktree固定对象。
 
