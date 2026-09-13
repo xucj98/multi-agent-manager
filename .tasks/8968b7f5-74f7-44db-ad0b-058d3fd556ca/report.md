@@ -1,5 +1,18 @@
 # P0 选中 query 诊断记录接口：P1/P2 窄修复交付报告
 
+## C2 最小 GPU 验收（停止于首个必需 smoke 失败）
+
+**状态：未准入。** 固定的 renderer 生命周期 gate 已通过；紧随其后的 C2 worktree smoke 在真正的模型 rollout 前失败。因此没有启动 J/S 的两 episode 诊断 smoke、没有写 query record，也没有执行 logging off/on 配对。
+
+- C2 固定映射为 `CUDA_VISIBLE_DEVICES=6`、`SAPIEN_RENDER_DEVICE=cuda:0`、`VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json`。GPU0 已有约 16.9 GiB 外部占用，未触碰 GPU0–5、C1 GPU1/2 或 C3 GPU0。
+- 任务隔离部署位于 `/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic`，三树干净：RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、bridge `e147f600dc4329f330a6e2eb0335150b5b3093a3`、OpenPI `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`。
+- C1 的首次 RMBench installer 调用因系统缺少 `/usr/bin/time` 在启动前失败，原始证据保留在 `records/install-RMBench.log`；改用 shell `time` 的同参数 retry 成功，日志为 `records/install-RMBench-retry1.log`。没有修改安装器、依赖或源码。
+- 40-reset gate 在 C2 GPU6 完整通过：`passed=true`、`completed_count=40`、seed `100000..100039` 全部 accepted/ready、`error=null`，且所有 renderer/RPC marker 为零。receipt 为 `records/renderer_gate_gpu6.json`，SHA-256 `f67665446952f080f43e20a8219942d584fe448da55e49f0b66543c0f1d95451`；对应 MAM job `d1d00246-929f-420b-ae5c-d2d287a4b71d` 已在进程退出后归档。
+- 同一环境下的唯一 worktree smoke 命令为 `RMBench/.venv/bin/python RMBench/script/worktree_env_smoke.py`，退出码 1。它已先完成 SAPIEN render，再在 `worktree_env_smoke.py:35` 以 `RuntimeError: cuRobo extension is not from the venv` 停止；`geom_cu.__file__` 的词法路径在 task `.venv` 内，但解析到共享 uv archive `/mnt/public/xcj/cache/uv/archive-v0/.../curobo/...`，其中不含 `site-packages`，触发该 provenance 断言，尚未执行 cuRobo CUDA distance。原始日志 `records/c2-gpu6-worktree-env-smoke.log` 的 SHA-256 为 `cfe2d0e9f68d4407cc1026968509db89cc0403c8639eeea5c1ce2bc26f8702ba`。
+- 按失败即停止约束，未重试该 smoke、未改环境或已 review 源码，也未启动 `rmbench_benchmark.py`、端口 `19460/19462`、结果组 `query_diagnostic_c2_20260914`，或任何 policy/RNG diagnostic pair。失败后无 task-owned child、无上述端口，GPU6 为 4 MiB/0%，三树仍干净。
+- 预生成的 run-level 内容证据仍完整但未被执行：J `full_t_plus_1` 为 60 files / 5,258,412,876 bytes / aggregate `9bac89f2d41a09c5cec138acd0274d5bd0c8a5f21bb5cad0ac825f069defc22f`；S `serial_lag30` 为 63 files / 5,258,483,478 bytes / aggregate `00f414d08fbfdb395a02a824c6137fe93a40f6fd4ae68371477600a0efa1ad2e`。两份 scheduler config 均固定 `episode_ids [0,1]`、`query_ids [1]`、`max_records 2`、`max_array_bytes 67108864`。
+- 总证据 manifest：`/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/c2-query-diagnostic-run-evidence.json`，SHA-256 `f83efd753546825b3df2a09f006b0674cc1994ee6efeabe0908df5c9fe7ab23f`。它链接权重内容、输入 manifests、gate、失败日志、命令、清理状态和未执行边界。
+
 ## 交付
 
 - OpenPI worktree：`/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/openpi`
@@ -118,4 +131,4 @@ incomplete，不带 NPZ。
 
 选中 JSON/NPZ 写入仍在 policy response 后、execute dispatch 前同步进行，可能增加该 query 的
 本地 dispatch 延迟。JAX 设备异步和 controller 内部队列、TOPP、SDK、物理 tick、相机内部状态均未由
-此 CPU 修复验证。未进行 GPU smoke；是否准入仍由 Manager 和复审决定。
+此 CPU 修复验证。C2 renderer gate 已通过，但必需 worktree smoke 在 cuRobo provenance 断言处停止，未获得模型 rollout 或 query/RNG pairing 证据；详情见报告开头。
