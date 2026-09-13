@@ -1199,3 +1199,38 @@ J 的两条 matching smoke 都经 `/tmp/e6908_validate_smoke.py` 验证通过：
 P-N/P-S 使用独立、已准入的 YAML runtime：RMBench `f401f5279c95451eb424ac98b831bab5552b2120`（包含 `2e9677c` 与已批准 renderer reuse 修复）、bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。其四份 prepare-audit receipt 均已完成且 checkpoint before/after inventories 一致；P-N 是空 fields/joint-dense，P-S 是 `phase, origin_mat` 的 serial-token query feedback。J 的 frozen runtime 为 RMBench `bf34743334efc98440fa9b05e3f2f05e8303846a`、同一 bridge/OpenPI。所有启动前都核对 formal leaf 不存在、端口空闲及三库 tracked 状态干净；C1 首次启动按约两分钟间隔错开。
 
 P-S 的两个 smoke 也均通过完整门禁：eval1/2 的 episode0 视频分别为 359/325 frames，episode1 均保留 no-video 证据。当前本轮已新增并登记 6 条 formal100；没有未收尾的短 smoke。所有结果位于 `/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/` 的各 run leaf。
+
+## 2026-09-13 19:23 CST：put-back N/S 终验归档与高频评测准备快照
+
+本节只收尾已自然停止的 formal100，并记录高频方案的独立准备状态；没有重跑、拼接或按成绩筛选 episode，也没有修改任何活跃 runtime。
+
+四条 put-back formal 均重新核对原始 `diagnostics_summary.json`、`episode_diagnostics.jsonl`、`seed_preflight.jsonl`、`processes.jsonl`、`video_checks.jsonl`、worker/scheduler 日志和配对 smoke2。每条 summary 均为 `completed`、target 100、error null；100 条固定且连续的 accepted seed、100 个 terminal diagnostics、100 个 scheduler `episode_terminal` / exit 0、100 个 video check `ok=true` 均成立，前五个视频实际可解码。所有自有 child 都有受控退出记录；EOF、ConnectionReset、traceback、segfault、RPC/runtime-error、driver/renderer marker 均为零。每条 formal 的 command manifest SHA 与自身 smoke2 一致，且保留 `checkpoint_metadata/lineage/config_source/input_audit.json` 和 `input_manifest.json`。每份 worker log 各有一条已知、非致命的 SAPIEN Vulkan ICD warning，未作为基础设施失败。
+
+| run | 固定环境 seed | score | matching smoke2 | MAM job | final_review SHA-256 |
+| --- | --- | ---: | --- | --- | --- |
+| `c_put_back_no_memory_trainseed0_evalseed1_100ep_r3` | `200000..200099` | 27 / 100 | `c_put_back_no_memory_trainseed0_evalseed1_smoke2_r3` | `30fda7f6-0d1b-440d-857b-85e203dc9963` archived | `5026bad9709661858c940ae26e587af1adc99b3476a148cd7fe178574bfb2c8a` |
+| `c_put_back_no_memory_trainseed0_evalseed2_100ep_r3` | `300000..300099` | 22 / 100 | `c_put_back_no_memory_trainseed0_evalseed2_smoke2_r3` | `479c266c-7530-404b-9071-2f68344e2190` archived | `78e87aedac0b6e68b57e45cb940385621f05b3fd6b249313730e82c59687109c` |
+| `c_put_back_serial_lag30_trainseed0_evalseed1_100ep_r3` | `200000..200099` | 44 / 100 | `c_put_back_serial_lag30_trainseed0_evalseed1_smoke2_r3` | `81818520-2cfb-4f20-a98a-712c06db482a` archived | `96ca056e69a4fe591aedfdd9ecb9dbf109d449a31fb74d9fec1e1335e4537fbf` |
+| `c_put_back_serial_lag30_trainseed0_evalseed2_100ep_r3` | `300000..300099` | 51 / 100 | `c_put_back_serial_lag30_trainseed0_evalseed2_smoke2_r3` | `cdd254f1-b01f-4cf8-9017-cd7259403ee2` archived | `15d0143d9cd67fb009a095887e7ac7feabbdd85988c0ac5c5004bb4429e8708f` |
+
+上述四条的运行时为 clean、冻结的 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。结果根为 `/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/<run>/final_review.json`；四份 smoke、formal raw artifact 和 final review 均保留，MAM 仅停止跟踪已结束的 PID。
+
+同轮已归档的 J 结果保持不变：`c_rearrange_full_t_plus_1_trainseed0_evalseed1_100ep_r3` 为 87 / 100（`a0276c6b0a19d439208895c941292328bba72698663711c2adc17cb264e3b378`，matching `...evalseed1_smoke2_r3`，job `884096c3-f7ad-48f2-b1a7-843bc0c2cb66`）；`...evalseed2_100ep_r3` 为 90 / 100（`66f6a7991daae578a773209024825fac034e83f43c42f57ea2fc65133e6c143a`，matching `...evalseed2_smoke2_r3`，job `071c8a2e-c00f-46d7-b180-c31c8e91c718`）。两条都是固定 100 条完整结果，原 archive 保持不变。
+
+### 高频状态推理：独立 runtime 与冻结清单
+
+新路径为 `/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c-eval-highfreq-base`；三树均 clean，冻结在 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。它只读复用 checkpoint/assets，未改写活跃 r3 tree、checkpoint 或 `eval_result`。
+
+私有准备产物位于该 runtime 的 `.local/highfreq_preparation/`：
+
+| 文件 | SHA-256 |
+| --- | --- |
+| `checkpoint_inventory_and_frozen_matrix.json` | `1345324299f57a99296ad419afde20c723cd75854e2e92c3403ce7faea4f7113` |
+| `baseline_manifest_inputs.json` | `138d49a3f2289300e71e5fd3d3f5cd6cae178ad1c8b2c759eb1b6a8cb4399610` |
+| `frozen_run_matrix.md` | `5b5bc1369017893a41b3b7df83470276106d885e092e9d102f5ebc3663cc2204` |
+
+清单冻结 24 个 future formal100：J HF-fixed 与 J HF-event 各两任务×三 eval（12），S HF-fixed 两任务×三 eval（6），J HF-periodic K10 两任务×三 eval（6）。每个 arm/eval 仍要求自身严格 matching smoke2；另有 eval0 的 `100000/100001` baseline/shadow 工程配对，单列为工程等价检查，不能充当任何 arm 的 formal gate。实读基线配置的 `random_light=false` 和 `crazy_random_light_rate=0` 已进入准备留痕。
+
+C3 GPU0 的稳定基础 renderer 40-reset gate 仍在运行：MAM `9325bb73-243c-405f-b9af-bf719d7ade20`，PID `1270746`，receipt 目标为 `records/renderer_reset_gate_c3_gpu0_highfreq_base.json`。本次快照中进程仍存活、worker log 继续写入，但 receipt 尚未产生；因此没有将 CPU/import 或进行中的 GPU job 表述为 gate PASS。结束后才会审计 40/40、ready/nonterminal、exit 0、error null 和零基础设施 marker，并据此 archive 或记录失败。
+
+高频源码 task `0acf5d43-91b6-4171-b727-e3fe0f7e7939` 当前公开 revision 为 `7009b32ca379c4d188e631775c638ebeafae2498`，状态仍为 working，报告仍是 draft。本任务尚未收到独立 review PASS 和 Manager 的部署准入；因此没有 cherry-pick/deploy 该实现，也没有启动任何高频 engineering smoke、matching smoke 或 formal。待源码、独立 review 与 Manager 准入三者齐备后，才会在上述独立 runtime 接入指定 commit，并按冻结矩阵执行所需 gate→matching smoke2→formal100。
