@@ -1322,3 +1322,23 @@ MAM job `d40eb04a-0ad4-421b-a74a-7734d6f3c9db` 已于终验后归档，archive n
 matching smoke `c_put_back_serial_lag30_trainseed0_evalseed0_smoke2_r3` 同样从 raw artifact 重验：`100000/100001` accepted terminal、两条 scheduler exit 0、episode0 解码 330 帧、episode1 no-video、零基础设施 marker；其既有 smoke review SHA-256 为 `a0d9948549c5ecd9d23a3b36a1e81e793146dce51aebf5f19487e24c0d6ecee1`。formal command 保留 smoke 引用和 input audit/manifest 副本。
 
 稳定正式路径为 `/mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk_20260910/c_put_back_serial_lag30_trainseed0_evalseed0_100ep_r3/`。其中 `final_review.json` SHA-256 为 `ba49592d1d914c2cf49e997b1b7f09f69f5e66157751316e5353d3d6b29e5a68`，保存所有核心 raw artifact、配置、command、scheduler 和 lineage 哈希。matching smoke 已依实验规范删除；formal leaf 的 `smoke_cleanup_receipt.json` SHA-256 为 `0547d40468bb1f0d200d81ea5c4af99b94c80091dee8ebf3d9e6f983d9ccc7c4`，保留删除前 51 个文件 / 1,849,489 bytes、smoke core hash、验收结论、formal command 引用和 final-review SHA。formal raw artifacts、lineage 和 final review 均保留。
+
+## 2026-09-13 23:24 CST：put-back T train0 的 eval1/2 smoke 通过并启动 formal100
+
+按发布 task revision `966b80919a2636022b8aa343a32aaa627939d1e0`，先只读去重旧 T eval1/2 的 r2 partial leaf（各仅 23 条 preflight/diagnostic/video、48 条 process、没有 `final_review.json`），未复用或拼接。随后在 C1 独立、冻结且 tracked-clean 的 runtime
+`/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c-eval-putback-baselines-yaml` 完成各自 matching smoke2；RMBench 为 `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge 为 `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI 为 `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。checkpoint 固定为 `pi05_rmbench_put_back_block_full_t_plus_30/memory20k_e7e5ac54_put_back_full_t_plus_30_s0/20000`；未训练、未接入 HF、未改动 runtime、checkpoint 或协议。
+
+| matching smoke | 固定环境 seed | manifest / audit SHA-256 | raw-artifact gate |
+| --- | --- | --- | --- |
+| `c_put_back_full_t_plus_30_trainseed0_evalseed1_smoke2_r3` | `200000`, `200001` | `00c2a8af8c8eb455be87104fa66789266c8fbea2f65a7fa2ca4922003130f0c2` / `daa7428d0f4a3962d4bc651fad99f032c1e6ae79baff527c66d46eeccd96d8eb` | `completed`, target 2, error null；两条 accepted terminal、两个 scheduler exit 0；episode0 MP4 经 cv2 解码 325 帧，episode1 no-video。`seed_preflight` / diagnostics / video / processes SHA 分别为 `5691669ae57d33eccd3721fb6ed855f26faef232972440dd9f550e1b2d8c5875` / `cd874c5de8e7d7e15997ac7992a40dce74be1014ccaced3b5d0efeee3175b901` / `bdc82271083a03d45860567258fbdbe9e41ec265151ea65801be79fb98f75a41` / `61a4b546f47a24618f651ce094348b67a1b36f59faf9f52cb81da055de234e57`。 |
+| `c_put_back_full_t_plus_30_trainseed0_evalseed2_smoke2_r3` | `300000`, `300001` | `735f9d1ae5af382e481a7b7289e76a7ed4268d48b7fc1fc9d64e92ad983569ab` / `b69c305f210f7f91501b2b3476341fcefaabee886955a214879aebbb98b87d1e` | `completed`, target 2, error null；两条 accepted terminal、两个 scheduler exit 0；episode0 MP4 经 cv2 解码 328 帧，episode1 no-video。`seed_preflight` / diagnostics / video / processes SHA 分别为 `3a1b5e3bef956e7e01c792037da5d21f212dffc68aced516bdbee8f449c0b664` / `dd836075a08e91aeb3d5b9171888385afb8d9a0676e6cdb2d31fdb15b29f615c` / `f6d62bccf423028f9ae5de64d8ffa5e7bfd8a8ea03846e33fe4a21399af0353b` / `d92bad3702f9881a40cf63e444a9f656e51bf44d035ab96e88479e2d484fa314`。 |
+
+两个 smoke 均逐树扫描 EOF、ConnectionReset、BrokenPipe、traceback、segfault、driver、RPC/runtime 与 scheduler-before-terminal marker，结果为零；worker 各有一条既有健康 run 同样存在的 SAPIEN `Failed to find Vulkan ICD file` warning，未视为基础设施失败。正式命令的 metadata 合同仍为 `put_back_block_full_t_plus_30`、joint-dense `phase, origin_mat`、H50/K30、`last_executed` feedback、`demo_clean_state` 来源、policy RNG key 0 和 `demo_clean_eval` 环境。
+
+| formal run | C1 GPU / ports | 固定环境 seed | outer PID | MAM job | 启动后核验 |
+| --- | --- | --- | ---: | --- | --- |
+| `c_put_back_full_t_plus_30_trainseed0_evalseed1_100ep_r3` | GPU1 / 19410, 19412 | `200000..200099` | 428749 | `da058195-ff39-49ed-8e83-be5e1a8aaa7e` | job status `running`；两个服务已监听并已有正常 episode0 raw artifact。 |
+| `c_put_back_full_t_plus_30_trainseed0_evalseed2_100ep_r3` | GPU2 / 19420, 19422 | `300000..300099` | 431409 | `3191f8c6-4c53-48a3-9ab7-8b44216ab2c0` | job status `running`；正式启动器、独立结果 leaf 与 matching smoke 引用均已建立。 |
+
+两条 formal 均从不存在的新 r3 leaf 以 `--smoke-run` 启动，没有覆盖 partial 或有效结果；两条 MAM job 均记录真实 remote PID/boot identity。本轮至此不等待 formal 完成；后续由 MAM 唤醒后再按完整 100 条 raw-artifact 合同验收、归档，并在正式验收后清理 matching smoke。
+
