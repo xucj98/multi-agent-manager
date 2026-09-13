@@ -1,134 +1,107 @@
-# 高频状态 / replan：真实 recorder 与 child 身份增量复审
+# 高频状态 / replan：rolling evidence gate 修复增量复审
 
-本报告替代上一版冻结报告
-`7d15393804ae60555385cb0b6b5c8ac86deabbab`，按已发布 review 要求
-`9705c9fe2301694be733169a14501ca7498c0cf3`，增量复审源交付报告
-`aac1cbd563f7a7aaf83fc0b161ee3dc4463f2959`。审查仅使用下列干净、
-精确提交；未读取或采用作者工作区的后续未提交修改。
+本报告替代未准入记录 `27b16d899cf0220986a7531ad04989b227270f61`，按已发布
+review 要求 `841214e101f297b2b4d01ea5c12d3c3f4f251c68`，复审源交付报告
+`2d3e0f7ba2fa61b9db83aa4550410e370af1a4b9`。审查只使用以下干净、精确
+提交；未读取或采用作者工作区的后续未提交修改。
 
-| 仓库 | 正式基线 | 审查候选 | 状态 |
+| 仓库 | 本轮基线 | 审查候选 | 状态 |
 | --- | --- | --- | --- |
 | OpenPI（本轮未改） | — | `0ce566bd34f99cb4775422f012ab67c16aa53885` | review worktree clean |
-| robot-bridge | `a0f1d5035d77cea7cb300eb511ceb5cf3fd1a93d` | `552ea78f73e62fddc747d5d26e7e6c365fa00339` | review worktree clean |
-| RMBench | `f401f5279c95451eb424ac98b831bab5552b2120` | `c99ec6a2c6df96ec8705b106b125935fce862052` | review worktree clean；已确认候选包含 f401 |
+| robot-bridge | `552ea78f73e62fddc747d5d26e7e6c365fa00339` | `ffa122494c19e1c0154e877010f7b470967ccfc6` | review worktree clean |
+| RMBench | `c99ec6a2c6df96ec8705b106b125935fce862052` | `6abebf08d084d0be43aa56ebe158dc8395fa58e4` | review worktree clean；候选保留正式 `f401f5279c95451eb424ac98b831bab5552b2120` 祖先 |
 
-两个增量 diff 的 `git diff --check` 均通过。OpenPI 保持上一轮已审候选，
-本轮没有重跑无关全库测试。
+两个增量 diff 的 `git diff --check` 均通过。
 
-## 结论：仍不准入有限 GPU 工程 smoke 或正式评测
+## 结论：通过本项代码准入，可进入有限 GPU 工程 smoke
 
-上一版 P1 的真实 recorder 接口和 child 身份遗漏已经修复，且身份没有进入
-环境 reset 参数，故不引入第二次环境 reset。不过，本候选仍有两个 P1：异常
-child 可以留下指向不存在文件的 episode 引用；formal smoke gate 完全不验证
-rolling evidence 的存在、身份或完整收尾。后者可让不完整 evidence 进入正式
-统计的前置 smoke，因此不能准入。
+上一版的 P1（formal smoke 未验证 evidence）已修复。显式 rolling/matched 配置现在
+从已解析的 scheduler YAML 决定 evidence 是否必需；matching smoke 和 formal episode
+收尾都使用 RMBench 的同一检查。缺失、坏 JSONL、身份不符、无 `episode_finished`、
+`truncated` 或 `evidence_complete: false` 均不能被记为完整 evidence，也不能通过
+matching smoke。
 
-## 已确认修复的路径
+早期 child 未创建文件的上一版 P2 也已按 Manager 裁决收束：episode 保存明确的
+`missing`/`unavailable` 状态而非悬空普通路径，且原有 scheduler/runtime 失败原因和
+消息保持第一原因。已创建的部分文件保留路径，并标为 `incomplete` 或 `invalid`。
 
-- RMBench `RMBenchResultRecorder.path_for("rolling_evidence")` 现在分配
-  `rolling_evidence/episodeN.jsonl`，并通过 `record_episode()` 把
-  `rolling_evidence_path` 保存在 `episode_diagnostics.jsonl`
-  （`script/eval_diagnostics.py:72-108, 536-576`）。
-- bridge 生成的 child 命令包含
-  `--rolling-evidence-episode-id {episode_id}` 和
-  `--rolling-evidence-seed {seed}`（`robot_bridge/benchmark/runner.py:615-643`）。
-  `scripts/run_scheduler.py:78-93` 将它们传为专用审计身份；
-  `OpenPiSimulationScheduler` 将身份与 `_reset_args` 分离，并用于 writer header
-  （`robot_bridge/scheduler/openpi_simulation.py:167-204, 550-593`）。
-- 正式 f401 scheduler 配置只包含 `move_steps: 30`、`debug_iterations: 0` 和
-  `policy_first_infer_timeout: 90.0`，没有额外 reset 参数。结合上述接线，已核对
-  benchmark 的已接受 reset 只发生一次，child 不会为获得审计身份而再次 reset。
-- 默认 baseline 不申请 evidence 路径，正常路径不创建 `rolling_evidence` 目录或
-  episode 引用。上一轮通过的默认 action-RNG 生命周期、matched/HF 显式 reset
-  分界及 rolling 算法合同在本次窄改中未见回归。
+因此，针对本轮 evidence gate 的代码已满足有限 GPU 工程 smoke 准入。此结论不表示
+GPU smoke 或正式评测已经执行或成功；正式 100-episode 评测仍须先通过每个 arm/环境
+seed 自身的 matching smoke，并由 Manager/评测 owner 按冻结合同启动。
 
-`RollingEvidenceWriter` 自身对已打开的文件会写 header、逐事件 flush/fsync、
-容量溢出 `truncated`，以及最终 `episode_finished` 和 `evidence_complete`
-（`robot_bridge/scheduler/rolling_evidence.py:45-136`）。这只是 writer 局部行为；
-以下两个 P1 说明它尚未成为可靠的正式结果准入链。
+## 共享检查链路
 
-## P1-A：early child failure 会持久化悬空 evidence 引用
+- bridge 只在解析后的 `openpi_simulation` 配置为非 `baseline` rolling，或
+  `reset_episode_rng: true` 的 matched baseline 时设置 evidence required
+  （`robot_bridge/benchmark/runner.py:102-110, 665-693`）。CLI 本身要求
+  `--scheduler-config`，所以没有由手写 child command 绕开这项配置事实的正式入口。
+  普通 baseline 保持 `required=false`。
+- formal gate 将该已解析事实传给 `validate_smoke_run()`，而不是从 episode record
+  是否恰好存在一个路径倒推（bridge `runner.py:354-378`）。随后
+  `assert_smoke_compatible()` 比较保存的与当前的 `launch`/scheduler config，阻止把
+  不同协议的 smoke 复用于 formal（`:795-825`）。
+- RMBench 的 `check_rolling_evidence()` 逐行校验 schema v1 JSONL、header record、
+  header `episode_id`/`seed`、无 `truncated`、最后的 `episode_finished` 与
+  `evidence_complete is True`（`script/eval_diagnostics.py:675-759`）。
+  `validate_smoke_run()` 对每个 matching-smoke episode 复用它并拒绝任一非
+  `complete` 状态（`:762-831`）。
+- bridge `_record()` 在每个显式协议 episode 收尾也调用同一 RMBench checker
+  （`runner.py:404-472`）。完整 evidence 才写普通 `rolling_evidence_path`；缺失或
+  unavailable 只写状态，部分/无效文件保留路径和状态。evidence 问题本身会使正常
+  child 的 episode 成为失败；已有 child/runtime error 则不改写其 `reason`/`error`
+  （`:441-457`）。RMBench `_DiagnosticTask` 优先使用 payload 的原始 reason
+  （`script/eval_diagnostics.py:375-406`）。
 
-`BenchmarkRunner._accepted_episode()` 在启动 child 前预分配 evidence path
-（`runner.py:496-504`），但无论 child 后续如何失败，两个异常分支都会无条件把
-同一路径写进 episode payload（`:521-542`）。`_record()` 也没有检查文件是否存在
-（`:400-422`）。真实 RMBench recorder 会忠实保存该字符串，因此失败结果会声称
-拥有一个实际不存在的 artifact。
+这条路径保持上一轮已通过的真实 recorder path/reference、child header identity 与
+单次 benchmark reset：审计 identity 仍独立于 `_reset_args`；默认 baseline 不请求
+artifact，不新增 writer I/O。此前已审的 RNG、matched/HF、队列和算法合同不在本窄改中
+发生变化。
 
-用当前 bridge runner、当前 RMBench recorder 和真实 `_accepted_episode()` 控制路径
-做 CPU 复现：scheduler child 直接 `SystemExit(1)`，不创建 artifact。结果为：
+## 实际边界验证
 
-```text
-runner_exception=EpisodeFailure: episode 0: terminal_scheduler_error: scheduler exit=1
-recorded_path_exists=False
-failure_reason=terminal_scheduler_error
-```
+以真实 RMBench recorder 和 bridge child seam 复核了以下状态：
 
-作者的真实-recorder seam 没有覆盖此边界：它的失败 child 在退出前手工写入一行
-header（`tests/benchmark/test_runner.py:346-409`），所以断言的文件必然存在。
+- 完整 child：每个文件的 header identity 与 accepted episode 相同，最终记录完整，
+  episode 结果包含有效 path。
+- writer 已打开后异常：部分 artifact 保留，并被记为不完整；run 作为基础设施失败。
+- writer 创建前异常：没有普通 `rolling_evidence_path`，记录为 `missing`，原始
+  `terminal_scheduler_error` 和 `scheduler exit=1` 保持在 runtime diagnostics。
+- child 正常退出但只留下 header：formal episode 收尾用同一 checker 将其记为
+  `rolling_evidence_incomplete`，并以 `accepted_infrastructure_failure` 拒绝。
+- matching smoke：缺引用、缺文件、坏 JSONL、identity 不符、无终态、truncated 和
+  `evidence_complete=false` 均被拒绝；普通 default smoke 无需 evidence。
 
-这不是只会由刻意构造的 child 触发。真实 `OpenPiSimulationScheduler` 直到
-`init_state()` 的末尾才调用 `_ensure_rolling_evidence()`
-（`openpi_simulation.py:236-313`）；父类在此之前已经建立 clients、读取 policy metadata
-并进入 `init_state()`（`scheduler/base.py:131-147`）。metadata 缺失或不合法、初始化或
-连接相关的早期异常都可能发生在 writer 打开前。当前外层 `try` 只包住其后的
-`_reset_simulation_if_configured()`（`openpi_simulation.py:216-231`），不能覆盖这些路径。
+另以实际 `RollingEvidenceWriter` 写出一份完整和一份容量截断 JSONL，再交给 RMBench
+checker：完整文件得到 `complete`；截断文件得到
+`incomplete (truncated)`。这确认 validator 与真实 writer schema 对齐，而非只接受手写
+fixture。
 
-失败 artifact 因此不能被离线审计，也不能让消费者区分“文件尚未创建”与“完整
-证据可用”。这是本轮要求的异常 child artifact seam 的 P1。
+## 独立 CPU 验证
 
-## P1-B：formal smoke gate 不检查 evidence，能接受缺失或不完整证据
-
-bridge 的 formal gate 直接委托 RMBench `validate_smoke_run()`
-（`robot_bridge/benchmark/runner.py:354-374`）。该函数只检查标准 smoke 文件、两条
-普通 episode 记录、视频/进程记录、summary 和 bridge hash
-（`script/eval_diagnostics.py:647-706`）。它没有：
-
-- 根据 rolling/matched 配置要求每个 accepted episode 都有 evidence 引用；
-- 检查该文件存在于结果目录、逐行 JSONL 可解析，或 header 的 `episode_id`/`seed`
-  与 episode record 一致；
-- 要求末行是 `episode_finished`，或要求 `evidence_complete: true`；
-- 因 `truncated` 或其它 incomplete evidence 拒绝 smoke。
-
-两项独立 CPU 构造均被当前 validator 接受：第一项让两条 episode record 指向
-不存在的 evidence 文件，得到 `validator_accepted=True`，而所有引用均不存在；第二项
-让两个文件都有最终 `episode_finished`，但 `evidence_complete: false`，仍得到
-`validator_accepted_incomplete_evidence=True`。后一种情况与 writer 的容量溢出语义
-直接相符，因而违反“truncated/incomplete 不得作为完整证据进入正式统计”的冻结合同。
-
-这与 P1-A 的失败结果问题不同：即使 smoke 的两个 episode 被记录为正常完成，当前
-formal gate 仍会把缺失、损坏或明确不完整的 rolling evidence 当作有效 smoke 的一部分。
-
-## 再次准入前的最小验收
-
-1. 对所有显式 rolling 或 matched smoke episode，失败 child 在 writer 创建前不能留下
-   可用性假象。实现可以产生有 header、异常和最终 incomplete 标记的可解析 artifact，
-   或持久化明确的 `missing`/不可用状态；无论采用哪种表示，不能保存一个未验证的普通
-   evidence 路径。
-2. 扩展 `validate_smoke_run()`：对于要求 evidence 的协议，逐 episode 验证文件存在、
-   JSONL 可解析、header 身份匹配 episode record、最后一行 `episode_finished`，且
-   `evidence_complete` 为 `true`。缺失、truncated、无最终收尾或身份不一致必须拒绝；
-   默认 baseline 继续不要求 evidence。
-3. 用真实 RMBench recorder 和实际 scheduler child 覆盖：正常完整 artifact、writer 已打开
-   后的异常、writer 创建前的初始化失败，以及默认关闭。formal gate 测试必须分别拒绝
-   缺失引用、损坏 JSONL、身份不符、无最终记录和 `evidence_complete: false`。
-
-完成上述窄修并提供新的干净精确提交后，再做增量复审；在此之前不得启动 GPU smoke、
-正式仿真、训练或部署。
-
-## 独立验证
-
-未使用 GPU，未启动训练、正式评测、部署或需登记的长进程。
+未使用 GPU，未启动训练、真实 smoke/formal 评测、部署或需登记的长进程。
 
 ```text
-robot-bridge focused CPU seam/tests
-  7 passed in 0.46s
-  覆盖真实 recorder 正常/已写 header 的异常、命令身份、CLI 转发、
-  terminal、容量 truncation、default 无文件、缺身份拒绝。
+robot-bridge
+  PYTHONPATH=<OpenPI client> .venv/bin/pytest -q tests/benchmark/test_runner.py
+  15 passed in 0.74s
 
-RMBench recorder tests
-  4 passed in 9.04s
+  PYTHONPATH=<OpenPI client> .venv/bin/pytest -q tests/benchmark/test_stage3.py
+  11 passed in 0.85s
+
+RMBench
+  .venv/bin/python -m unittest discover -s tests -p 'test_eval_diagnostics.py' -v
+  5 passed in 9.70s
+
+跨库实际 writer/checker CPU seam
+  complete=complete; truncated=incomplete (reason=truncated)
 ```
 
-RMBench 测试有既有 SAPIEN/Vulkan 和资源文件警告，没有测试失败。这些通过结果证实
-已修复的接口接线和 writer 局部行为；它们不覆盖上述两个 P1，也不构成 GPU smoke 准入。
+RMBench 测试仍有既有 SAPIEN/Vulkan 与资源文件警告，但无测试失败。未机械重跑无关
+全库；作者报告的 524 passed/2 skipped 不作为本独立结论。
+
+## 限制与后续
+
+本报告只解除本轮 recorder/evidence gate 的代码阻塞。尚未在 GPU 上验证真实 SAPIEN
+服务、policy server 或实际 36 批评测协议，也不把 CPU seam 当作成功率结果。若后续变更
+scheduler 配置解析、writer schema、result recorder 或 runner 收尾，应重新复核这条
+共享 gate。
