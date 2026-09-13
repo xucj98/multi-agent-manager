@@ -1,15 +1,17 @@
-## 当前状态：put-back J/T train1 · eval1 已终验；eval2 待启动（2026-09-14 CST）
+## 当前状态：put-back J/T train1 · eval2 formal100 运行中（2026-09-14 CST）
 
-已完成授权队列的首对缺失原协议结果，无新增训练、转换、传输、源码或依赖变更。冻结且 clean 的 C1 runtime 为 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`；两项均保持 H50/K30、首个 infer 90 秒、后续 infer 30 秒，以及原始 RNG 生命周期。
+授权队列按固定顺序继续执行，新增训练、转换、传输、源码、依赖、checkpoint 或共享 cache 变更均为 0。运行树保持 clean 且固定为 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`；H50/K30、原始 RNG 生命周期、首个 infer 90 秒、后续 infer 30 秒不变。
 
-| arm / formal100 | 固定环境 seed | 结果 | final review SHA-256 | MAM / smoke cleanup |
-| --- | --- | ---: | --- | --- |
-| J `full_t_plus_1` · `c_put_back_full_t_plus_1_trainseed1_evalseed1_100ep_r3` | `200000..200099` | **47/100**；`button_not_pressed_after_center=35`，`button_press_insufficient=18` | `f02b472b80d9009bca1d26df66a77c343ea4e48d8c39a1b68c70e607f6d13cc3` | job `bf7a953a-e35a-4ca3-a8cc-ccd9cf4f3cd0` archived；receipt `27554f8d38e3f5e72d25aef6e34bc2b45b044ba4f9691a6e5ffb8c45530cc33b`；matching smoke leaf 已删除 |
-| T `full_t_plus_30` · `c_put_back_full_t_plus_30_trainseed1_evalseed1_100ep_r3` | `200000..200099` | **46/100**；`button_not_pressed_after_center=40`，`button_press_insufficient=14` | `94f4e4297d3b63b69b09a4296a1ef0684b3bb138c57d9b250767e305e6ca752b` | job `d805fb5c-f1ff-41ae-8b6d-59a3aa481e07` archived；receipt `4f95d22649baa237eff7042c3e4233d92ad929d04971b8e3ec0e852dca8a5331`；matching smoke leaf 已删除 |
+J/T train1/eval1 已完整终验并归档：J `47/100`，final review `f02b472b80d9009bca1d26df66a77c343ea4e48d8c39a1b68c70e607f6d13cc3`；T `46/100`，final review `94f4e4297d3b63b69b09a4296a1ef0684b3bb138c57d9b250767e305e6ca752b`。两份 cleanup receipt 已保存，且只删除了各自 matching smoke leaf；J 的历史 23 集 `r2` partial 保留。
 
-两个 matching video/no-video smoke2 均独立通过其完整产物合同（J 2/2、T 1/2）；formal 均已核验 100 条连续 accepted preflight、100 条 terminal diagnostics、100 个 episode JSON、视频策略、scheduler exit 0、完整自有子进程退出、端口/outer PID 释放、source/checkpoint/manifest/hash 合同和零基础设施 marker。`final_review.json`、cleanup receipt、任务本地 smoke review、formal 日志及 J 的历史 23 集 `r2` partial 均保留。任务本地终验器为 `c-eval-putback-baselines-yaml/records/finalize_jt_train1_evalseed1_20260914.py`，SHA-256 `b447514f0d834c6198d178e166b2b16bc3d751eb4bfc77a7da11d296fa06098f`。
+eval2 已先完成全结果去重（无目标 leaf）、两项独立 checkpoint audit 与 smoke/formal dry-run；审计确认 train seed 1、eval seed 2、环境 seed `300000..300099`、fresh policy key 0、H50/K30、端口和命令合同。对应 task-local 准备 receipt 为 `putback_JT_trainseed1_evalseed2_prepare_20260914.json`（SHA-256 `d3a0814252237438ff549d6cc88549fd8668ee083c46c999a89408506c518589`），其 dedup record SHA-256 为 `83c1db689fc4bb4741b0b790adf1aab1f6b9757789427894c28562bfb7fb83a3`。
 
-当前无未归档 job。下一项为同一固定运行树上的 train1/eval2：先分别运行 J/T 的 matching video/no-video smoke2，再以全新 leaf 正式运行 `300000..300099`；J 使用 C1 GPU1 / `19410,19412`，T 使用 C1 GPU2 / `19420,19422`。随后按已发布顺序继续 train2/eval1、train2/eval2。
+| arm / matching smoke2 | smoke 结果与 review | formal100 / 资源 | MAM job（登记时状态） |
+| --- | --- | --- | --- |
+| J `full_t_plus_1` · `c_put_back_full_t_plus_1_trainseed1_evalseed2_smoke2_r3` | 2/2；video/no-video、terminal、seed、process、port、source/hash 通过；`8986b295afecf7876db37a3d2d0a779f1bb5715882ffc49078b84846a3a77253` | `c_put_back_full_t_plus_1_trainseed1_evalseed2_100ep_r3`；C1 GPU1，`19410/19412`，outer PID `1013453` | `0f7daad0-ba87-41dc-8efd-57431d03a289`（running） |
+| T `full_t_plus_30` · `c_put_back_full_t_plus_30_trainseed1_evalseed2_smoke2_r3` | 1/2；video/no-video、terminal、seed、process、port、source/hash 通过；`1a840abb5b32016ee01ba58d470d3121430171259c98375c473dd2e9297f3c8c` | `c_put_back_full_t_plus_30_trainseed1_evalseed2_100ep_r3`；C1 GPU2，`19420/19422`，outer PID `1013518` | `8883cf5e-9fd9-4255-b120-eac472a20c40`（running） |
+
+smoke 终验器 `validate_jt_train1_evalseed2_smoke_20260914.py`（SHA-256 `c6541ae9aa4db38e1acf564df96ba031e172db510921aa1f877e90d012c14555`）和 formal 收尾器 `finalize_jt_train1_evalseed2_20260914.py`（SHA-256 `b9997331123125d28fda03fecc1d313a9a8f55b29f6767a2ee698791d95591f5`）均已编译。formal 停止后将按完整100合同写 `final_review.json`、归档 job、写 cleanup receipt，再只删除对应 smoke leaf；基础设施首因则保留证据并停止该项。当前由 MAM 监测，两条正式任务不在本轮主动轮询。
 
 ---
 
