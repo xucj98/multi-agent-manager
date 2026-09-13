@@ -19,3 +19,6 @@ Manager直接核对已转换key_state_config：cover phase有6类，red/green/bl
 
 ## 用户最新纠正：wuwen-1缓存入口（2026-09-13）
 用户明确要求且授权删除wuwen-1的`/root/.cache`，参考本机，将`/root/.cache`建立软链接指向`/mnt/public/xcj/cache`。必须执行该操作，不传输数据集，不在训练命令设置`HF_LEROBOT_HOME=/mnt/public/xcj/cache/huggingface/lerobot`。先只读核对本机/root/.cache软链和目标，以及wuwen-1共享目标可访问，然后仅删除wuwen-1的/root/.cache路径本身（若为软链只unlink，禁止尾随/或递归到共享target），建立指向/mnt/public/xcj/cache的软链。该删除已经用户显式授权，无需再次确认。随后unset HF_LEROBOT_HOME，核对默认cache解析正确且三套数据可见，修改尚未启动的smoke/正式命令去掉此override；如Python依赖缓存环境需使用正常默认，不另造替代环境变量规避用户要求。报告软链readlink/stat/数据可见性证据以及是否已开任何GPU程序，继续优先N gate/正式训练。之前rsync为0bytes失败已归档，不再尝试。
+
+## Manager N代码准入与缓存复核（2026-09-13 10:10 CST）
+Manager已审核867aa05e428d6ce259fba99f55def3b5b4fce951完整N diff并通过diff-check；直接逐集核对三套共150episode sidecar与原Parquet action[:14]逐值完全一致、M+1尾重复、finite及total_frames=29920/32626/50904，N代码准入。补默认缓存/norm/真实batch证据后可直接每新路径50step save/restore gate；各项通过后逐项正式20k，不用再次等待代码审批。正式step100/GPU/日志/MAMjob receipt必须回报。N冻结执行tree保持不动，J/S在开发tree继续。Manager已独立SSH核对用户要求的/root/.cache软链及三套默认路径metadata可见；全部后续命令去除HF_LEROBOT_HOME override。
