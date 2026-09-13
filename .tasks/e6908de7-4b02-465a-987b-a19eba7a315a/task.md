@@ -254,3 +254,12 @@ Manager已直接SSH读取f401f5279c95451eb424ac98b831bab5552b2120的完整17行d
 Manager随后发布精确arms/触发阈值/试验计数。代码未验收前可做CPU/dry-run/资源及checkpoint准备，不能将新模式当已上线。源实现+独立review通过、Manager准入后，每模式匹配必要smoke2（video/no-video），通过即可按冻结清单正式3 eval seed×100，无需逐批重复问许可。首先跑小规模预先固定seed的诊断/吞吐gate，不按成功率挑阈值；任何性能pilot单列且不拼正式结果。把推理probe数、action replan数、K分布、事件/偏差触发、实际执行/丢弃行、wall/sim时间、峰值显存及失败类别加入原始记录验收。任务继续承担所有长job登记、完成收尾与结果报告。
 
 在新模式准入前不为此空置全部4090；原有已授权eval可接续，但至少明确下一张可用于新smoke的卡和预计释放时间，避免全部排满数日。预计>30分钟的传输/正式程序都登记MAM。本轮不创建新通用调度框架、不自行改算法合同。
+
+## 新推理首轮评测清单（Manager冻结）
+科学/实现合同以0acf5d43最新版为准。0新增训练；现有rearrange_blocks与put_back_block各train0 J/S，同H50，原始模型/数据/seed列表不变。第一层J HF-fixed(K30,probe5)与HF-event(Kmax30,probe5,phase window3同时间rows中>=2不一致，连续2次,minprefix10)两臂×2任务×3eval=12个新正式100集批次。原J baseline K30复用已验收结果；新runtime关闭/影子模式必须先验证等价，否则补新baseline且明确原因，不默默换比较来源。
+
+第二层S HF-fixed K30/probe5×2任务×3eval=6新批；原S baseline复用完整300。第三层J HF-periodic K10/probe5×2任务×3eval=6新批，作为频繁replan对照，后于核心12批与S路径准入；它不声称与event平均调用数严格匹配。总24新批=2400正式执行，existing baseline去重，不增加training seed。T endpoint输出本轮不进入frame-deviation/HF，保留原协议评测。
+
+新功能每种路径先匹配smoke2含video/no-video；另做J baseline/shadow的同checkpoint/seed/action RNG成对工程核验，确认额外观测不会改变任务cue、动作流、仿真随机性或终态；保存实际command序列/进度证据而非只比成功率。工程seed固定900000/900001，不进入正式seed100000/200000/300000各100清单。依据smoke仅判接口/基础设施/执行合同/吞吐，不根据分数调阈值或换任务。r_s1仅可做短吞吐probe，不自动扩展到正式全网格。
+
+代码review及Manager准入后按第一层优先从可用卡并发开跑，每批真实job登记；为保证响应，不需要收齐全部24批才发布进展。完成100集按原terminal/seeds/exit/video/metadata/rawhash合同验收，负结果保留；出错只修基础设施并独立运行完整新批。扩展cover/swap等留在后续，不能把本轮2任务说成九任务验证。
