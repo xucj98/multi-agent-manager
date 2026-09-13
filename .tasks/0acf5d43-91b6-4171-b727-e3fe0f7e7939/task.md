@@ -1,5 +1,15 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## 当前修复：Manager 对复审 27b16d899 的裁决
+
+Manager 已直接读取冻结 bridge552ea 的 _formal_gate/_accepted_episode/_record、writer，以及 RMBenchc99 的 validate_smoke_run，确认下列遗漏。上一轮真实 recorder 接线、child identity 和单次 reset 已通过，不重做算法/RNG改动。候选基线仍 OpenPI0ce566bd34f99cb4775422f012ab67c16aa53885（保持不变）、bridge552ea78f73e62fddc747d5d26e7e6c365fa00339、RMBenchc99ec6a2c6df96ec8705b106b125935fce862052（保留 f401 祖先）。复用已有独立树。
+
+1. 接受 formal smoke gate 缺证据校验为 P1：既有 validator 根本未消费 rolling evidence，缺文件或 evidence_complete=false 仍能被当作 matching smoke。请在现有 recorder/validator 中加入可复用的窄验证，runner 根据实际显式 rolling/matched 协议传递“需要 evidence”，不能以 record 是否恰好带 path 决定是否需要，否则缺整个字段仍绕过。逐 episode 校验引用、实际文件/可解析 JSONL、支持的 schema、header episode_id/seed、最终 episode_finished/evidence_complete 严格 true；存在 truncated、缺终态、身份错或不可解析均拒绝。默认 baseline 仍不要求 evidence，既有标准 source/manifest/video/process门禁不弱化。
+2. 初始化失败的悬空引用接受为 P2 可用性问题：已有 terminal_scheduler_error/runtime_error 会判 run 失败，故此项本身并不证明失败被计成成功，但文件状态仍不诚实。采用最小明确 unavailable/missing/incomplete 状态即可，不要求为未执行推理伪造事件/重开 writer。未创建文件不能写成普通可用引用；已写部分文件保留并明确 incomplete/原始错误，原 failure reason 和 traceback 留存。不要覆盖已存在 artifact。
+3. 不仅 smoke，正式100各 episode 收尾也必须使用同一证据检查规则，成功退出但日志截断不能静默标为正常完整 run。证据异常按基础设施/证据失效保留失败 leaf，不当算法失败混入成功率，不拼 partial；无须另造验收框架或将全部科学时序解释塞进通用 validator。
+
+必要 CPU 验证：真实 recorder + child 在 writer 前直接失败、writer 后异常、正常完整和默认关闭；matching gate 接受完整并拒绝缺引用/文件、坏 JSONL、身份错、无终态、truncated、complete=false；至少一例正常 child 退出但 evidence 不完整的正式收尾拒绝。保留既有默认行为与一次 reset 检查。先完成该冻结链的窄修并提交 clean 新版本、更新简短文档/report；不要继续任意 edge-case 硬化，不修改 P0 logger、训练、阈值或源码运行树。仍 CPU only、未准入 HF GPU；作者测试不能代替独立复审和 Manager 最终裁决。完成后 publish report 并结束。
+
 ## Manager 当前增量裁决：真实 RMBench recorder 接口不匹配
 
 新OpenPI0ce566b/bridgea0f1d50进入独立review后发现P1。Manager直接核对runner._accepted_episode和既有RMBenchResultRecorder.path_for：前者请求rolling_evidence，而真实recorder只接受episode_video/process_log，未知kind抛RuntimeError；调用又在try外，故显式HF/matched运行会在scheduler启动前失败，不能按fake recorder测试PASS准入。
