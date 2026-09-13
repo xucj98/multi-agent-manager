@@ -1,5 +1,16 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## Manager 已接受独立方案核查：补齐两个停止边界后交工具验收
+
+独立工程核查 report 88976c0165e29956838f62d50df7e55f0ecce66e 已完成。Manager 亲自核对冻结 transport/codec、worker execute/clear、runner _wait/_loop 源码，接受其可行性和以下增量要求；这是设计准入，**尚不是未交付工具的 GPU 准入**。作者继续准备，不扩大工作范围。
+
+- 同步 policy RPC 返回后立即在 RAM 深拷贝完整 actual request、call kwargs 与 post-wire H50，再把未修改的原 result 还给 scheduler。磁盘文件/hash/fsync 放到完整首轮 run_iteration 和 after_execute 完成、queue clear 后，不在模型前增加 I/O。不得后台持有原数组引用；metadata/reset RPC 原样透传，不算 action sample。
+- 在发送前拒绝第二次 infer/infer_audited。首个 RPC 若发生 post-send transport/capture 异常，记 sample-ambiguous 并停止，不能自动 retry；每臂最多一次发送，剩余两样本不能因错误重置计数。
+- **固定 env100000 的预检拒绝必须停止。** Runner 默认 accepted=false 会 seed+=1 并再次 reset；必须在任务私有外层保留首个原始 preflight 事件后，在其进入该分支前终止。仅允许 episode0/seed100000 的一次 reset；拒绝、身份错、缺 accepted、意外 terminal 或 reset传输异常都保留失败证据并停止，不以 seed100001替代。可在原 preflight 事件发出后的窄 hook 实现，勿重写整个 runner。
+- 真实 execute 后须等原 run_iteration 完成再 clear，随后仅用无 drain 的 get_episode_status 验证 logical_step0；明确 queued30/dropped30/queue空。保留原 runner 的失败处理：诊断 child 明确截停，使其在 ep0记录 scheduler_exited_before_terminal/runtime error 后终止，不进入ep1。不要把 writer 的 evidence_complete=true 当正常episode；失败 leaf 加独立 bounded_first_query 收据，永不作为 matching smoke/formal入口。
+
+CPU 准备检查补上 accepted=false 不二次reset、不发infer；post-send异常不重试；第二infer在发送前阻止。保持之前完整输入/请求返回值不变、原执行/after_execute/clear顺序检查。交工具实际路径、最小diff/hash、CPU结果后由Manager核查并通知运行。没有新增训练或正式评测授权，不更改之前的两样本结论范围。
+
 ## 当前接续：准备原入口两样本验证，先完成 CPU/源代码核对
 
 Manager 已独立验收 report 240caf91cdab0aa8fc91b198424495bf00237969 的离线数值部分：重哈希其 34 个引用文件，逐项重读两集旧 baseline H50 / shadow K30 和新 NPZ，确认新 H50 vs 旧 baseline 为 511/700 不同，历史 K30 为 299/420 不同，报告数值准确。接受“新结果不等于任一旧侧”；**不接受仅凭下一组两样本便能区分 wrapper、启动顺序等具体原因的表述**。同时改变入口/缓存/插桩后一次复现或不复现只能给有边界的证据，不能独立作因果归因。
