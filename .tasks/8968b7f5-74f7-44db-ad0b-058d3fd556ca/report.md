@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-**未通过完整 GPU 诊断验收；本次有界恢复已结束，未自动重试。**
+**未通过完整 GPU 诊断验收；S（`serial_lag30`）尚未启动，当前仅完成 CPU/离线准备，等待 Manager 与独立 reviewer 验收。**
 
-本报告对应已发布任务 revision `c13aa2c55aaec8da3e211696b22b4dc613feec27`。授权的 attempt2 已修复并通过 task-private preflight，J（`full_t_plus_1`）两集 smoke 与严格 `recorded` 验收均通过；随后真实 logging off/on pair 在与保存记录的严格输出比较处失败。流水线在该首因停止，S（`serial_lag30`）未启动。
+本报告对应已发布任务 revision `0d1576069c7d6f90b765be6ca3b190368cbb69bf`。授权的 attempt2 已修复并通过 task-private preflight，J（`full_t_plus_1`）两集 smoke 与严格 `recorded` 验收均通过；随后真实 logging off/on pair 在与保存记录的严格输出比较处失败。流水线在该首因停止，S（`serial_lag30`）未启动。
 
 ## 自匹配 preflight 修复及部署
 
@@ -49,3 +49,19 @@ output.actions: dtype/shape float32/(50, 14) != float64/(50, 14)
 后置核验以 PID 解析方式排除了检查器自身及祖先，未发现其他 task-owned 进程；19460/19462 未监听。GPU6 当时为 4 MiB、0%，三棵 C2 运行树保持上述冻结提交且 clean。
 
 已归档 MAM job `90d495d9-2ef3-49b8-8073-536c2cf6b920`，归档时间 `2026-09-13T19:31:19Z`。归档只停止 MAM 跟踪，不删除 C2 证据。v1、旧 v2、attempt2 的原始 receipts、logs、configs、manifests 及失败输出均保留；没有覆盖已有 JSON/NPZ 或结果目录。
+
+## 离线边界复核与 S 接续准备
+
+本节仅补充 CPU/离线复核与任务私有工具部署：未启动 GPU、模型加载、reset 或 S smoke/pair，也没有重跑 J。旧 J pair 收据仍完整保留且整体为失败：`/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/pairs-timeout90-v2/full_t_plus_1/episode-000000-query-000001-seq-000001.json`，SHA-256 `77e397f3574b09ee389d0aac4637923bf6b39a4feac8c556a067e5d8676af0b3`。
+
+派生边界收据为 `/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/pairs-timeout90-v2-invariance-replay/full_t_plus_1/episode-000000-query-000001-seq-000001-boundary-derivation.json`，SHA-256 `7160a86032543f32cf633be50fb958ac1b0db8d2647b49f2e044d051dd1ddeb2`。它保留旧比较项和失败身份，并将两个问题分开记账：
+
+- **同一已加载 backend 的 logging invariance 通过。** 原 pair 在同一 backend、同一恢复起始 key 下直接 off/on 调用；普通输出 `actions`、`memory_prediction`、`memory_prediction_ids`（排除 timing 与诊断 sidecar）严格相等，最终 RNG 相等，logging-on sidecar 的输入与 split 前/后 RNG 也都与保存值严格对齐。
+- **跨进程 saved replay 仍失败。** 保存的 Policy `after_output_transform.actions` 是 H50 `float64`；只在冻结的 `OpenPiBackend.infer` 输出边界执行 `np.asarray(..., dtype=np.float32)` 后，期望 identity 为 `28dd865d2ca69883f8120850c383ce2d2c2b7b26178270857e775acbba4356ac`，而旧 pair 的 ordinary action identity 为 `e7520d71939c2b297f3d2ffe9bd3ccc17ff5fb4dafcee4078ab38f537f2442e1`，仍不相等。保存的 post-wire H50 与该 backend cast 后结果严格相等，实际 execute K30 也严格等于 H50 的前 30 行；因此失败属于保存结果跨进程重放检查，不能归因于同进程 logging 改变了调用行为。
+- 旧 pair 没有保存完整 direct off/on 数组，无法离线补算 `max_abs` 或 RMSE；递归 saved-output 比较在 actions mismatch 后停止，后续字段为 `unavailable`，不能写为通过。
+
+S-only 接续已准备并部署，尚未获准执行。本地准备收据 `/mnt/public/xcj/Projects/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/c2-query-diagnostic-invariance-replay-s-continuation/invariance_replay_s_preparation.json` 的 SHA-256 为 `ca94e5fd0b9f0ea5dcf507474c49d6c73462abe097b9d025a897aab18c2f9a96`；C2 部署收据 `passed=true`，SHA-256 `385d504c4874215506eee54c3c305e3a922b7a8e770dc65133e18f85b0e157d6`。工具 manifest 的 SHA-256 为 `46cb62aad57e883d849b37d5871547656fb0469c6ec8b8e3d87df5a236e86443`，相对旧 pair 脚本的 diff 为 `tools/pair_query_diagnostic_logging-to-invariance-replay.diff`，SHA-256 `6bface9d305e426cb24983034baa5e62017b3dd38c5810cf66688dd54048f452`。
+
+新 pair 工具只对 saved replay 的 `actions` 应用上述明确的 backend `float32` 转换；其他字段继续按 dtype、shape 和值严格比较。未来 S pair 会在每次推理后保存实际 off/on 普通输出的小型 NPZ 和字段 identity，未压缩上限为 8 MiB，不增加模型调用。CPU/static 核验均通过：7 个 pair strictness/bundle unittest、2 个 S preflight process-boundary unittest、3 个 S static-contract unittest，以及两个 shell 工具的 `bash -n`。
+
+若获准，入口为 `/mnt/public/xcj/Projects/state-vla/workspace/8968b7f5-74f7-44db-ad0b-058d3fd556ca/records/tools/query-diagnostic-c2-timeout90-v2-invariance-replay-s-continuation/run_serial_lag30_continuation.sh`，仍固定 C2 GPU6、端口 19460/19462、首个/后续 RPC 90/30 秒、episodes 0/1、seeds 100000/100001、query 1、H50/K30、2 records/64 MiB。准备与末次只读核验均显示 S result、diagnostic 和 pair leaf 不存在；19460/19462 未监听且没有 task-owned 进程。完整 GPU 验收仍未通过，S 继续必须等待 Manager 与独立 reviewer 验收该准备结果。
