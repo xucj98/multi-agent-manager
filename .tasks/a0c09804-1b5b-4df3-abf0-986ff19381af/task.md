@@ -16,3 +16,7 @@ SHA-256 b87e37cbb0214f53f447f23d13c297863fdf14d753869756c895aead699858bf。
 3. 非交互执行标准 bash scripts/install.sh（可显式 MAM_SERVICE_MANAGER 为上述 root），保存完整有界安装 transcript 到本 task 的 evidence 目录。安装器自带必须完成的单元测试、wait 行为检查、随机未知 ID API 检查、六个 terra/max 模型 turn 的普通持久线程真实 delivery fixture，然后才替换本项目生产 daemon。不要绕过或用上面的原生 fixture 代替这些 gate。当前 App Server 实际 trace 环境此前已匹配，预计无需重启；不要自动给 yes、不要重启 App Server 或更改 Codex DB/features。若安装器因需要 App Server 重启退出，保留现场并报告具体目标/原因，由 Manager 决定，不能扩大操作。
 4. 安装后确认 pipx installed package 的 wake_runtime.py 与已验收 source 内容一致、实际 singleton daemon 使用安装包且健康、Manager binding 保留。核对现存 training/eval task/job 数和身份未变（观测/合法归档变动需与活动 owner 区分）。新 fallback 后续可能出现真实 blocked 旧 job 升级，这不等于安装失败，不人工清除 state。不得对训练、eval、生产 task/job 做归档/改绑或停止。
 5. 发布 report：准确安装 source/merge commit、测试数与三个 live gate、安装退出状态、App Server 是否重启、生产 daemon 前后 PID/identity/manager、保留证据路径和SHA，明确普通 thread 测试与真实原生测试的边界。可执行工作结束正常退出，MAM 后续唤醒，不轮询。预计超30分钟程序登记 job；本次安装预计短无需额外 job。异常只做本次安全可逆收尾，不为通过验收擅改产品实现。
+
+## 用户最新方向：暂缓生产更新
+
+用户要求优先核实 MAM 是否能直接使用原生 followup 接口或其他直达 subagent 的途径，避免经 Manager 的模型 turn 转交。立即在下一个安全边界暂停生产更新；准备/测试未进入安装则不再 pipx install 或替换生产 daemon。若收到通知时已有 installer/live fixture 在运行，按其所有权范围完成安全清理，报告准确已完成变更，不粗暴中断持久 fixture，不追加安装尝试。先发布实际进度与剩余步骤，保持原worktree和证据供后续续办。
