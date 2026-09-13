@@ -25,3 +25,8 @@ Manager已审核867aa05e428d6ce259fba99f55def3b5b4fce951完整N diff并通过dif
 
 ## Manager stats-only准入补充（2026-09-13）
 Manager逐行审核移除camera_keys、同步MemoryLeRobotDataset.hf_dataset、adapter前dummy视觉注入。补每任务固定索引原始/优化路径至少一个batch的state/action逐值一致，以及2-worker行为，通过后commit到干净独立stats执行tree，保持N冻结树不变。norm保留原seed/sampler/实际9984行合同，产物验收后继续已授权的smoke→正式，不再等第二轮代码审批。
+
+## Manager真实训练加载修复准入（2026-09-13 16:10 CST）
+Manager已直接核对MemoryLeRobotDataset._episode/build_episode：构建整集Memory数据需要数值/绑定列和sidecar，当前hf_dataset[start:stop]却连同相机列解码整集，导致随机首batch极慢。授权在从冻结N867aa05建立的独立加载修复候选tree做最小性能修复：在整集读取前投影到build_episode实际需要的column binding（含state用于query_count、series/availability/constants/events）与episode索引列；普通__getitem__从原dataset获取当前帧的真实图像路径必须保持，禁止dummy、改变图像转换或对原HF/source数据全局删列。可同样避免_episode_positions为读取episode_index解码首帧图像。
+
+不改数据、sampler/seed/次序、norm、targets/mask/loss/输入语义；原冻结树保持不动。补证明整集cache不触发图像解码的回归、原始/新路径实际样本的图像与数值/标签/权重逐值一致（至少三任务与一个现有memory J/S路径），处理列投影后原hf reference同步及stats-only兼容。实际random32batch/2worker速度与finite确认；同源原始对照可用固定contiguous batch避免无界慢profile。代码diff和结果交Manager快速review后，以新干净commit继续原50-step保存恢复→正式；不需再咨询是否可以修这个明确瓶颈。优先解除N启动，J/S继续已有语义接入，禁止把新实验指标调优混入性能修复。
