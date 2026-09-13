@@ -1,6 +1,6 @@
 ## 当前状态：C3 高频工程验证被 matched action gate 阻断（2026-09-14 CST）
 
-C3 GPU0 上的获批有限工程验证已完成 8 个两集 leaf，**没有启动 HF matching smoke、r_s30 控制或任何 HF formal100**。运行根为 `/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914`，三库仍干净且精确固定为 RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`。冻结矩阵、baseline inputs 与 run matrix SHA 分别为 `20e414eb…700adb`、`305250a1…4a69`、`f5e5dc56…8a69`；任务私有工具 SHA 为 `dcf93891de82adaf21e676c55ee30901309f9c9a6097841ff4be4c7ba7f29c87`。
+C3 GPU0 上的获批有限工程验证已完成 8 个两集 leaf，**没有启动 HF matching smoke、r_s30 控制或任何 HF formal100**。运行根为 `/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914`，三库仍干净且精确固定为 RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`。冻结矩阵、baseline inputs 与 run matrix SHA 分别为 `20e414eb…700adb`、`305250a1…5610`、`f5e5dc56…8a69`；任务私有工具 SHA 为 `dcf93891de82adaf21e676c55ee30901309f9c9a6097841ff4be4c7ba7f29c87`。
 
 四个普通 baseline/shadow 与四个 matched baseline/shadow 均使用环境 seed `100000,100001`，每个 leaf 都完整终态、launcher/scheduler exit 0、episode0 video/episode1 no-video、端口释放，并实际记录 `random_light=false`、`crazy_random_light_rate=0`。普通 baseline 按合同没有 rolling action/probe RNG 日志；该可观测缺口保留，未被当成动作等价证据。
 
