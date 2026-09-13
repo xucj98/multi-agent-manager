@@ -91,8 +91,9 @@ save thread`。三条完成模型如下，均为原冻结 commit
 每条验证都要求 checkpoint 仅有数字目录 `20000`、`params/assets/metadata`、无 `train_state`；加载时
 审计钩子拒绝原训练数据、base weights、外部 norm 和 memory YAML 读取。CPU 与 GPU 子命令均以
 exit 0 完成；GPU 检查是 checkpoint 恢复与一次 finite infer，并非 offline rollout、RMBench 仿真或
-部署。各 checkpoint 的 `training_acceptance/` 目录保留 CPU/GPU 日志及
-`formal_20000_acceptance.json`；共享可复用验证脚本和被中断尝试的 SHA256 清单在
+部署。各 run 根的 `training_acceptance/` 目录保留 CPU/GPU 日志及
+`formal_20000_acceptance.json`；`20000` 本身仍只含 `_CHECKPOINT_METADATA`、`params`、
+`assets` 和 `metadata`。共享可复用验证脚本和被中断尝试的 SHA256 清单在
 `/mnt/public/xcj/Projects/openpi/logs/attempt_history/19e98b62-eba2-4968-ac06-31da16f71f99/acceptance/`。
 三个训练 PID 被回收前未能读取数值 exit code，因此只据成功保存日志陈述完成，不虚报 exit 0。
 
