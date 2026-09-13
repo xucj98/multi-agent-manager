@@ -1,5 +1,55 @@
 # 交付报告
 
+## 最新执行结果（2026-09-14；C3 GPU0 授权的单实例 C0/C1/P 检查）
+
+**结论：通过。** 已在 C3 的 `GPU0` 只执行一次授权的 `--execute`：一个真实 backend 实例依次完成 C0、C1 和 P；receipt 的 `decision` 为 `pass`。这只说明固定保存输入在同一已加载实例内，五次 forecast probe 未改变后续普通 action 的软件可观察结果或 action RNG 状态；它不证明环境推进、五帧新观测、完整 rollout、HF 效果或 formal 准入。
+
+### 执行与运行身份
+
+- C3 实际 hostname 为 `is-ddj72jhhjdy7hiyj-devmachine-0`；GPU0 为 NVIDIA GeForce RTX 4090。执行前 GPU0 是 `1 / 24564 MiB, 0%`，结束后复查仍为 `1 / 24564 MiB, 0%`；外层 PID `1361565`、launcher `1361567`、工具 Python `1361577` 均已退出。
+- 外层启动于 `2026-09-13T22:39:01Z`、结束于 `2026-09-13T22:40:15Z`，退出码 `0`。`stderr.log` 只有 hwloc topology 警告与 XLA 找不到 `ptxas` 后交给 driver PTX compilation 的警告，没有终止异常；`stdout.log` 指向 receipt。
+- 实际命令、cwd、解释器、CUDA/JAX/XLA/cache 环境与冻结三库身份在 `execution_20260914_c0_c1_p_v1/launch_metadata.json` 中保存。运行值为 `CUDA_VISIBLE_DEVICES=0`、`SAPIEN_RENDER_DEVICE=cuda:0`、`VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json`、`XLA_PYTHON_CLIENT_MEM_FRACTION=0.40`，以及指定 checkpoint 的 `RB_OPENPI_POLICY_DIR` 与冻结 bridge/openpi-client `PYTHONPATH`。没有环境 reset、simulator、policy server、warmup、重试、第二 backend/episode 或正式评测。
+- receipt 确认冻结运行树 clean：OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`。工具、tests 和冻结源码均未改动。
+
+### 预算、收尾与对照
+
+- `budget` 为普通 action `3/3`、joint forecast probe `5/5`、总 sampler calls `8/8`，`retry_policy` 为 none；receipt 中正好有 3 条 `ordinary_action` 和 5 条 `forecast_probe`。调用顺序是 C0 action、C1 action、P probe 1–5、P action；C0/C1 精确对照通过后才进入 P。
+- `stop_reason=null`、`error=null`、`cleanup_errors=null`、`serialization_errors=null`，`policy_state_restored=true`。工具结束前的临时 rolling state 已恢复为工具调用前状态。
+- C0 与 C1 的 reset/final action/probe keys、序号和所有普通非 timing 输出均精确相同。P 的最终普通 action 同 C1 也精确相同；比较字段为 `actions`、`memory_prediction`、`memory_prediction_ids`、`memory_raw_actions`、`policy_rng`，唯一排除的是 `policy_timing`。三次普通 action 的同一非 timing 树 SHA-256 是 `4edc1afd8518085f8943ba8dde7eb28caa676d3cf40fd5089193c15bc5943581`，因此没有触发“输出不同”时才允许进行的离线元素差异计算。
+- P reset 时 action key 为 `[0, 0]`、probe key 为 `[1099583820, 1938652209]`，两个序号都是 0。五个 probe 均保持 action key `[0, 0]` 和 action 序号 0，只推进 probe key/序号：
+
+  | probe | probe key（调用后） | probe 序号（调用后） |
+  | --- | --- | --- |
+  | 1 | `[3671460393, 3925137291]` | 1 |
+  | 2 | `[2114279338, 2039787051]` | 2 |
+  | 3 | `[891150875, 1373214049]` | 3 |
+  | 4 | `[1391925822, 3050319562]` | 4 |
+  | 5 | `[3086767906, 2453882555]` | 5 |
+
+  P 最终普通 action 后 action key 为 `[1797259609, 2579123966]`、action 序号为 1；probe key/序号仍为 `[3086767906, 2453882555]` / 5。每条调用的输入前后语义 SHA 均为 `a489f7d1f871ea4667d404f82a6cdd229e9081e523b041bbaaab50d1ffe5034e`，receipt 记录没有调用修改输入。
+
+### 实际输出与完整性
+
+P 的完整普通输出保存为 `outputs/P_ordinary_output.pkl`：`actions` 为 `float32[50,14]`（数据 SHA `b56eb60ce8d5317e804a72bc8907a1a28e00eba111e1211c65937b07f1cd20a6`），`memory_prediction` 为 50×2，`memory_prediction_ids` 为 `int32[50,2]`（`8f3c38e64c3232a66d1bdc6035bd3a15735d917d3a193039e0ea8213292f6b28`），`memory_raw_actions` 为 `float32[50,32]`（`7f13cb5dbb9fc4ef3b66bdf969cdd72e0b085a7e05235def0048c2b9f88b1e80`），并含 `policy_rng` 与 `policy_timing`。前四项及 `policy_rng` 同 C0/C1 精确相等；完整 artifact 的二进制 SHA 会因 timing 内容不同而不同。
+
+receipt 的 artifact writer 尝试并成功写入全部 9 个预期 pickle。实际路径都在 C3：`/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/probe_side_effect_check/run_20260914_c0_c1_p_v1`。
+
+| artifact | SHA-256 |
+| --- | --- |
+| `inputs/stripped_observation.pkl` | `63e13ce343e048ec9f3ba3d7ee7d5cbe4dfd6381e0091a4b3d136f212ba3d34e` |
+| `outputs/C0_ordinary_output.pkl` | `c00aa5b9c78fa328e1db2d461401382b0ee67eb26feca8be40fd14dfa1104efb` |
+| `outputs/C1_ordinary_output.pkl` | `494c26d25f59630908a8414c77ed8b9d81c5fed6989fcfe3001b1895319fd7b5` |
+| `outputs/P_probe_01_output.pkl` | `ecd551b4d198ef80ff9fdc4d587b637747f67826019930e1b4313b9ede3a8591` |
+| `outputs/P_probe_02_output.pkl` | `b31b9486cce417ca4f123a9b798e5303d52a9bb81736146069e57f94df706708` |
+| `outputs/P_probe_03_output.pkl` | `daa046ac0182833700095852281edc97baedd29e5a413eaad8878700f86ba9e0` |
+| `outputs/P_probe_04_output.pkl` | `0fbff7e9a137515ad13b3a3d6bd72f942638b42bf3ce819057092441a2f71b39` |
+| `outputs/P_probe_05_output.pkl` | `02b65fcc85e27ad6f485e045530ed60202f2e7ebff7a35168dd9dea46e6ee175` |
+| `outputs/P_ordinary_output.pkl` | `ecb30324e686a598e69ace4c38b76ddc4155ebe03709187affde245a574c3f72` |
+
+输入、工具和结果身份如下：request SHA-256 `8e642b353b0a2bfd6e7569f1f4c52aa9490aad92df4102ffda73ecf47091ac48`；已验收 source plan v4 SHA-256 `4408a8732f3fa259f5224de6dfe7c40add97e40e5a7fc511a076f8f4fb5a9916`；实际 execute `plan.json` SHA-256 `dbeb43c9b87b78ad3a52f70afe14979e6d1780190988308db89bcb03948fbbd7`；工具 SHA-256 `6edd0ba2ce04c6ba70c9efa239cd5f603e9097ad7079f10dce013a660850491c`；receipt SHA-256 `14f2a9a771387f4703c84226d852c82f9442650f42d9ba8b331139fbb2641983`；launch metadata SHA-256 `72909a6edd4ade56bd8591458f0bce8da9de264ed83cc8ad64bbbc326af84b79`。
+
+本次实际时长约 74 秒，结束后才尝试依据先前等待记录登记 MAM job；`mam job add` 复查 PID 时已发现它停止，因而拒绝创建 job。没有本次运行可归档的 job，也没有触碰任何其他进程。
+
 ## 最新修订（2026-09-14；同实例 probe 副作用检查仍仅 CPU 准备）
 
 已修复 Manager 复核指出的两处 CPU 控制缺口；**没有**以 `--execute` 运行检查，没有构造真实 `OpenPiBackend`、加载 checkpoint/model/GPU、发送 sampler request、环境 reset、仿真轨迹或 formal。历史正常 action 诊断预算仍为 **8/8**，本节未改变其记账或结论。
