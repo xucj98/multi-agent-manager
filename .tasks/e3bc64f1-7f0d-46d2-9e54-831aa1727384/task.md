@@ -53,3 +53,5 @@ Manager已阅读66049be与5835fa04055d520e418cc1448c1bd58fa1e665cb完整实现�
 5. 每条正式启动立即mam job add登记，发布各自gate与启动receipt，含最终code、数据/sidecar/norm身份、命令、GPU/PID/job和step100有限loss。Manager随后抽查原始证据并最终验收；短训练通过不能计作正式训练完成。若reviewer完整报告随后出现具体阻塞项，按影响范围暂停相关新启动并通知Manager，其余已通过路径继续。
 
 尽快先回报资产/五卡smoke的实际状态与日志位置；不要仅回复将执行后结束turn。当前可执行准备完成、仅剩已登记长进程时再正常结束turn，禁止自建轮询/cron。
+
+正式独立review报告02a0fea942f36b0943bd59909c27eb921ec55213已由Manager验收，无新增阻塞项。Manager另核验J/S整合HEAD34002dce65962734c59725a0f6d982ae2c438a2d，相对afb7a4d只有memory_data.py及其test变化，两个文件均与已验收5835fa0逐字节相同，diff-check通过。接受该干净整合版本进入上述逐路径运行gate；原有有条件正式20k准入继续有效。
