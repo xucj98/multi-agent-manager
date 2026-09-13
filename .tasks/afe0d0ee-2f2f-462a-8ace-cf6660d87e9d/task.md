@@ -1,5 +1,11 @@
 # P0诊断记录接口独立审查：行为等价、RNG与证据完整性
 
+## Manager 对 report d1fffd760 的裁决与下一轮边界
+
+接受已独立通过的真实 J/S 路径、Memory-v1 完整性、preflight 和此前生命周期/RNG结论。Manager 已检查真实 Policy capture 与 b169 录入/Externalizer，确认人为替换 raw actions 为 array_ref 会产生 recorded/offline-invalid；按 P2 录入一致性小修处理。但报告并未证明当前真实 producer 可输出该 descriptor，因此不采纳“此反例本身阻止一切最小受控 GPU 验证”的泛化。GPU 调度仍以 Manager 明确的运行/证据合同为准，当前尚未派发。
+
+已要求原作者只做 live ingress 对外来 array_ref 的集中拒绝/绑定，保持离线正常外置数组和真实 J/S ndarray，避免继续逐字段扩展。保持本次报告原样作为审查证据，不必重写历史立场。作者新 clean commit 到达后另行通知窄复核；现在结束，不追逐 dirty diff 或拓展任意非法输入。此次无需重复既有 Policy6/bridge57全套。
+
 ## 当前增量复审：Memory-v1 完整性和 preflight 修复已冻结（取代下文旧候选）
 
 源 report `e5ec1cdd0017dd7a01ba3b29cc9d2035ec4e3bc0` 已发布。Manager 已核对作者 clean HEAD，现在恢复本任务独立增量复审：
