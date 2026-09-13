@@ -1,5 +1,33 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## 当前 Manager 裁决与执行授权：完整轨迹工程阶段（2026-09-14）
+
+Manager 已独立验收 report 0c959fc4c9acf785a0e2a60d9422b3d1dfd14a75：在 C3 重新读取全部9个 pickle、验证哈希及剥离cmd的原始输入、逐字段比较完整普通输出（仅剔除 policy_timing，dtype/shape/value/bytes 均一致），核对全部8次调用的实际key data/哈希/序号及恢复前后状态。记录见论文 docs/audits/20260914-hf-original-entry/probe_gpu_acceptance.json。接受同一加载实例/固定输入的3 action+5 probe副作用检查；普通返回没有 state 字段，不虚报。旧跨进程失败保持失败，未确立根因，也未证明环境/完整轨迹等价。
+
+现在明确解除“不得运行任何完整HF轨迹”的工程暂停，授权直接执行下述既有5个两集profile，不再等待一轮准备报告。目的为验证真实新观测、状态消费、队列与触发实现，不以这10集估计效果或调参数。本次是新的有界阶段：最多10个episode attempts，每profile最多2个；旧首query8/8与同实例3+5账本均结束且不重用。正式36批仍未获执行准入，不能把旧 matched-action gate 改PASS或放宽容差。
+
+### 顺序和具体范围
+
+1. rearrange J 的既有 `j_shadow_rs30_degradation`：r_s=30，H50/K30，沿原profile的legacy action RNG生命周期；两集只检查无中途probe、队列/执行边界及正常终态。不声称它是HF-fixed的完整退化等价控制，不因跨进程数值不等追加重放。
+2. put_back_block J HF-fixed，H50/K30，r_s=5；2集。
+3. put_back_block J HF-event，同H50/Kmax30/r_s5、3行至少2行phase不等、连续2次、minprefix10；2集。
+4. rearrange_blocks J HF-fixed；2集。
+5. rearrange_blocks J HF-event；2集。
+
+全部复用已冻结train0/20k J模型、eval0环境seeds100000/100001、既有 video/no-video smoke2 协议。HF modes按已审源码的自动逐episode action/probe reset协议；不要仅根据scheduler显式reset参数False误报HF未reset。不得新造put-back r_s30 profile、S/T/K10、train seed、训练、第二套runtime或额外warmup/retry。工程task内的采样不得形成新的formal计数。
+
+### 运行与验收
+
+- 继续仅用 C3=wuwen-4090-3 / GPU0，端口19400/19402。执行前确认hostname、GPU与端口可用；冲突则结束turn报告，禁止终止他人进程。冻结三库和checkpoint继续只读，OpenPI0ce566bd34f99cb4775422f012ab67c16aa53885 / bridgeffa122494c19e1c0154e877010f7b470967ccfc6 / RMBench6abebf08d084d0be43aa56ebe158dc8395fa58e4；路径仍为 e6908de7.../c3-highfreq-engineering-20260914。
+- 复用该runtime `.local/highfreq_engineering/hf_engineering.py` 原文件（SHA dcf93891de82adaf21e676c55ee30901309f9c9a6097841ff4be4c7ba7f29c87）逐个 `dry-run --profile`、`run --profile`、`audit --profile`，从冻结matrix读取4个已准备HF profile名字。Manager已读run_profile/cmd_run，它只运行显式给定的一个smoke profile，没有自动pair或formal。允许该工具在原task-private生成目录写入上述尚未启动profile的命令/manifest/result/audit；不得覆盖旧文件或改工具/三库。你自己的队列、阶段receipt和日志存本TASK-ID目录；如需串行shell只组合这5个既有命令，不包装模型/scheduler。HF leaf原名字/classification可保持matching_smoke_only_no_formal100_started，但实际本轮验收仅是工程候选，不能自动启动formal。
+- 复用既有正常 BenchmarkRunner/robot/policy server，保留原90秒首infer/30秒后续、启动/reset/episode timeout、renderer、cache、光照关闭、source-root和环境设置，记录完整实际命令和source/输入hash。不得使用早期首query diagnostic wrapper/exit70，也不运行工具的 `audit --pair` 去反复追逐旧bitwise差异。
+- 每leaf正常结束并完成基础设施/证据验收后才进入下一leaf：恰好两个连续accepted seeds及终态，runtime error为空，视频策略与子进程退出完整，rolling JSONL有正确episode/seed header与完整episode_finished，无truncated/missing，配置实际random_light=false和crazy_random_light_rate=0。预检拒绝seed时立即停，不跳seed补足。任何基础设施/合同错误停止后续，不自动重试/改环境。普通任务Fail允许正常收尾并继续，不以success/failure分数决定后续样本。
+- 在任务阶段receipt里离线汇总每集已完成action rows、ordinary/probe调用数、probe的source/target时刻、状态输入消费、触发阈值/连续计数、clear返回的未执行行数、实执行K分布和推理wall时间。逐集确认HF-fixed中途不发新action/clear；HF-event仅在冻结判据成立后clear后缀再normal infer，不能用probe动作。若两集无trigger，如实记录该路径未观测，不为了制造trigger调参/加集。
+- r_s30需实测probe_count=0；HF中若早终态没有probe，记录该集无法覆盖相应路径，不把“没崩溃”当覆盖PASS。实际action/probe key只按现有wire可观测字段报告，不能把stream/call误称捕获了内部key。可复用原单leaf audit但其PASS不能代替这些具体合同核对，不另造通用审计框架。
+- 预计队列超过30分钟，应在进程仍活着时登记本TASK-ID的实际远端outer PID，正常结束turn，MAM转给Manager后由原生followup唤醒收尾；不要等进程结束才登记。最终保留失败与成功原件，核对自有进程/端口释放、归档job并发布精简report。
+
+terra/max独立review task 9c7622d0-45e6-4952-8b63-744d7e151a8c 正核对camera get_obs副作用和工具边界；不必等它准备才开始你的命令核对。若收到实际阻断问题即停止依赖步骤并报告。Manager自己裁定科学意义与是否进入formal；本轮0新增训练，正式台账46批不变。
+
 ## 当前 Manager 执行授权：一次同实例 C0/C1/P 对照（2026-09-14）
 
 现正式授权原 terra/max 执行者在 C3 GPU0 运行已经验收的同实例工具一次，无需再交一轮准备报告等待许可。Manager 已验收修订报告 cc13734159384e2151b799e8c871a6b92a7ff9e9、亲自阅读实际调用/比较/收尾/写盘控制流、复跑11个CPU测试与上次两个反例（包含持续key读取失败）；首infer前key物化0次，异常保留实际3+5账本、8份输出和恢复状态。独立身份报告5a85ad21fa8d171ce781b89867e85fcc468701c3及receipt bf20b8ec6603d3d138d8c180843757e34405cae92ad78a0ff36125a052ff7924通过；Manager另在C3重哈希13个文件、验证三库clean HEAD、按模板PathFinder确认实际导入树，并核对原baseline真实config.policy_command。
