@@ -1234,3 +1234,16 @@ P-S 的两个 smoke 也均通过完整门禁：eval1/2 的 episode0 视频分别
 C3 GPU0 的稳定基础 renderer 40-reset gate 仍在运行：MAM `9325bb73-243c-405f-b9af-bf719d7ade20`，PID `1270746`，receipt 目标为 `records/renderer_reset_gate_c3_gpu0_highfreq_base.json`。本次快照中进程仍存活、worker log 继续写入，但 receipt 尚未产生；因此没有将 CPU/import 或进行中的 GPU job 表述为 gate PASS。结束后才会审计 40/40、ready/nonterminal、exit 0、error null 和零基础设施 marker，并据此 archive 或记录失败。
 
 高频源码 task `0acf5d43-91b6-4171-b727-e3fe0f7e7939` 当前公开 revision 为 `7009b32ca379c4d188e631775c638ebeafae2498`，状态仍为 working，报告仍是 draft。本任务尚未收到独立 review PASS 和 Manager 的部署准入；因此没有 cherry-pick/deploy 该实现，也没有启动任何高频 engineering smoke、matching smoke 或 formal。待源码、独立 review 与 Manager 准入三者齐备后，才会在上述独立 runtime 接入指定 commit，并按冻结矩阵执行所需 gate→matching smoke2→formal100。
+
+### matching smoke 临时产物清理回执（2026-09-13 19:25 CST）
+
+依 RMBench 实验规范，四个已验收且已归档 formal 的 task-owned matching smoke2 leaf 已清理；formal raw artifact、`final_review.json` 和 MAM archive 均未改变。每个 formal leaf 新增 `smoke_cleanup_receipt.json`，其中保留 smoke 的 completed/2 条 accepted terminal/video/no-video/scheduler exit 0 结论、formal 的 final-review SHA、formal command 所引用的 smoke 路径、六份核心 smoke artifact SHA 和删除前目录统计。正式 leaf 的 `command.txt` 仍保留历史 smoke 路径，回执明确该路径已按验收后的临时产物规则删除。
+
+| formal run | 删除的 matching smoke leaf | 删除前文件 / bytes | cleanup receipt SHA-256 |
+| --- | --- | ---: | --- |
+| `c_put_back_no_memory_trainseed0_evalseed1_100ep_r3` | `c_put_back_no_memory_trainseed0_evalseed1_smoke2_r3` | 51 / 1,864,401 | `09def792d79f920b4461d5ec26cb325332150687d04e7b54674f747fe3a76015` |
+| `c_put_back_no_memory_trainseed0_evalseed2_100ep_r3` | `c_put_back_no_memory_trainseed0_evalseed2_smoke2_r3` | 51 / 1,733,810 | `671cce3ec5e9e03c7fa1195b741732b16f20cdc36e9ffcfe539b52e834bd90df` |
+| `c_put_back_serial_lag30_trainseed0_evalseed1_100ep_r3` | `c_put_back_serial_lag30_trainseed0_evalseed1_smoke2_r3` | 51 / 1,891,558 | `a54cfba3e7fe4c3956df84932d412ec0cec539ac3192dda2ce011838dbf1a46b` |
+| `c_put_back_serial_lag30_trainseed0_evalseed2_100ep_r3` | `c_put_back_serial_lag30_trainseed0_evalseed2_smoke2_r3` | 51 / 1,854,277 | `f645bb09afcbe7816e9dcb91a37c511c12191e7a1998d864ecfdd23815153161` |
+
+因此前节“smoke raw artifact 均保留”仅应理解为 formal 验收前的留存状态；最终清理状态以本节回执为准。
