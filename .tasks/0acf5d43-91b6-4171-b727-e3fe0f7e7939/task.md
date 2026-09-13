@@ -1,5 +1,15 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## 当前接续：旧工程与新首query捕获的离线差异定位
+
+已收到报告18f786b49c3461fb2b2fc766b2afa8febe234e26：新捕获6次正常action sample没有复现历史差异。Manager正在独立核验wrapper与原始数组。请与Manager并行做下面的离线定位，不增加GPU采样、reset、完整轨迹或修改生产源码，剩余2次采样暂保留。
+
+1. 把这次新捕获的首query完整H50/queuedK30，与旧matched baseline/shadow的put-back episode0及episode1真实对应动作逐项比较，给出新结果究竟等于旧哪一侧，或两边均不同。保留float32 wire合同，列真实差值，不把哈希不一致本身当输入已不同的证据。
+2. 逐项对比旧hf_engineering.py执行入口与新run_first_query_diagnostic.py：实际robot/policy环境/命令、checkpoint/metadata、reset config overrides、instruction获取与设置、相机/图像预处理、scheduler初始化与reset顺序、第一次get_obs及动作key初始化路径。用源行号和旧command/config/preflight/episode artifact指出已确认差异，特别核对本次从profile组装的reset是否遗漏旧runner的task_overrides或语言指令。不要继续笼统列“可能环境/生命周期”。
+3. 若旧轨迹没有保存的字段无法回溯，明确最小不可观测缺口；给出能只用剩余两次action samples区分具体假设的最小方案供Manager裁决，但本次先不执行。不要重复八leaf长轨迹、扩日志框架或调阈值。
+
+交紧凑离线报告与派生artifact/hash。当前已确认旧前缀数值差异不是50/30形状误差；新的控制样本相等也不自动撤销旧失败或证明所有运行确定。停止点是具体差异/最小有界验证方案，完成后正常结束turn。
+
 ## 当前任务：HF GPU成对差异的首query窄诊断，正式评测继续暂停
 
 C3工程report `1b0006941651c958d7ece0b217034c33634a2bd0` 已发布，8个2episode leaf正常退出，但matched两任务未通过动作等价。Manager已亲自核对原始failure文件SHA `c6519c947782001a07295daf7aeed4a6a1d2295669c17ececd8acb537e2c26f4`、精确source与比较脚本，作如下裁决：
