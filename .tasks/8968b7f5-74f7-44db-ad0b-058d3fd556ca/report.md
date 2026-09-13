@@ -2,7 +2,7 @@
 
 ## Manager 最终裁决
 
-本报告对应最后清理授权 revision `060f79cb30a0b0167d8f5ce54752e0b69c4a7719`；有界验收裁决来自 revision `506649777f83d7adbd4f7f9fb482246f525298eb`。**Manager 接受冻结 OpenPI、robot-bridge 与 RMBench 实现的有界诊断能力；结论只覆盖已核验的 J（`full_t_plus_1`）和 S（`serial_lag30`）实际 query-1 示例。**
+本报告对应缓存清理授权 revision `c4a6ba6d29a676f9b214b60dd47b00f0b9650a06`；前序 workspace 清理由 revision `060f79cb30a0b0167d8f5ce54752e0b69c4a7719` 授权，有界验收裁决来自 revision `506649777f83d7adbd4f7f9fb482246f525298eb`。**Manager 接受冻结 OpenPI、robot-bridge 与 RMBench 实现的有界诊断能力；结论只覆盖已核验的 J（`full_t_plus_1`）和 S（`serial_lag30`）实际 query-1 示例。**
 
 - J 与 S 各有两条严格 `recorded` 记录。已核验的 Policy action → backend `float32` H50 → execute K30 前缀映射精确；S 的真实 logits、selected IDs 和 action-condition 也彼此一致。
 - 在同一已加载 backend、相同实际输入及恢复起始 key 下，J 与 S 的 logging off/on 普通输出、状态和最终 RNG 都严格相等。这证明本次实际例子的记录及同进程 logging invariance，不证明每个任务或输入上的行为等价，也不证明物理实时等价。
@@ -34,7 +34,15 @@ S 的 `actual_k=null` 表示 controller completion 未被观测；30 行 schedul
 
 `c2-query-diagnostic/transfer/` 的两个 bundle 也在删除前用 `git bundle list-heads` 核对：OpenPI bundle 的 HEAD 为 `bc7603c5b2d3b9a58675f3cc351b49afcbf35bd6`，robot-bridge bundle 的 HEAD 为 `e147f600dc4329f330a6e2eb0335150b5b3093a3`；各自主库的 `codex/p0-query-diagnostics-accepted` 持久 ref 均指向同一提交，因此无需复制 bundle。
 
-独立清理收据位于 `/mnt/public/xcj/Projects/multi-agent-manager/.tasks/8968b7f5-74f7-44db-ad0b-058d3fd556ca/artifacts/p0-query-diagnostics-workspace-cleanup-20260914.json`，SHA-256 为 `bb881bc21c6e33a1288c92f9c903acc99b37b31a67f28693166e37a512410397`，由 MAM 根提交 `ed36f67c6a23be70ceae836271c88c2788e6b2b6` 保存。旧归档包及其 `SHA256SUMS` 未改动，未触碰 C2 证据。清理后 workspace 顶层只剩登记的 `openpi` 与 `robot-bridge`，二者仍为已验收提交且 clean。执行者没有调用 `mam task archive`；源任务保持未归档，交由 Manager 收尾。
+独立清理收据位于 `/mnt/public/xcj/Projects/multi-agent-manager/.tasks/8968b7f5-74f7-44db-ad0b-058d3fd556ca/artifacts/p0-query-diagnostics-workspace-cleanup-20260914.json`，SHA-256 为 `bb881bc21c6e33a1288c92f9c903acc99b37b31a67f28693166e37a512410397`，由 MAM 根提交 `ed36f67c6a23be70ceae836271c88c2788e6b2b6` 保存。旧归档包及其 `SHA256SUMS` 未改动，未触碰 C2 证据。清理后 workspace 顶层只剩登记的 `openpi` 与 `robot-bridge`，二者仍为已验收提交且 clean。
+
+## 归档缓存收尾
+
+按 revision `c4a6ba6d29a676f9b214b60dd47b00f0b9650a06` 的授权，使用不跟随软链的遍历，仅删除两棵登记工作树中的普通非软链 `.pytest_cache`、`.ruff_cache`，以及实际源码、tests、scripts、packages 根下的 `__pycache__`/`.pyc`。OpenPI 删除 11 个缓存目录、64 个文件、1,014,824 bytes；robot-bridge 删除 13 个缓存目录、69 个文件、1,684,373 bytes。未重跑测试，未改 tracked 源码、持久 refs、MAM 旧归档或 C2 证据。
+
+本次明确跳过 `.venv`、`.local` 与所有共享链接。清理后的 `git status --short --ignored` 仅保留这些受控环境/共享路径：OpenPI 的 `.venv`、`.local`、`assets`、`checkpoints`、`data`、`datasets`、`logs`、`offline_test`、`offline_test_results`、`policy_records`、`wandb`，以及 robot-bridge 的 `.venv`、`.local`、`logs`；两个工作树仍在已验收提交且 clean。
+
+缓存清理收据为 `/mnt/public/xcj/Projects/multi-agent-manager/.tasks/8968b7f5-74f7-44db-ad0b-058d3fd556ca/artifacts/p0-query-diagnostics-workspace-cache-cleanup-20260914.json`，SHA-256 为 `37eb3ec5eaf0432867febd8eca546cb67f4088235afde1aafcae0bcf26e1e784`，由 MAM 根提交 `a73e9bf8bb97c2e3522dfd561c5bc2c5e4e23540` 保存。执行者没有调用 `mam task archive`；源任务保持未归档，交由 Manager 收尾。
 
 以下各节按实际发生顺序保留早期失败、后续 S 接续和收据；其中的当时状态描述不改变上面的最终裁决。
 
