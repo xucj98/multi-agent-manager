@@ -1,3 +1,18 @@
+## 当前状态：put-back J/T train1 · eval1 已终验；eval2 待启动（2026-09-14 CST）
+
+已完成授权队列的首对缺失原协议结果，无新增训练、转换、传输、源码或依赖变更。冻结且 clean 的 C1 runtime 为 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`；两项均保持 H50/K30、首个 infer 90 秒、后续 infer 30 秒，以及原始 RNG 生命周期。
+
+| arm / formal100 | 固定环境 seed | 结果 | final review SHA-256 | MAM / smoke cleanup |
+| --- | --- | ---: | --- | --- |
+| J `full_t_plus_1` · `c_put_back_full_t_plus_1_trainseed1_evalseed1_100ep_r3` | `200000..200099` | **47/100**；`button_not_pressed_after_center=35`，`button_press_insufficient=18` | `f02b472b80d9009bca1d26df66a77c343ea4e48d8c39a1b68c70e607f6d13cc3` | job `bf7a953a-e35a-4ca3-a8cc-ccd9cf4f3cd0` archived；receipt `27554f8d38e3f5e72d25aef6e34bc2b45b044ba4f9691a6e5ffb8c45530cc33b`；matching smoke leaf 已删除 |
+| T `full_t_plus_30` · `c_put_back_full_t_plus_30_trainseed1_evalseed1_100ep_r3` | `200000..200099` | **46/100**；`button_not_pressed_after_center=40`，`button_press_insufficient=14` | `94f4e4297d3b63b69b09a4296a1ef0684b3bb138c57d9b250767e305e6ca752b` | job `d805fb5c-f1ff-41ae-8b6d-59a3aa481e07` archived；receipt `4f95d22649baa237eff7042c3e4233d92ad929d04971b8e3ec0e852dca8a5331`；matching smoke leaf 已删除 |
+
+两个 matching video/no-video smoke2 均独立通过其完整产物合同（J 2/2、T 1/2）；formal 均已核验 100 条连续 accepted preflight、100 条 terminal diagnostics、100 个 episode JSON、视频策略、scheduler exit 0、完整自有子进程退出、端口/outer PID 释放、source/checkpoint/manifest/hash 合同和零基础设施 marker。`final_review.json`、cleanup receipt、任务本地 smoke review、formal 日志及 J 的历史 23 集 `r2` partial 均保留。任务本地终验器为 `c-eval-putback-baselines-yaml/records/finalize_jt_train1_evalseed1_20260914.py`，SHA-256 `b447514f0d834c6198d178e166b2b16bc3d751eb4bfc77a7da11d296fa06098f`。
+
+当前无未归档 job。下一项为同一固定运行树上的 train1/eval2：先分别运行 J/T 的 matching video/no-video smoke2，再以全新 leaf 正式运行 `300000..300099`；J 使用 C1 GPU1 / `19410,19412`，T 使用 C1 GPU2 / `19420,19422`。随后按已发布顺序继续 train2/eval1、train2/eval2。
+
+---
+
 ## 当前状态：put-back J/T train1 · eval1 正式100已启动（2026-09-14 CST）
 
 已按发布 revision `468bc0d32e4dd5056b06264915a685912992811e` 去重并启动首对缺失评测；新增训练、转换和数据传输均为 0。广泛扫描结果显示，J train1/eval1 仅有历史 `r2` partial（23 集、`failure_review.json`，没有 `final_review.json`），J/T 的 train1/2、eval1/2 不存在可复用的完整正式100，因此没有重跑任何有效结果。
