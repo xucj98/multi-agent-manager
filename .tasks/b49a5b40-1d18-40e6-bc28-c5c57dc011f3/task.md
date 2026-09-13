@@ -14,3 +14,6 @@
 5. 添加必要回归覆盖明确拒绝→升级一次→manager active不打断→idle投递→executor原生激活/收尾归档后不再错误唤醒；restart、rebind、unknown/paused、manager missing/等于recipient、防递归、一般transient RPC errors重试仍有效。运行规定unittest全套。
 
 先完成diagnosis.md/实现/测试并发布report与commit，等待独立review；不自行安装/重启production或App Server。新的MAM live验证在review后由Manager安排，允许mock明确reject的回归但不能仅mock就宣称真实v2链路恢复。任务当前工作完成后正常结束，不轮询。
+
+## Git基线核实
+Manager已git fetch origin main。origin/main=2cb7309是本地main=bc8726f的祖先，故本地main已包含远端，不回退、不覆盖已安装task rebind。请从main=bc8726f创建修复worktree。
