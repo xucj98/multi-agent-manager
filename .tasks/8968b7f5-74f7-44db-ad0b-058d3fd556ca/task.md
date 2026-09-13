@@ -1,5 +1,19 @@
 # P0诊断记录接口：状态原始输出、动作和RNG的无行为改动采集
 
+## 当前接续：离线明确 pair 的两种比较边界，准备 S 接续
+
+Manager 已读 attempt2 report fb8c60a93b924ae1819cb0e2c7dd5446fad2932d、真实 pair 收据及源码。pair receipt SHA77e397f3574b09ee389d0aac4637923bf6b39a4feac8c556a067e5d8676af0b3、episode0 record SHA9f7191f0fd1c87464b378450c89524dc25d4c066012228db3792f9bcc9d4b1fe、NPZ SHA85cf69da786301ec412ee49b459370db9240cdd7811ad610b4ea505d4a0cb37c均经Manager重哈希。**dtype修正不是充分修复**：Manager按原_pair_identity规则对保存的policy after_output_transform.actions先cast float32，得到28dd865d2ca69883f8120850c383ce2d2c2b7b26178270857e775acbba4356ac；真实pair ordinary_on动作身份是e7520d71939c2b297f3d2ffe9bd3ccc17ff5fb4dafcee4078ab38f537f2442e1，两者仍不同。旧pair仅存动作身份、未存off/on完整数组，不能离线给出该差异的max_abs/RMSE或补出未比较到的memory字段。
+
+Manager 的科学裁决：原任务主要检验同一已加载模型、同实际输入/起始key下，开启记录是否改变动作/状态/最终RNG；保存的smoke输出能否在另一个进程中精确重放是额外的重放能力检查。不能把两者合成一个失败就归因日志副作用，也不能把本进程off/on相同写成跨进程完全复现。J当前收据支持前者的本次有界结果，后者仍失败；不降低任何对应层的数值相等标准，不删除旧失败。P0机制实验后续如涉及干预，应在同一加载实例中有未干预对照；当前不开展机制采样。
+
+请先完成下列 CPU/离线工作，与Manager对J完整记录的核验并行，**本次不新开GPU采样、模型、reset、replay**：
+1. 复核上述cast身份，确认保存的完整post-wire H50、execute K30是否分别精确等于policy after_output_transform经冻结backend转换及前30行。明确原工具把Policy边界float64与backend边界float32直接比较的问题；不要只把_same_value改成忽略dtype/allclose。
+2. 用新独立派生收据完整保留原pair的每项比较、原failed状态和身份，新增明确的logging_invariance / cross_process_saved_replay两项结论。原脚本off/on严格比较已覆盖完整ordinary_output（除timing/诊断sidecar）、memory输出和最终key，需查源说明；跨进程动作身份不同如实fail，旧未保存数组和未执行后续字段比较写unavailable，不能标PASS。
+3. 为此前未开始的S两集smoke+同输入key off/on pair准备最小任务私有接续工具。沿原冻结三库、C2GPU6/19460,19462、90/30秒、episodes0/1、env100000/100001、query1、2record/64MiB、原协议。保留所有已有J结果，不重跑J或renderer。S结果目录未存在可继续使用；新pair工具/收据必须用新路径并保留原脚本。
+4. 新pair将同进程logger invariance与跨进程saved replay分开输出；对后者的期望actions仅在明确backend层按冻结np.asarray(...,float32)转换，其他字段原样严格比较；不得在全树做cast或隐去真实差异。为本次off/on普通输出保存小型NPZ和字段身份（已有一次调用结果，推理后落盘、不增加模型调用），支持离线量化差异。无必要保存巨量sidecar副本或重建框架。S继续是否准入由Manager审阅这份准备结果后通知；当前仍CPU/离线。
+
+交最小diff/hash及有意义CPU检查：off/on任一动作/状态/RNG不同必须fail；只有旧保存结果不同时清晰区分两状态；正确boundary的dtype一致、数值变化仍拒绝；不覆盖旧输出。若发现logger/producer实际修改行为的新证据立刻报告，不因以上裁决忽略它。源任务范围不扩HF或formal100。
+
 ## 当前接续：修正任务自有 preflight 的自匹配，恢复尚未开始的90秒试跑
 
 Manager已独立核对52edad76报告、远端preflight/terminal receipt及其SHA；失败是e6cf1ebac7c61b801588189bfdf3370ae4ee69fbe9e8684f0a6020fb51a4f855脚本第83–86行按RUN子串筛ps时，将自身PID2550668及task venv解释器路径当作残留。pipeline仅运行约1秒，last_phase=preflight；没有J/S runner或90秒模型请求。本次接受为任务自有启动检查的确定缺陷，不是算法、CUDA或模型响应故障。
