@@ -76,3 +76,14 @@ fresh smoke 通过 audit、HDF5 行对齐、scene provenance 和 ranking 泄漏�
 - `01e38f37-b811-4fde-a862-613fb078ced1`：GPU3 上的 ranking fresh smoke；第 1 集为较长多次 swap replay，已在预计超过 30 分钟时补登记。该 smoke 成功后将先做同样的 provenance/leakage/N/CPU 检查，再独立登记 ranking 的 canonical 50 条生成。
 
 两项 job 都没有启动训练。运行日志和 pid 与对应产物同目录保存；完成后会先审计，再归档 MAM job。
+
+## ranking smoke 通过并已启动正式生成
+
+- ranking smoke job `01e38f37-b811-4fde-a862-613fb078ced1` 已归档。真实退出码为 0；audit 中 seed `420000/420001` 分别有 selected-success planning 与 successful replay。
+- HDF5 行数分别为 555、2,431，均为 14D joint vector 和三路同步 RGB。物理 event/terminal feedback 的 observation 行和保存边界有效，micro-stage 区间有效。
+- provenance 检查只发现可见 RGB/position、相对 left/middle/right 的过去尝试、物理按压和标记为 `manager_confirmation_required` 的反馈；`hidden_permutation_or_target_ranking` 明确为 `not_recorded`，未写 sampled permutation、correct ranking 或 block internal identity。
+- ranking canonical 50 条生成已启动并登记：`0a3a2f9c-c590-4f17-9ff7-556b06baf1b0`，GPU3、seed stream `420000 + attempt_index`、`max_attempts=300`，输出为 `RMBench/data/blocks_ranking_try/demo_clean_state/`。
+
+## press_button 当前进度
+
+press canonical job `b45e86f0-7de1-4647-a5d0-71eeaa73bd7c` 仍在 GPU2 运行。最新 audit summary 显示 planning `50/50` selected trajectories、0 selection failure、0 exception；尚未完成 replay，因此尚未宣称 canonical 数据就绪。两项正式任务结束后都会先做完整 audit，再分别转换、计算 CPU stats 和发布下一份 evidence。
