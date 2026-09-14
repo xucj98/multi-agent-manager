@@ -15,3 +15,6 @@
 
 ## Manager接受B增量复验
 已读取两项创建/CPU功能检查/HEAD与clean证据，接受B/RMBench和B/robot-bridge通过。累计五个分支通过：B三库、C的RMBench/robot-bridge；验收范围仍为文档驱动环境创建及CPU功能，非GPU实验准入。C/OpenPI仍等待修复任务提供默认检查有效的新base，不接受优化模式绕过。当前不再重测五个通过分支，保留原首次失败与后续复验记录；待C明确修复交付后再通知最后一项复验，本任务暂不归档。
+
+## 最后一项C/OpenPI复验准入
+C已部署修复base c03898f5a76f4ac208f7d23ae14e2cc759be8853（原34002dce直接子提交，修复环境检查，不改模型）。请仅按本机.local/README→C说明→repo AGENTS/明确引用环境文档，使用此新BASE_COMMIT在原任务workspace新建缺失openpi并运行普通CPU检查。其余五项不重复。实际在文档要求的C1执行，不读修复代码或报告补步骤，不使用PYTHONOPTIMIZE。若C1共享盘阻塞，记录命令/主机/首次错误及等待时间并明确未通过，不能把C2成功替代；已有目标则报告具体状态，不自行覆盖。正常成功则记录HEAD、环境来源、CPU实际结果并发布最终六项矩阵。
