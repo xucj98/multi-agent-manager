@@ -85,7 +85,7 @@ tree: f2316e769447f7bf3dab6fff5faa31878b813182
 /mnt/public/xcj/Projects/state-vla/.local/backups/2b8c1566-f2ca-4591-bb69-a28ad52e29f9/final-delivery-evidence/
 ```
 
-目录包含 `SHA256SUMS`、`entry-history.txt`、`c03898f-stable-ref-verification.txt`、C2 成功日志、C1 取消日志、`blank-acceptance-report-499a7c59.md` 与 `cleanup-inventory.txt`。原始日志和 worktree 未移动。
+目录包含 `SHA256SUMS`、`entry-history.txt`、`c03898f-stable-ref-verification.txt`、C2 成功日志、C1 取消日志、`blank-acceptance-report-499a7c59.md` 与 `cleanup-inventory.txt`。原始日志和 worktree 未移动。 已在 C1 对 `SHA256SUMS` 的 30 个条目执行 `sha256sum -c`，全部通过；记录为 `final-checksum-verification.log`。
 
 ## 清理边界
 
