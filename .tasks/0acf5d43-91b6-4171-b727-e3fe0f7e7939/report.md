@@ -1,3 +1,11 @@
+# 置顶：第一层 J put-back matched-baseline eval0 终态审计（2026-09-14）
+
+C3 GPU0 的 `c_hf_j_matched_baseline_put_back_trainseed0_evalseed0_100ep` 已完成、逐项终态审计通过，并已在审计后归档 MAM job `0ef8faa7-001e-4e66-a5a9-6ff30f74b4b5`。连续环境 seed 为 `100000..100099`，100 个 preflight 都 accepted、100 个 episode 都是正常终态；结果为 **100/100 Success**。这是冻结原件的描述性结果，不从该单臂分数推断 HF 效果或改变后续协议。
+
+新的 task-private per-eval 审计器 `tools/audit_formal_matched_baseline_put_back.py` 先完成不写入 dry audit，随后才写入不可变 receipt。它实际调用 RMBench recorder 的 `validate_smoke_run()` 和每集 `check_rolling_evidence(..., required=True)`，硬编码并核对本 lane 的 manifest SHA-256 `c99a4fb9810e0c108f38b12ae7cd6d7aabbb3d2e427950a059ee2d8d893e78a4` 与 matching-smoke config SHA-256 `e077f7b9e6053b6eaf67de6ab9e0f512a265792a8031f5cdafd5a4d4bab341e3`。审计还核对 checkpoint/source/scheduler/RNG identity、每集一次 action RNG reset、无 probe、规则的 normal query/queue/completed triplet、5 个 MP4 的 `ffprobe`/`ffmpeg` 解码，以及 102 starts / 102 exits（100 scheduler exit 0，robot/policy 受控 `-15` shutdown，所有记录 PID 已退出）。
+
+终态 receipt 为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_matched_baseline_put_back_evalseed0_terminal_audit_20260914.json`，SHA-256 `b255092f3c5f514e36a8c1d90d280ab07605db5e77524b95fb9ef7c4eab520bc`；工具与 receipt 的 task-private state commit 为 `751b516f22d69c231db273b0104cb5aa1df84e30`。按已发布顺序，下一步直接启动冻结的 GPU0 HF-fixed lane `c_hf_j_hf_fixed_put_back_trainseed0_evalseed0_100ep`；不调整 seed、阈值、runtime 或 GPU 分配。
+
 # 置顶：第一层 J put-back matched-baseline 三条 smoke→formal lane 已启动（2026-09-14）
 
 Manager 的新授权已按原冻结队列开始执行 put-back J matched-baseline 的 eval0/1/2 三条 lane。启动前 C3 GPU0/1/2 均为 `1 MiB used / 24080 MiB free / 0%`，对应端口 `19400/19402`、`19410/19412`、`19420/19422` 无 listener；未触碰 GPU3 或其他任务资源。每条调用冻结 task-private `launch_first_layer.py lane`，先执行自身 strict matching smoke2，再仅在既有 identity/evidence/quiescence gate 通过后以同一 outer PID `exec` 原 BenchmarkRunner formal100。
