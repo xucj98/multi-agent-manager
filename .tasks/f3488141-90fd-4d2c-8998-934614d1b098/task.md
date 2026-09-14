@@ -16,3 +16,10 @@ terra/max；Manager负责设计与裁决，沿九任务覆盖优先。读MAM AGE
 C manifest job完成且18项CPU checks通过、六checkpoint校验通过后，允许按已生成确切manifest执行每模型eval0/1/2 matching smoke2 → formal100，共18批。不必再等一次人工确认，但任何门禁失败必须停止该lane并报告，不降阈值不改算法。开始前核实源码clean、真实加载路径与五个transformers patch内容正确；symlink路径断言的已知工具限制据实保留，真实smoke必须通过。
 保持train0、H50/K30、首infer90秒后续30秒、每run单一policy server跨episode连续action RNG，不能带入HF per-episode reset。smoke的成功率不作放行阈值，正常任务失败可接受，基础设施/身份错误不可。每一完整formal必须引用自己的matching smoke，保留全部失败，禁止拼接partial。
 C1 GPU1/2每卡串行一条lane，启动时实查空闲及端口；同一task/eval的N/J尽量同卡，按swap→battery→cover逐任务N/J配对轮转，先eval0覆盖三任务，再eval1/2，不因分数改变次序。C3 HF不抢占。长进程登记MAM，完成批次及时发布证据并按原门禁推进队列，Manager另行验收结果；无新训练。
+
+## 2026-09-15 C1立即调度修正
+Manager实查C1 GPU1–7均空闲；GPU0已有16.9GiB占用不使用。六N/J已完成训练及传输验收，CPU准备1873761运行4小时仍无index，不应形成全队列屏障。现将“18项全通过才开跑”改为“每个checkpoint/eval项身份、路径、冻结协议和matching smoke候选核验通过，即可该项GPU smoke；通过后自动formal100”，其他项尚未完成不阻挡。保留全部科学合同与失败门禁，不重复已验证checksum或恢复，不降低任何身份/协议检查。
+
+授权C1 GPU1–6并行各一lane，GPU7备用；任务/模型固定卡以免冲突，先三任务N/J eval0六项，再各自eval1/2。检查现有CPU准备阻塞的子进程和日志，允许修复本任务launcher/逐项receipt，必要时结束并替换本任务卡住的CPU准备进程（先保存证据），不得影响他人进程。每项formal登记真实PID及job，完成收尾。首次infer90s/后续30s、H50/K30、seed0、原协议连续action RNG、固定评测seed不变。
+
+六N/J共18正式批优先启动；随后安排已验收swap/cover S的6批接入（独立候选和metadata核验通过后同规则放行）。先报告真实smoke启动，再报告formal启动，不只报告静态候选。
