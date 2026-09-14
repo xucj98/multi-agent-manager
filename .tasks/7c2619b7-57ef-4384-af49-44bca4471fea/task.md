@@ -11,3 +11,10 @@ terra/max reviewer。按 MAM AGENTS/task show，仅为必要源库创建独立re
 注意：HF-fixed可以记录deviation streak>0但trigger=false，并不等于发生replan；该leaf尚只是matching-smoke候选，不等于HF有效或formal准入。历史跨进程bitwise失败不重跑、不改PASS。不要把wire stream/call当实际内部PRNG key，也不要把policy_timing当独立确认同步端到端时延。
 
 交精简report和本地JSON receipt（必要精确hash、重算计数、失败/限制、明确结论）；只读SSH拉取的小数据可留本任务evidence。先发实际阻断，正常完成发布report后结束turn。Manager独立从原始状态/动作字段分析科学边界，不需要你设计论文主张或按这两集提出调参。
+
+
+## Manager 最终验收（2026-09-14）
+
+接受 report b9016f63894f0bcd93abff0e67fb941814b6a94b 和 receipt a01a93ebee11144f6c60a10b1182272416d0420d64b2c14c94efd14fea0ac79f 的工程范围结论。Manager 独立重哈希13项证据、重算全部34个action/166个probe/198次forecast消费与1000完成行，并核读reset/四mat离散抽样源码及scheduler accepted-reset接线。两个不同seed请求正确传递，现有资料不足以认定reset bug或两个active初始条件不同；相同保存轨迹不能冒充独立失败机制证据。HF-fixed准时更新已确认，未发生replan，不建立有效性或formal准入。
+
+持久验收：/root/Documents/task-state-vla-paper/docs/audits/20260914-hf-original-entry/putback_hf_fixed_acceptance.json SHA e1c0eb3df0ab40b5cc771ddfe03db05c5089f415f0cc6d3c44285d2229fd8601；独立receipt/report已原字节保存同目录。本review无剩余工作，归档；源任务授权队列继续。
