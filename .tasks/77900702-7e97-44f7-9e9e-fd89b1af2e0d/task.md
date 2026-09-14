@@ -11,3 +11,10 @@ terra/max，只读窄范围审计；Manager负责科学裁决和论文。先读 
 实际冻结runtime c-eval-putback-baselines-yaml 三库 RMBench f401f5279c95451eb424ac98b831bab5552b2120 / bridge f9626636c4776d8eb15f9c556775cb2d12c000e5 / OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4；区别于 task登记的源worktree head。核对真实checkpoint train1、eval2、H50/K30、90/30秒、legacy continuous action RNG、metadata来源、command和matching smoke。终验器实际SHA 6368b249c1615ac35f87a813accaf1dfdcc895cf425e76fc442988cb4eb4c885；仅私有MAM ID更正是否与保留原件一致应核实。两个旧jobs 0f7daad0-ba87-41dc-8efd-57431d03a289 / 8883cf5e-9fd9-4255-b120-eac472a20c40 已归档。
 
 不运行GPU/模型/仿真/训练，不拷大资产，不修改结果、冻结源码、owner report或论文；不触碰运行中train2 jobs，不归档源任务。无源码修改，无需无关worktree。小型证据/JSON receipt放本task目录，保留可供Manager独立核算的两叶原始preflight/diagnostics与final_review。可参考已归档afcae511工作流程但不得依其旧结果宣称本次通过。交精简报告、receipt路径/hash、实际检查与限制、是否有阻止计入正式结果的缺口，发布后结束turn。
+
+
+## Manager 最终验收（2026-09-14）
+
+接受独立report fa5a4fca16869227ef374f3bee85ccb87c4c0963 与receipt eac1c29667fd65894a9b55dc46deef36249c0fba5df8b578d10fbb8230d3605b；Manager另从本地副本及C1重哈希两份final review和20项原件，重算200条连续seed/accepted/terminal/outcome/失败类别，核对进程退出、视频策略、实际config/checkpoint和smoke留存链。J58/100、T62/100纳入正式台账。未重解码视频、多GB模型依赖来源链及已删除smoke raw限制保留。
+
+持久验收receipt /root/Documents/task-state-vla-paper/docs/analysis/putback_jt_train1_eval2_acceptance_20260914.json SHA 912eea54c9aecc371e694760a68c91ebd1f693f0fa8440830058bcf22a596af4；独立receipt已原字节保存同目录。新快照 accepted_results_20260914_jt_train1_eval2.json SHA 7491997a1daa1709d638c7a348a129d015916075fffa50ea0a7ea9b9b22485a5：48批/4800执行/20模型/14完整3eval。训练seed分析由Manager完成，原train2队列继续。本review无剩余任务，可归档。
