@@ -1,72 +1,80 @@
-task_revision: 25c8959f56be40bada047087d4572bff069aba76
+task_revision: b361eb600b45611f223a8b99e91fbda661f69d26
 
-# V 工程、真实 CPU 准入与 P1 修复交付
+# V 工程、CPU 准入与双卡容量 profile 交付
 
-完成既定 V 的真实五任务 CPU 输入准入、非空两步容量 profile 候选，以及 review `a98a1d8e-bf13-4316-9425-18389580fc6c` 指出的运行时 P1 修复。未启动 GPU、两步 smoke、20k 训练或闭环评测；没有登记长进程。
+已完成既定 V 实现、五项真实 CPU 输入准入、P1 runtime 修复，以及 Manager 授权的 wuwen-11 GPU0/1 双卡 FSDP 两步容量 profile。双卡在首次 optimizer update 真实 OOM，未生成 step-2 checkpoint；因此 metadata gate、checkpoint-only policy restore、18-slot `[50,14]` 推理、推理显存和 CPU RSS 都没有运行。没有启动 20k formal、评测、额外 GPU profile，未使用 GPU4/GPU6，也没有扩大卡数或修改 batch、图像槽、相机或分辨率。
 
 ## 交付 commits
 
 | 仓库 | worktree | 交付 commit |
 | --- | --- | --- |
 | OpenPI | `/mnt/public/xcj/Projects/workspace/e34ba9b3-34e2-4df4-92d8-4cea983b7303/openpi` | `66d9253cf1bdc4971e59cdae7827846eccdb4714` |
-| RMBench | `/mnt/public/xcj/Projects/workspace/e34ba9b3-34e2-4df4-92d8-4cea983b7303/RMBench` | `f402babca5e7621be83f1725033e858aef69d091` |
+| RMBench | `/mnt/public/xcj/Projects/workspace/e34ba9b3-34e2-4df4-92d8-4cea983b7303/RMBench` | `4db38c1f936c3e1bed1c85114d8173b07a472243` |
 | robot-bridge | `/mnt/public/xcj/Projects/workspace/e34ba9b3-34e2-4df4-92d8-4cea983b7303/robot-bridge` | `20dae84e5fc2e48f93e72b5c1b8a0001071fec94` |
 
-原 V 交付保持在 OpenPI `96e37e840f196d3b0945994d9a9bb5980d25ca58`、RMBench `a03fd1c3a40ac89542b7afe80d7188acd3dc2bd9`、robot-bridge `20dae84e5fc2e48f93e72b5c1b8a0001071fec94`；本轮只追加 OpenPI `dd6b4866eef80d76adbb5ed6eccc349ceca8c32f` / `66d9253cf1bdc4971e59cdae7827846eccdb4714` 和 RMBench `f402babca5e7621be83f1725033e858aef69d091`。三条 worktree 均为干净状态。
+OpenPI 的 V 实现与 P1 修复保持在 `96e37e8…`、`dd6b486…`、`66d9253…`；RMBench 的 CPU 准入候选基线为 `f402bab…`，本轮增量 `4db38c1…` 只记录双卡结果、保留旧单卡证据并扩展纯 JSON validator。三条本地源码 worktree 均干净。
 
-## Review P1 响应
+## V 工程与真实 CPU 输入
 
-- `VisualHistoryRuntime` 的 pending 现在绑定 episode generation 和 cache revision。reset 后的 late commit、或已被另一个提交取代的 pending 都会明确拒绝，不会把旧 episode 图像写入新 cache。
-- V `Policy` 用 reentrant lock 覆盖 prepare、model sample、commit、reset 和 JAX RNG 更新；并发 infer/reset 不能反序完成或跨 episode 泄漏。
-- reset 后首个 runtime 输入强制 `visual_history_frame_id.logical_step=0`，因此不能把晚到帧当 episode anchor。
-- `VisualHistoryLeRobotDataset` 改为 16-frame LRU，并只解码最近四个 prior query、anchor 和 current；不会随整个 persistent worker 生命周期增长。
-- V formal recipe 固定 `save_interval=20000`、`save_full_state=False`、`save_dtype="bfloat16"`。它保留 N/S/J 的 model-only 合同：完成 checkpoint 可按 metadata 做 policy restore，不支持 optimizer resume。两步 profile 强制 `save_interval=2`，其 CPU metadata restore gate 会核验该合同。
+- `VisualHistoryRuntime` 的 pending 绑定 episode generation/cache revision；reset 后 late commit 与被更新 pending 都会拒绝。V policy 用 reentrant lock 串行化 prepare、sample、commit、reset 和 JAX RNG；episode 首次 infer 强制 `logical_step=0`。
+- `VisualHistoryLeRobotDataset` 的 decoded-frame LRU 上限为 16；仅解码 anchor、current 和最近四个 prior query。V 在归一化前只选择 state/action 前 14 维，随后模型补至 32 维。
+- `cpu_preflight_20260914.json` 覆盖 `rearrange_blocks`、`put_back_block`、`swap_blocks`、`battery_try`、`cover_blocks`：每项均为 50 episodes、三路 CHW `[3,480,640]`、batch 32、18 槽、H50/K30、matching N 14D norm。query rows 分别为 700、609、1,018、1,111、1,718；norm SHA-256 已在 manifest 及 preflight 中记录。
+- `observe_and_pickup`、`swap_T`、`blocks_ranking_try`、`press_button` 保持对应 data owner pending，未填虚构 repo 或 norm。
 
-新增回归覆盖 reset→late commit、pending completion 反序、首帧非零 step 拒绝、policy infer/reset 串行化、LRU 上限，以及 formal/smoke checkpoint 参数。
+## wuwen-11 双卡 FSDP 容量 profile
 
-## 五个真实 CPU 输入结果
+B 端隔离 worktree：`/mnt/public3/xcj/Projects/state-vla/workspace/e34ba9b3-34e2-4df4-92d8-4cea983b7303/openpi`，基于干净 OpenPI `66d9253…`；其受管环境 smoke 通过。启动前 GPU0/1 各有 76,741 MiB 空闲、0% 利用率且无可见 compute PID；GPU4/GPU6 未选用。
 
-证据文件为 RMBench `experiments/pi05_visual_history_v/cpu_preflight_20260914.json`。全部从 OpenPI `66d9253…` 以 `JAX_PLATFORMS=cpu` 执行：每行 50 episodes、三路 `[3,480,640]` RGB、raw state/action `[32]` 的前 14D robot prefix、K=30、实际 batch 32 和全部 18 图槽通过；模型侧 state/actions 分别为 `[32,32]` / `[32,50,32]`，norm 输入仍为 14D。
+实际训练命令使用 `env -u HF_LEROBOT_HOME`、`CUDA_VISIBLE_DEVICES=0,1`、`PYTHONPATH=src`、`XLA_PYTHON_CLIENT_MEM_FRACTION=0.95` 和 `--fsdp-devices=2`。mesh 为 `(batch=1, fsdp=2)`，`PartitionSpec((batch, fsdp),)` 将 global batch 32 切为 GPU0 rows 0–15、GPU1 rows 16–31，即每卡 16；eligible 参数与 optimizer tensor 沿 FSDP axis 分片，未形成 data-parallel replica group。
 
-| task | query rows | N robot norm SHA-256 | batch 后 RSS MiB |
-| --- | ---: | --- | ---: |
-| `rearrange_blocks` | 700 | `5d84df27e9fce3c6ec28585319ed293fa59fc1822063ecfa0e95c5bf4478606b` | 1650.27 |
-| `put_back_block` | 609 | `7a014e42dc9d51c8601b05dca5c876c58dda1308e61d1619e3d1c367baa7f261` | 1726.64 |
-| `swap_blocks` | 1,018 | `acb30919ff4be931da9c62173959971f9944bfc6d304ee80ab09448d79f6b336` | 1927.45 |
-| `battery_try` | 1,111 | `5ebaa98a5bf1151f9480811173cf5cd4de0a5e53ca6e123dea75a997bbb0be89` | 1843.65 |
-| `cover_blocks` | 1,718 | `ca4cf5ffdf648b61bcfa63e40532ab285b1368ceff728efa53fafa60bd27e551` | 2076.14 |
+冻结合同保持 Pi0.5、rearrange 的真实 50-demo repo、matching N norm `5d84df27…4478606b`、14D robot inputs、H50/K30、三相机、原始 `3×480×640`、18 slots、global batch 32、seed 0、BF16 model-only；仅增加资源配置 FSDP2 与技术计时所需 `--log-interval=1`。运行名和输出根为 `v_rearrange_blocks_capacity_profile_fsdp2_seed0_rerun1` / `pi05_visual_history_v_capacity_profile_fsdp2_rerun1`，不会覆盖旧 GPU6 单卡 OOM。
 
-每个 worker 的 cache 都实际到达上限 16，decoded raw RGB arrays 为 `176,947,200` bytes；RSS 是 CPU loader 的观测值，不能代替 GPU 容量 profile。每行还核验 metadata、converter 和 N checkpoint 内 norm copy 的 SHA-256。
+结果：模型初始化 240.99 s，profile wall 472.55 s；首次 optimizer update 前 OOM。GPU0 peak 74,747 MiB、minimum free 6,408 MiB、GPU1 peak 74,705 MiB、minimum free 6,450 MiB；两卡 max util 均为 100%。XLA 在 GPU0 与 GPU1 都报告请求 51,561,303,472 bytes（48.02 GiB）。没有完成 update、没有保存 checkpoint、没有 step-2 目录。故无有效 train-step/save 时长，也不能声称 restore、`actions.shape == (50,14)`、inference mean/p95、inference GPU memory 或 CPU RSS。
 
-`observe_and_pickup`、`swap_T` 保持数据 owner `f0011538-fbad-49f6-b117-4d628f2bf30c` pending；`blocks_ranking_try`、`press_button` 保持 `2a792e9a-9fbe-4334-bf8e-b7e293bdd64a` pending。它们没有假 repo、假 norm 或 runnable job。
+首个同名前缀启动器因 wuwen-11 缺少 `/usr/bin/time` 在 Python 启动前退出 127；其独立日志已保存，且不计为训练尝试。随后独立 `rerun1` 才是上述真实双卡 OOM。既有 GPU6 单卡收据 `a98_review_failure_20260915/profile_receipt.json` 原样保留，双卡收据不覆盖它。
 
-## 容量 profile 与 formal 候选
+## 证据、回传和清理
 
-- `jobs_smoke_candidates.json` 现在只有一个 `rearrange_blocks` technical capacity profile，状态为 `pending_manager_authorization`。它固定 batch 32、H50/K30、三相机、source 分辨率、18 槽、真实 repo、matching N asset/hash、OpenPI `66d9253…`、robot-bridge `20dae84…` 和 RMBench 基线 `a03fd1c…`。
-- 候选实际命令显式传入 `--visual-history-smoke --num-train-steps=2 --save-interval=2`；step-2 checkpoint 只能作为 `technical_smoke`，不可 formal/eval。receipt 固定写入候选 JSON 中的 `profile_receipt_path`，要求 peak GPU memory、init、两次 step、save、恢复后 18-slot inference mean/p95、source commits、norm hash、restore result 和 GPU identity。
-- `jobs_formal_candidates.json` 仍为 `jobs: []`。模板固定 20k / batch 32 / seed 0 / `--save-interval=20000` / BF16 model-only，不会启动任何正式训练。
-- 两个 manifest 的 pure validator dry-run 都返回 `gpu_started: false`；本轮没有执行候选命令。
+本地独立收据及原始日志位于：
+
+```text
+/mnt/public/xcj/Projects/openpi/checkpoints/
+  pi05_visual_history_v_capacity_profile_fsdp2_rerun1/
+    pi05_visual_history_aloha_v/
+      v_rearrange_blocks_capacity_profile_fsdp2_seed0_rerun1/
+        profile_receipt.json
+        profile_metrics_summary.json
+        remote_deployment/
+        pre_python_launcher_failure/
+```
+
+`remote_deployment` 的 19 个文件已逐项 SHA-256 回传校验；receipt 本身的本地/远端 SHA-256 均为 `0cbfc0ed3af28ec2592bbe370921acee7585302c4a2cc5175af9a87a92de92e6`。没有生成模型或 checkpoint，因此本地 checkpoint-only restore 不适用；B 上仅删除空 checkpoint run 目录，保留轻量 failure evidence。未登记 MAM long job：实际 profile 7.9 分钟，低于 30 分钟阈值。
+
+RMBench `README.md`、`jobs_smoke_candidates.json` 和 `validate_candidates.py` 记录 FSDP2 outcome、旧单卡 receipt 引用、formal 未授权状态和 validator 的 rejected-profile 分支。`jobs_formal_candidates.json` 仍为零个 formal jobs。
 
 ## 验证
 
 ```text
-PYTHONPATH=src JAX_PLATFORMS=cpu .venv/bin/pytest -q -m 'not manual' \
-  src/openpi/training/visual_history_test.py src/openpi/training/config_test.py \
-  src/openpi/training/checkpoint_metadata_test.py src/openpi/training/data_loader_test.py \
-  src/openpi/policies/policy_test.py src/openpi/models/pi0_test.py
-# 49 passed, 2 deselected
+# B isolated environment
+.venv/bin/python scripts/worktree_env_smoke.py
+# passed: locked torch, private transformers patches, editable OpenPI
 
-JAX_PLATFORMS=cpu PYTHONPATH=src .venv/bin/python scripts/visual_history_preflight.py \
-  --output /tmp/v_preflight_all_runtime_fix.json
-# 5 rows written; CPU only
+# B no-training mesh check
+CUDA_VISIBLE_DEVICES=0,1 ... fsdp_devices=2
+# device_count=2; mesh={batch:1, fsdp:2}; global32 -> 16/card; 18 keys; H50/K30
 
+# RMBench result metadata
 python experiments/pi05_visual_history_v/validate_candidates.py \
   --manifest experiments/pi05_visual_history_v/jobs_smoke_candidates.json --dry-run
 python experiments/pi05_visual_history_v/validate_candidates.py \
   --manifest experiments/pi05_visual_history_v/jobs_formal_candidates.json --dry-run
-# both gpu_started: false
+# both gpu_started=false
+
+# changed validator
+openpi/.venv/bin/ruff check experiments/pi05_visual_history_v/validate_candidates.py
+python -m py_compile experiments/pi05_visual_history_v/validate_candidates.py
+git diff --check
+# passed
 ```
 
-OpenPI changed-file Ruff、RMBench validator Ruff、JSON parsing、`py_compile` 和各 worktree `git diff --check` 均通过。候选 CLI 也以完整 nested repo/asset/smoke/save flags 做了 CPU-only config parse，未调用 `scripts/train.py`。
-
-实际 step-2 checkpoint 尚不存在，因此候选中的 `--check-checkpoint` restore gate 尚未运行；CPU checkpoint metadata roundtrip 已覆盖该保存合同。GPU profile、formal training、policy runtime restore of a generated checkpoint 和评测都仍需 Manager 准入。修复 commit 已备好供 review `a98a1d8e-bf13-4316-9425-18389580fc6c` 复查，本执行者不等待 review 结果。
+双卡容量证据应交回原独立 review 增量验收；Manager 如需继续，只能在新授权下决定资源或冻结合同的后续处理。
