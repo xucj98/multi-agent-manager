@@ -3,9 +3,9 @@
 ## 已提交的工程交付
 
 - RMBench worktree：`/mnt/public/xcj/Projects/workspace/f0011538-fbad-49f6-b117-4d628f2bf30c/RMBench`
-  - commit `03ba4e2a8a0aee7b0b59ea0b701d85c1c9304873`
+  - commit `05e512f529a4dea393d2f730b1f34ed6d5b5f212`
   - 两任务的 source-only 逐帧 trace、独立 `collection_provenance/episode<N>.json`、确定性 seed/attempt 记录、2 集 smoke/50 集正式入口、完整性验证器和 schema 草案。
-  - provenance 在 replay 结束且环境关闭前冻结；不再写入 `play_once()` 的 `info`，避免进入 RPC/在线 policy 路径。
+  - provenance 在 replay 结束且环境关闭前冻结；不再写入 `play_once()` 的 `info`，避免进入 RPC/在线 policy 路径。断点恢复仅在 HDF5、trace 与 provenance 全部存在时跳过该集，半成品会保留并显式报错。
 - openpi worktree：`/mnt/public/xcj/Projects/workspace/f0011538-fbad-49f6-b117-4d628f2bf30c/openpi`
   - commit `6c0501725dc4d244d813db18edaaba9fe69fafeb`
   - 14-D robot-only LeRobot converter、N sidecar、两个 no-memory YAML 与 pi0.5 H50/K30、bs32、20k、seed0 配置。
