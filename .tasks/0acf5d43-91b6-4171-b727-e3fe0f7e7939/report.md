@@ -1,3 +1,15 @@
+# 置顶：第一层 J rearrange HF-event eval0 formal100 终态审计与首个自然 trigger（2026-09-14）
+
+C3 GPU0 outer PID `2112144` 已停止。终态审计将其归类为**自然正常完成**：`BenchmarkRunner` 的结构化 summary 为 `completed`、`error=null`、target `100`；100 个 scheduler 均 exit 0，robot/policy 为 runner 受控 `-15` shutdown，outer 中早期连接重试没有覆盖这一终态结论。连续 accepted seed 为 `100000..100099`，结果为 **84/100**（16 个普通任务失败：`block2_not_moved_to_middle=7`、`button_not_pressed=7`、`button_pressed_multiple_times=2`）。这是冻结原件的描述性结果，不作科学结论。
+
+终态收据为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_hf_event_rearrange_evalseed0_terminal_audit_20260914.json`，SHA-256 `9f33589e01c6b53a64b6f323b1859dddcbd87121cb1aa50af755d4b0f68d373b`；审计器 `tools/audit_formal_hf_event.py` SHA-256 `530176353be9455b1f9eb04bb9cfa505b2acc90418030e31fc2573a3d67f0d6e`。它实际调用 recorder 的 `validate_smoke_run()` 和每集 `check_rolling_evidence(..., required=True)`，核对 matching smoke identity、formal preflight/quiescence/formal-start、100 个 reset 与 terminal、5 个 MP4 的 `ffprobe`/`ffmpeg` 解码、102 starts / 102 exits、以及所有 rolling plan 生命周期。冻结 runtime 仍为 OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`，均 clean。
+
+本批有 **154** 个自然 `plan_triggered`，分布于 39 个 episode；首个在 episode 14 / seed `100014`（该 episode terminal Success）。专门原始收据为 `receipts/formal_hf_event_rearrange_evalseed0_first_natural_trigger_20260914.json`，SHA-256 `332c0aa3d6fe7ab371153e6789f451c53541fa6ed201b66fcd9973eef3a0f862`；逐字节 raw excerpt 为同名 `.raw.jsonl`，SHA-256 `d1c345f9933ac574105c6bf5f3b78fde29140cad9e3ad875eeca1a7d3894dfb5`。它复制原 `rolling_evidence/episode14.jsonl`（SHA-256 `fcaf7a080932d302aa5379ff8afc7e207176a8a7fc8225b501d048bf1bd76466`）的 174–186 行。
+
+首个 trigger 的时序为：plan 10 / source `270` 的普通 action query 10 已执行 prefix `15`，剩余 queue `15`；d=10 的 probe call/RNG 47 为 2/3 phase mismatch、streak 1，d=15 的 probe call/RNG 48 为 3/3 mismatch、streak 2，满足冻结判据。`plan_triggered` 原始行记录 clear `dropped=15`，与剩余后缀精确相等；下一条即为 plan 11 / source `285` 的 `start_reason=event_trigger`、`request_type=infer_audited` 的正常 action infer，使用 action RNG call 11（不是 probe RNG），输入与触发 probe 输入相同，后续记录证明新 plan 已执行 5 行、queue 为 25。收据还记录旧/新 queued actions 的 SHA-256，且 clear 与下一 plan 之间没有旧 plan record。此证据已保留供 Manager 独立裁决；未经裁决不会启动任何后续新的 event batch。
+
+state 提交：`d3018f0`（`audit: record HF-event eval0 terminal and trigger evidence`）。
+
 # 置顶：第一层 J rearrange HF-fixed formal100 终态审计（2026-09-14）
 
 三条已授权 HF-fixed formal100 均已完成并通过终态审计；每条均为连续的 100 个 accepted episode，不以 smoke 或运行中日志推断结果：
