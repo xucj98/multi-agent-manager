@@ -18,3 +18,6 @@
 现授权在wuwen-11实查空闲GPU0上从pi05_base独立开始一条battery S seed0/bs32/H50K30/lag30/20k save20k/BF16 model-only正式训练。使用v7 launch_battery_s_b_formal20k_candidate.sh（SHA a985e81820280bd8b3e434aef64ab0cf6be9747d02433beb5dc72a5868c93607），允许设置MAM_FORMAL_20K_APPROVED为本TASK-ID；不得从smoke续训。启动前校验HEAD/hash、数据资产、GPU约75GB以上空闲与无干扰、正式根不存在。GPU0不可用可选同机满足条件空闲卡并记录。
 用nohup/setsid等脱离SSH会话的持久入口启动，不让20k随连接结束；立即登记真实训练PID的MAM job，记录父子PID及启动收据。确认真正进入训练/有限step后发布，不长轮询。完成后验收20k保存与CPU/GPU checkpoint-only恢复，再归档job。
 B统一Projects/state-vla目录及共享cache约定不变，HF_LEROBOT_HOME unset。只新增这一条模型；不扩seed、数据或schema。此前失败原件与迁移映射保留。
+
+## 用户新增收尾要求：B checkpoint回传后删除远端副本
+训练继续，不改运行中路径。完成后严格阅读本机 /mnt/public/xcj/Projects/multi-agent-manager/.local/wuwen-11.md 的“训练完成、回传与删除远端 checkpoint”。本任务新生成的formal及保留smoke模型须经zx-data→wuwen-nx-aic回传本集群 /mnt/public/xcj/Projects/openpi/checkpoints/ 同group结构，逐文件SHA-256/大小校验、A侧checkpoint-only恢复通过且无活跃依赖后，直接删除B相应已核验模型副本；保留日志/来源/失败/迁移及删除收据，不删除共享pi05_base、cache、数据或他人模型。长传输登记MAM；在报告中区分训练完成、回传验收、B副本删除三个状态。此清理用户已授权，无需再次请示；传输或本地恢复未通过禁止删除。
