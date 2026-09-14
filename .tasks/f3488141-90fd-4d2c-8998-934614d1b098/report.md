@@ -1,86 +1,36 @@
-# 六个首波 N/J 模型的 Cluster-C 评测准备（C1 manifest job 运行中）
+# 六个首波 N/J 模型的 Cluster-C 评测执行（C1 runtime repair 运行中）
 
-本轮没有启动任何 GPU evaluator、smoke 或 formal，也没有训练、数据集、pi05 base、cache 或 HF 资产传输。HF 仍依赖的
-`/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914`
-已保留且未改动。
+六个 20k checkpoint 已传输并验收，冻结 runtime 为 RMBench `ad7f9d6ba9acd16c31243ad4811e0dfa31cef514`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。C3 的 `c3-highfreq-engineering-20260914` 未被读取、修改或删除；没有启动训练、GPU smoke 或 formal。
 
-## 冻结运行时与本机协议准备
+本机 18 项 prepare、smoke dry-run 和 formal dry-run 已通过。它们固定 train seed 0、eval seed 0/1/2 对应 100000/200000/300000 起点、H50/K30、`demo_clean_eval`、首次 infer 90 秒与后续 30 秒。checkpoint schema 经 `load_train_config → _runtime_metadata → MemoryContext` 恢复，没有 GT memory 注入或按 task 名猜字段。六个 C checkpoint 的文件数和 `_CHECKPOINT_METADATA` SHA 已验收，未传数据集、pi05 base、训练缓存或 HF 资产。
 
-- RMBench task worktree 只含一项小配置提交：`ad7f9d6ba9acd16c31243ad4811e0dfa31cef514`
-  (`Prepare N/J memory schema evaluation variants`)；其 `rmbench_base` 固定为
-  `f401f5279c95451eb424ac98b831bab5552b2120`，并增加 swap_blocks、battery_try、cover_blocks
-  的 N/J metadata assertion variant。bridge/OpenPI 固定为
-  `f9626636c4776d8eb15f9c556775cb2d12c000e5` 和
-  `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，三库均 clean。
-- C1 隔离 runtime 位于
-  `/mnt/public/xcj/Projects/state-vla/workspace/f3488141-90fd-4d2c-8998-934614d1b098/wave1-nj-original-protocol`；
-  RMBench/bridge/OpenPI HEAD 分别为 `ad7f9d6`、`f962663`、`a869498`。为导入 RMBench 小配置提交，只在
-  stable repo 建立 isolated ref `task/f3488141-90fd-4d2c-8998-934614d1b098-rmbench-protocol-config`，未切换 stable checkout。
-- 本机 18 个 `(checkpoint, eval0/1/2)` 已在 `JAX_PLATFORMS=cpu`、`CUDA_VISIBLE_DEVICES=''` 下完成
-  `--prepare-audit`、smoke dry-run 与 formal dry-run。总表为
-  `/mnt/public/xcj/Projects/workspace/f3488141-90fd-4d2c-8998-934614d1b098/transfer/local_protocol_preparation/index.json`：
-  `status=passed`、`total=18`。每项固定 training seed 0；环境 seed 起点为 100000/200000/300000，H50/K30、
-  `demo_clean_eval`、首次 infer 90 秒、后续 30 秒和 matching smoke → formal 引用均已核验。
-- checkpoint metadata 经 `load_train_config -> _runtime_metadata -> MemoryContext` 直接恢复 schema、fields、feedback
-  与 `demo_clean_state` 来源；没有向 evaluator 注入 GT，也没有按 task 名猜字段。RMBench dynamic loader 已实际确认支持
-  `swap_blocks`、`battery_try`、`cover_blocks`；BenchmarkRunner 每个 run 只启动一次 policy server，100 episode 中保持连续 action RNG。
+## 首项已具备的执行门禁
 
-## Cluster-C checkpoint 传输已完成并核验
+`swap_blocks` N、eval0 的 prepare 和 smoke dry-run 已在 C1 成功完成。其候选为：
 
-传输 job `f621fcb1-ffa2-4b80-ba70-28bed708d660` 的原始日志位于
-`/mnt/public/xcj/Projects/workspace/f3488141-90fd-4d2c-8998-934614d1b098/transfer/transfer.log`，脚本在
-`2026-09-14T18:01:37+08:00` 完成。六个 C 目标都包含 `params/`、`assets/`、`metadata/`、`_CHECKPOINT_METADATA`，
-文件数和 metadata SHA-256 与源一致，并各自通过 `rsync -aicn --delete --omit-dir-times`：
+- smoke：`c_wave1_swap_blocks_n_trainseed0_evalseed0_smoke2_r1`
+- formal：`c_wave1_swap_blocks_n_trainseed0_evalseed0_100ep_r1`
+- checkpoint：`.../pi05_rmbench_swap_blocks_no_memory/memory20k_5835fa0_nocmdbuf_swap_blocks_n_s0/20000`
+- audit：`RMBench/.local/memory_schema_eval/inputs/swap_no_memory--57835512d288ff62--train0--eval0/input_audit.json`
 
-| checkpoint | files | metadata SHA-256 |
-| --- | ---: | --- |
-| swap J | 55 | `de788ccf…42ebfd` |
-| battery J | 60 | `ef37c836…9d680a` |
-| cover J | 55 | `49a2f02f…52f2de` |
-| swap N | 56 | `d3bf7079…a2b1c9b` |
-| battery N | 58 | `83f2b31c…5cbb7` |
-| cover N | 59 | `d2f60c9f…a156426` |
+该 dry-run 的 metadata 已确认 `pi05_rmbench_swap_blocks_no_memory`、无 memory fields、`demo_clean_state` 来源、H50/K30、environment seed 起点 100000。输出位于 C1 task workspace 的 `c_protocol_preparation/00_swap_blocks_n_eval0_smoke_dryrun.stdout.json`。
 
-没有覆盖既有目标，也没有传输数据集、pi05 base、训练缓存或 HF 资产。
+## C1 共享 Python 缓存故障与修复
 
-## C1 manifest 生成状态
+旧 CPU-only job `f3ad56f9-7766-46ee-8a98-110a3ba9d297` 已归档。它先完成上述首项 smoke dry-run，之后在 formal dry-run 的 Python 导入中反复进入 `wait_on_page_bit_common`；证据显示阻塞跨越 `wandb`、`pandas`、`multiprocess`、`fsspec`、`polars`、`aiohttp`，并最终定位到共享 Python 3.11 标准库 `bz2.pyc` 和 NumPy OpenBLAS 文件。它不是 checkpoint、schema 或 GPU 问题。
 
-第一次 C1 CPU job `65987649-f3f6-444b-bd91-080cdbcaaecb` 没有形成完整 receipt：它在写完
-swap_blocks N / eval0 的 prepare、smoke dry-run、formal dry-run 后停止，
-`c_protocol_preparation.partial_foreground_session_interrupted_20260914T120620Z/index.json` 只含第 0 条，
-没有最终的 `status`/`total`。这三份 stdout JSON 均有效、stderr 均为空；没有下一条 invoke 的 stderr 或脚本级异常日志。
-当时使用的是前台 SSH 输出流，进程停止边界与首次 `PASS` 输出完全相邻，因此按 launcher/session 中断保留为首因，
-不把它误报为 schema 或 checkpoint 失败。
-
-partial receipt 已保留，原输出目录重新留给同一、未修改的脚本。重启 job：
+证据与局部精确副本位于：
 
 ```text
-MAM job: f3ad56f9-7766-46ee-8a98-110a3ba9d297
-host/PID: wuwen-4090-1 / 1873761
-script: .../transfer/prepare_c_nj_manifests.py
-stdout/stderr: .../workspace/f3488141-90fd-4d2c-8998-934614d1b098/c_protocol_preparation.nohup.log
-output: .../workspace/f3488141-90fd-4d2c-8998-934614d1b098/c_protocol_preparation/
+/mnt/public/xcj/Projects/state-vla/workspace/f3488141-90fd-4d2c-8998-934614d1b098/transfer/c1_uv_cache_read_repair_20260915/
 ```
 
-该进程使用 `nohup`、stdin `/dev/null` 和 task-local log，且已由 init 收养；脚本内部仍固定
-`JAX_PLATFORMS=cpu` 与空的 `CUDA_VISIBLE_DEVICES`。每次观测的 `nvidia-smi` 都没有显示新的 GPU compute process；
-GPU0 的 16.9 GiB 进程是运行前已存在的他人进程。重启 job 只有在 `index.json` 达到
-`status=passed,total=18` 后，才会验收 C checkpoint 路径、冻结 commits、matching smoke/formal 名称以及 GPU1/2 的交替建议，
-并进入已批准的真实 smoke → formal 队列。
+其中 W&B `0.19.11`（911 文件、68,306,476 bytes）、其运行时依赖闭包、NumPy（916 文件、64,653,996 bytes）和 Python 3.11 标准库（1,260 文件、30,731,458 bytes）均已从 C2 精确复制到 C1 本机根盘并完成源/目标清单哈希核验。局部 probe 因后续任意共享包仍可阻塞，证明单包补丁不足。
 
-C OpenPI 的既有 `worktree_env_smoke.py` 在 symlink-mode 下因 `transformers_root.is_relative_to(.venv)` 路径断言失败；
-只读核验显示 5 个 `transformers_replace` patch 文件内容匹配且 `nlink=1`，installer 的 `uv pip check` 通过。该路径断言不是
-schema/manifest 阻断；真实 GPU smoke 必须按已发布准入通过自身门禁。
+当前登记 job `cc6d002a-249b-4f7a-a9c4-d5fa06128ab1`（C1 PID `1889131`）以低 I/O 优先级从 C2 顺序物化三套冻结 venv 的完整 site-packages 及 CPython 3.10 标准库到 `/root/state-vla-local-overlay/f3488141-90fd-4d2c-8998-934614d1b098/`。它使用参数化、白名单 source streamer；每项先断言 C2 source path、落地后检查 runtime sentinel。首次 OpenPI 传输已确认进入正确的目标树（约 317 MB 时观测），没有修改共享 uv cache、venv、三库源码、checkpoint 或 C3 runtime。此前一次错误归档 C2 home 的 task-local 临时副本已立即清除，receipt 已保留；该 job 已归档且未影响 runtime。
 
-## 已批准的 GPU 队列（尚未启动）
+完成后将以按解释器版本选择本机 stdlib、按 venv 选择本机 site-packages 的 task-local `sitecustomize` 启动 shim 验证 OpenPI、bridge 和 RMBench worker；不使用 `PYTHONHOME`，因此 venv `sys.prefix` 保持冻结 runtime。通过 CPU import 与真实 smoke 基础设施门禁后才启动 GPU。
 
-已发布准入 revision `e325a9c9f863395844582d3ea7ccb77b64392a6e` 允许在 C receipt 完整通过后直接执行，
-无需再次等待人工确认。每项必须保持 train seed 0、H50/K30、`demo_clean_eval`、首次 infer 90 秒、后续 30 秒，
-并让每个 run 的单一 policy server 跨 episode 保持 continuous action RNG；真实 smoke 的基础设施或身份门禁失败会停止该 lane，
-不能降低阈值、修改冻结协议或带入 HF per-episode reset。
+## 已批准的真实 GPU 队列
 
-C1 GPU1/2 每卡串行。按 swap → battery → cover 的 task N/J 配对轮转，先完成三个任务的 eval0 覆盖，再依次 eval1、eval2；
-同一 task/eval 的 N/J 尽量固定在同一张卡。每个模型都执行自身 matching smoke2 后才启动其 formal100，formal 显式引用该 smoke，
-每个长 formal 单独登记 MAM job，并保留全部失败、诊断、视频与退出证据。第一条候选 smoke 为
-`c_wave1_swap_blocks_n_trainseed0_evalseed0_smoke2_r1`，matching formal 为
-`c_wave1_swap_blocks_n_trainseed0_evalseed0_100ep_r1`。
+首波 eval0 固定卡位：GPU1 swap N、GPU2 swap J、GPU3 battery N、GPU4 battery J、GPU5 cover N、GPU6 cover J；GPU7 备用，GPU0 禁用。每卡一 lane，先启动 GPU1 真实 smoke 验证本机覆盖层、端口和 policy load，再错峰启动其余五项。每项 smoke 通过后自动启动自身 matching formal100，formal 的真实 PID 立即登记 MAM；失败保留全部结果和诊断并停止该 lane。随后按同样映射执行 eval1、eval2。
