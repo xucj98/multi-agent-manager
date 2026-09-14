@@ -10,6 +10,8 @@ C3 GPU0 outer PID `2112144` 已停止。终态审计将其归类为**自然正�
 
 state 提交：`d3018f0`（`audit: record HF-event eval0 terminal and trigger evidence`）。
 
+对应 MAM long-running job `380ad209-d5c5-432e-9718-247c2cced46a` 已于 `2026-09-14T12:18:45Z` 在终态审计后归档；归档注记记录了 84/100、matching smoke 与逐集 rolling evidence 通过，以及首个自然 trigger 收据。
+
 # 置顶：第一层 J rearrange HF-fixed formal100 终态审计（2026-09-14）
 
 三条已授权 HF-fixed formal100 均已完成并通过终态审计；每条均为连续的 100 个 accepted episode，不以 smoke 或运行中日志推断结果：
