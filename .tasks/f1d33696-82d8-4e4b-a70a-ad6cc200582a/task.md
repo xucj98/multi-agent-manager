@@ -1,0 +1,18 @@
+# HF工程阶段最终独立证据审查
+
+terra/max，只读有界审查，Manager亲自负责科学解释与正式准入。先读 MAM AGENTS/README/.local/README/.local/wuwen-4090.md，mam task show本TASK-ID与源task最新已发布report。源task 0acf5d43-91b6-4171-b727-e3fe0f7e7939。
+
+只审剩余三个已经结束的两集leaf；前面r_s30和put-back HF-fixed已有Manager验收，复用其收据，不重复审阅。C3 host wuwen-4090-3，共享runtime `/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914`；leaf在runtime/RMBench/eval_result/memory_chunk_20260910/：
+1. c_hf_j_hf_event_put_back_trainseed0_evalseed0_smoke2，report7b604bdd3f1aa471c0cca6537d5f1fa3ab3fe203；stage SHA eff848ff7cd3f09cc14ab27c086cdde48ba740cde52f25e4e884c2210d2873db、trace SHA2ee5b6e3f51fbd9770ae96d94f57c17a40ff4dddda7ef04d6a40571a132c3cec、review7285dea5822bcc1f67f3943ac1af1830796d3305d832e14b6c90f90195ebf9b9。
+2. c_hf_j_hf_fixed_rearrange_trainseed0_evalseed0_smoke2，reportaf9ea57a962c22c204664d861bd66da468dc4249；stage831120a90e00f72563197cc87d591bedb8e0dc3a37b13d965093d44caa9c0912、trace649bf10718a99346ce453c167e8384c5383a19167db8d2558c06bc4dbf8e42c2、review2f95b8c50f94194aa62fcbca701efa9e2b01f8cd0876b7373e0f474a40a6e046。
+3. c_hf_j_hf_event_rearrange_trainseed0_evalseed0_smoke2，job def61eba-a703-480b-b431-eae84eb80ee1已停止，owner正在收尾。先审前两项，最后从源任务发布报告核对本leaf最终stage与收尾（不轮询，若尚缺收据则交明确缺项，不冒称最终通过）。Manager已直接读取两集terminal success392/404行，14次action/65和67次probe，未trigger；这只是待核实输入。
+
+stage目录 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/hf_trajectory_engineering_20260914/<profile>`；helper review runtime/.local/highfreq_engineering/audits/reviews/<profile>.review.json，execution按stage引用定位。helper SHA dcf93891de82adaf21e676c55ee30901309f9c9a6097841ff4be4c7ba7f29c87。冻结三库OpenPI0ce566bd34f99cb4775422f012ab67c16aa53885 / bridgeffa122494c19e1c0154e877010f7b470967ccfc6 / RMBench6abebf08d084d0be43aa56ebe158dc8395fa58e4。
+
+独立重哈希三叶的stage/trace/review/execution及review引用原件，核对checkpoint/metadata各任务正确、train0/20k、H50/K30/r_s5、三库、已接受seeds100000/100001、光照关闭、HF逐episode双流reset、视频策略/终态/进程退出。检查日志基础设施异常；视频可依赖owner解码收据，明确未重解码。仅复制小型证据，不重哈希多GB模型/资产。
+
+从rolling原件重算：每5完成行probe、边界消费/下一query输入、J绝对target与各任务metadata phase列、action/probe wire计数、实际K、终态丢弃和主动clear分开、完整证据。progress顶层logical_step可滞后，使用source_step+completed_rows/consumption.current_step/episode_status重建。事件判据固定phase三行至少2行不等、连续2次有效probe、10<=d<30。无trigger就是未观测该路径，不伪称成功重规划，不为覆盖而更改阈值/补样本。
+
+另窄核对既有CPU测试/已发布代码review对真实scheduler触发→clear→普通infer顺序、取消返回后缀、双流RNG、terminal和旧pending memory隔离覆盖了什么。优先只读源task report与冻结测试；如确需独立源码review，仅给bridge建冻结worktree并读其AGENTS，禁止重建三库环境/重跑全套测试/新造测试框架。无需运行任何新测试或GPU，报告已存在代码/测试证据的具体位置与未覆盖限制。历史跨进程bitwise失败保持失败，不能要求再重跑证明其PASS。
+
+最终交精简report和JSON receipt（原件路径/hash、独立重算、实际缺口）。回答是否存在具体工程阻断，以及三个leaf各自作为未来matching smoke候选的边界；不授权formal、不更新论文。缺少自然触发与代码缺陷须分开，不由你裁定算法效果。Manager将据证据明确决定后续原计划36批的分阶段准入。不修改源报告、冻结runtime、工具、结果、checkpoint、阈值或seed；完成后发布并正常结束turn。
