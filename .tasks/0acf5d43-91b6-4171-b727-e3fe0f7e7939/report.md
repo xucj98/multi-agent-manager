@@ -1,3 +1,13 @@
+# 置顶：第一层 J put-back HF-fixed eval2 终态审计（2026-09-15）
+
+C3 GPU2 的 `c_hf_j_hf_fixed_put_back_trainseed0_evalseed2_100ep` 已停止，但停止本身没有被视为成功。task-private `audit_formal_hf_fixed_put_back.py --eval-seed 2` 先通过不写入 dry audit，再以 recorder 的 `validate_smoke_run()` 和每集 `check_rolling_evidence(..., required=True)` 做终态审计。结构化 BenchmarkRunner summary 为 `completed`、`error=null`、target `100`：连续 seed `300000..300099` 的 100 个 preflight 均 accepted、100 个 episode 均正常终态，结果为 **82/100 Success** 与 18 个普通 `button_not_pressed_after_center` 任务失败。该描述性结果不触发重跑、阈值调整或选择样本。
+
+终态 receipt 为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_hf_fixed_put_back_evalseed2_terminal_audit_20260915.json`，SHA-256 `4eea6182261102c0dd35235c19745e45587264bd7f2e1a9885cf8353f0edb49d`。审计器 eval2 接线 state commit 是 `5ee393bf6b18a1c0426ad5cbd6f970ff17a518ab`，receipt state commit 是 `4c45d9eda04fc47f24e2dbcdac8f0792bec8cec8`。它核对 GPU2/`19420,19422`、冻结 clean 三库 HEAD、checkpoint/metadata、manifest `0fd8a86eaf238365927bd5a4066704c0e9f287cf4dbd0b23351178456af4643b`、scheduler `1b411a2a4adf0bcf2042dbbdf021b12d4a6a0e000b48df733c48895d16bee8f9` 和新的 strict matching-smoke2 config `e126930909857d7d14c8d6660dba2d875224ee31fffe7f5c0a4b7ceec64d580b`；`random_light=false`、`crazy_random_light_rate=0` 未变。
+
+100 份 rolling evidence 完整，均以一次 `policy_rng_reset` 开始，使用 `episode_reset_key0_independent_probe_v1` / `explicit_episode_reset`；HF-fixed 不含 trigger、clear 或 event replan record。原始汇总为 1,316 个 action plan、7,455 个 progress/forecast consumption、6,239 个 independent probe、1,216 个 completed plan 和 100 个 terminal plan，rolling aggregate SHA-256 为 `249174909d44d29b9f669f677b2501c4ec181a2924dc9407ecf273d33494f785`。前 5 个 MP4 均可解码；process ledger 有 102 starts / 102 matching exits，100 scheduler 均 exit 0，robot/policy 为 runner 受控 `-15` shutdown，全部记录 PID 已退出。
+
+MAM stopped job `9895bcfd-1cea-4ee3-b54a-4f13536ced18` 将在本终态报告发布后归档。按已授权固定 lane 顺序，随后只启动 GPU2 的 put-back HF-event eval2 strict matching-smoke2→formal100；不改变 seed、阈值、runtime、checkpoint、source 或冻结输入。
+
 # 置顶：第一层 J put-back HF-fixed eval0 终态审计（2026-09-15）
 
 C3 GPU0 的 `c_hf_j_hf_fixed_put_back_trainseed0_evalseed0_100ep` 已停止；停止本身未被当作结果。task-private `audit_formal_hf_fixed_put_back.py --eval-seed 0` 先完成一次不写入 dry audit，随后以 recorder 的 `validate_smoke_run()` 和每集 `check_rolling_evidence(..., required=True)` 实施终态审计。结构化 BenchmarkRunner summary 为 `completed`、`error=null`、target `100`，因此归类为正常完成：连续环境 seed `100000..100099` 的 100 个 preflight 都 accepted、100 个 episode 均正常终态，结果为 **49/100 Success** 与 51 个普通 `button_not_pressed_after_center` 任务失败。该结果不触发重跑、阈值调整或样本选择。
