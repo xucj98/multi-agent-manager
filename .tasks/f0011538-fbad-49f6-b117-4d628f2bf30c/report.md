@@ -20,6 +20,7 @@
 ## 来源与合同
 
 - 实查未发现两任务可复用的成品 `demo_clean_state` source；正式数据将使用非 eval 的自然数尝试 seed（0 起），并保存 planning/replay 成功、失败和筛选记录。正式 eval seed 范围 `100000..100099`、`200000..200099`、`300000..300099` 已显式排除。
+- 任务指定的 `EXPERIMENT_PLAN.zh-CN.md` 和 `ASSET_AUDIT.zh-CN.md` 已在 `/mnt/public/xcj` 实查，均不存在；该文档缺口已记录，未用猜测替代。`/root/.cache` 已确认链接至 `/mnt/public/xcj/cache`，且当前 `HF_LEROBOT_HOME` 未设置。
 - `observe_and_pickup` 保存 reference `(modelname, model_id)`、全部 candidate pair、初始 pose 和真实 occlusion-wall frame；这些都只在 source provenance。
 - `swap_T` 保存 actor-origin 初始 pose、逐帧当前 pose、Sapien `wxyz` quaternion 和 `[x,y,yaw]`。首帧落稳 pose 与 actor-origin 在旧 smoke 中相差约 red 1.96 cm、blue 2.18 cm；Manager 需冻结 canonical initial source。
 - `MEMORY_SCHEMA_DRAFT.zh-CN.md` 只是一份待裁决草案。J/S 未实现；现有 serial runtime 不能承载连续 swap pose，不能量化为 categorical 代替该问题。
