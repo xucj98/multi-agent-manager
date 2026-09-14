@@ -13,3 +13,10 @@
 已直接检查VisualHistoryRuntime reset/prepare/commit，确认pending无episode generation且commit会写入reset后的缓存。接受其P1阻断：修复reset与在途infer、反序completion，覆盖RNG/state串行化及旧generation拒绝，增加真实边界回归；首infer必须保证初始step0或显式锚点，不得以晚到帧代替episode初始观察。五真实任务与N norm及非空profile按上节继续。
 不接受把“model-only不能续训”自动当必须改full-state的缺陷：既有N/S/J均BF16 model-only，checkpoint-only policy恢复与训练optimizer续训是不同要求。继续匹配既有model-only合同，明确中断不可optimizer-resume；设置正式save_interval=20000并验证保存/CPU或GPU policy恢复候选，不自行增加full-state或改变实验。
 修复后交付新commits及问题逐项响应供同reviewer复查。未完成不得GPU/正式训练/闭环准入。数据loader缓存需有界并测CPU RAM，不能随整个数据集无限增长。
+
+## 2026-09-15 Manager：双卡容量方案准入
+已核对a98复审及实际OOM receipt：原P1/五任务CPU/norm修复接受；单卡18槽bs32首update OOM为实测容量阻断，非已训练。当前授权作者实现并执行一个双卡技术profile，不授权正式20k。
+
+优先wuwen-11 GPU0/1，先实查两卡空闲显存与利用率（此前各4.4GiB占用/0%，不能终止他人进程）；GPU4 battery与GPU6 observe预留禁止占用。利用现有训练device mesh/FSDP路径，固定GLOBAL batch32、seed0、18槽/三相机/原输入分辨率、H50/K30和base、norm、loss、optimizer。先确认batch在两卡的真实切分以及参数/optimizer分片语义，不将per-device batch32变global64。允许仅改资源配置/必要兼容限制并记录独立commit；不减少history/分辨率/相机/steps。禁止配置HF_LEROBOT_HOME，按B规范缓存软链，unset该变量；旧profile曾设置此变量须如实记录并在复测纠正，不改写失败记录。
+
+只做两step profile→save2→checkpoint-only policy恢复，记录两卡峰值、真实step耗时、全18有效槽policy动作[50,14]和mean/p95、独立推理显存及CPU RSS。若推理单卡不适配4090须给实测资源需求，不能只证明训练成功。失败即保存明确证据，不自行扩大四卡/改科学合同。短profile通常无需长job，预计>30min按MAM登记。结果交原独立review增量验收后Manager决定正式队列；九任务N/S/J不等V。
