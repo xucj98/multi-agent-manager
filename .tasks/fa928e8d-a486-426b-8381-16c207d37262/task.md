@@ -12,3 +12,9 @@
 先读MAM `.local/README.md`、`.local/wuwen-4090.md`、`.local/wuwen-11.md`。稳定B_ROOT=/mnt/public3/xcj/Projects/state-vla；三库稳定入口在B_ROOT下；本任务RUN_ROOT=$B_ROOT/workspace/fa928e8d-a486-426b-8381-16c207d37262/battery-s，部署材料在同TASK目录deployment/，共享cache=/mnt/public3/xcj/cache。worktree由稳定入口installer创建，不直接使用旧顶层仓库作为新runtime、不手工另起散乱venv。已有旧资产核验后复用，不迁移/覆盖未知或活跃目录。
 已报旧stage /mnt/public3/xcj/workspace/fa928e8d-a486-426b-8381-16c207d37262/deployment 尚无GPU/venv。授权先核实无进程引用，将该任务部署材料完整迁入新TASK/deployment（目标存在则先核对，禁止覆盖差异），核对hash并保存旧→新映射。AIC /tmp/battery_s_b_transfer_fa928e8d-a486-426b-8381-16c207d37262 同样迁入本机共享PROJECT_ROOT/workspace/TASK-ID下transfer staging，修改控制包所有路径，保留旧失败记录。旧stage只删除已核对迁移的本任务文件/空目录。
 不得移动活跃run或全局旧仓库；无需等我重复确认目录迁移。先落实目录、稳定installer路径与环境smoke，再恢复已授权传输/短训练；发布实际路径、映射/hash和入口证据。正式20k准入不变。
+
+## Manager正式20k准入（B v7）
+已阅读cc5c33d报告、完整gate receipt及实际launcher，独立核对gate SHA fbf924dd27fe893417aefd0372fd5ec7d2123646c5e4151eed3cf52435e4fc66、9项核心证据本地/远端hash一致，B runtime HEAD34002dce且clean。短50step保存、CPU全参和GPU policy恢复证据满足本次沿冻结源码的训练准入；未由Manager重复数值恢复。
+现授权在wuwen-11实查空闲GPU0上从pi05_base独立开始一条battery S seed0/bs32/H50K30/lag30/20k save20k/BF16 model-only正式训练。使用v7 launch_battery_s_b_formal20k_candidate.sh（SHA a985e81820280bd8b3e434aef64ab0cf6be9747d02433beb5dc72a5868c93607），允许设置MAM_FORMAL_20K_APPROVED为本TASK-ID；不得从smoke续训。启动前校验HEAD/hash、数据资产、GPU约75GB以上空闲与无干扰、正式根不存在。GPU0不可用可选同机满足条件空闲卡并记录。
+用nohup/setsid等脱离SSH会话的持久入口启动，不让20k随连接结束；立即登记真实训练PID的MAM job，记录父子PID及启动收据。确认真正进入训练/有限step后发布，不长轮询。完成后验收20k保存与CPU/GPU checkpoint-only恢复，再归档job。
+B统一Projects/state-vla目录及共享cache约定不变，HF_LEROBOT_HOME unset。只新增这一条模型；不扩seed、数据或schema。此前失败原件与迁移映射保留。
