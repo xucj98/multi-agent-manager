@@ -56,3 +56,16 @@ RMBench/data_smoke_postcommit/_logs/
 ## 后续受控步骤
 
 fresh smoke 通过 audit、HDF5 行对齐、scene provenance 和 ranking 泄漏检查后，分别在 GPU2/3 从 clean commit 启动各 50 条生成，并以 `setsid` 保存 stdout/pid、用 `mam job add` 登记。每个 50 条完成即单独审计、转换为 LeRobot、以 CPU 计算 `--max-frames 10000` norm stats 并发布进度。不会启动 20k 训练；训练前仍须由 Manager 验收数据完整性、来源/标签合同、CPU 验证和短恢复候选。
+
+## press_button fresh smoke 已通过
+
+- fresh smoke 退出码为 0；`attempts.jsonl` 中 `410000`、`410001` 各有一条 selected-success planning 和成功 replay。
+- HDF5 observation 行数为 episode0=`629`、episode1=`528`；均有 14D `joint_action/vector` 和三路等长 RGB。
+- 11/9 个物理按压 event 的 `frame` 均在 `[0, rows)`，且 `control_frame_boundary = frame + 1`；micro-stage 边界也在 `[0, rows]`。
+- 实际 LeRobot smoke repo：
+  `/root/.cache/huggingface/lerobot/press_button_demo_clean_state_no_memory_smoke_postcommit`。
+  回读结果为 2 episodes、1,155 rows、14D state/action、三路 `(3,480,640)` 图像；manifest 为 `memory: absent` 且 `source_scene_labels_copied_to_rows: false`。
+- CPU-only norm stats 已通过：
+  `/mnt/public/xcj/Projects/openpi/assets/pi05_rmbench_no_memory/press_button_demo_clean_state_no_memory_smoke_postcommit/norm_stats.json`。
+
+该结果只证明 fresh smoke 和 N 链路；canonical 50 条数据及任何训练尚未启动，待 ranking smoke 同样通过后按 GPU2/3 合同登记正式生成。
