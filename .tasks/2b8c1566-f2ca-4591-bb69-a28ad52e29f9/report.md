@@ -50,20 +50,16 @@ bash /mnt/public/xcj/Projects/state-vla/openpi/.local/create_worktree.sh \
 
 安装完成后显示 native profile、242 个 symlink 安装包、私有 transformers patch、cache symlink probe 和 `pip check` 均成功。随后默认命令 `.venv/bin/python scripts/worktree_env_smoke.py` 成功；解释器、`openpi` 和 `openpi_client` 都来自该新 worktree。日志与 metadata 位于该 workspace 根的 `create-worktree.log`、`default-cpu-smoke.log` 和 `verification-metadata.txt`。这只是 C2 结果。
 
-## C1 空白复验状态
+## C1 自测收尾（不作为空白验收）
 
-C1 `is-ddfwxekq6usner7v-devmachine-0` 已实际启动一个新的三参数复验，base、branch 和 workspace 分别为：
+本任务启动的 C1 `blank-c1-c03898f` 是修复者自测，不是原 `bed9952b-c1a2-40ec-9f6d-34feeba91aa5` 空白验收。它已从最初的共享盘 I/O 等待恢复，创建了 `c03898f` worktree 和 `.venv`，随后停在 `uv sync --frozen --active --link-mode symlink`。没有完成入口、`pip check` 或默认 CPU smoke，因此不提供 C1 通过或失败结论。
+
+在 `2026-09-15T03:01:24+08:00`，本任务的 `uv sync` 与原验收者的 C1 安装同时使用 `/mnt/public/xcj/cache/uv`；原验收者当时已进入 `pip check`，而本任务仍在 sync 等待。为优先原验收者，只核对并向本任务的精确 `uv sync` PID `1895752` 发送 TERM。该子进程于 `2026-09-15T03:03:00+08:00` 退出；`2026-09-15T03:03:28+08:00` 复核本任务进程树已不存在。原验收者的入口、受管安装器和 `pip check` 进程未被信号操作。
+
+保留部分 worktree、branch、`create-worktree.log` 与 `verification-metadata.txt`，没有删除或重试：
 
 ```text
-c03898f5a76f4ac208f7d23ae14e2cc759be8853
-task/2b8c1566-f2ca-4591-bb69-a28ad52e29f9-blank-c1-c03898f
 /mnt/public/xcj/Projects/state-vla/workspace/2b8c1566-f2ca-4591-bb69-a28ad52e29f9/blank-c1-c03898f
 ```
 
-这是同一次尝试，没有重试。它最初在 `2026-09-15T02:54:05+08:00` 的 `git worktree add` 阶段出现 `D / wait_on_page_bit_common`，之后自行恢复：worktree HEAD 已到 `c03898f`，共享目录链接和 `.venv` 已创建。随后进入 `uv sync --frozen --active --link-mode symlink`。
-
-截至 `2026-09-15T02:58:54+08:00`，该次 C1 `uv sync`（PID `1895752`）仍为 `Sl / futex_wait_queue_me`，安装日志在创建 venv 后没有新输出；当时 C1 共有两条 `uv sync` 使用同一共享 cache。尚未出现 transformers patch、`pip check`、入口完成输出或默认 `.venv/bin/python scripts/worktree_env_smoke.py` 的结果。因此 C1 没有通过或失败的 smoke 结论，不能以 C2 结果代替。
-
-早期 I/O 状态和当前 sync 等待状态、进程、日志、workspace 清单分别保存在上述 backup 路径的 `c1-blank-retest-blocked-snapshot.log` 与 `c1-blank-retest-sync-wait-snapshot.log`。未中断另一项 C1 安装、未启动 GPU、未作额外重试。若该同一次安装后续仍未完成，应先核对其部分 worktree、branch 和进程，再决定继续或清理，避免重复创建。
-
-这次启动原预计远低于 30 分钟，故未登记 MAM job；截至交付时本任务 `mam job list` 没有未归档 job。
+证据保存在 backup 路径的 `c1-blank-retest-cancellation-snapshot.log`、`c1-blank-retest-cancellation-result.log` 和 `c1-blank-retest-cancelled-create-worktree.log`。本任务没有仍在运行的 C1 进程，也没有未归档 MAM job；原验收者的进程归其任务处理。
