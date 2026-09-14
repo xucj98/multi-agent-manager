@@ -1,3 +1,17 @@
+# Manager 最终验收与本机归档准备（2026-09-14）
+
+原协议补齐八批均已验收。最后train2/eval2独立报告fa1416cd5d029a90be7cd4dc172a72e54ce98bfd，Manager另核对两份final review及20项核心原件、本地和C1双重hash，并重算200连续seed/preflight/terminal/outcomes/失败/进程/video策略。J68/T73已纳入论文提交8bd8143，当前52批/5200执行/20模型/16完整3eval；源report335817668c2caa8c66d1bc70f2e01d9ce7d35f7f的最后队列已完成。没有新GPU/训练授权。
+
+现在只做本机workspace的归档准备，沿terra/max。Manager查到 /mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a 除登记三库外还有 RMBench-ledger、RMBench-r3-lifecycle-gate、RMBench-warp-cache-docs、RMBench-c-eval-docs-consolidated、RMBench-r2-running-ledger、RMBench-eval-seed-runtime、RMBench-serial-ledger、manager-handoff-ack.md、c_checkpoint_transfer。MAM archive会先outer_check，再删除登记worktrees和task branches并rmdir根，不会自动处理这些额外条目。
+
+核对这些本机条目的用途、真实git注册/HEAD/dirty/合入状态和运行依赖。对已合入、无人使用的clean额外worktrees用git worktree remove正确移除，不用rm破坏注册；未合入提交用明确持久保留引用或小型bundle及说明保存到本task evidence/archive_preparation再处理；有未提交且来源不清改动则保留并报告，不强制删除。传输材料先核对是否为唯一checkpoint/必要来源证据，不重复复制大模型，已验证远端存在且仅临时副本的自有材料可清理；必要小型来源/哈希收据移到本task evidence保留。旧交接ack如无新增价值可删除。检查登记三库的ignored文件，保留唯一证据，确认可以由MAM删除其自有环境。核对登记三库HEAD在持久主分支/保留引用可达，避免archive删最后引用。
+
+严格保留集群C上的全部runtime、源码、环境、结果、checkpoint、共享cache与HF冻结矩阵；HF task0acf仍使用远端 e6908de7/c3-highfreq-engineering-20260914 等路径，不能因本机任务完成递归清理远端同名workspace。也不改本机其他task。若有真实本机活跃依赖，列出并报告，勿终止进程。这个准备工作不需要GPU、传输大文件或主动等待其他owner。
+
+交紧凑归档准备report：已清理清单、保留证据位置/hash、登记三库commit可达性、额外条目清空或准确阻断理由，说明远端HF环境保持。完成后发布并结束turn，Manager亲自执行mam task archive。以下历史只作出处，本节为唯一当前待办。
+
+---
+
 # Memory v1 新 checkpoint 评测准备
 
 ## 当前执行：原协议 put-back J/T train1/2 补齐三组 eval，新增训练 0
