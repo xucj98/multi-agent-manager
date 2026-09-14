@@ -45,27 +45,42 @@
 
 ## C1 manifest 生成状态
 
-C1 正在运行同一套隔离 runtime 的 CPU-only 重验与 18 项 C 路径 manifest/dry-run：
+第一次 C1 CPU job `65987649-f3f6-444b-bd91-080cdbcaaecb` 没有形成完整 receipt：它在写完
+swap_blocks N / eval0 的 prepare、smoke dry-run、formal dry-run 后停止，
+`c_protocol_preparation.partial_foreground_session_interrupted_20260914T120620Z/index.json` 只含第 0 条，
+没有最终的 `status`/`total`。这三份 stdout JSON 均有效、stderr 均为空；没有下一条 invoke 的 stderr 或脚本级异常日志。
+当时使用的是前台 SSH 输出流，进程停止边界与首次 `PASS` 输出完全相邻，因此按 launcher/session 中断保留为首因，
+不把它误报为 schema 或 checkpoint 失败。
+
+partial receipt 已保留，原输出目录重新留给同一、未修改的脚本。重启 job：
 
 ```text
-MAM job: 65987649-f3f6-444b-bd91-080cdbcaaecb
-host/PID: wuwen-4090-1 / 1868128
+MAM job: f3ad56f9-7766-46ee-8a98-110a3ba9d297
+host/PID: wuwen-4090-1 / 1873761
 script: .../transfer/prepare_c_nj_manifests.py
-output:  .../workspace/f3488141-90fd-4d2c-8998-934614d1b098/c_protocol_preparation/
+stdout/stderr: .../workspace/f3488141-90fd-4d2c-8998-934614d1b098/c_protocol_preparation.nohup.log
+output: .../workspace/f3488141-90fd-4d2c-8998-934614d1b098/c_protocol_preparation/
 ```
 
-脚本内部固定 `JAX_PLATFORMS=cpu` 与空的 `CUDA_VISIBLE_DEVICES`。C1 首次导入现有 CUDA-build PyTorch 依赖时因共享缓存冷读而较慢；
-每次观测的 `nvidia-smi` 都没有显示新的 GPU compute process；GPU0 的 16.9 GiB 进程是运行前已存在的他人进程。该 job 完成后将核对
-`index.json` 的 `status=passed,total=18`、C checkpoint 路径、冻结 commits、matching smoke/formal 名称以及 GPU1/2 的交替建议，
-再 archive 两个已停止 job。
+该进程使用 `nohup`、stdin `/dev/null` 和 task-local log，且已由 init 收养；脚本内部仍固定
+`JAX_PLATFORMS=cpu` 与空的 `CUDA_VISIBLE_DEVICES`。每次观测的 `nvidia-smi` 都没有显示新的 GPU compute process；
+GPU0 的 16.9 GiB 进程是运行前已存在的他人进程。重启 job 只有在 `index.json` 达到
+`status=passed,total=18` 后，才会验收 C checkpoint 路径、冻结 commits、matching smoke/formal 名称以及 GPU1/2 的交替建议，
+并进入已批准的真实 smoke → formal 队列。
 
 C OpenPI 的既有 `worktree_env_smoke.py` 在 symlink-mode 下因 `transformers_root.is_relative_to(.venv)` 路径断言失败；
 只读核验显示 5 个 `transformers_replace` patch 文件内容匹配且 `nlink=1`，installer 的 `uv pip check` 通过。该路径断言不是
-schema/manifest 阻断；真实 GPU smoke 仍需 Manager 放行。
+schema/manifest 阻断；真实 GPU smoke 必须按已发布准入通过自身门禁。
 
-## 后续 GPU 门禁（尚未执行）
+## 已批准的 GPU 队列（尚未启动）
 
-C1 GPU1/2 在本轮只读检查中为空闲，清单交替建议其执行。Manager 冻结候选并明确放行后，第一条 smoke 将使用
-`c_wave1_swap_blocks_n_trainseed0_evalseed0_smoke2_r1`；对应 formal 为
-`c_wave1_swap_blocks_n_trainseed0_evalseed0_100ep_r1`。完整 18 条 C 路径命令会在上述 C receipt 中保存，且不能在本 task 的
-CPU/传输准备阶段启动。
+已发布准入 revision `e325a9c9f863395844582d3ea7ccb77b64392a6e` 允许在 C receipt 完整通过后直接执行，
+无需再次等待人工确认。每项必须保持 train seed 0、H50/K30、`demo_clean_eval`、首次 infer 90 秒、后续 30 秒，
+并让每个 run 的单一 policy server 跨 episode 保持 continuous action RNG；真实 smoke 的基础设施或身份门禁失败会停止该 lane，
+不能降低阈值、修改冻结协议或带入 HF per-episode reset。
+
+C1 GPU1/2 每卡串行。按 swap → battery → cover 的 task N/J 配对轮转，先完成三个任务的 eval0 覆盖，再依次 eval1、eval2；
+同一 task/eval 的 N/J 尽量固定在同一张卡。每个模型都执行自身 matching smoke2 后才启动其 formal100，formal 显式引用该 smoke，
+每个长 formal 单独登记 MAM job，并保留全部失败、诊断、视频与退出证据。第一条候选 smoke 为
+`c_wave1_swap_blocks_n_trainseed0_evalseed0_smoke2_r1`，matching formal 为
+`c_wave1_swap_blocks_n_trainseed0_evalseed0_100ep_r1`。
