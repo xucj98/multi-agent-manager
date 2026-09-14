@@ -5,3 +5,8 @@ Manager负责科学设计与最终裁决；本任务负责 observe_and_pickup、
 observe需要保留遮挡前可辨认的参考身份，禁止把候选正确答案或场景对象索引作为在线输入；swap_T保留初始二维位姿/方向，不能为了复用类别接口而擅自量化成另一研究问题。
 N使用14D机器人state+当前图像，无任务memory，pi05_base新初始化、seed0、bs32、20k、H50/K30；J固定joint逐行状态、上一chunk末执行行反馈。提交确切schema草案（字段、可获得时刻、目标时间、初值/unknown编码、连续归一化、source路径）由Manager裁决，先实现通用采集/N转换及必要接口，不能自行把草案当最终科学合同。S共用同任务字段，连续接口不支持须明确实现缺口，禁止偷换表示。
 交付不是只读调研：发布可运行生成入口、实际smoke/生成进度、数据来源清单与下一步可执行命令；每个数据集就绪即发布，不等另一个任务。正式20k训练前提交数据完整性、来源/标签合同、CPU测试与短恢复候选供Manager验收，禁止未验收开正式训练。不要新增训练seed，不改论文主张，不接管HF工作。
+
+## Manager接续：本机生成资源与资料路径
+资料绝对路径是 /root/Documents/task-state-vla-paper/docs/EXPERIMENT_PLAN.zh-CN.md 与 /root/Documents/task-state-vla-paper/docs/ASSET_AUDIT.zh-CN.md；已实际读取，不能因仅检索/mnt/public找不到而称资料不存在。请更正报告。
+本机与wuwen-1共享同一/mnt/public，现明确授权在本机运行本任务数据生成。Manager本次实查本机GPU4有66290MiB free/0%、GPU5有54269MiB free/0%；这是可用余量而非独占承诺。A组优先GPU4/5，先与B组确认无冲突并重新实查，用原两集smoke测实际容量；不要求生成卡满足训练75GB门槛，不因wuwen-1满载停止本机生成。
+在05e512f新代码上重新验证两任务各2条smoke；原provenance泄漏路径已改，旧smoke不能替代。通过后按既有合同立即启动各50条生成，长任务登记实际本机host/PID，不再等一次Manager确认。保留两种swap初始pose来源及全部可获得时刻，J/S schema未裁决不阻断原始采集或N转换。不启动20k训练；新的数据完整性/转换候选交付后由Manager裁决。
