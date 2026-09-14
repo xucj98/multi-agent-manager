@@ -1,3 +1,19 @@
+# 置顶：第一层 J rearrange matched-baseline formal100 终态审计（2026-09-14）
+
+三条已授权 formal100 都通过终态审计，结果来自各自连续的 100 个 accepted episode，而非 smoke 或日志推断：
+
+| Eval | 环境 seed | 成功 | 成功率 | 普通失败数 |
+| --- | --- | ---: | ---: | ---: |
+| 0 | `100000..100099` | 86/100 | 0.86 | 14 |
+| 1 | `200000..200099` | 81/100 | 0.81 | 19 |
+| 2 | `300000..300099` | 87/100 | 0.87 | 13 |
+
+终态收据为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_matched_baseline_rearrange_terminal_audit_20260914.json`，SHA-256 `361cfbb8a2cc2c5484bfd32419bace5b37d07be77c3f7de636668e060340f7c1`；审计器为同目录 `tools/audit_formal_matched_baseline.py`，SHA-256 `999853679a607ab91c530265dfb0b2ee7ff04476809aedb0b92874fb8138a3e5`，提交 `34f3323` / `acf03bc`。
+
+收据实际调用 recorder 的 `check_rolling_evidence(..., required=True)` 和 `validate_smoke_run()`；逐条核对 300 个连续终态和 preflight reset、300 份完整 baseline rolling evidence（每集一次 `policy_rng_reset`、无 probe、常规 infer-audited query/queue/completed 路径）、15 个启用 MP4 的 `ffprobe`/`ffmpeg` 解码、以及每 run 102 个 start 和 102 个 exit（100 scheduler=0，robot/policy=`runner_shutdown` / `-15`）。三个冻结 runtime 源仍为 OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`，且均 clean。
+
+停止的 baseline MAM job `09912433-20ef-45ac-9ead-853e51c97cce`、`9b596267-568b-4096-84de-fd163450944e`、`f95b92ad-5c62-4f51-a1f8-df3201cd5210` 已附终态审计注记归档。原始 outer teardown 日志保留；它们的连接重试没有覆盖结构化完成结论。
+
 # 置顶：第一层 J rearrange matched-baseline 正式启动与 smoke→formal 交接修复（2026-09-14）
 
 三条新 strict matching smoke 均已完整结束并通过实际 `eval_diagnostics.validate_smoke_run` 门禁；随后原 outer 在 formal 资源预检前停止，**没有创建任何 formal leaf、formal-start 收据或正式 episode**。这不是模型、仿真或任务结果失败。
