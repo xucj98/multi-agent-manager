@@ -61,6 +61,6 @@ MAM job `a7b7eb97-5c5b-4803-a448-024b92afbd43`（PID `1498697`，GPU5）在本�
 
 ## MAM job 收尾与下一步
 
-observe 转换 job `0cfdfc00-e935-4fae-8c33-21e53042a515` 已停止，receipt 记录 exit status 0（2026-09-14 15:11:30Z），且上述数据、CPU batch 和候选证据已经核验。本报告发布后可归档该 stopped job。swap_T 的 running job 保持登记和运行，不干预。
+observe 转换 job `0cfdfc00-e935-4fae-8c33-21e53042a515` 已停止，receipt 记录 exit status 0（2026-09-14 15:11:30Z），且上述数据、CPU batch 和候选证据已经核验；报告发布后已于 15:46:13Z 归档。swap_T 的 running job 保持登记和运行，不干预。
 
 swap_T 停止后应依序进行完整 source 验证、processed/LeRobot 转换、robot-only sidecar、实际 norm 采样说明、CPU batch 和独立候选，再提交给 Manager。任何 observe smoke、CPU recovery 或 formal 20k 均只在相应 Manager 门禁授权后执行；本执行者未启动正式训练。
