@@ -12,3 +12,6 @@
 
 ## 2026-09-15 Manager验收裁决
 接受报告三通过三阻断；不把CPU通过当成GPU训练/评测通过。B缺稳定仓库与C缺指定base由修复任务2b8c1566-f2ca-4591-bb69-a28ad52e29f9处理，本任务保留待修复后复验。复验仅沿更新文档重试B/RMBench、B/robot-bridge、C/openpi，已通过分支无需重复安装；仍不运行GPU、不读取源码猜步骤。等待Manager通知准备完成后再开始。
+
+## Manager接受B增量复验
+已读取两项创建/CPU功能检查/HEAD与clean证据，接受B/RMBench和B/robot-bridge通过。累计五个分支通过：B三库、C的RMBench/robot-bridge；验收范围仍为文档驱动环境创建及CPU功能，非GPU实验准入。C/OpenPI仍等待修复任务提供默认检查有效的新base，不接受优化模式绕过。当前不再重测五个通过分支，保留原首次失败与后续复验记录；待C明确修复交付后再通知最后一项复验，本任务暂不归档。
