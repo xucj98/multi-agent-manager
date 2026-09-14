@@ -15,7 +15,7 @@ task-private summary receipt `/mnt/public/xcj/Projects/state-vla/workspace/0acf5
 
 该比较也明确记录了设计上的 lane 差异：三个环境 seed cohort 两两交集均为 0，GPU/端口各自固定；因此不能断言跨 eval 的物理 scene 初始状态相同。保留的 `task_context.origin_mat` 分布也不同（eval0 `back/front/left/right=32/31/17/20`，eval1 `23/31/19/27`，eval2 `26/21/35/18`）。这些是可证事实，不构成对 100/73/61 差异的因果解释，不触发重跑、调参或阈值变化。
 
-按冻结顺序，下一步直接启动 GPU2 HF-fixed lane `c_hf_j_hf_fixed_put_back_trainseed0_evalseed2_100ep`；它将运行自身 strict matching smoke2，随后才可进入 formal100。
+按冻结顺序，GPU2 HF-fixed lane `c_hf_j_hf_fixed_put_back_trainseed0_evalseed2_100ep` 已以 outer PID `2851971` 启动，并登记为 MAM job `9895bcfd-1cea-4ee3-b54a-4f13536ced18`。它正在运行自身 strict matching smoke2，只有既有 identity/evidence/quiescence gate 通过后才进入 formal100；seed、阈值、runtime 和冻结输入均未改动。
 
 # 置顶：第一层 J put-back matched-baseline eval1 终态审计（2026-09-14）
 
