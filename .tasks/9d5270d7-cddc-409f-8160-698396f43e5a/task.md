@@ -12,3 +12,9 @@ C1 正式根 /mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk
 
 不执行模型/仿真/训练、不拷大资产、不修改产物、冻结源码、论文或owner报告，不触碰 HF 的运行及收尾。无源码变更，无需无关worktree。可参考旧review流程但必须独立核验本次原件。将小型原始证据副本和重算receipt置于本task目录，保留可供Manager独立核算的两叶final_review、preflight、diagnostics及核心引用。交简短report、receipt路径/hash、是否有计入正式结果的阻断与实际范围限制；发布后正常结束turn。
 
+
+## Manager 最终验收（2026-09-14）
+
+接受独立report fa1416cd5d029a90be7cd4dc172a72e54ce98bfd，receipt88c5d263c462364920d02df6cadcf3da0cd0006d85a48c3389b15fdf30cc5133。Manager从本地及C1重哈希两份final review和20项核心引用，独立重算200连续seed/preflight/terminal/outcomes/失败类别及video策略、自有进程退出、config与smoke命令。J68/T73正式纳入；视频解码、多GB模型和删除smoke raw限制保留。
+
+验收 /root/Documents/task-state-vla-paper/docs/analysis/putback_jt_train2_eval2_acceptance_20260914.json SHA bb80762d5f153e754d1c8889bd5ed5222f20a073b1d52bfb8f6cd1f847e3fb6a；新snapshot accepted_results_20260914_jt_train2_eval2.json SHA73d5a39cc7890de1d1dacdb70dbe0b85b5b194b78f49a678e57235e7cc3df880；52批/5200执行/20模型/16完整3eval。独立receipt已原字节保存论文资料，科学汇总由Manager完成，提交8bd8143。此独立审查完成，可归档；不清理HF使用的源任务共享runtime。
