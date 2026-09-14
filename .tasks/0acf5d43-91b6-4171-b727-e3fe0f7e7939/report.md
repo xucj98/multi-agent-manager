@@ -1,3 +1,19 @@
+# 置顶：第一层 J rearrange HF-fixed formal100 终态审计（2026-09-14）
+
+三条已授权 HF-fixed formal100 均已完成并通过终态审计；每条均为连续的 100 个 accepted episode，不以 smoke 或运行中日志推断结果：
+
+| Eval | 环境 seed | 成功 | 成功率 |
+| --- | --- | ---: | ---: |
+| 0 | `100000..100099` | 90/100 | 0.90 |
+| 1 | `200000..200099` | 91/100 | 0.91 |
+| 2 | `300000..300099` | 87/100 | 0.87 |
+
+终态收据位于 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/`：eval0 `formal_hf_fixed_rearrange_evalseed0_terminal_audit_20260914.json`（SHA-256 `015228318456f60f56bd88c4417297f037edf57746305f75684d3afc0b96957b`）、eval1 `formal_hf_fixed_rearrange_evalseed1_terminal_audit_20260914.json`（`843ad93c85c12b79a388a35840c79d15a7b47c96a291ee036658fbb38572a40c`）、eval2 `formal_hf_fixed_rearrange_evalseed2_terminal_audit_20260914.json`（`41ed0610524275bc9d68c9c2b0142e16e5917ee9ada266b93ef3c5ed931cb1e5`）。审计器为同目录 `tools/audit_formal_hf_fixed.py`，state 提交 `a4b9063`。
+
+审计实际调用 `check_rolling_evidence(..., required=True)` 与 `validate_smoke_run()`，并核对每条的 100 个连续 seed、preflight/terminal、完整 rolling-plan lifecycle、前 5 个 MP4 的 `ffprobe`/`ffmpeg` 解码、以及 102 starts / 102 exits（100 scheduler 均 exit 0；robot/policy 为受控 `runner_shutdown` / `-15`，无仍存活 PID）。三库仍为冻结 clean HEAD：OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`。
+
+HF-fixed 原始计数合计为 268/300；matched-baseline 为 254/300，差值为 +14 successes（+4.67pp）。这只是冻结原件的描述性计数，尚非科学结论。停止的 fixed MAM jobs `236c12af-448f-486d-bae2-39229981ac6f`、`5bf35bb8-50b0-41a4-8caf-c5a439c14818`、`ea9bc114-9b5f-4d11-92fd-bf290273b661` 已在终态审计后归档。
+
 # 置顶：第一层 J rearrange matched-baseline formal100 终态审计（2026-09-14）
 
 三条已授权 formal100 都通过终态审计，结果来自各自连续的 100 个 accepted episode，而非 smoke 或日志推断：
