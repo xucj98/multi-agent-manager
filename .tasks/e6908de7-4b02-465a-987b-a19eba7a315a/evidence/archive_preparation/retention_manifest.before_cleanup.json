@@ -1,0 +1,804 @@
+{
+  "created_at_utc": "2026-09-14T05:20:56.318995+00:00",
+  "git_retention": {
+    "entries": [
+      {
+        "ancestor_of_xcj_dev": false,
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/registered-rmbench",
+        "archive_ref_verified_sha": "3775d4a878adb0f840c1f8a9e12aa014fb185a53",
+        "clean_before_cleanup": true,
+        "kind": "registered_worktree",
+        "name": "RMBench",
+        "original_branch": "task/e6908de7-4b02-465a-987b-a19eba7a315a",
+        "refs_containing_at_manifest": [
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-eval-seed-runtime",
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-r3-lifecycle-gate",
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-warp-cache-docs",
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/registered-rmbench",
+          "refs/heads/codex/c-eval-renderer-r3",
+          "refs/heads/task/0acf5d43-91b6-4171-b727-e3fe0f7e7939",
+          "refs/heads/task/0acf5d43-f401-source",
+          "refs/heads/task/e6908de7-4b02-465a-987b-a19eba7a315a",
+          "refs/heads/task/e6908de7-eval-seed-runtime",
+          "refs/heads/task/e6908de7-r3-lifecycle-gate",
+          "refs/heads/task/e6908de7-warp-cache-docs"
+        ],
+        "repo": "/mnt/public/xcj/Projects/RMBench",
+        "sha": "3775d4a878adb0f840c1f8a9e12aa014fb185a53",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench"
+      },
+      {
+        "ancestor_of_xcj_dev": false,
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-ledger",
+        "archive_ref_verified_sha": "2f1e81d2b625d33379b02884589a9ed3cc76e6c7",
+        "clean_before_cleanup": true,
+        "kind": "extra_worktree",
+        "name": "RMBench-ledger",
+        "original_branch": "task/e6908de7-c-eval-ledger-20260912",
+        "refs_containing_at_manifest": [
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-ledger",
+          "refs/heads/task/e6908de7-c-eval-ledger-20260912"
+        ],
+        "repo": "/mnt/public/xcj/Projects/RMBench",
+        "sha": "2f1e81d2b625d33379b02884589a9ed3cc76e6c7",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-ledger"
+      },
+      {
+        "ancestor_of_xcj_dev": false,
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-r3-lifecycle-gate",
+        "archive_ref_verified_sha": "2e9677ce8ec9f623395184f63f32ddafa66e5e44",
+        "clean_before_cleanup": true,
+        "kind": "extra_worktree",
+        "name": "RMBench-r3-lifecycle-gate",
+        "original_branch": "task/e6908de7-r3-lifecycle-gate",
+        "refs_containing_at_manifest": [
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-r3-lifecycle-gate",
+          "refs/heads/task/0acf5d43-91b6-4171-b727-e3fe0f7e7939",
+          "refs/heads/task/0acf5d43-f401-source",
+          "refs/heads/task/e6908de7-r3-lifecycle-gate"
+        ],
+        "repo": "/mnt/public/xcj/Projects/RMBench",
+        "sha": "2e9677ce8ec9f623395184f63f32ddafa66e5e44",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r3-lifecycle-gate"
+      },
+      {
+        "ancestor_of_xcj_dev": false,
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-warp-cache-docs",
+        "archive_ref_verified_sha": "99b7d38b6d5445bae0e73d2e5dc1faf26f3920eb",
+        "clean_before_cleanup": true,
+        "kind": "extra_worktree",
+        "name": "RMBench-warp-cache-docs",
+        "original_branch": "task/e6908de7-warp-cache-docs",
+        "refs_containing_at_manifest": [
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-warp-cache-docs",
+          "refs/heads/task/e6908de7-warp-cache-docs"
+        ],
+        "repo": "/mnt/public/xcj/Projects/RMBench",
+        "sha": "99b7d38b6d5445bae0e73d2e5dc1faf26f3920eb",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-warp-cache-docs"
+      },
+      {
+        "ancestor_of_xcj_dev": false,
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-c-eval-docs-consolidated",
+        "archive_ref_verified_sha": "a3566f708fbb9c2971fadb3ce89aa31384718768",
+        "clean_before_cleanup": true,
+        "kind": "extra_worktree",
+        "name": "RMBench-c-eval-docs-consolidated",
+        "original_branch": "task/e6908de7-c-eval-docs-consolidated",
+        "refs_containing_at_manifest": [
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-c-eval-docs-consolidated",
+          "refs/heads/task/e6908de7-c-eval-docs-consolidated"
+        ],
+        "repo": "/mnt/public/xcj/Projects/RMBench",
+        "sha": "a3566f708fbb9c2971fadb3ce89aa31384718768",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-c-eval-docs-consolidated"
+      },
+      {
+        "ancestor_of_xcj_dev": false,
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-r2-running-ledger",
+        "archive_ref_verified_sha": "1f91d189d755666e4fc668e65b7284b1e8dc09e3",
+        "clean_before_cleanup": true,
+        "kind": "extra_worktree",
+        "name": "RMBench-r2-running-ledger",
+        "original_branch": "task/e6908de7-r2-running-ledger",
+        "refs_containing_at_manifest": [
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-r2-running-ledger",
+          "refs/heads/task/e6908de7-r2-running-ledger"
+        ],
+        "repo": "/mnt/public/xcj/Projects/RMBench",
+        "sha": "1f91d189d755666e4fc668e65b7284b1e8dc09e3",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r2-running-ledger"
+      },
+      {
+        "ancestor_of_xcj_dev": false,
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-eval-seed-runtime",
+        "archive_ref_verified_sha": "9d8f47887a50ea691e5624de139f10bfcfb54412",
+        "clean_before_cleanup": true,
+        "kind": "extra_worktree",
+        "name": "RMBench-eval-seed-runtime",
+        "original_branch": "task/e6908de7-eval-seed-runtime",
+        "refs_containing_at_manifest": [
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-eval-seed-runtime",
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-r3-lifecycle-gate",
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-warp-cache-docs",
+          "refs/heads/codex/c-eval-renderer-r3",
+          "refs/heads/task/0acf5d43-91b6-4171-b727-e3fe0f7e7939",
+          "refs/heads/task/0acf5d43-f401-source",
+          "refs/heads/task/e6908de7-eval-seed-runtime",
+          "refs/heads/task/e6908de7-r3-lifecycle-gate",
+          "refs/heads/task/e6908de7-warp-cache-docs"
+        ],
+        "repo": "/mnt/public/xcj/Projects/RMBench",
+        "sha": "9d8f47887a50ea691e5624de139f10bfcfb54412",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-eval-seed-runtime"
+      },
+      {
+        "ancestor_of_xcj_dev": false,
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-serial-ledger",
+        "archive_ref_verified_sha": "bcd5393a9add35a79c9b766128abbcd844e27b09",
+        "clean_before_cleanup": true,
+        "kind": "extra_worktree",
+        "name": "RMBench-serial-ledger",
+        "original_branch": "task/e6908de7-serial-ledger-20260912",
+        "refs_containing_at_manifest": [
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-serial-ledger",
+          "refs/heads/task/e6908de7-serial-ledger-20260912"
+        ],
+        "repo": "/mnt/public/xcj/Projects/RMBench",
+        "sha": "bcd5393a9add35a79c9b766128abbcd844e27b09",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-serial-ledger"
+      },
+      {
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/registered-robot-bridge",
+        "archive_ref_verified_sha": "f9626636c4776d8eb15f9c556775cb2d12c000e5",
+        "clean_before_cleanup": true,
+        "kind": "registered_worktree",
+        "name": "robot-bridge",
+        "original_branch": "task/e6908de7-4b02-465a-987b-a19eba7a315a",
+        "refs_containing_at_manifest": [
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/registered-robot-bridge",
+          "refs/heads/codex/p0-query-diagnostics-accepted",
+          "refs/heads/task/0acf5d43-91b6-4171-b727-e3fe0f7e7939",
+          "refs/heads/task/e6908de7-4b02-465a-987b-a19eba7a315a",
+          "refs/review/f962663"
+        ],
+        "repo": "/mnt/public/xcj/Projects/robot-bridge",
+        "sha": "f9626636c4776d8eb15f9c556775cb2d12c000e5",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge"
+      },
+      {
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/registered-openpi",
+        "archive_ref_verified_sha": "a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4",
+        "clean_before_cleanup": true,
+        "kind": "registered_worktree",
+        "name": "openpi",
+        "original_branch": "task/e6908de7-4b02-465a-987b-a19eba7a315a",
+        "refs_containing_at_manifest": [
+          "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/registered-openpi",
+          "refs/heads/codex/p0-query-diagnostics-accepted",
+          "refs/heads/codex/put-back-memory-baselines",
+          "refs/heads/codex/unified-sim-real-runtime",
+          "refs/heads/task/0acf5d43-91b6-4171-b727-e3fe0f7e7939",
+          "refs/heads/task/e3bc64f1-7f0d-46d2-9e54-831aa1727384",
+          "refs/heads/task/e3bc64f1-7f0d-46d2-9e54-831aa1727384-js",
+          "refs/heads/task/e3bc64f1-7f0d-46d2-9e54-831aa1727384-loader",
+          "refs/heads/task/e6908de7-4b02-465a-987b-a19eba7a315a"
+        ],
+        "repo": "/mnt/public/xcj/Projects/openpi",
+        "sha": "a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/openpi"
+      }
+    ],
+    "strategy": "Verified local archive branches preserve every extra and registered tip before original task branches are removed."
+  },
+  "handoff_ack": {
+    "bytes": 684,
+    "original_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/manager-handoff-ack.md",
+    "redundant_with": "MAM task status handoffs record",
+    "sha256": "5b817c1bad74977e57da2e24ad25361c66088721f80257bb49b4871232423266"
+  },
+  "post_commit_local_cleanup_plan": {
+    "extra_original_branches": [
+      "task/e6908de7-c-eval-ledger-20260912",
+      "task/e6908de7-r3-lifecycle-gate",
+      "task/e6908de7-warp-cache-docs",
+      "task/e6908de7-c-eval-docs-consolidated",
+      "task/e6908de7-r2-running-ledger",
+      "task/e6908de7-eval-seed-runtime",
+      "task/e6908de7-serial-ledger-20260912"
+    ],
+    "extra_worktrees": [
+      "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-ledger",
+      "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r3-lifecycle-gate",
+      "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-warp-cache-docs",
+      "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-c-eval-docs-consolidated",
+      "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r2-running-ledger",
+      "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-eval-seed-runtime",
+      "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-serial-ledger"
+    ],
+    "ordinary_entries": [
+      "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/manager-handoff-ack.md",
+      "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c_checkpoint_transfer"
+    ],
+    "worktree_method": "git worktree remove; never rm"
+  },
+  "purpose": "Pre-archive retention evidence before removing unregistered local workspace entries.",
+  "schema_version": 1,
+  "scope": {
+    "allowed_final_workspace_entries": [
+      "RMBench",
+      "robot-bridge",
+      "openpi"
+    ],
+    "local_workspace_only": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a",
+    "remote_cluster_c_preservation": {
+      "dependency_task": "0acf5d43-91b6-4171-b727-e3fe0f7e7939",
+      "no_remote_modification_or_deletion": true,
+      "protected_runtime_root": "/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914"
+    }
+  },
+  "task_id": "e6908de7-4b02-465a-987b-a19eba7a315a",
+  "transfer_material": {
+    "completed_transfers": [
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258419874,
+        "historical_verified_at": "2026-09-12T03:47:50+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "put_back_full_t_plus_1_s1.log",
+        "log_sha256": "496d99f31f35de29beeb465ef4338519e9ca181a5d124d10d7250fa0bcc73774",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "93d52e294ea56f0456e85645335d2a999862d02bd9024bafd0ad72b299b931a2",
+          "regular_file_count": 62,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "93d52e294ea56f0456e85645335d2a999862d02bd9024bafd0ad72b299b931a2",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s1/20000",
+        "source_regular_file_count": 62,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s1/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258430419,
+        "historical_verified_at": "2026-09-12T04:13:53+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "put_back_full_t_plus_1_s2.log",
+        "log_sha256": "66666411b20a4dc950c2b81031e94b38d9221748c2a190ae2c82ba12b14c6be6",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "677133e3ae0fc6e29b5c0b5a9a990c9f3167a4c6c7da954b51df16f8ecdca5fd",
+          "regular_file_count": 62,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "677133e3ae0fc6e29b5c0b5a9a990c9f3167a4c6c7da954b51df16f8ecdca5fd",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s2/20000",
+        "source_regular_file_count": 62,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_1/memory20k_e7e5ac54_put_back_full_t_plus_1_s2/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258413807,
+        "historical_verified_at": "2026-09-12T03:20:57+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "put_back_full_t_plus_30_s0.log",
+        "log_sha256": "57b571569a3e684eac954bc7f2d6a3ade438792fce2fb770638fb678238c107e",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "fde20eaff44183e4651eedb60ebd7973bfd6a10843c45e718ffae0dd9699a966",
+          "regular_file_count": 59,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "fde20eaff44183e4651eedb60ebd7973bfd6a10843c45e718ffae0dd9699a966",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_30/memory20k_e7e5ac54_put_back_full_t_plus_30_s0/20000",
+        "source_regular_file_count": 59,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_30/memory20k_e7e5ac54_put_back_full_t_plus_30_s0/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258423912,
+        "historical_verified_at": "2026-09-12T03:50:02+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "put_back_full_t_plus_30_s1.log",
+        "log_sha256": "87d2f172d1b3cc6eb9f8d24f9d2e57523d35aa8bad6c46133628733478931e67",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "f48391ac8a49406ea7670041e43907ce5bfdc8ec27cf2f503cbf5882c757b552",
+          "regular_file_count": 62,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "f48391ac8a49406ea7670041e43907ce5bfdc8ec27cf2f503cbf5882c757b552",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_30/memory20k_e7e5ac54_put_back_full_t_plus_30_s1/20000",
+        "source_regular_file_count": 62,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_30/memory20k_e7e5ac54_put_back_full_t_plus_30_s1/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258419117,
+        "historical_verified_at": "2026-09-12T04:21:33+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "put_back_full_t_plus_30_s2.log",
+        "log_sha256": "ac1ec6172b8fb3e1180830d0215736955af0122fa6e69d78d31a07c1c25d5dff",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "7b7b32bd8c19df805e9aa02f013e298b4d2e454072a11a9ede4fccdeab4a1fdc",
+          "regular_file_count": 60,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "7b7b32bd8c19df805e9aa02f013e298b4d2e454072a11a9ede4fccdeab4a1fdc",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_30/memory20k_e7e5ac54_put_back_full_t_plus_30_s2/20000",
+        "source_regular_file_count": 60,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_full_t_plus_30/memory20k_e7e5ac54_put_back_full_t_plus_30_s2/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258430645,
+        "historical_verified_at": "2026-09-12T21:05:24+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "put_back_no_memory_s0.log",
+        "log_sha256": "8aae8397060cbcee5a63fa3dc637fea6d4baedd3b2fa79357c213b6cb563ffac",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "fbf28132edc56ce1d187f2435aad956066007d51758ed50576912a461c4e60e1",
+          "regular_file_count": 61,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "fbf28132edc56ce1d187f2435aad956066007d51758ed50576912a461c4e60e1",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s0/20000",
+        "source_regular_file_count": 61,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s0/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258440313,
+        "historical_verified_at": "2026-09-12T21:20:29+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "put_back_no_memory_s1.log",
+        "log_sha256": "0f04867d0ed348bb9303064faf53f93b99eae16ac0101f2001f05f70d1d28399",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "c4745ee8e78a6a0f11a53c98d56088cb5a374a491d2853331f1c7bbd31ffbb3a",
+          "regular_file_count": 59,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "c4745ee8e78a6a0f11a53c98d56088cb5a374a491d2853331f1c7bbd31ffbb3a",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s1/20000",
+        "source_regular_file_count": 59,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s1/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258442903,
+        "historical_verified_at": "2026-09-12T21:36:13+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "put_back_no_memory_s2.log",
+        "log_sha256": "ea36e113144366dc0943a40feab35f045a201fe0f40f2bf82cf906433794401f",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "1ae4342011db2089fcc78e58e6c5eb68d0797340a3a6ce682b52592611174e65",
+          "regular_file_count": 59,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "1ae4342011db2089fcc78e58e6c5eb68d0797340a3a6ce682b52592611174e65",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s2/20000",
+        "source_regular_file_count": 59,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_no_memory/memory20k_695bc51f_put_back_no_memory_s2/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258483478,
+        "historical_verified_at": "2026-09-12T21:03:44+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "put_back_serial_lag30_s0.log",
+        "log_sha256": "0a6edf3352e225579b3b6ed0b561f4e74b4484cfb2d42d68b9a5d2e4331d335c",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "be0b69aee7cadf39bb223f130836cf5f1552cbfd4609d18e75772a9b9b9ba296",
+          "regular_file_count": 63,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "be0b69aee7cadf39bb223f130836cf5f1552cbfd4609d18e75772a9b9b9ba296",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s0/20000",
+        "source_regular_file_count": 63,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s0/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258478140,
+        "historical_verified_at": "2026-09-12T21:17:04+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "put_back_serial_lag30_s1.log",
+        "log_sha256": "9a58ae1721b47e9dd375220b1862f4a5fddca998708ee4428598f2e60709fdd2",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "3eb0cf905927657e99f019be888f0a0f196d26690f28378cce0272fe4cb5ecd5",
+          "regular_file_count": 61,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "3eb0cf905927657e99f019be888f0a0f196d26690f28378cce0272fe4cb5ecd5",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s1/20000",
+        "source_regular_file_count": 61,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s1/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258486617,
+        "historical_verified_at": "2026-09-12T21:34:24+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "put_back_serial_lag30_s2.log",
+        "log_sha256": "dd8acd258ddf3f9edeeec3583e099358fcb33bb7f5e10c9da36f6593a8482a80",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "b8798a992ff7017d8a7c87958cb85f12a9937185d2f7357613136c3194be5e47",
+          "regular_file_count": 62,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "b8798a992ff7017d8a7c87958cb85f12a9937185d2f7357613136c3194be5e47",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s2/20000",
+        "source_regular_file_count": 62,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_put_back_block_serial_lag30/memory20k_695bc51f_put_back_serial_lag30_s2/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258310443,
+        "historical_verified_at": "2026-09-12T03:37:30+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "rearrange_full_t_plus_1_s0.log",
+        "log_sha256": "8a37a4cc9f6e1cba860a094ada6fac6603ed106ad3c1af57d30db699100f6994",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "ff734aaaacced12188242b3450b9f8d0d7edbb9259fa2ebc87ffe28202592cd8",
+          "regular_file_count": 60,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "ff734aaaacced12188242b3450b9f8d0d7edbb9259fa2ebc87ffe28202592cd8",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s0/20000",
+        "source_regular_file_count": 60,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s0/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258312076,
+        "historical_verified_at": "2026-09-12T03:39:50+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "rearrange_full_t_plus_1_s1.log",
+        "log_sha256": "2d4eb25e64f54ac0cd4640760f8a7e777296fdec275ba38574e2f5bd4cf69da2",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "89b2dc60f0d86b6f9f6048fa7b2e6b4fe0ef9c5025aceee7992181f77eed78ca",
+          "regular_file_count": 61,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "89b2dc60f0d86b6f9f6048fa7b2e6b4fe0ef9c5025aceee7992181f77eed78ca",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1/20000",
+        "source_regular_file_count": 61,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s1/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258309417,
+        "historical_verified_at": "2026-09-12T04:03:29+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "rearrange_full_t_plus_1_s2.log",
+        "log_sha256": "545214e537f1283375c32af8e84365d6a26557ff1514ffa787d6bfaf7cecfe62",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "4da00bd88757c8ec99faf1f04e4f94b8d5f484cbb6a3722bdced1866f11fa9b6",
+          "regular_file_count": 60,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "4da00bd88757c8ec99faf1f04e4f94b8d5f484cbb6a3722bdced1866f11fa9b6",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s2/20000",
+        "source_regular_file_count": 60,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_1/memory20k_e7e5ac54_rearrange_full_t_plus_1_s2/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258301240,
+        "historical_verified_at": "2026-09-12T03:22:41+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "rearrange_full_t_plus_30_s0.log",
+        "log_sha256": "36d41e453d246069921d76e53191b746c94d7c1d4678d7d2dd27b6404397bd54",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "a3329dd4250943407a31b2d599f21df2590667efd3bc5e89369b1aac46a6964d",
+          "regular_file_count": 60,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "a3329dd4250943407a31b2d599f21df2590667efd3bc5e89369b1aac46a6964d",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s0/20000",
+        "source_regular_file_count": 60,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s0/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258301013,
+        "historical_verified_at": "2026-09-12T04:06:38+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "rearrange_full_t_plus_30_s2.log",
+        "log_sha256": "d308399c634c099d6beee30c2e4a11f44e51c7f718b743ab104030b7c9dcacac",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "5ca58395751d2ca07bdfd66f91dbbbb151fdc8a8393717bc2b520cac1693d73e",
+          "regular_file_count": 60,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "5ca58395751d2ca07bdfd66f91dbbbb151fdc8a8393717bc2b520cac1693d73e",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s2/20000",
+        "source_regular_file_count": 60,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_full_t_plus_30/memory20k_e7e5ac54_rearrange_full_t_plus_30_s2/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258336892,
+        "historical_verified_at": "2026-09-12T04:31:06+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "rearrange_no_memory_s0.log",
+        "log_sha256": "85f0a3f727dc3c89559aa0c71137e2256c4daeafb214c519cecaa8505586a465",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "a3a3dcf8685d494e90bfb2092e0220b0a14071897cdb9e3703417f58c7338a32",
+          "regular_file_count": 61,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "a3a3dcf8685d494e90bfb2092e0220b0a14071897cdb9e3703417f58c7338a32",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_no_memory/memory20k_e7e5ac54_rearrange_no_memory_s0/20000",
+        "source_regular_file_count": 61,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_no_memory/memory20k_e7e5ac54_rearrange_no_memory_s0/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258323201,
+        "historical_verified_at": "2026-09-12T12:08:05+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "rearrange_no_memory_s1.log",
+        "log_sha256": "b6c6eae9e60c6ed783085d0b8faebea6d5081824c2f4dfbf509d158eb5bdbbdd",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "eb4377338b5e3c6948c2531eb985aa4d969e37d21d56f47e530ba502cc5ba201",
+          "regular_file_count": 59,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "eb4377338b5e3c6948c2531eb985aa4d969e37d21d56f47e530ba502cc5ba201",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_no_memory/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_no_memory_s1/20000",
+        "source_regular_file_count": 59,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_no_memory/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_no_memory_s1/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258332631,
+        "historical_verified_at": "2026-09-12T12:09:14+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "rearrange_no_memory_s2.log",
+        "log_sha256": "1180fcf16f27eb9e5ecfb9a0609c823bcae1545aea24b9a424e9b3e7c0a16a40",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "f379c34d186e73cd576e151328cf37c0acd419d210bb8adc82509b91ed1111bd",
+          "regular_file_count": 58,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "f379c34d186e73cd576e151328cf37c0acd419d210bb8adc82509b91ed1111bd",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_no_memory/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_no_memory_s2/20000",
+        "source_regular_file_count": 58,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_no_memory/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_no_memory_s2/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258350615,
+        "historical_verified_at": "2026-09-12T04:24:37+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "rearrange_serial_lag30_s0.log",
+        "log_sha256": "160a271247cb6eb67c6fc5abe805d862c40b5aace6d41d1e344379220f0aa1e3",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "e38a17a27a60139b7b527300b947aa5c20270920f6fd94f92bb86d56a9370751",
+          "regular_file_count": 59,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "e38a17a27a60139b7b527300b947aa5c20270920f6fd94f92bb86d56a9370751",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_e7e5ac54_rearrange_serial_lag30_s0/20000",
+        "source_regular_file_count": 59,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_e7e5ac54_rearrange_serial_lag30_s0/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258363670,
+        "historical_verified_at": "2026-09-12T14:20:51+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "rearrange_serial_lag30_s1.log",
+        "log_sha256": "83bf7b8ee9ce259d4fd60421e4f5bbf875fe098775592147f604289ad435aeb7",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "813e498e0f4f6ffd44e708d84f4f592591a063f1fc29af235278fe78c8c34949",
+          "regular_file_count": 61,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "813e498e0f4f6ffd44e708d84f4f592591a063f1fc29af235278fe78c8c34949",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_serial_lag30_s1/20000",
+        "source_regular_file_count": 61,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_serial_lag30_s1/20000"
+      },
+      {
+        "file_count_matches_source": true,
+        "historical_rsync_total_bytes": 5258363885,
+        "historical_verified_at": "2026-09-12T14:22:29+08:00",
+        "historical_verifier": "rsync -aicn --delete --omit-dir-times --out-format='%i %n%L'",
+        "log": "rearrange_serial_lag30_s2.log",
+        "log_sha256": "4e6b9fce3033f0fbac1602e3ea606bbbbd47735feeaa7a45383fa28c24002d21",
+        "metadata_matches_source": true,
+        "remote_read_only_check": {
+          "metadata_sha256": "07de6b2dfac14c0a2742a759ee0005deec91380a76741668eb34aee62ee301ae",
+          "regular_file_count": 63,
+          "state": "present"
+        },
+        "source_checkpoint_metadata_sha256": "07de6b2dfac14c0a2742a759ee0005deec91380a76741668eb34aee62ee301ae",
+        "source_path": "/mnt/public/xcj/Projects/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_serial_lag30_s2/20000",
+        "source_regular_file_count": 63,
+        "target_path": "/mnt/public/xcj/Projects/state-vla/openpi/checkpoints/pi05_rmbench_rearrange_blocks_serial_lag30/memory20k_7ae41311_pi05_rmbench_rearrange_blocks_serial_lag30_s2/20000"
+      }
+    ],
+    "files": [
+      {
+        "bytes": 28624,
+        "path": "put_back_full_t_plus_1_s1.log",
+        "sha256": "496d99f31f35de29beeb465ef4338519e9ca181a5d124d10d7250fa0bcc73774"
+      },
+      {
+        "bytes": 30693,
+        "path": "put_back_full_t_plus_1_s2.log",
+        "sha256": "66666411b20a4dc950c2b81031e94b38d9221748c2a190ae2c82ba12b14c6be6"
+      },
+      {
+        "bytes": 28285,
+        "path": "put_back_full_t_plus_30_s0.log",
+        "sha256": "57b571569a3e684eac954bc7f2d6a3ade438792fce2fb770638fb678238c107e"
+      },
+      {
+        "bytes": 28624,
+        "path": "put_back_full_t_plus_30_s1.log",
+        "sha256": "87d2f172d1b3cc6eb9f8d24f9d2e57523d35aa8bad6c46133628733478931e67"
+      },
+      {
+        "bytes": 30697,
+        "path": "put_back_full_t_plus_30_s2.log",
+        "sha256": "ac1ec6172b8fb3e1180830d0215736955af0122fa6e69d78d31a07c1c25d5dff"
+      },
+      {
+        "bytes": 28603,
+        "path": "put_back_no_memory_s0.log",
+        "sha256": "8aae8397060cbcee5a63fa3dc637fea6d4baedd3b2fa79357c213b6cb563ffac"
+      },
+      {
+        "bytes": 0,
+        "path": "put_back_no_memory_s0.wrapper.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 28468,
+        "path": "put_back_no_memory_s1.log",
+        "sha256": "0f04867d0ed348bb9303064faf53f93b99eae16ac0101f2001f05f70d1d28399"
+      },
+      {
+        "bytes": 0,
+        "path": "put_back_no_memory_s1.wrapper.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 35644,
+        "path": "put_back_no_memory_s2.log",
+        "sha256": "ea36e113144366dc0943a40feab35f045a201fe0f40f2bf82cf906433794401f"
+      },
+      {
+        "bytes": 0,
+        "path": "put_back_no_memory_s2.wrapper.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 28645,
+        "path": "put_back_serial_lag30_s0.log",
+        "sha256": "0a6edf3352e225579b3b6ed0b561f4e74b4484cfb2d42d68b9a5d2e4331d335c"
+      },
+      {
+        "bytes": 0,
+        "path": "put_back_serial_lag30_s0.wrapper.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 29154,
+        "path": "put_back_serial_lag30_s1.log",
+        "sha256": "9a58ae1721b47e9dd375220b1862f4a5fddca998708ee4428598f2e60709fdd2"
+      },
+      {
+        "bytes": 0,
+        "path": "put_back_serial_lag30_s1.wrapper.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 36029,
+        "path": "put_back_serial_lag30_s2.log",
+        "sha256": "dd8acd258ddf3f9edeeec3583e099358fcb33bb7f5e10c9da36f6593a8482a80"
+      },
+      {
+        "bytes": 0,
+        "path": "put_back_serial_lag30_s2.wrapper.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 35159,
+        "path": "rearrange_full_t_plus_1_s0.log",
+        "sha256": "8a37a4cc9f6e1cba860a094ada6fac6603ed106ad3c1af57d30db699100f6994"
+      },
+      {
+        "bytes": 36422,
+        "path": "rearrange_full_t_plus_1_s1.log",
+        "sha256": "2d4eb25e64f54ac0cd4640760f8a7e777296fdec275ba38574e2f5bd4cf69da2"
+      },
+      {
+        "bytes": 28444,
+        "path": "rearrange_full_t_plus_1_s2.log",
+        "sha256": "545214e537f1283375c32af8e84365d6a26557ff1514ffa787d6bfaf7cecfe62"
+      },
+      {
+        "bytes": 28306,
+        "path": "rearrange_full_t_plus_30_s0.log",
+        "sha256": "36d41e453d246069921d76e53191b746c94d7c1d4678d7d2dd27b6404397bd54"
+      },
+      {
+        "bytes": 28536,
+        "path": "rearrange_full_t_plus_30_s2.log",
+        "sha256": "d308399c634c099d6beee30c2e4a11f44e51c7f718b743ab104030b7c9dcacac"
+      },
+      {
+        "bytes": 28327,
+        "path": "rearrange_no_memory_s0.log",
+        "sha256": "85f0a3f727dc3c89559aa0c71137e2256c4daeafb214c519cecaa8505586a465"
+      },
+      {
+        "bytes": 49214,
+        "path": "rearrange_no_memory_s1.log",
+        "sha256": "b6c6eae9e60c6ed783085d0b8faebea6d5081824c2f4dfbf509d158eb5bdbbdd"
+      },
+      {
+        "bytes": 49239,
+        "path": "rearrange_no_memory_s2.log",
+        "sha256": "1180fcf16f27eb9e5ecfb9a0609c823bcae1545aea24b9a424e9b3e7c0a16a40"
+      },
+      {
+        "bytes": 28239,
+        "path": "rearrange_serial_lag30_s0.log",
+        "sha256": "160a271247cb6eb67c6fc5abe805d862c40b5aace6d41d1e344379220f0aa1e3"
+      },
+      {
+        "bytes": 28511,
+        "path": "rearrange_serial_lag30_s1.log",
+        "sha256": "83bf7b8ee9ce259d4fd60421e4f5bbf875fe098775592147f604289ad435aeb7"
+      },
+      {
+        "bytes": 0,
+        "path": "rearrange_serial_lag30_s1.wrapper.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 28553,
+        "path": "rearrange_serial_lag30_s2.log",
+        "sha256": "4e6b9fce3033f0fbac1602e3ea606bbbbd47735feeaa7a45383fa28c24002d21"
+      },
+      {
+        "bytes": 0,
+        "path": "rearrange_serial_lag30_s2.wrapper.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 1019,
+        "path": "transfer_checkpoint.sh",
+        "sha256": "1ed712c46bee66f094c2af4e58a24703969ad019ad8e4a1438c822b98abab079"
+      }
+    ],
+    "inventory_total_bytes": 703435,
+    "local_directory": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c_checkpoint_transfer",
+    "remote_check_at_utc": "2026-09-14T05:20:56.318995+00:00",
+    "remote_check_host": "wuwen-4090-aic",
+    "remote_check_method": "read-only tests for checkpoint components plus metadata SHA-256 and regular-file count",
+    "worker_script_sha256": "1ed712c46bee66f094c2af4e58a24703969ad019ad8e4a1438c822b98abab079"
+  }
+}
