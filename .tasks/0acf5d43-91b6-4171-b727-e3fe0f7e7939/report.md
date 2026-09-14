@@ -1,3 +1,15 @@
+# 置顶：第一层 J put-back matched-baseline 三条 smoke→formal lane 已启动（2026-09-14）
+
+Manager 的新授权已按原冻结队列开始执行 put-back J matched-baseline 的 eval0/1/2 三条 lane。启动前 C3 GPU0/1/2 均为 `1 MiB used / 24080 MiB free / 0%`，对应端口 `19400/19402`、`19410/19412`、`19420/19422` 无 listener；未触碰 GPU3 或其他任务资源。每条调用冻结 task-private `launch_first_layer.py lane`，先执行自身 strict matching smoke2，再仅在既有 identity/evidence/quiescence gate 通过后以同一 outer PID `exec` 原 BenchmarkRunner formal100。
+
+| Eval / GPU / ports | formal run | outer PID | MAM job |
+| --- | --- | ---: | --- |
+| eval0 / GPU0 / `19400,19402` | `c_hf_j_matched_baseline_put_back_trainseed0_evalseed0_100ep` | `2473855` | `0ef8faa7-001e-4e66-a5a9-6ff30f74b4b5` |
+| eval1 / GPU1 / `19410,19412` | `c_hf_j_matched_baseline_put_back_trainseed0_evalseed1_100ep` | `2473856` | `76bb00e7-f83b-42e9-9244-711c2b4002f9` |
+| eval2 / GPU2 / `19420,19422` | `c_hf_j_matched_baseline_put_back_trainseed0_evalseed2_100ep` | `2473857` | `f1237a80-7831-494e-932b-221234483d4f` |
+
+三条 outer 在启动后三秒仍存活，随后立即按真实 remote PID 登记。冻结 source、checkpoint、manifest、scheduler、RNG scope、环境 seed 和阈值均未修改；尚未从运行中推断结果，也未启动 fixed/event 或任何 S/K10 批次。停止后将先做逐集终态审计和归档，再按同 lane 原顺序接续下一 arm。
+
 # 置顶：第一层 J rearrange HF-event 三个 eval formal100 终态与同 seed 配对审计（2026-09-14）
 
 三个授权的 HF-event formal100 均已完成并通过终态、身份、rolling evidence 与 trigger 审计；结果来自每条连续 100 个 accepted episode。它们是冻结原件的描述性记录，不将发生 trigger 的 episode 成功或失败解释为 trigger 的因果效果。
