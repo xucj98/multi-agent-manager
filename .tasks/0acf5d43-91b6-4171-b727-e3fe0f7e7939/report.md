@@ -6,7 +6,7 @@ C3 GPU1 的 `c_hf_j_hf_fixed_put_back_trainseed0_evalseed1_100ep` 已停止，�
 
 100 份 rolling evidence 均完整：每集第一条为一次 `policy_rng_reset`，协议为 `episode_reset_key0_independent_probe_v1` / `explicit_episode_reset`，HF-fixed 无 trigger、clear 或 event replan 记录。总计为 1,173 个 action plan、6,783 个 progress/forecast consumption、5,710 个 independent probe、1,073 个 completed plan 和 100 个 terminal plan；rolling-file aggregate SHA-256 是 `c045d41d306296d1349fceb832e0f0ed2c262d6a4ad9da32e5b19000790d36c2`。前 5 个 MP4 均经 `ffprobe` 和 `ffmpeg` 解码；process ledger 有 102 starts / 102 matching exits，100 个 scheduler 均 exit 0，robot/policy 均是 runner 受控 `-15` shutdown，所有记录 PID 已退出。outer log 中的连接重试原件仍保留并被哈希，但不会覆盖上述 completed 结构化终态。
 
-本次复查时 GPU1 的两个端口均已释放、GPU1 为 `2 MiB` / `0%`；另外 GPU0 eval0 和 GPU2 eval2 的 put-back HF-fixed outer jobs 仍在运行，未从其仍在运行的状态推断成绩。GPU1 的 stopped MAM job `0283a094-b073-4a95-ba7c-be67cadbd924` 将在本报告发布后归档，并按已授权固定 lane 顺序接续自身 put-back HF-event strict smoke2→formal100；不改变 seed、阈值、runtime、checkpoint 或冻结输入。
+GPU1 的两个端口已释放、GPU1 为 `2 MiB` / `0%`，stopped MAM job `0283a094-b073-4a95-ba7c-be67cadbd924` 已在终态报告发布后归档。随后 MAM snapshot 显示 GPU0 eval0 的 HF-fixed job 已停止、GPU2 eval2 的 HF-fixed job 仍在运行；这里不把 GPU0 的停止或 GPU2 的运行状态当作结果，它们分别仍需独立收尾或等待终态。GPU1 已按固定 lane 顺序启动 put-back HF-event `c_hf_j_hf_event_put_back_trainseed0_evalseed1_100ep`：outer PID `3187488` 在启动三秒及 MAM 登记时均存活，MAM job 为 `88a440d4-60b1-464a-a492-84cdefecee8d`。该 outer 正在运行新的 strict matching smoke2，只有 identity/evidence/quiescence gate 通过才会 `exec` 原 formal100；seed、阈值、runtime、checkpoint 和冻结输入均未改变。
 
 # 置顶：第一层 J put-back matched-baseline eval2 终态与三 eval 原始汇总（2026-09-14）
 
