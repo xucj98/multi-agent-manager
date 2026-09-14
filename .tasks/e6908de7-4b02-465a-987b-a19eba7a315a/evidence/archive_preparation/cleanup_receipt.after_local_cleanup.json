@@ -1,0 +1,352 @@
+{
+  "archive_preflight": {
+    "archived_job_count_from_task_status": 105,
+    "external_process_references": [],
+    "open_file_references": [],
+    "outer_check": "PASS using multi_agent_manager.cli.outer_check",
+    "registered_worktrees": {
+      "RMBench": {
+        "allowed_ignored_paths": [
+          ".local",
+          ".venv/",
+          "assets",
+          "data",
+          "eval_result",
+          "logs",
+          "policy/DP/checkpoints",
+          "policy/Mem-0/assets",
+          "policy/Mem-0/checkpoints/Qwen3-VL-2B-Instruct",
+          "policy/Mem-0/checkpoints/m1_mix",
+          "policy/Mem-0/checkpoints/mem0_swap_blocks_single_20260907",
+          "policy/Mem-0/lerobot_datasets",
+          "policy/pi05/checkpoints"
+        ],
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/registered-rmbench",
+        "archive_ref_verified_sha": "3775d4a878adb0f840c1f8a9e12aa014fb185a53",
+        "branch": "task/e6908de7-4b02-465a-987b-a19eba7a315a",
+        "dirty_function": "PASS",
+        "head": "3775d4a878adb0f840c1f8a9e12aa014fb185a53",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench"
+      },
+      "openpi": {
+        "allowed_ignored_paths": [
+          ".local",
+          ".venv/",
+          "assets",
+          "checkpoints",
+          "data",
+          "datasets",
+          "logs",
+          "offline_test",
+          "offline_test_results",
+          "policy_records",
+          "wandb"
+        ],
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/registered-openpi",
+        "archive_ref_verified_sha": "a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4",
+        "branch": "task/e6908de7-4b02-465a-987b-a19eba7a315a",
+        "dirty_function": "PASS",
+        "head": "a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/openpi"
+      },
+      "robot-bridge": {
+        "allowed_ignored_paths": [
+          ".local",
+          ".venv/",
+          "eval_result",
+          "logs"
+        ],
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/registered-robot-bridge",
+        "archive_ref_verified_sha": "f9626636c4776d8eb15f9c556775cb2d12c000e5",
+        "branch": "task/e6908de7-4b02-465a-987b-a19eba7a315a",
+        "dirty_function": "PASS",
+        "head": "f9626636c4776d8eb15f9c556775cb2d12c000e5",
+        "workspace_path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge"
+      }
+    },
+    "unarchived_jobs": [],
+    "workspace_entries": [
+      "RMBench",
+      "openpi",
+      "robot-bridge"
+    ]
+  },
+  "created_at_utc": "2026-09-14T05:26:53.720323+00:00",
+  "local_cleanup": {
+    "extra_worktrees_and_original_branches_removed": [
+      {
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-ledger",
+        "archive_ref_verified_sha": "2f1e81d2b625d33379b02884589a9ed3cc76e6c7",
+        "original_branch_removed": "task/e6908de7-c-eval-ledger-20260912",
+        "worktree": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-ledger"
+      },
+      {
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-r3-lifecycle-gate",
+        "archive_ref_verified_sha": "2e9677ce8ec9f623395184f63f32ddafa66e5e44",
+        "original_branch_removed": "task/e6908de7-r3-lifecycle-gate",
+        "worktree": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r3-lifecycle-gate"
+      },
+      {
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-warp-cache-docs",
+        "archive_ref_verified_sha": "99b7d38b6d5445bae0e73d2e5dc1faf26f3920eb",
+        "original_branch_removed": "task/e6908de7-warp-cache-docs",
+        "worktree": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-warp-cache-docs"
+      },
+      {
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-c-eval-docs-consolidated",
+        "archive_ref_verified_sha": "a3566f708fbb9c2971fadb3ce89aa31384718768",
+        "original_branch_removed": "task/e6908de7-c-eval-docs-consolidated",
+        "worktree": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-c-eval-docs-consolidated"
+      },
+      {
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-r2-running-ledger",
+        "archive_ref_verified_sha": "1f91d189d755666e4fc668e65b7284b1e8dc09e3",
+        "original_branch_removed": "task/e6908de7-r2-running-ledger",
+        "worktree": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-r2-running-ledger"
+      },
+      {
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-eval-seed-runtime",
+        "archive_ref_verified_sha": "9d8f47887a50ea691e5624de139f10bfcfb54412",
+        "original_branch_removed": "task/e6908de7-eval-seed-runtime",
+        "worktree": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-eval-seed-runtime"
+      },
+      {
+        "archive_ref": "refs/heads/archive/e6908de7-4b02-465a-987b-a19eba7a315a/extra-serial-ledger",
+        "archive_ref_verified_sha": "bcd5393a9add35a79c9b766128abbcd844e27b09",
+        "original_branch_removed": "task/e6908de7-serial-ledger-20260912",
+        "worktree": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench-serial-ledger"
+      }
+    ],
+    "extra_worktrees_removed_with": "git worktree remove",
+    "hash_verified_ordinary_entries_removed": [
+      "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/manager-handoff-ack.md",
+      "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c_checkpoint_transfer"
+    ],
+    "ignored_generated_caches_removed": {
+      "created_at_utc": "2026-09-14T05:25:42.768440+00:00",
+      "entries": [
+        {
+          "file_count": 1,
+          "file_names": [
+            "run_memory_schema_eval.cpython-310.pyc"
+          ],
+          "inventory_sha256": "15891d3d708dc93ef7eabee08e3bac8083db2a3885b35a7b002562eaa5970448",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/RMBench/experiments/memory_chunk_20260910/commands/__pycache__",
+          "total_bytes": 13702
+        },
+        {
+          "file_count": 4,
+          "file_names": [
+            ".gitignore",
+            "CACHEDIR.TAG",
+            "README.md",
+            "v/cache/nodeids"
+          ],
+          "inventory_sha256": "211fb0af843d0c0f5695dbbcf19f7fa08c0c0504134ea8bfc8e8ebd3e620e8d2",
+          "kind": "pytest_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/.pytest_cache",
+          "total_bytes": 11400
+        },
+        {
+          "file_count": 3,
+          "file_names": [
+            "__init__.cpython-311.pyc",
+            "config.cpython-311.pyc",
+            "schema.cpython-311.pyc"
+          ],
+          "inventory_sha256": "3e6a9a1e26041a0498391ffd54a2d30ec1ee55f2f21b5e4cf8e9cde03349eeb4",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/robot_bridge/__pycache__",
+          "total_bytes": 9605
+        },
+        {
+          "file_count": 3,
+          "file_names": [
+            "__init__.cpython-311.pyc",
+            "provenance.cpython-311.pyc",
+            "runner.cpython-311.pyc"
+          ],
+          "inventory_sha256": "eb6aa545fc095144a25637135fb8acd6b726f144487517da23addfd649e7d990",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/robot_bridge/benchmark/__pycache__",
+          "total_bytes": 91360
+        },
+        {
+          "file_count": 2,
+          "file_names": [
+            "__init__.cpython-311.pyc",
+            "server.cpython-311.pyc"
+          ],
+          "inventory_sha256": "0065bb7775d7d15ac1ab495e3a32560062feb59f2e10385ef1c84cda011235cb",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/robot_bridge/policy/__pycache__",
+          "total_bytes": 5585
+        },
+        {
+          "file_count": 2,
+          "file_names": [
+            "__init__.cpython-311.pyc",
+            "base.cpython-311.pyc"
+          ],
+          "inventory_sha256": "1b393a693295640b16dc76e35d7db76c27de1b0889fca96f93a1125772aa91dd",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/robot_bridge/policy/backends/__pycache__",
+          "total_bytes": 2855
+        },
+        {
+          "file_count": 2,
+          "file_names": [
+            "__init__.cpython-311.pyc",
+            "server.cpython-311.pyc"
+          ],
+          "inventory_sha256": "4cc7c17ebb126e8668728a1c963461f8de18b3aede0100fb80c0b73d9849aa53",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/robot_bridge/robot/__pycache__",
+          "total_bytes": 8439
+        },
+        {
+          "file_count": 8,
+          "file_names": [
+            "__init__.cpython-311.pyc",
+            "base.cpython-311.pyc",
+            "execution_progress.cpython-311.pyc",
+            "mock.cpython-311.pyc",
+            "rmbench_rpc.cpython-311.pyc",
+            "rmbench_sim_worker.cpython-311.pyc",
+            "rmbench_simulation.cpython-311.pyc",
+            "x2robot_offline.cpython-311.pyc"
+          ],
+          "inventory_sha256": "6031fdc4233b9558b2ff3c50a0a1fa2d9becbad78cfc6395f20e025148371a0c",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/robot_bridge/robot/controllers/__pycache__",
+          "total_bytes": 168962
+        },
+        {
+          "file_count": 11,
+          "file_names": [
+            "__init__.cpython-311.pyc",
+            "base.cpython-311.pyc",
+            "control.cpython-311.pyc",
+            "dm05.cpython-311.pyc",
+            "mem0.cpython-311.pyc",
+            "memory_context.cpython-311.pyc",
+            "openpi.cpython-311.pyc",
+            "openpi_offline.cpython-311.pyc",
+            "openpi_simulation.cpython-311.pyc",
+            "openpi_takeover.cpython-311.pyc",
+            "simulation.cpython-311.pyc"
+          ],
+          "inventory_sha256": "90a9a7db573d594120fcf31571174d0c873c9ff918c902dab010a341abdac196",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/robot_bridge/scheduler/__pycache__",
+          "total_bytes": 276426
+        },
+        {
+          "file_count": 4,
+          "file_names": [
+            "__init__.cpython-311.pyc",
+            "codec.cpython-311.pyc",
+            "udp.cpython-311.pyc",
+            "websocket.cpython-311.pyc"
+          ],
+          "inventory_sha256": "bb9584609e2f1cadf08856a0a1a465465c3f24c73469b9d13f6480becd26ba18",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/robot_bridge/transport/__pycache__",
+          "total_bytes": 24292
+        },
+        {
+          "file_count": 5,
+          "file_names": [
+            "__init__.cpython-311.pyc",
+            "image.cpython-311.pyc",
+            "keyboard.cpython-311.pyc",
+            "logging.cpython-311.pyc",
+            "trajectory.cpython-311.pyc"
+          ],
+          "inventory_sha256": "7dc31623229e097d16fe166858b006d54f30a6edd9ed4e7ace675d5d88a6a338",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/robot_bridge/utils/__pycache__",
+          "total_bytes": 29374
+        },
+        {
+          "file_count": 1,
+          "file_names": [
+            "run_scheduler.cpython-311.pyc"
+          ],
+          "inventory_sha256": "7092029c2e4250f4e126bebeff0297439bf3bb767f35829341767cc610506128",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/scripts/__pycache__",
+          "total_bytes": 6440
+        },
+        {
+          "file_count": 1,
+          "file_names": [
+            "test_runner.cpython-311-pytest-9.1.1.pyc"
+          ],
+          "inventory_sha256": "676eb4b69e47dcb33b49ccb1f9f2a2c5987e2e6e25abfd6b6d7efc46e1d292d0",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/tests/benchmark/__pycache__",
+          "total_bytes": 36260
+        },
+        {
+          "file_count": 12,
+          "file_names": [
+            "test_control_server.cpython-311-pytest-9.1.1.pyc",
+            "test_first_infer_timeout.cpython-311-pytest-9.1.1.pyc",
+            "test_lifecycle.cpython-311-pytest-9.1.1.pyc",
+            "test_memory_context.cpython-311-pytest-9.1.1.pyc",
+            "test_memory_v1_schedulers.cpython-311-pytest-9.1.1.pyc",
+            "test_openpi.cpython-311-pytest-9.1.1.pyc",
+            "test_openpi_feedback.cpython-311-pytest-9.1.1.pyc",
+            "test_openpi_memory_transform_contract.cpython-311-pytest-9.1.1.pyc",
+            "test_openpi_simulation.cpython-311-pytest-9.1.1.pyc",
+            "test_openpi_takeover.cpython-311-pytest-9.1.1.pyc",
+            "test_resolve_param.cpython-311-pytest-9.1.1.pyc",
+            "test_simulation_adapters.cpython-311-pytest-9.1.1.pyc"
+          ],
+          "inventory_sha256": "0b6e7274bf92119e7b9adda476759a01c0e2807beecbda184b5ecff9223dc968",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/tests/scheduler/__pycache__",
+          "total_bytes": 431425
+        },
+        {
+          "file_count": 1,
+          "file_names": [
+            "test_websocket.cpython-311-pytest-9.1.1.pyc"
+          ],
+          "inventory_sha256": "8abd93eca63384bc773867e40fbf78e5cbf8cef9050fd1b98410efd5654fc799",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/robot-bridge/tests/transport/__pycache__",
+          "total_bytes": 5548
+        },
+        {
+          "file_count": 2,
+          "file_names": [
+            "__init__.cpython-311.pyc",
+            "memory_config.cpython-311.pyc"
+          ],
+          "inventory_sha256": "575a2da264ad34b52907448312336d4acbb78b22aff4403111cc114b486ab457",
+          "kind": "python_bytecode_cache",
+          "path": "/mnt/public/xcj/Projects/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/openpi/packages/openpi-client/src/openpi_client/__pycache__",
+          "total_bytes": 74071
+        }
+      ],
+      "purpose": "Remove only generated ignored caches that MAM dirty() rejects; no result, checkpoint, asset, data, environment, or symlink target was removed."
+    }
+  },
+  "manager_action": "Manager may run mam task archive e6908de7-4b02-465a-987b-a19eba7a315a; this executor did not archive the task.",
+  "remote_cluster_c": {
+    "dependent_task": "0acf5d43-91b6-4171-b727-e3fe0f7e7939",
+    "no_remote_cleanup_or_modification": true,
+    "preserved": true,
+    "protected_runtime_root": "/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914"
+  },
+  "retention_evidence_commit": "894fef8250617a8d955e53afd70ae22433b5f61a",
+  "retention_manifest": {
+    "path": ".tasks/e6908de7-4b02-465a-987b-a19eba7a315a/evidence/archive_preparation/retention_manifest.before_cleanup.json",
+    "sha256": "6e1d613391c63c36a5239c6b4ac14674e0d5ecaebff93e3fea9d86b2ecde3414"
+  },
+  "schema_version": 1,
+  "task_id": "e6908de7-4b02-465a-987b-a19eba7a315a"
+}
