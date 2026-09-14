@@ -2,7 +2,7 @@
 
 ## 结论
 
-截至 2026-09-15 的 B 复验，文档已足以完成 5 个独立的新环境及真实 CPU 检查：B/openpi、B/RMBench、B/robot-bridge、C/RMBench、C/robot-bridge 均创建、安装并自检通过。B 的两个仓库在首次尝试时确实不存在，后续沿更新后的原文档重试成功；首次失败证据仍保留在本报告。C/openpi 的任务指定 BASE_COMMIT 在首次尝试时不在稳定仓库中，按 Manager 指示暂缓复验，等待明确的复验 base。未修改任何稳定脚本、代码、共享配置或他人环境。
+截至 2026-09-15 的最后 C/openpi 复验，六个独立环境均已按文档创建、安装并完成真实 CPU 检查：B/openpi、B/RMBench、B/robot-bridge、C/openpi、C/RMBench、C/robot-bridge 全部通过。B 的两个仓库在首次尝试时确实不存在，后续沿更新后的原文档重试成功；C/openpi 的原 BASE_COMMIT 在首次尝试时确实不可用，随后仅使用最新已发布 task 明确给出的复验 base `c03898f5a76f4ac208f7d23ae14e2cc759be8853` 成功。所有首次失败证据仍保留在本报告。未修改任何稳定脚本、代码、共享配置或他人环境。
 
 执行者从 MAM 库的 `.local/README.md` 开始，仅沿其链接阅读 `.local/wuwen-11.md`、`.local/wuwen-4090.md`、存在仓库的 `AGENTS.md` 与其明确引用的 `docs/worktree_env/README.zh-CN.md`。未读取实现、安装脚本、其他 task 报告或私有 launcher。
 
@@ -13,11 +13,11 @@
 | B / openpi | 通过，入口 exit 0 | 通过，exit 0 | 通过，`worktree_env_smoke.py` | `/mnt/public3/xcj/Projects/state-vla/workspace/bed9952b-c1a2-40ec-9f6d-34feeba91aa5/openpi` |
 | B / RMBench | 复验通过，入口 exit 0 | 通过 | 通过，CPU import exit 0 | `/mnt/public3/xcj/Projects/state-vla/workspace/bed9952b-c1a2-40ec-9f6d-34feeba91aa5/RMBench` |
 | B / robot-bridge | 复验通过，入口 exit 0 | 通过，exit 0 | 通过，`worktree_env_smoke.py` | `/mnt/public3/xcj/Projects/state-vla/workspace/bed9952b-c1a2-40ec-9f6d-34feeba91aa5/robot-bridge` |
-| C / openpi | 暂缓复验 | 未运行 | 未运行 | 保留首次指定 BASE_COMMIT 不可用的证据，等待 Manager 提供明确复验 base |
+| C / openpi | 最终复验通过，入口 exit 0 | 通过，exit 0 | 通过，`worktree_env_smoke.py` exit 0 | `/mnt/public/xcj/Projects/state-vla/workspace/bed9952b-c1a2-40ec-9f6d-34feeba91aa5/openpi` |
 | C / RMBench | 通过，入口 exit 0 | 通过 | 通过，CPU import exit 0 | `/mnt/public/xcj/Projects/state-vla/workspace/bed9952b-c1a2-40ec-9f6d-34feeba91aa5/RMBench` |
 | C / robot-bridge | 通过，入口 exit 0 | 通过，exit 0 | 通过，`worktree_env_smoke.py` | `/mnt/public/xcj/Projects/state-vla/workspace/bed9952b-c1a2-40ec-9f6d-34feeba91aa5/robot-bridge` |
 
-所有已创建 worktree 使用 `task/bed9952b-c1a2-40ec-9f6d-34feeba91aa5`：B/openpi 为 `34002dce65962734c59725a0f6d982ae2c438a2d`；B/RMBench 与 C/RMBench 均为 `f401f5279c95451eb424ac98b831bab5552b2120`；B/robot-bridge 与 C/robot-bridge 均为 `f9626636c4776d8eb15f9c556775cb2d12c000e5`。B/openpi、B/RMBench、B/robot-bridge 和 C/RMBench 均以 `git branch --show-current` 与 `git rev-parse HEAD` 复核。
+所有已创建 worktree 使用 `task/bed9952b-c1a2-40ec-9f6d-34feeba91aa5`：B/openpi 为 `34002dce65962734c59725a0f6d982ae2c438a2d`；C/openpi 为 `c03898f5a76f4ac208f7d23ae14e2cc759be8853`；B/RMBench 与 C/RMBench 均为 `f401f5279c95451eb424ac98b831bab5552b2120`；B/robot-bridge 与 C/robot-bridge 均为 `f9626636c4776d8eb15f9c556775cb2d12c000e5`。六个 worktree 均由各稳定入口输出 source commit；B/openpi、B/RMBench、B/robot-bridge、C/openpi 和 C/RMBench 另以 `git branch --show-current` 与 `git rev-parse HEAD` 复核。
 
 ## 文档命令及证据
 
@@ -91,7 +91,7 @@ error: BASE_COMMIT is not available in /mnt/public/xcj/Projects/state-vla/openpi
 # exit 2
 ```
 
-该入口在创建前失败，C 任务目录下 `openpi` 不存在。文档没有说明缺失 base 的获取、同步或替代提交策略；需要发布方提供可达对象或文档化恢复步骤。分类：外部 git 对象/发布输入问题（文档无恢复办法）。
+该入口在创建前失败，C 任务目录下 `openpi` 不存在。原文档没有说明缺失 base 的获取、同步或替代提交策略；该次失败分类为外部 git 对象/发布输入问题（文档无恢复办法）。随后 Manager 在最新已发布 task 中明确准入新的复验 base；该输入不是从实现、修复报告或猜测中取得，最终 C1 复验见下文。
 
 ## 额外步骤与边界
 
@@ -130,3 +130,31 @@ ssh wuwen-11 'cd .../robot-bridge && .venv/bin/python scripts/worktree_env_smoke
 两项均未执行文档中要求已分配设备的 GPU/render smoke。最后的只读复核显示两个仓库均在 `task/bed9952b-c1a2-40ec-9f6d-34feeba91aa5`，HEAD 分别为 `f401f5279c95451eb424ac98b831bab5552b2120` 和 `f9626636c4776d8eb15f9c556775cb2d12c000e5`，`git status --porcelain` 均无输出。
 
 此前“B / RMBench、robot-bridge：文档路径与实际稳定根不一致”一节保留原始 `No such file or directory` 输出，作为首个失败证据；本次不覆盖该事实，而是记录修复后同一文档导航与同一三参数合同已能完成复验。
+
+## 2026-09-15 C / openpi 最终复验
+
+最新已发布 task 明确准入复验 base `c03898f5a76f4ac208f7d23ae14e2cc759be8853`，并要求仅在 C1 执行。执行者重新沿本机 `.local/README.md`、`.local/wuwen-4090.md`、C1 `openpi/AGENTS.md` 和其明确引用的 `docs/worktree_env/README.zh-CN.md` 导航；未读取修复代码或报告。创建前，C1 的目标 `/mnt/public/xcj/Projects/state-vla/workspace/bed9952b-c1a2-40ec-9f6d-34feeba91aa5/openpi` 为 `absent`。
+
+按 C 集群文档三参数入口在 `wuwen-4090-1` 实际执行：
+
+```text
+ssh wuwen-4090-1 'bash /mnt/public/xcj/Projects/state-vla/openpi/.local/create_worktree.sh c03898f5a76f4ac208f7d23ae14e2cc759be8853 task/bed9952b-c1a2-40ec-9f6d-34feeba91aa5 /mnt/public/xcj/Projects/state-vla/workspace/bed9952b-c1a2-40ec-9f6d-34feeba91aa5'
+# exit 0
+# stdout includes: created openpi worktree: .../workspace/.../openpi
+# source commit: c03898f5a76f4ac208f7d23ae14e2cc759be8853
+# All installed packages are compatible
+# editable source: .../workspace/.../openpi
+# openpi installer profile: native-symlink
+```
+
+按环境说明“安装后检查与实验”段落，在同一 C1 worktree 执行普通 CPU 检查；命令未设置 `PYTHONOPTIMIZE`，随后只读确认 C1 环境中 `PYTHONOPTIMIZE=unset`：
+
+```text
+ssh wuwen-4090-1 'cd /mnt/public/xcj/Projects/state-vla/workspace/bed9952b-c1a2-40ec-9f6d-34feeba91aa5/openpi && .venv/bin/python scripts/worktree_env_smoke.py'
+# exit 0
+# stdout: {"numpy":"1.26.4", "openpi":".../workspace/.../openpi/src/openpi/__init__.py", "openpi_client":".../workspace/.../openpi/packages/openpi-client/src/openpi_client/__init__.py", "openpi_client_dist":"0.1.0", "openpi_dist":"0.1.0", "python":".../workspace/.../openpi/.venv/bin/python", "venv":".../workspace/.../openpi/.venv"}
+```
+
+此 CPU smoke 在 C1 曾受共享盘页读取影响：首次状态采样时约已运行 1 分 18 秒，`ps` 显示 `D / wait_on_page_bit_common`；持续观察到至少 12 分 48 秒，期间无 stdout/stderr。未改用 C2、未新建第二次检查、未使用优化模式。随后同一会话正常以 exit 0 返回，因此该共享盘等待是实际阻塞观察而非最终失败。
+
+最后的只读复核显示分支 `task/bed9952b-c1a2-40ec-9f6d-34feeba91aa5`、HEAD `c03898f5a76f4ac208f7d23ae14e2cc759be8853`，`git status --porcelain` 无输出。曾尝试按 MAM 长进程规则登记该阻塞 PID；登记时它恰已退出，MAM 返回 `process not found`，因此没有遗留 job。
