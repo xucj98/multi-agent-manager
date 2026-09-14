@@ -1,3 +1,23 @@
+# 置顶：第一层 J rearrange matched-baseline 正式启动与 smoke→formal 交接修复（2026-09-14）
+
+三条新 strict matching smoke 均已完整结束并通过实际 `eval_diagnostics.validate_smoke_run` 门禁；随后原 outer 在 formal 资源预检前停止，**没有创建任何 formal leaf、formal-start 收据或正式 episode**。这不是模型、仿真或任务结果失败。
+
+初始 outer 的首因是 task-private launcher 在 smoke 返回后立即执行其严格 GPU gate。GPU0/1/2 当时分别观察到 `memory_used_mib=3099/2005/3067`，因其 `used<=256MiB` 条件被拒绝；三个 smoke 的 runner-owned robot、policy 和 scheduler 均有完整 exit 记录，当前对应 PID、端口和四卡占用均已消退。现有账本不能把瞬态占用可靠归因于自有 teardown 或其他 VM，因此没有放宽任何阈值。旧 MAM jobs `53dbce3f-987e-43fd-bcba-fbd403e839a9`、`a4fe4550-fbe4-401b-8f63-65b0a32b9c50`、`172faecb-ea53-48fc-a055-41e1b58ec85f` 已在原件审计后归档。
+
+task-private state 修复 commit `71866bdec4a738fae56e41d3ab85f504e102776f` 在 formal 前增加有上限的 smoke→formal 静默等待：必须同时满足 recorder 的自有子进程 exit ledger 完整、记录 PID 不再存在、端口释放，以及原有的 `free>=20000MiB`、`used<=256MiB`、`util<=10%`。它每 2 秒取样，180 秒超时仍写不可变收据并拒绝 formal；不改变三库、checkpoint、manifest、scheduler、RNG、命令 argv 或冻结阈值。模拟 ready/timeout 路径、Python 编译和 diff 检查通过；验证收据 commit `1469bf787be106315c228c4f4b7d013a93d15d9d`。
+
+原始拒绝审计收据：`/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/smoke_to_formal_resource_handoff_rejection_20260914.json`，SHA-256 `4f43273496b433f59bc4755bca5d70b3a77d9bf9c65d930b3902b377599dc965`。修复验证收据：`/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/smoke_to_formal_handoff_repair_validation_20260914.json`，SHA-256 `ab7b391cce8a15ad8dd4c8b60b2e4114a4f378107ac79d28c20189f2f2ab1e18`。
+
+三条 formal 均在 `2026-09-14T02:19:55Z` 写入 `formal100_started=true`，使用已验证的原 matching smoke，不重跑 smoke：
+
+| GPU / 端口 | formal run | 新 outer PID | MAM job | handoff receipt SHA-256 | formal-start receipt SHA-256 |
+| --- | --- | ---: | --- | --- | --- |
+| GPU0 / 19400,19402 | `c_hf_j_matched_baseline_rearrange_trainseed0_evalseed0_100ep` | `1405062` | `09912433-20ef-45ac-9ead-853e51c97cce` | `2d4e27f5a0d001af686d570d921cbc5712e21728f5dfafe6024c6d9c975eb80d` | `4376a28fc5fcbcaec9230fb6b943c9fbd835e48ca0e32fa8b9ebfa734813e2f7` |
+| GPU1 / 19410,19412 | `c_hf_j_matched_baseline_rearrange_trainseed0_evalseed1_100ep` | `1405063` | `9b596267-568b-4096-84de-fd163450944e` | `36d3cbdbe45156ebd49f3caf4818ace0f251221eb20a626e09e6bf2f8e6bb2d2` | `8035c9abcda4922dd576776314e94d9b3e914c704ff889bde768b380c2099f33` |
+| GPU2 / 19420,19422 | `c_hf_j_matched_baseline_rearrange_trainseed0_evalseed2_100ep` | `1405064` | `f95b92ad-5c62-4f51-a1f8-df3201cd5210` | `7cac9385f620ce7455ce8847754e2a040e97dd21afca8b6c6c27ce68cac1289a` | `0d4954aa31e114051a10ee2cce847d39147ed94bd346eba9e9cf48fd13311ad6` |
+
+运行时 handoff/formal-start/preflight 原件均在同一 `formal_first_layer_j_20260914/receipts/` 目录。预检记录启动时四卡均为 `1MiB used / 24080MiB free / 0%`，对应端口空闲，三库仍为冻结 clean HEAD：OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`。当前只报告 formal 已启动；不从 smoke 或运行中状态推断正式分数。
+
 ## 最终工程阶段收尾（2026-09-14；五个 profile / 10 个已授权 episode）
 
 本轮已授权的工程轨迹预算已用尽：五个 profile 各恰好两个 accepted episode，共 **10/10**；没有增加 seed、episode、重试、调参或诊断，`formal100_started=false`。以下是工程运行、基础设施和轨迹合同证据，**不构成科学效果比较，也不构成 formal 准入结论**；任务层的科学裁决仍由 Manager 完成。
