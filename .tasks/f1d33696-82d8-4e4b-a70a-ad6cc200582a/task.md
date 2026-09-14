@@ -16,3 +16,10 @@ stage目录 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b72
 另窄核对既有CPU测试/已发布代码review对真实scheduler触发→clear→普通infer顺序、取消返回后缀、双流RNG、terminal和旧pending memory隔离覆盖了什么。优先只读源task report与冻结测试；如确需独立源码review，仅给bridge建冻结worktree并读其AGENTS，禁止重建三库环境/重跑全套测试/新造测试框架。无需运行任何新测试或GPU，报告已存在代码/测试证据的具体位置与未覆盖限制。历史跨进程bitwise失败保持失败，不能要求再重跑证明其PASS。
 
 最终交精简report和JSON receipt（原件路径/hash、独立重算、实际缺口）。回答是否存在具体工程阻断，以及三个leaf各自作为未来matching smoke候选的边界；不授权formal、不更新论文。缺少自然触发与代码缺陷须分开，不由你裁定算法效果。Manager将据证据明确决定后续原计划36批的分阶段准入。不修改源报告、冻结runtime、工具、结果、checkpoint、阈值或seed；完成后发布并正常结束turn。
+
+
+## Manager 最终验收（2026-09-14）
+
+接受report2923083647de4f427269693860134412ee391f3e与receipt f19f0212d1d3370da7e519b612628bd0df6d1e159bd4b4f927d1f7c40e76b600的工程结论。Manager另从C3重哈希三叶全部42项原件及五profile汇总，重算6集action/probe/forecast消费/比较/终态与输入连接，核读真实clear返回检查及已有CPU测试。未发现具体工程阻断；四集event零自然trigger作为限制保留，不强制追加样本制造触发。
+
+持久验收 /root/Documents/task-state-vla-paper/docs/audits/20260914-hf-original-entry/final_engineering_acceptance.json SHA 1140382c9425886fec6fad3c70f90b271d05b347a58ea7e89c6606c574b1473c；独立report/receipt已原字节保存。Manager准入原计划第一层J18批，逐run仍须不变的matching gate、精确身份及正式合同；由源执行task的新发布指令落实，不由review启动GPU。本review无剩余工作，归档。
