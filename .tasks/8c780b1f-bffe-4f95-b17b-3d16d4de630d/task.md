@@ -1782,3 +1782,9 @@ C1 正式根 /mnt/public/xcj/Projects/state-vla/RMBench/eval_result/memory_chunk
 实际冻结 runtime c-eval-putback-baselines-yaml：RMBench f401f5279c95451eb424ac98b831bab5552b2120 / bridge f9626636c4776d8eb15f9c556775cb2d12c000e5 / OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4。核对真实checkpoint train2/eval1、H50/K30、首infer90秒/后续30秒、历史continuous action RNG、metadata和实际command；区别于源任务登记的worktree HEAD。task-local终验器 SHA256 a532cd5d6b76c637165b05c9d0a431f820ad11ea6f59d4f9aa763aae201aa423。
 
 不执行模型/仿真/训练、不拷大资产、不修改产物、冻结源码、论文或owner报告，不触碰正在运行的 train2/eval2 或 HF。无源码变更，无需无关worktree。可参考旧review流程但必须独立核验本次原件。将小型原始证据副本和重算receipt置于本task目录，保留可供Manager独立核算的两叶final_review、preflight、diagnostics及核心引用。交简短report、receipt路径/hash、是否有计入正式结果的阻断与实际范围限制；发布后正常结束turn。
+
+## Manager 最终验收（2026-09-14）
+
+接受独立report 1cbebfb6f7623e97be069ddf13dc1c37b5852446 和receipt 8f18a36aa368cd7f723d8eed62cc9c44fb14e229f7176bbfa2ed741125f0ba29。Manager另从本地原件和C1重哈希两份final review及20项核心引用，独立重算200条连续seed/preflight/terminal/outcomes/失败类别、video策略、自有进程退出、actual config与smoke命令链。J70/100、T68/100纳入原协议正式台账；视频重解码、大模型完整rehash及已删除smoke raw的限制保留。
+
+验收收据 /root/Documents/task-state-vla-paper/docs/analysis/putback_jt_train2_eval1_acceptance_20260914.json SHA256 2e2e91920f15378d36c1b65747e11015a32e84307c3b7619d5971131ebe3308f；独立receipt已原字节保存同目录。新快照 accepted_results_20260914_jt_train2_eval1.json SHA256 1419d39159916795b0786d02a7044eb35df15cb24d5492c8c7258964c14c8f43：50批/5000执行/20模型/14完整3eval。论文资料提交32554ae，编译PDF仍冻结44批。train2/eval2归源owner继续；本review完成，可归档。
