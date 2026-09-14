@@ -1,3 +1,23 @@
+## 最终工程阶段收尾（2026-09-14；五个 profile / 10 个已授权 episode）
+
+本轮已授权的工程轨迹预算已用尽：五个 profile 各恰好两个 accepted episode，共 **10/10**；没有增加 seed、episode、重试、调参或诊断，`formal100_started=false`。以下是工程运行、基础设施和轨迹合同证据，**不构成科学效果比较，也不构成 formal 准入结论**；任务层的科学裁决仍由 Manager 完成。
+
+最后一个叶子 `c_hf_j_hf_event_rearrange_trainseed0_evalseed0_smoke2` 已完成并归档：episode 0 / seed `100000` 与 episode 1 / seed `100001` 都是 Success，logical step 分别为 392 / 404，普通 action 调用各 14 次、probe 分别为 65 / 67 次，实执行 K 分布为 `{30: 13, 2: 1}` 与 `{30: 13, 14: 1}`。逐条以 `source_step + completed_rows` 重建完成时刻，并核验 probe source/target、forecast 消费、后续普通 action 输入、JSONL header/终态、视频和受控进程退出；`trace_contract_validation.json` 全部通过。两集各只有一次高偏差（episode 0：`u=230,d=20,2/3`；episode 1：`u=255,d=15,3/3`），均未连续两次，因此 `trigger_eligible_count=0`、`trigger_count=0`、`clear_count=0`，没有观察到真实 **trigger → clear → normal replan** 路径。没有为了制造该覆盖而改变冻结阈值或增加样本。
+
+| Profile | 两集普通任务结果 | ordinary action / probe 调用 | 覆盖状态 |
+| --- | --- | --- | --- |
+| `j_shadow_rs30_degradation_rearrange` | Success / Fail | 14/0；24/0 | `r_s=30` 工程退化控制，无中途 probe；不覆盖 event 路径 |
+| `j_hf_fixed_put_back` | Fail / Fail | 17/83；17/83 | 两个 Fail 都是普通任务的 `step_limit_reached`，不是 runtime 或基础设施错误；HF-fixed 不启用 event clear/replan |
+| `j_hf_event_put_back` | Success / Success | 12/55；12/55 | 两集均未满足冻结的连续触发判据；未覆盖 trigger→clear→replan |
+| `j_hf_fixed_rearrange` | Success / Success | 14/65；14/67 | HF-fixed 不启用 event clear/replan |
+| `j_hf_event_rearrange` | Success / Success | 14/65；14/67 | 两集均未满足冻结的连续触发判据；未覆盖 trigger→clear→replan |
+
+五个 leaf 均已完成各自的基础设施和轨迹/合同验收：恰好两个连续 accepted seed、完整终态/JSONL evidence、关闭随机光照、视频策略和受控服务收尾均已核对。合计记录 152 次 ordinary action 调用和 540 次 probe；全局 `trigger_count=0`、`clear_count=0`、普通 action replan 数为 0。HF-event 的两条未覆盖路径是明确的证据缺口，不以运行是否 Success/Fail 填补。
+
+最终 event leaf 的完成收据为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/hf_trajectory_engineering_20260914/c_hf_j_hf_event_rearrange_trainseed0_evalseed0_smoke2/stage_receipt.json`，SHA-256 `38a29085a787e70c3a23ef0f213b5731f5300d4e0d325b9e78bf741eb2ae3a1e`；其 trace validation / official audit / execution / review SHA-256 分别为 `4ca29736c9bc907eec214b67d9a0b8fa2259df6d25405e2797c36b9a2c956c86`、`d3ed9582fec4e56156432bb1c90c0231d80a4030acb35a76b9f1f808ef92fe43`、`ab51f7d222c6a8b2b1d835a5934d2b564589db944de193a3ef7837ea19e4a0b6`、`2d220d44fea2af4467854f3f3c6cc735f34caaa7ca2697d8d4d77099f5ebfa3d`。审计后端口 `19400/19402` 无 listener，C3 GPU0 空闲；OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4` 均 clean。MAM job `def61eba-a703-480b-b431-eae84eb80ee1` 已在该验收后归档。
+
+任务私有的五 profile 汇总为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/hf_trajectory_engineering_20260914/five_profile_summary.json`，SHA-256 `33b38af07acc100e81a540c236392f6cf492e930d5b2091ddbec9396103a274e`。本节覆盖并取代下方各叶子段落中“下一项运行”的历史提示；本工程阶段不再启动任何 GPU 工作或 formal。
+
 ## 最新工程轨迹状态（2026-09-14；C3 rearrange J HF-fixed）
 
 授权队列的第四个两集 leaf `c_hf_j_hf_fixed_rearrange_trainseed0_evalseed0_smoke2` 已完成、通过逐条 rolling 合同验证和原工具单 leaf audit，且其 stopped MAM job 已在资源释放后归档。它仍是 **engineering candidate / matching-smoke-only** 证据：`formal100_started=false`，两集 Success 不构成 formal 准入或效果结论。
