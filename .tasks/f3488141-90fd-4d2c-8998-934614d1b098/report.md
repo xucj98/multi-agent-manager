@@ -34,3 +34,22 @@
 ## 已批准的真实 GPU 队列
 
 首波 eval0 固定卡位：GPU1 swap N、GPU2 swap J、GPU3 battery N、GPU4 battery J、GPU5 cover N、GPU6 cover J；GPU7 备用，GPU0 禁用。每卡一 lane，先启动 GPU1 真实 smoke 验证本机覆盖层、端口和 policy load，再错峰启动其余五项。每项 smoke 通过后自动启动自身 matching formal100，formal 的真实 PID 立即登记 MAM；失败保留全部结果和诊断并停止该 lane。随后按同样映射执行 eval1、eval2。
+
+## 2026-09-15 C1 GPU1: r1 failure preserved, local selector repair, r2 smoke started
+
+`c_wave1_swap_blocks_n_trainseed0_evalseed0_smoke2_r1` created a result leaf but is **not** an accepted smoke: it completed zero rollouts after the RMBench worker `get_metadata` RPC timed out during robot startup. The leaf, process logs, `_result.txt`, diagnostics and SHA-256 receipt remain at the C1 result path; it is not reused by any later formal.
+
+The repair stays outside all three repositories. The C2-validated local source/package/stdlib overlay now has task-local Python-home wrappers for Python 3.10 and 3.11. They select local stdlib before interpreter startup, prepend the task bootstrap for spawned workers, and retain the frozen venv `sys.prefix` and `sys.executable`. CPU probes passed for the real bridge→RMBench worker metadata handshake, OpenPI/bridge imports, NumPy/JAX/SAPIEN, source commits and the exact r2 dry-run. No source, dependency, checkpoint, HF/C3, GT-memory or reset behavior changed.
+
+Fresh r2 commands were generated without changing r1:
+
+- smoke: `c_wave1_swap_blocks_n_trainseed0_evalseed0_smoke2_r2`
+- matching formal: `c_wave1_swap_blocks_n_trainseed0_evalseed0_100ep_r2`
+
+Its GPU1 preflight passed (frozen commits, clean C2 worktrees, five transformer patches, checkpoint identity, GPU1 and ports 19410/19412). The real r2 smoke launched on C1 with outer PID `1900152`; its result leaf was created, robot service reached 19410, and the policy restored the 6.2 GiB checkpoint with about 10.1 GiB allocated on GPU1. At this report update it is still finishing policy startup before the 19412 listener and first rollout. Formal has not started and will use r2 only after two accepted rollout/identity checks; its real PID will be registered immediately.
+
+Evidence is under C1:
+
+```text
+workspace/f3488141-90fd-4d2c-8998-934614d1b098/transfer/c1_uv_cache_read_repair_20260915/full_overlay_validation_20260915/
+```
