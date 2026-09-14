@@ -1,3 +1,22 @@
+# 置顶：第一层 J rearrange HF-event 三个 eval formal100 终态与同 seed 配对审计（2026-09-14）
+
+三个授权的 HF-event formal100 均已完成并通过终态、身份、rolling evidence 与 trigger 审计；结果来自每条连续 100 个 accepted episode。它们是冻结原件的描述性记录，不将发生 trigger 的 episode 成功或失败解释为 trigger 的因果效果。
+
+| Eval | 环境 seed | HF-event | matched baseline | HF-fixed | event vs baseline `E+ B- / E- B+` | event vs fixed `E+ F- / E- F+` |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 0 | `100000..100099` | 84/100 | 86/100 | 90/100 | 9 / 11 | 7 / 13 |
+| 1 | `200000..200099` | 88/100 | 81/100 | 91/100 | 16 / 9 | 7 / 10 |
+| 2 | `300000..300099` | 86/100 | 87/100 | 87/100 | 2 / 3 | 10 / 11 |
+| 合计 | 三个各 100 集 lane | 258/300 | 254/300 | 268/300 | 27 / 23 | 24 / 34 |
+
+每个 pairing 均先核验三臂 episode ID `0..99` 与对应环境 seed 完全相同；专门收据保存完整四格 outcome 表（含 both-success / both-fail），不以仅有的成功数差额替代配对。汇总收据为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_hf_event_rearrange_three_eval_seed_paired_summary_20260914.json`，SHA-256 `e779275ba49c7c587173bf6aa93db852736fb76550f8c36967ef3558f083e905`。
+
+三个 event terminal receipt 分别为 eval0 `formal_hf_event_rearrange_evalseed0_terminal_audit_20260914.json`（`9f33589e01c6b53a64b6f323b1859dddcbd87121cb1aa50af755d4b0f68d373b`）、eval1 `formal_hf_event_rearrange_evalseed1_terminal_audit_20260914.json`（`eaceed71183a7d76357346cac3c524b324e5871cb2bbcc17866b4885346a0711`）和 eval2 `formal_hf_event_rearrange_evalseed2_terminal_audit_20260914.json`（`23f0beb2e109e8b80c5560ba9ac866b026c0a3af436b679bf4971a8953c21e85`）。三条都实际调用 `validate_smoke_run()` 和每集 `check_rolling_evidence(..., required=True)`，核对 100 个 accepted preflight/terminal、5 个 MP4 的 `ffprobe`/`ffmpeg` 解码、102 start/102 exit、100 scheduler exit 0，以及 robot/policy 的受控 `-15` shutdown；所有记录 PID 已退出。
+
+`plan_triggered` 原件和逐事件详情保留在上述 terminal receipts，并由汇总收据保存每个 eval 的触发次数与 episode map：eval0 **154** 次、39 个 episode（`14,15,16,21,22,24,26,27,28,29,31,32,33,34,35,38,39,41,45,51,52,55,59,60,63,64,65,71,73,74,75,77,84,86,87,93,95,97,99`）；eval1 **125** 次、32 个 episode（`1,3,4,6,8,14,18,19,21,24,25,26,28,33,37,41,42,48,51,56,64,66,68,71,72,79,86,88,91,93,95,96`）；eval2 **200** 次、41 个 episode（`2,4,6,7,11,12,16,19,21,22,27,28,32,33,35,36,38,41,45,48,52,53,55,56,61,63,65,67,69,70,72,74,75,80,81,84,88,90,92,98,99`）。合计为 **479** 个 trigger、112 个 eval–episode pair；这只描述执行中的触发暴露，不能用于解释成功因果。
+
+终态审计后，MAM jobs `380ad209-d5c5-432e-9718-247c2cced46a`（eval0）、`9776cd89-0dad-447b-a772-ceba29ff1539`（eval1）和 `a79b70de-9c74-4d72-977f-7eb2060dabc5`（eval2）均已归档。task-private state commit：`8e4b3d0f60b3a27d0ddbeab830f10ce4475c123a`（包含 eval1/2 审计器扩展、两个终态 receipt 与三 eval 配对收据）。未启动、重跑或调整任何后续 event batch、阈值、seed 或冻结输入。
+
 # 置顶：第一层 J rearrange HF-event eval0 formal100 终态审计与首个自然 trigger（2026-09-14）
 
 C3 GPU0 outer PID `2112144` 已停止。终态审计将其归类为**自然正常完成**：`BenchmarkRunner` 的结构化 summary 为 `completed`、`error=null`、target `100`；100 个 scheduler 均 exit 0，robot/policy 为 runner 受控 `-15` shutdown，outer 中早期连接重试没有覆盖这一终态结论。连续 accepted seed 为 `100000..100099`，结果为 **84/100**（16 个普通任务失败：`block2_not_moved_to_middle=7`、`button_not_pressed=7`、`button_pressed_multiple_times=2`）。这是冻结原件的描述性结果，不作科学结论。
