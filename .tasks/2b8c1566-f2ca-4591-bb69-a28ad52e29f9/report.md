@@ -1,4 +1,4 @@
-task_revision: 761a5d251d16b630af630736294b2a51679c010b
+task_revision: 4fefffca62dc87fcdfd77d9fc9ebabe2088c17a7
 
 # B/C 稳定入口与 OpenPI 内容 profile 部署结果
 
@@ -63,3 +63,38 @@ bash /mnt/public/xcj/Projects/state-vla/openpi/.local/create_worktree.sh \
 ```
 
 证据保存在 backup 路径的 `c1-blank-retest-cancellation-snapshot.log`、`c1-blank-retest-cancellation-result.log` 和 `c1-blank-retest-cancelled-create-worktree.log`。本任务没有仍在运行的 C1 进程，也没有未归档 MAM job；原验收者的进程归其任务处理。
+
+## 最终空白验收与归档锚点
+
+原空白使用者任务 `bed9952b-c1a2-40ec-9f6d-34feeba91aa5` 已归档，其最终已发布报告为 `499a7c59f9457f58b6d14baa1b728547cefc5878`。Manager 已接受六项文档驱动独立环境创建和 CPU 检查全部通过；其中 C1/OpenPI 使用 `c03898f5a76f4ac208f7d23ae14e2cc759be8853`，三参数入口和普通 `worktree_env_smoke.py` 均 exit 0，且 `PYTHONOPTIMIZE` 未设置。这是独立的 C1 空白验收，不以此前 C2 结果或本任务取消的 C1 自测替代。
+
+`c03898f` 已保留为 C 稳定仓库 `/mnt/public/xcj/Projects/state-vla/openpi` 内的独立恢复 ref：
+
+```text
+refs/heads/frozen-c03898f -> c03898f5a76f4ac208f7d23ae14e2cc759be8853
+object type: commit
+parent: 34002dce65962734c59725a0f6d982ae2c438a2d
+tree: f2316e769447f7bf3dab6fff5faa31878b813182
+```
+
+该 ref 独立于本任务所有 `task/2b8c1566-f2ca-4591-bb69-a28ad52e29f9*` 分支；稳定 checkout 仍为 `a869498f…`。`show-ref`、`rev-parse`、`cat-file -t`、commit 元数据和受管安装器 hash 均已核对，记录在稳定证据中的 `c03898f-stable-ref-verification.txt`。归档不得删除或改名 `frozen-c03898f`，因此 archive 不会丢失唯一的交付 commit。
+
+入口两轮前后文件、哈希、静态拒绝/兼容检查、C2 成功创建与 smoke、取消的修复者 C1 自测日志，以及原空白验收报告，已归集到：
+
+```text
+/mnt/public/xcj/Projects/state-vla/.local/backups/2b8c1566-f2ca-4591-bb69-a28ad52e29f9/final-delivery-evidence/
+```
+
+目录包含 `SHA256SUMS`、`entry-history.txt`、`c03898f-stable-ref-verification.txt`、C2 成功日志、C1 取消日志、`blank-acceptance-report-499a7c59.md` 与 `cleanup-inventory.txt`。原始日志和 worktree 未移动。
+
+## 清理边界
+
+本任务没有再运行安装，也没有删除任何目录、模型、数据、cache、其他 workspace 或已用 runtime。C1/C2/C3 最后扫描没有本 TASK-ID 进程，`mam job list --task` 也没有未归档 job。
+
+- **必须保留：** `frozen-c03898f`、稳定入口及完整 backup/evidence 目录；C2 成功 runtime `cpu-openpi-c03898f-c2` 及其 task branch 作为已用 runtime。
+- **可在 Manager 明确授权后清理：** 已取消的修复者 C1 部分 worktree `blank-c1-c03898f` 和仅对应的 `task/...-blank-c1-c03898f` branch。应先用 Git 对精确 worktree 做移除并确认 `git worktree list`，随后才可删该精确 branch；不可使用递归删除，也不可碰 `frozen-c03898f`。
+- **可在本任务归档后由 Manager 处理：** 本任务 A 侧 clean 的 `openpi` 和 `multi-agent-manager` worktree，以及 C 专属 bootstrap 副本。稳定 frozen ref 与证据已使这些不再是 `c03898f` 的唯一保存处。
+- **暂不建议清理：** `bundle-staging/` 中 B 的恢复 bundle，需单独完成 B 的恢复 ref 审计后再决定。
+
+完整路径、理由和推荐操作顺序见上述稳定证据目录的 `cleanup-inventory.txt`。
+
