@@ -1,5 +1,19 @@
 # 交付报告
 
+## 最新工程轨迹状态（2026-09-14；C3 put-back J HF-event）
+
+授权队列的第三个两集工程 leaf `c_hf_j_hf_event_put_back_trainseed0_evalseed0_smoke2` 已完成、通过离线轨迹合同和原工具单 leaf audit，并在归档前确认 C3 GPU0 端口释放。它仍是 **engineering candidate / matching-smoke-only** 证据：`formal100_started=false`，不自动获得 formal 准入。两集的实际 benchmark 结果都是 Success，但这不是效果结论或 trigger 覆盖结论。
+
+- 冻结 C3 运行树、GPU0、端口 `19400/19402`、checkpoint 与三库身份保持不变。execution return code 为 0、`ports_released_after=true`；审计后两端口均无 listener，OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4` 都 clean。
+- 原 `hf_engineering.py` SHA-256 为 `dcf93891de82adaf21e676c55ee30901309f9c9a6097841ff4be4c7ba7f29c87`。execution SHA-256 为 `1e9744587bb708780531b5c1903164eaecc9c9b270aa10a718666ffba5720d70`；`audit --profile` exit 0，stdout SHA-256 为 `3c22d5f5b0e4688d98198b6f14c01ce281c38b78947b882cdf952dd3ac8d8559`，review SHA-256 为 `7285dea5822bcc1f67f3943ac1af1830796d3305d832e14b6c90f90195ebf9b9`，无 observability gaps。
+- 恰有两个连续 accepted seed：episode 0 / `100000` 和 episode 1 / `100001`。benchmark `completed`、`error=null`、target episodes 为 2；两集都以 `episode_terminal`、scheduler return code 0 和 `Success` 结束，logical step 为 334。video 策略正确：episode 0 启用、334 frames、检查通过；episode 1 禁用、检查通过。robot 与 policy 正常以 `-15` shutdown 记录收尾。
+- 每集实际完成 334 action rows，12 次 ordinary action 和 55 次 probe；实执行 K 分布为 `{30: 11, 4: 1}`。前 11 个 plan 逐个完成 30 行；最终 plan 的 source 为 330，完成 4 行、丢弃 26 行，终态逻辑步由 `source_step + completed_rows` 和 `episode_status.logical_step` 交叉核对，而未误用 `plan_progress`/`plan_terminal` 的顶层 `logical_step`。
+- J rolling 合同逐条重算通过。55 个 comparison 均从保存 forecast field order `[“phase”, “origin_mat”]` 的 column 0 重算，使用当前 action plan 为 reference、old indices `d:d+3`、new indices `0:3` 和 absolute targets `[u+1,u+2,u+3]`；无 gap、stale、invalid、probe error、exception 或越界。每个 probe 的输入等于刚消费的 state，后续 ordinary action 的 memory input 等于前一 K30 boundary 的消费 state。
+- 每集恰有一个 `policy_rng_reset`；保存的 action / probe `stream`、`call` 仅是 wire metadata（action 1–12、probe 1–55），不称作内部 key。唯一高偏差是 source step 125、`d=5`、3/3 phase mismatch、streak 1；它低于 `min_prefix=10` 且不连续。两集均为 `trigger_eligible_count=0`、`trigger_count=0`、`clear_count=0`，因此真实 **trigger → clear → normal replan** 路径未被观察到；没有为制造覆盖修改阈值或增加 episode。
+- 离线合同收据位于 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/hf_trajectory_engineering_20260914/c_hf_j_hf_event_put_back_trainseed0_evalseed0_smoke2/trace_contract_validation.json`，SHA-256 `2ee5b6e3f51fbd9770ae96d94f57c17a40ff4dddda7ef04d6a40571a132c3cec`。两个 episode 的 action-input、probe-input、consumption canonical SHA 分别相同：`b49efa9d1e46d5fb3431bff594aaa5d545be5d3ac61f3d2d34711fdd9fc969ca`、`ca1056ff3a99a0066634f59425da97f84bc2649b0eb51aad206cb988b8c8fbdf`、`454310333cd2b80f49bd4713b43646ed369386811097984605f0d13cd6a4dd96`。rolling evidence SHA-256 为 episode 0 `42696aba7f73b843c87e43cb72e1e2c6989adb6c11f81e452de37ff48714bbc6`、episode 1 `dba9ff91cfa76eb65619f02c7bac3fcdb91e5d4f2ffa624be1865e07cb635f61`。
+- 完整 stage receipt 位于 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/hf_trajectory_engineering_20260914/c_hf_j_hf_event_put_back_trainseed0_evalseed0_smoke2/stage_receipt.json`，SHA-256 `eff848ff7cd3f09cc14ab27c086cdde48ba740cde52f25e4e884c2210d2873db`。MAM job `e56a6dc1-3c15-43cf-94f0-1741c88f8880` 已在审计和资源释放后归档。
+
+下一项仅按已授权顺序运行 `c_hf_j_hf_fixed_rearrange_trainseed0_evalseed0_smoke2` 的两集；仍不调整参数、seed、checkpoint、runtime 或工具，也不启动 formal。
 ## 最新工程轨迹状态（2026-09-14；C3 put-back J HF-fixed）
 
 授权队列的第二个两集工程 leaf `c_hf_j_hf_fixed_put_back_trainseed0_evalseed0_smoke2` 已完成并通过基础设施、原工具 audit 与逐条 rolling 合同验收。它仍是 **engineering candidate / matching-smoke-only** 证据，`formal100_started=false`，不会自动启动 formal；两集的实际任务结果均为 Fail，不能写成控制成功。
