@@ -9,3 +9,10 @@
 文档保持简洁：README只入口；集群文档只特有规范；通用仓库操作留repo文档。发布方须保证指定base可达，缺库/缺base不让新使用者猜代码或换commit。修复后以本任务独立worktree做必要CPU检查，记录精确复验命令但不替代空白使用者验收。交付commit/远端变化/验证和遗留；Manager再请原空白使用者仅按修订说明重试三个失败分支。
 
 第一轮仅返回CODEX_THREAD_ID并结束以便绑定；正式工作待绑定通知。
+
+## Manager复核：拒绝优化模式绕过检查
+已独立核对B两库HEAD和C所需commit均存在，部署缺口接受。C smoke采用PYTHONOPTIMIZE=1不接受：实际脚本assert同时校验transformers来源、patch逐字节一致及nlink，-O一并取消它们，不是仅修一个路径误报。Manager已从.local/wuwen-4090.md删除绕过段落，保留原失败日志。
+
+继续最小修复：阅读OpenPI AGENTS，在本任务独立worktree修正CPU smoke对受管symlink模式的判断，显式校验解释器环境/来源、安装patch内容及链接安全属性，关键检查使用不会被-O移除的显式异常。确认实际安装器的受管patch语义，不预设整package都必须私有，也不允许未验证共享文件写入。默认CPU命令必须正常通过，错误来源或补丁错误要能被拒绝。通用环境说明应放OpenPI对应文档，不在集群入口追加提交专属绕过手册。
+
+提交独立环境修复commit供Manager验收；允许采用新修复base作为空白验收对象并记录与原34002dce差异，禁止暗改冻结旧提交或生产worktree。不要通过关闭assert/跳过patch检查获得成功。正式部署新base与复验待Manager核对后安排；B两分支可先由原空白用户复验。
