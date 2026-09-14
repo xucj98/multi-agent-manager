@@ -1,3 +1,22 @@
+# 置顶：第一层 J put-back matched-baseline eval2 终态与三 eval 原始汇总（2026-09-14）
+
+C3 GPU2 的 `c_hf_j_matched_baseline_put_back_trainseed0_evalseed2_100ep` 已完成、逐项终态审计通过，并已归档 MAM job `f1237a80-7831-494e-932b-221234483d4f`。连续环境 seed 为 `300000..300099`，100 个 preflight 都 accepted、100 个 episode 都正常终态；结果为 **61/100 Success** 和 39 个普通 `button_not_pressed_after_center` 任务失败。终态 receipt 为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_matched_baseline_put_back_evalseed2_terminal_audit_20260914.json`，SHA-256 `e41fe05195db35514279df4c79e633e24bec4fb136d6ccebfa42974d346581b4`，state commit 为 `7943584fdbc5c8e9dac648defd9ae04db68e40ef`。
+
+三条 completed put-back matched-baseline 的原始结果汇总为：
+
+| Eval | 环境 seed | Success | 普通失败 |
+| --- | --- | ---: | ---: |
+| 0 | `100000..100099` | 100/100 | 0 |
+| 1 | `200000..200099` | 73/100 | 27 |
+| 2 | `300000..300099` | 61/100 | 39 |
+| 合计 | 三个各 100 集 cohort | 234/300 | 66 |
+
+task-private summary receipt `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/put_back_matched_baseline_three_eval_raw_summary_20260914.json`（SHA-256 `9cb184009524ef79a81f54e77c22a82ab21ad282e2aedc43fb6d4e2c140350cc`，state commit `dbf89fb231d7d1b54741aab86c1de462bb7ce25e`）保存三组完整 `episode_id → seed → result → primary_failure_reason` 原始 map 和对应原始 JSONL hash。它重新核对三 eval 的冻结 source、checkpoint/metadata、policy/robot metadata、matched-baseline scheduler、reset request/video pattern、task args 与 rolling RNG lifecycle 的稳定身份均相同：每集 action RNG reset 为 evidence 的第一条、`explicit_episode_reset`、无 probe，且每个 run 都使用 `episode_reset_key0_independent_probe_v1`。可观察 evidence 只记录 lifecycle 标签，不包含内部 JAX key 数组。
+
+该比较也明确记录了设计上的 lane 差异：三个环境 seed cohort 两两交集均为 0，GPU/端口各自固定；因此不能断言跨 eval 的物理 scene 初始状态相同。保留的 `task_context.origin_mat` 分布也不同（eval0 `back/front/left/right=32/31/17/20`，eval1 `23/31/19/27`，eval2 `26/21/35/18`）。这些是可证事实，不构成对 100/73/61 差异的因果解释，不触发重跑、调参或阈值变化。
+
+按冻结顺序，下一步直接启动 GPU2 HF-fixed lane `c_hf_j_hf_fixed_put_back_trainseed0_evalseed2_100ep`；它将运行自身 strict matching smoke2，随后才可进入 formal100。
+
 # 置顶：第一层 J put-back matched-baseline eval1 终态审计（2026-09-14）
 
 C3 GPU1 的 `c_hf_j_matched_baseline_put_back_trainseed0_evalseed1_100ep` 已完成、逐项终态审计通过，并已在审计后归档 MAM job `76bb00e7-f83b-42e9-9244-711c2b4002f9`。连续环境 seed 为 `200000..200099`，100 个 preflight 都 accepted、100 个 episode 都是正常终态；结果为 **73/100 Success**，另有 27 个普通 `button_not_pressed_after_center` 任务失败。该分数只记录冻结原件，不用于选择样本、改阈值或推断 HF 效果。
