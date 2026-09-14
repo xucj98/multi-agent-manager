@@ -52,7 +52,7 @@ bash /mnt/public/xcj/Projects/state-vla/openpi/.local/create_worktree.sh \
 
 ## C1 空白复验状态
 
-C1 `is-ddfwxekq6usner7v-devmachine-0` 已实际启动新的三参数复验，base、branch 和 workspace 分别为：
+C1 `is-ddfwxekq6usner7v-devmachine-0` 已实际启动一个新的三参数复验，base、branch 和 workspace 分别为：
 
 ```text
 c03898f5a76f4ac208f7d23ae14e2cc759be8853
@@ -60,6 +60,10 @@ task/2b8c1566-f2ca-4591-bb69-a28ad52e29f9-blank-c1-c03898f
 /mnt/public/xcj/Projects/state-vla/workspace/2b8c1566-f2ca-4591-bb69-a28ad52e29f9/blank-c1-c03898f
 ```
 
-该次尝试没有通过或失败的 smoke 结论：在 `2026-09-15T02:54:05+08:00`，其 `git worktree add` 子进程曾处于 `D / wait_on_page_bit_common`；随后保存的 `2026-09-15T02:55:02+08:00` 快照仍显示入口和受管安装器在等待，workspace 仅有初始 `openpi/.git`。因此未开始 uv sync，也没有运行 CPU smoke。按照任务要求，未重试、未中断其他 C1 安装；精确的进程、日志和目录快照在上述 backup 路径中。C1 不能据 C2 结果宣称通过。
+这是同一次尝试，没有重试。它最初在 `2026-09-15T02:54:05+08:00` 的 `git worktree add` 阶段出现 `D / wait_on_page_bit_common`，之后自行恢复：worktree HEAD 已到 `c03898f`，共享目录链接和 `.venv` 已创建。随后进入 `uv sync --frozen --active --link-mode symlink`。
 
-这次启动原预计远低于 30 分钟，故未登记 MAM job；截至交付时本任务 `mam job list` 没有未归档 job。若共享盘恢复后仍需处理 C1，应先核对该次部分 worktree/branch 的最终状态，再决定清理或继续，避免重复创建。
+截至 `2026-09-15T02:58:54+08:00`，该次 C1 `uv sync`（PID `1895752`）仍为 `Sl / futex_wait_queue_me`，安装日志在创建 venv 后没有新输出；当时 C1 共有两条 `uv sync` 使用同一共享 cache。尚未出现 transformers patch、`pip check`、入口完成输出或默认 `.venv/bin/python scripts/worktree_env_smoke.py` 的结果。因此 C1 没有通过或失败的 smoke 结论，不能以 C2 结果代替。
+
+早期 I/O 状态和当前 sync 等待状态、进程、日志、workspace 清单分别保存在上述 backup 路径的 `c1-blank-retest-blocked-snapshot.log` 与 `c1-blank-retest-sync-wait-snapshot.log`。未中断另一项 C1 安装、未启动 GPU、未作额外重试。若该同一次安装后续仍未完成，应先核对其部分 worktree、branch 和进程，再决定继续或清理，避免重复创建。
+
+这次启动原预计远低于 30 分钟，故未登记 MAM job；截至交付时本任务 `mam job list` 没有未归档 job。
