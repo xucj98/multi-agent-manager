@@ -1,3 +1,24 @@
+## 当前状态：本机归档准备完成，Manager 可执行归档（2026-09-14 CST）
+
+本任务没有未归档 job（archived_count=105）。本机 workspace 的 MAM 预检已经完成：实际 outer_check() 通过，目录只剩登记的 RMBench、robot-bridge、openpi；三个登记工作树的 HEAD/任务分支均与登记值一致，且实际 dirty() 全部通过。进程与打开文件扫描没有发现任何外部本机依赖。因此没有本机归档阻断项；本执行者没有调用 mam task archive，请由 Manager 执行。
+
+已删除的未登记本机条目：
+
+- 七个干净的 RMBench 额外工作树：RMBench-ledger、RMBench-r3-lifecycle-gate、RMBench-warp-cache-docs、RMBench-c-eval-docs-consolidated、RMBench-r2-running-ledger、RMBench-eval-seed-runtime、RMBench-serial-ledger。每个均通过 git worktree remove 删除，其原 task/... 分支也已删除。
+- manager-handoff-ack.md 和仅含 worker/log 的 c_checkpoint_transfer 本地目录。删除前逐项核对已提交清单的 31 个文件名、大小与 SHA-256。
+- MAM dirty() 拒绝的 16 个生成缓存目录（62 个 .pyc 或标准 pytest cache 文件，1,195,744 bytes）；没有删除结果、checkpoint、资产、数据、环境或 symlink target。
+
+保留证据在 .tasks/e6908de7-4b02-465a-987b-a19eba7a315a/evidence/archive_preparation/：
+
+- retention_manifest.before_cleanup.json：SHA-256 6e1d613391c63c36a5239c6b4ac14674e0d5ecaebff93e3fea9d86b2ecde3414，提交 894fef8250617a8d955e53afd70ae22433b5f61a。它保存 10 个持久本地 archive/e6908de7-4b02-465a-987b-a19eba7a315a/... 引用、每个原分支/HEAD、22 个传输日志及脚本 SHA-256、历史零差异 rsync 验证和 read-only Cluster-C 核验。
+- cleanup_receipt.after_local_cleanup.json：SHA-256 303ec1608c3667ba67c1c9e287437632b8b8d3255d15f5069e6dbd1e4d9271e3，提交 be23e05f787de288ad8543dcc4569e7a74e2cba9。它记录实际删除、缓存审计、归档预检和三个登记 HEAD 的 archive ref 验证。
+
+登记 HEAD 均由独立持久引用保留：RMBench 3775d4a878adb0f840c1f8a9e12aa014fb185a53、robot-bridge f9626636c4776d8eb15f9c556775cb2d12c000e5、OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4。Manager 删除登记 task/e6908de7-4b02-465a-987b-a19eba7a315a 分支后，这些 archive refs 仍保留所有对应提交。
+
+Cluster-C 没有被本轮删除或修改。特别是 /mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914 保持不动，HF task 0acf5d43-91b6-4171-b727-e3fe0f7e7939 仍依赖它。传输收据的 22 个目标只做了 read-only 检查：必要目录存在，_CHECKPOINT_METADATA SHA-256 和常规文件数均与本机源匹配；未复制或清理远端 checkpoint。
+
+---
+
 ## 当前状态：put-back J/T train1/2 的八批原协议 formal100 已完成（2026-09-14 CST）
 
 本授权补齐队列已完成，没有活动 MAM job，也不再新增训练、转换、传输、源码、依赖、checkpoint 或共享 cache 变更。冻结运行树始终 clean：RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`；全部保持 H50/K30、原始 RNG 生命周期、首次 infer 90 秒与后续 30 秒。
