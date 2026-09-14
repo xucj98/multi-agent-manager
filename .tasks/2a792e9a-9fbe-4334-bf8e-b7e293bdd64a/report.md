@@ -69,3 +69,10 @@ fresh smoke 通过 audit、HDF5 行对齐、scene provenance 和 ranking 泄漏�
   `/mnt/public/xcj/Projects/openpi/assets/pi05_rmbench_no_memory/press_button_demo_clean_state_no_memory_smoke_postcommit/norm_stats.json`。
 
 该结果只证明 fresh smoke 和 N 链路；canonical 50 条数据及任何训练尚未启动，待 ranking smoke 同样通过后按 GPU2/3 合同登记正式生成。
+
+## 已登记的运行进程
+
+- `b45e86f0-7de1-4647-a5d0-71eeaa73bd7c`：GPU2 上的 `press_button` canonical 50 条 `demo_clean_state` 生成；seed stream `410000 + attempt_index`、stride 1、`max_attempts=300`，输出为 `RMBench/data/press_button/demo_clean_state/`，从 clean RMBench commit `74db631` 启动。
+- `01e38f37-b811-4fde-a862-613fb078ced1`：GPU3 上的 ranking fresh smoke；第 1 集为较长多次 swap replay，已在预计超过 30 分钟时补登记。该 smoke 成功后将先做同样的 provenance/leakage/N/CPU 检查，再独立登记 ranking 的 canonical 50 条生成。
+
+两项 job 都没有启动训练。运行日志和 pid 与对应产物同目录保存；完成后会先审计，再归档 MAM job。
