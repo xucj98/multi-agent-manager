@@ -10,3 +10,9 @@ terra/max；Manager负责设计与裁决，沿九任务覆盖优先。读MAM AGE
 3. 给出冻结候选runtime三库完整commit、18条实际config/manifest/命令dry-run、各自matching smoke2与fresh formal100名字/配置、资源建议。优先后续用已释放C1GPU1/2，先实测资源但本次CPU/传输准备不加载GPU，不抢C3高频卡。保留首infer90/后续30秒与既有renderer入口、视频/证据合同。新环境用现成C1 installer和共享cache，不升级依赖或自建部署框架。
 
 交付清楚哪些checkpoint已传且验证、哪些仍传输job、接口是否有实际阻断、下一批可执行smoke命令和预计时长。Manager复核候选并冻结后接正式评测；此次不启动GPU smoke/formal，不因准备的18批叫作已运行。当前可执行工作处理完发布紧凑report并结束turn，用MAM唤醒，不轮询。
+
+## 2026-09-14 Manager 准入：由准备推进18批正式评测
+本节替代之前CPU-only限制。Manager已检查RMBench ad7f9d6 配置diff（仅六variant与原协议base）、本机18项validation及已发布传输/接口报告。冻结候选 RMBench ad7f9d6ba9acd16c31243ad4811e0dfa31cef514、bridge f9626636c4776d8eb15f9c556775cb2d12c000e5、OpenPI a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4。
+C manifest job完成且18项CPU checks通过、六checkpoint校验通过后，允许按已生成确切manifest执行每模型eval0/1/2 matching smoke2 → formal100，共18批。不必再等一次人工确认，但任何门禁失败必须停止该lane并报告，不降阈值不改算法。开始前核实源码clean、真实加载路径与五个transformers patch内容正确；symlink路径断言的已知工具限制据实保留，真实smoke必须通过。
+保持train0、H50/K30、首infer90秒后续30秒、每run单一policy server跨episode连续action RNG，不能带入HF per-episode reset。smoke的成功率不作放行阈值，正常任务失败可接受，基础设施/身份错误不可。每一完整formal必须引用自己的matching smoke，保留全部失败，禁止拼接partial。
+C1 GPU1/2每卡串行一条lane，启动时实查空闲及端口；同一task/eval的N/J尽量同卡，按swap→battery→cover逐任务N/J配对轮转，先eval0覆盖三任务，再eval1/2，不因分数改变次序。C3 HF不抢占。长进程登记MAM，完成批次及时发布证据并按原门禁推进队列，Manager另行验收结果；无新训练。
