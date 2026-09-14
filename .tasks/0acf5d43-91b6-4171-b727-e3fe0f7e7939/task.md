@@ -285,3 +285,8 @@ Manager 已直接核对 BenchmarkRunner：policy server 在整个100集 run外�
 请在本任务内窄修持久化，优先沿现有每episode scheduler日志或已登记result路径输出有版本的结构化记录，不创建通用记录框架、不等待独立P0 logger。记录须能离线关联episode/plan/query、输入/forecast target、原始和解码状态、实际采样key、执行动作及已完成/丢弃前缀、probe、边界与terminal/异常原因。可增量事件或阶段快照，避免每次全量复制历史；不传输额外RGB或巨量旁路数据。普通默认路径保持原开销。
 
 不能只在get_status或正常退出时输出最后64条：700行/K10可能超过64个plan，且错误退出也要保留已完成证据。日志容量应明确、有界、超限标记incomplete，不得静默截断后通过正式验收。新增有意义验证：episode子进程退出后实际文件可解析、trigger旧计划丢弃和新计划接续完整、终态最后已执行前缀、异常/截断明确，默认关闭无新增输出。作者交付样例文件/解析命令/最小schema，由reviewer独立复核。若某个指标仍无可复核来源如实列出，不能只凭内存状态称已满足留痕。
+
+## 2026-09-14 Manager 首个自然trigger裁决与接续
+Manager直接读取C3三臂900条terminal，复算每eval成功数和配对，确认event84/88/86、baseline86/81/87、fixed90/91/87。另直接读取原episode14完整rolling，复算旧plan对probe的phase差异2/3、3/3，已执行15、清除15、下一source285正常infer及与触发probe输入相等，原件hash fcaf7a080932d302aa5379ff8afc7e207176a8a7fc8225b501d048bf1bd76466。该首trigger工程门槛通过；不是300集全部工程证据最终独立验收。
+继续原已冻结第一层18批中的put-back J matched-baseline→HF-fixed→HF-event，eval0/1/2共9批，原GPU/seed/门禁/阈值/随机数协议全部不变。无额外训练，不加重跑或调参，S/K10仍未准入。九任务覆盖优先；此接续仅用既有C3 lane，不抢C1及训练/数据生成资源。
+当前描述性结果event86.0%较fixed89.3%下降3.33pp，不能宣称事件重规划改善；不因该分数改阈值或取消预定第二任务以挑选结果。全三批独立证据验收仍需另行完成；保存所有trigger与失败原件，待可用reviewer接续。
