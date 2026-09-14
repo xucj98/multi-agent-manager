@@ -1,6 +1,6 @@
 # 第一波 N/J 与 swap S 正式 20k 已完成；仅 cover S 仍在运行
 
-## 当前状态（2026-09-14 07:51 UTC）
+## 当前状态（2026-09-14 08:39 UTC）
 
 - 七条已停止的 N/J/swap S 训练均以**达到请求的 step 20,000 并完成 Orbax finalization**结束；每个日志都有有限的 `Step 20000` 指标、`Finished saving checkpoint`、`No errors found in background save thread` 与 `Done waiting for Save Finalize thread`，没有 fatal marker。这是正常完成，不是异常中断。
 - 七个 checkpoint 都是 model-only：目录项严格为 `_CHECKPOINT_METADATA`、`assets`、`metadata`、`params`，无 `train_state`。
@@ -36,7 +36,7 @@ J 的 checkpoint copied binding manifest 与正式启动回执中记录的 sourc
 - N 最终回执：`/mnt/public/xcj/Projects/openpi/checkpoints/wave1_n_formal20k_5835fa0_nocmdbuf_20260913T0940Z/validation/final20k/final20k_receipt.json`，SHA-256 `b8240d5689c8f38f9e7d5ff5e198ccf9410b54749b41f734e4941fc78ea3b774`。
 - J 最终回执：`/mnt/public/xcj/Projects/openpi/checkpoints/wave1_js_formal20k_34002dce_nocmdbuf_20260913T1020Z/validation/final20k/final20k_receipt.json`，SHA-256 `01a4ad8016b888f5a322dee2225b41e4a7e0bb0afc5530ffd6c99c31646e8577`。
 - swap S 独立回执：`/mnt/public/xcj/Projects/openpi/checkpoints/wave1_js_formal20k_34002dce_nocmdbuf_20260913T1020Z/validation/final20k_swap_s/swap_s_final20k_receipt.json`，SHA-256 `4b8dde2011c800127eb74b25b65000e2821d42000535e573789d710f8f3f5fc9`。该目录独立于既有 `validation/final20k/`，未覆盖 N/J receipt。
-- 每份 receipt 包含最终训练日志 SHA、checkpoint copied norm/manifest/source metadata、CPU/GPU restore JSON 与日志 SHA、正式启动合同、commit、default cache 与 GPU pmon snapshot。验证脚本及日志位于对应的 `validation/final20k/`。
+- 每份 receipt 包含最终训练日志 SHA、checkpoint copied norm/manifest/source metadata、CPU/GPU restore JSON 与日志 SHA、正式启动合同、commit、default cache 与 GPU pmon snapshot。验证脚本及日志位于各自的 `validation/final20k*/` 目录。
 - 运行合同保持 seed 0、batch 32、H50/K30、model-only BF16、`/root/.cache -> /mnt/public/xcj/cache`、`HF_LEROBOT_HOME` unset；实际 CUDA 兼容项 `XLA_FLAGS=--xla_gpu_enable_command_buffer=` 保存在 launcher、pids/启动回执中，checkpoint `command.txt` 的既有 allowlist 不声称保存它。
 
 ## MAM 收尾与 GPU 状态
