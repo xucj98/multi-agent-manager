@@ -1,24 +1,26 @@
-## 当前状态：put-back J/T train1 已完成 eval1/eval2；train2/eval1 formal100 运行中（2026-09-14 CST）
+## 当前状态：put-back J/T train1 与 train2/eval1 已完成；train2/eval2 formal100 运行中（2026-09-14 CST）
 
-固定原协议队列已完成 train1 的两个 evaluation seed：运行树始终 clean 且固定为 RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`，保持 H50/K30、原始 RNG 生命周期、首次 infer 90 秒和后续 infer 30 秒。新增训练、转换、传输、源码、依赖、checkpoint 与共享 cache 变更均为 0。
+固定原协议运行树始终 clean：RMBench `f401f5279c95451eb424ac98b831bab5552b2120`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。所有批次保持 H50/K30、原始 RNG 生命周期、首次 infer 90 秒、后续 30 秒；新增训练、转换、传输、源码、依赖、checkpoint 与共享 cache 变更均为 0。
 
-| arm / evaluation seed | formal100 | 结果与正常失败 | final review SHA-256 | MAM / smoke cleanup |
-| --- | --- | ---: | --- | --- |
-| J `full_t_plus_1` / eval1 `200000..200099` | `c_put_back_full_t_plus_1_trainseed1_evalseed1_100ep_r3` | **47/100**；`button_not_pressed_after_center=35`，`button_press_insufficient=18` | `f02b472b80d9009bca1d26df66a77c343ea4e48d8c39a1b68c70e607f6d13cc3` | job `bf7a953a-e35a-4ca3-a8cc-ccd9cf4f3cd0` archived；matching smoke 已清理 |
-| T `full_t_plus_30` / eval1 `200000..200099` | `c_put_back_full_t_plus_30_trainseed1_evalseed1_100ep_r3` | **46/100**；`button_not_pressed_after_center=40`，`button_press_insufficient=14` | `94f4e4297d3b63b69b09a4296a1ef0684b3bb138c57d9b250767e305e6ca752b` | job `d805fb5c-f1ff-41ae-8b6d-59a3aa481e07` archived；matching smoke 已清理 |
-| J `full_t_plus_1` / eval2 `300000..300099` | `c_put_back_full_t_plus_1_trainseed1_evalseed2_100ep_r3` | **58/100**；`block_not_returned_to_origin_mat=1`，`button_not_pressed_after_center=25`，`button_press_insufficient=16` | `be14b50e2d1b4834a37349921a7b83fe2eb3721f7262a5d0273cbbdcf2ccca78` | job `0f7daad0-ba87-41dc-8efd-57431d03a289` archived；receipt `2cebc82e1a47fc3b90b4da5b05808e1607b539f7e4ff8214ca9cca51c668dcb1`；matching smoke 已清理 |
-| T `full_t_plus_30` / eval2 `300000..300099` | `c_put_back_full_t_plus_30_trainseed1_evalseed2_100ep_r3` | **62/100**；`button_not_pressed_after_center=21`，`button_press_insufficient=17` | `a5bbb1ae0c73326326ead750b46c63ddf805d8e5c8fdaffc9ff2c93ef45ffd75` | job `8883cf5e-9fd9-4255-b120-eac472a20c40` archived；receipt `79f2141bf0e859a947a6217b47105ab93062df85b9fe0b21bb716a4ec0d26f1d`；matching smoke 已清理 |
+| arm / train / eval | formal100 | 结果 | final review SHA-256 / MAM |
+| --- | --- | ---: | --- |
+| J `full_t_plus_1` / train1 / eval1 `200000..200099` | `c_put_back_full_t_plus_1_trainseed1_evalseed1_100ep_r3` | **47/100** | `f02b472b80d9009bca1d26df66a77c343ea4e48d8c39a1b68c70e607f6d13cc3`; job `bf7a953a-e35a-4ca3-a8cc-ccd9cf4f3cd0` archived |
+| T `full_t_plus_30` / train1 / eval1 `200000..200099` | `c_put_back_full_t_plus_30_trainseed1_evalseed1_100ep_r3` | **46/100** | `94f4e4297d3b63b69b09a4296a1ef0684b3bb138c57d9b250767e305e6ca752b`; job `d805fb5c-f1ff-41ae-8b6d-59a3aa481e07` archived |
+| J `full_t_plus_1` / train1 / eval2 `300000..300099` | `c_put_back_full_t_plus_1_trainseed1_evalseed2_100ep_r3` | **58/100** | `be14b50e2d1b4834a37349921a7b83fe2eb3721f7262a5d0273cbbdcf2ccca78`; job `0f7daad0-ba87-41dc-8efd-57431d03a289` archived |
+| T `full_t_plus_30` / train1 / eval2 `300000..300099` | `c_put_back_full_t_plus_30_trainseed1_evalseed2_100ep_r3` | **62/100** | `a5bbb1ae0c73326326ead750b46c63ddf805d8e5c8fdaffc9ff2c93ef45ffd75`; job `8883cf5e-9fd9-4255-b120-eac472a20c40` archived |
+| J `full_t_plus_1` / train2 / eval1 `200000..200099` | `c_put_back_full_t_plus_1_trainseed2_evalseed1_100ep_r3` | **70/100** | `32864e05054f65de653565d19908271e30ef8880b0f1eacb220100c5b41444bd`; job `0ccf5f61-bd19-4df7-88dc-9ec2f49d79c4` archived |
+| T `full_t_plus_30` / train2 / eval1 `200000..200099` | `c_put_back_full_t_plus_30_trainseed2_evalseed1_100ep_r3` | **68/100** | `eaac667a3ecd3236aca2c8cadf5eec3a1eee35edd9ab60b513a2669c75d1b94a`; job `1ae7a228-0a13-4074-88ba-8b12886e1676` archived |
 
-train1/eval2 的两个 formal 均经 100 条连续 seed/preflight/terminal diagnostics、100 个 episode JSON、视频、scheduler exit、完整子进程退出、端口/outer PID 释放、source/checkpoint/hash 合同和零基础设施 marker 复核。终验器的实际 SHA-256 为 `6368b249c1615ac35f87a813accaf1dfdcc895cf425e76fc442988cb4eb4c885`；写入前已将其仅 task-local 的 eval2 MAM provenance 更正为实际 job ID，未覆盖任何运行产物。
+train2/eval1 两叶均以 100 条连续 seed/preflight/terminal diagnostics、100 个 episode JSON、100 个 scheduler exit 0、102/102 自有进程退出、视频、端口与 outer PID 释放、来源/manifest 和 10 个核心 artifact hash 完成终验；infrastructure marker 为零。J 的 normal failures 是 `block_not_moved_to_center=1`、`button_not_pressed_after_center=20`、`button_press_insufficient=8`、`pressed_before_block_centered=1`；T 为 `button_not_pressed_after_center=17`、`button_press_insufficient=15`。matching smoke cleanup receipt SHA-256 分别为 `0f1fcc6c9a51e74ffb4ea0bfdfc261a8686312c1f843e590ac896147b065fde5`、`49f1395c498f8e234be895fa68373e667b39d5c75936580ed8aa68ace523e12e`；仅这两个 smoke leaf 已删除，formal leaf、reviews、receipts、logs 和 J 的历史 r2 partial 均保留。task-local train2/eval1 finalizer SHA-256 为 `a532cd5d6b76c637165b05c9d0a431f820ad11ea6f59d4f9aa763aae201aa423`。
 
-train2/eval1 的完整结果去重已完成，J/T 两项 matching video/no-video smoke2 均通过技术合同；J 的任务成功数为 1/2、review SHA-256 `d0e6436dda5fafa02ac744c7a76bf3b114893224da9f2eb250c9f7315867918a`，T 为 0/2、review SHA-256 `6b600146c965b924b0ebf70eefd87b4fb3b644bfef12234ed0ee3bf67fb9f1cf`。任务成功率不用于选择或阻断该技术门禁。
+train2/eval2 的宽去重扫描 106 个 config leaf，没有发现有效完整结果：`records/putback_JT_trainseed2_evalseed2_20260914.dedup.json` SHA-256 `803df59c14edf4d87621e85d5ed6aac3e989f6ebacc4d9b89f8ba29324b48453`。独立 audit/manifest 与 smoke/formal dry-run 已通过（preparation receipt SHA-256 `59641d2d2c4934a5f7b001d146b2633cd7abdced3ba021057e73e54741c2c957`）；smoke verifier SHA-256 `757c5b1f704b1a718cfe982b76ab8f97af7e6c0b900caab6035dcf9d1398c455`。
 
-| arm | running formal100 | fixed seeds / C1 resource | outer PID | MAM job |
-| --- | --- | --- | ---: | --- |
-| J `full_t_plus_1`, train2/eval1 | `c_put_back_full_t_plus_1_trainseed2_evalseed1_100ep_r3` | `200000..200099`; GPU1; ports `19410,19412` | `1301506` | `0ccf5f61-bd19-4df7-88dc-9ec2f49d79c4` |
-| T `full_t_plus_30`, train2/eval1 | `c_put_back_full_t_plus_30_trainseed2_evalseed1_100ep_r3` | `200000..200099`; GPU2; ports `19420,19422` | `1301571` | `1ae7a228-0a13-4074-88ba-8b12886e1676` |
+| arm | matching video/no-video smoke2 | running fresh formal100 | C1 resource / actual outer PID / MAM job |
+| --- | --- | --- | --- |
+| J `full_t_plus_1` | 2/2; `300000..300001`; review `7c34c4fbe5116dcdd469f54949ed8bf569d5e610b28955b147d5294bacf4c7cc` | `c_put_back_full_t_plus_1_trainseed2_evalseed2_100ep_r3`, fixed `300000..300099` | GPU1, `19410,19412`, PID `1588842`, job `bebb94c2-ed93-49ce-9415-39c4048d8f9e` |
+| T `full_t_plus_30` | 2/2; `300000..300001`; review `dbf7c55242d0a4a1861ac30ab123205b3df2a7479cefe2d69ff97dc427083dc6` | `c_put_back_full_t_plus_30_trainseed2_evalseed2_100ep_r3`, fixed `300000..300099` | GPU2, `19420,19422`, PID `1588843`, job `2319f9fc-4809-4846-8421-a78614a461b6` |
 
-两条 formal 已以实际 outer PID 登记为 running，尚无正式分数。本 turn 不主动轮询其进度；MAM 停止事件到达后，按 train2/eval1 派生终验器依次执行 check-only、写 final review、核对实际 MAM ID/连续 seed/terminal/video/process/source/hash、归档 job、写 cleanup receipt，并且只删除对应 smoke leaf。两项均成功收尾后，继续既定 train2/eval2 的完整去重、smoke2 与 fresh formal100（固定 `300000..300099`）。
+两条 formal 已以实际 PID 登记为 running，尚无正式分数。预启动记录为 `records/putback_JT_trainseed2_evalseed2_formal_prelaunch_20260914T023300Z.log`（SHA-256 `d23a155d1d74c35bd550c945e67dab25d910b27db9d50f97e705428a11964bf0`）。本 turn 不主动轮询；MAM 停止事件到达后，将以实际 job ID 派生终验器，按 check-only → final review → 独立复核 → MAM archive → cleanup receipt → 精确 smoke 删除的顺序收尾。
 
 ---
 
