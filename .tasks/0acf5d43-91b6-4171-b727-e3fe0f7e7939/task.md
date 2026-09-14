@@ -1,5 +1,39 @@
 # 高频状态推理与偏差触发replan：复用checkpoint的推理实现
 
+## Manager 正式准入：第一层 J 18批（2026-09-14）
+
+Manager已验收最终工程报告f4be7d6e8aa2a970d92197e74d2984b1168a03f9、独立报告2923083647de4f427269693860134412ee391f3e与receipt f19f0212d1d3370da7e519b612628bd0df6d1e159bd4b4f927d1f7c40e76b600，另从C3重哈希42项原件和五profile汇总、重算6集轨迹及输入连接、核读trigger清后缀再normal infer和既有CPU测试。工程阶段10/10结束，旧bitwise失败原件仍是失败，不要求重跑。验收收据 `/root/Documents/task-state-vla-paper/docs/audits/20260914-hf-original-entry/final_engineering_acceptance.json` SHA1140382c9425886fec6fad3c70f90b271d05b347a58ea7e89c6606c574b1473c。
+
+**现在授权直接落实并启动原冻结第一层18个formal100，不再只交准备报告。** 本节覆盖历史“formal禁止”指令，但不解除源码/checkpoint/阈值冻结。两任务rearrange、put_back；J train0/20k；arms仅j_matched_baseline、j_hf_fixed、j_hf_event；eval0/1/2各100。合计1800正式执行、0训练。S、periodic K10及其余18批仍未授权。
+
+### 资源、可比性和执行顺序
+
+- 继续使用原C3共享runtime `/mnt/public/xcj/Projects/state-vla/workspace/e6908de7-4b02-465a-987b-a19eba7a315a/c3-highfreq-engineering-20260914`；不新装环境。三库OpenPI0ce566bd34f99cb4775422f012ab67c16aa53885 / bridgeffa122494c19e1c0154e877010f7b470967ccfc6 / RMBench6abebf08d084d0be43aa56ebe158dc8395fa58e4精确且clean。
+- Manager于01:10Z实查C3四卡各1MiB/0%，仅ssh端口监听。分配GPU0/1/2三个串行lane：eval0→GPU0/19400,19402；eval1→GPU1/19410,19412；eval2→GPU2/19420,19422。每个lane依次rearrange的baseline→fixed→event，再put-back的baseline→fixed→event，共6批。各task/eval内三个arm固定同一GPU；不把不同方法固定在不同GPU造成额外混杂。启动前实时核对资源；冲突不杀他人进程。C1原协议train2由evaluation_owner处理，不触碰。
+- 三个lane可以并行；每lane每次只运行一套robot/policy/formal。同一formal对应smoke使用同GPU/ports/source/manifest/scheduler/RNG，其他并行负载记录入receipt，不改仿真步定义。先完成三个lane各自的rearrange matched-baseline smoke→formal启动并登记，不等某lane全部6批结束才启动其余lane。
+- 冻结矩阵仍来自 c-eval-highfreq-base/.local/highfreq_preparation/checkpoint_inventory_and_frozen_matrix.json（SHA20e414eb14c7f752b158949fda2c62b678e6c3eab2bd2a56452f315364700adb）、baseline_manifest_inputs.json（305250a177196a83bc27464b3c9eec1dc2d60a61d27bad4472a608c8aa4d5610）和frozen_run_matrix.md（f5e5dc56d13acea26d339387b790bec167f486fa3931f7041822ed7120684a69）；只物化第一层18行的原名称/参数。环境seed依次100000..100099、200000..200099、300000..300099，不跳过、不补seed、不拼partial。保留所有正常失败，分数/有无trigger不作选择门槛。
+
+### 匹配smoke及正式入口
+
+- 逐run使用冻结原BenchmarkRunner launcher和原input-audit/manifest生成路径。旧hf_engineering.py只支持smoke，不修改它、不把内部formal100_started字段当执行器。允许在本TASK-ID的task-private目录编写必要的少量命令生成/串行收尾脚本，构造真实已有launcher的--mode smoke/formal命令；不封装/替换policy或scheduler，不造新通用框架，不改三库、共享cache、依赖、模型或数据。任何新脚本只做既有操作编排，保留完整argv和env。
+- 正式前保存实际dry-run命令/manifest/audit/source/checkpoint/RNG身份，运行已有内置smoke compatibility和evidence门禁；不能用手写PASS替代。需要启动使用openpi/.venv解释器的task-private生成脚本时沿已验收入口，BenchmarkRunner及各服务仍用已冻结实际解释器。保留90秒首infer/30秒后续、660startup/reset、3600episode和原renderer/ICD参数。
+- 已验收的四条HF eval0两集可以复用为同一GPU0/19400,19402正式调用的matching-smoke，前提是内置identity/兼容校验全部成立、manifest/scheduler不变，不能为了通过去改旧原件。旧baseline/shadow及r_s30 engineering-only叶绝不当formal smoke。其他14条须各自新的strict smoke2（video/no-video，固定本eval前两个seed）→formal100。先去重已有完整结果、检查名字不存在；遇到来源不明冲突/真正不兼容即保留首因并交Manager，不覆盖、不循环重跑或私改名字。
+- 本授权认可的matching gate是身份/协议/完整终态/基础设施/视频/evidence合同，**不要求任务成功或自然触发replan**。四集event未trigger不意味着代码缺陷；CPU人工触发覆盖不冒充现场验证。冻结阈值及新协议在看formal成绩前不变。
+- 所有18批使用episode_reset_key0_independent_probe_v1：每accepted episode动作key0恢复，独立probe fold_in常量0x50524F42也恢复。matched baseline必须reset_episode_rng=true，完整normal action路径、不执行probe/clear/cache替换；HF按已审源码自动reset。绝不使用旧legacy baseline成绩替代同RNG协议对照。metadata写明scope、实际双流初始化/lifecycle及probe=0/预期；wire stream/call不能冒充内部key。J fixed/event r_s5、H50/K30保持；事件3行2行不等、连续2次有效probe、10<=d<30。
+
+### 长进程、验收与首次现场trigger
+
+- 每个预计>30分钟formal在真实outer进程活着时mam job add登记；三个lane各formal单独job，正常结束turn，用MAM转Manager/native followup恢复，不每分钟轮询。停止后先终验并发布结果，再归档job并启动该lane下一项；全部18批完成前此task保持负责，不依赖Manager逐一再授权。
+- 每个完整100批核查100连续accepted/preflight/terminal、视频前5开启其余关闭及视频解码、每集scheduler exit和所有自有子进程退出、log基础设施异常、source/checkpoint/manifest/hash、完整rolling evidence。保留原始trace与最终review；非HF baseline也须逐episodereset/evidence记录且probe0。forecast消费对齐与实际K/调用数、终态discard分开。
+- 逐个event触发从raw重建：同absolute target比较与streak满足、在已完成prefix d后clear返回恰K-d、旧剩余行未执行、下一action以event_trigger普通infer开始、action流按正常次序推进且旧pending不回写。首个出现自然trigger的完整episode保留小型专门receipt并随该100批终验发布，交Manager独立确认后再继续后续event批（其他baseline/fixed及已经运行的批照常）。若整批无trigger按0如实交付并正常继续，不为造覆盖加样本。任何真实合同/基础设施错误停该受影响lane并保留，不伪装任务Fail；共享根因影响其他lane时停止相关后续启动并报告。
+- 不要求额外GPU诊断/强迫trigger/新训练。shadow旧逐位差异不再作为重复采样理由；本次formal只是比较冻结推理协议的实证评测。每个正式批完成后可按已授权流程留cleanup收据清理它自己的新增matching-smoke；四个已验收HF eval0原始工程证据保留，不能删除它们。所有formal和失败证据均保留。
+
+Manager负责科学分析与论文，本执行工作继续terra/max。本次准入数18不等于已完成，正式台账仍48批。遇到实际可修的task-private编排错误自行窄修留痕；若需变更冻算法/合同则停止依赖步骤报告。
+
+---
+
+# 高频状态推理与偏差触发replan：复用checkpoint的推理实现
+
 ## 当前 Manager 裁决与执行授权：完整轨迹工程阶段（2026-09-14）
 
 Manager 已独立验收 report 0c959fc4c9acf785a0e2a60d9422b3d1dfd14a75：在 C3 重新读取全部9个 pickle、验证哈希及剥离cmd的原始输入、逐字段比较完整普通输出（仅剔除 policy_timing，dtype/shape/value/bytes 均一致），核对全部8次调用的实际key data/哈希/序号及恢复前后状态。记录见论文 docs/audits/20260914-hf-original-entry/probe_gpu_acceptance.json。接受同一加载实例/固定输入的3 action+5 probe副作用检查；普通返回没有 state 字段，不虚报。旧跨进程失败保持失败，未确立根因，也未证明环境/完整轨迹等价。
