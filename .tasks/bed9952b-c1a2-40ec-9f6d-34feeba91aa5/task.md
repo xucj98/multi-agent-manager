@@ -18,3 +18,6 @@
 
 ## 最后一项C/OpenPI复验准入
 C已部署修复base c03898f5a76f4ac208f7d23ae14e2cc759be8853（原34002dce直接子提交，修复环境检查，不改模型）。请仅按本机.local/README→C说明→repo AGENTS/明确引用环境文档，使用此新BASE_COMMIT在原任务workspace新建缺失openpi并运行普通CPU检查。其余五项不重复。实际在文档要求的C1执行，不读修复代码或报告补步骤，不使用PYTHONOPTIMIZE。若C1共享盘阻塞，记录命令/主机/首次错误及等待时间并明确未通过，不能把C2成功替代；已有目标则报告具体状态，不自行覆盖。正常成功则记录HEAD、环境来源、CPU实际结果并发布最终六项矩阵。
+
+## Manager最终验收：六项通过
+接受最终报告revision499a7c59：B/openpi、B/RMBench、B/robot-bridge、C/RMBench、C/robot-bridge、C1/openpi均由原空白使用者按文档导航与三参数入口创建独立环境，并实际完成CPU功能检查。C/OpenPI用c03898f修复base且PYTHONOPTIMIZE unset；旧失败记录保留。验收范围不包括GPU/render、正式训练或评测，也不保证C1共享盘延迟；实际至少12m48s页读取等待单独保留。任务完成，无需重复安装。
