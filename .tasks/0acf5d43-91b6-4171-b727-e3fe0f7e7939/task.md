@@ -290,3 +290,6 @@ Manager 已直接核对 BenchmarkRunner：policy server 在整个100集 run外�
 Manager直接读取C3三臂900条terminal，复算每eval成功数和配对，确认event84/88/86、baseline86/81/87、fixed90/91/87。另直接读取原episode14完整rolling，复算旧plan对probe的phase差异2/3、3/3，已执行15、清除15、下一source285正常infer及与触发probe输入相等，原件hash fcaf7a080932d302aa5379ff8afc7e207176a8a7fc8225b501d048bf1bd76466。该首trigger工程门槛通过；不是300集全部工程证据最终独立验收。
 继续原已冻结第一层18批中的put-back J matched-baseline→HF-fixed→HF-event，eval0/1/2共9批，原GPU/seed/门禁/阈值/随机数协议全部不变。无额外训练，不加重跑或调参，S/K10仍未准入。九任务覆盖优先；此接续仅用既有C3 lane，不抢C1及训练/数据生成资源。
 当前描述性结果event86.0%较fixed89.3%下降3.33pp，不能宣称事件重规划改善；不因该分数改阈值或取消预定第二任务以挑选结果。全三批独立证据验收仍需另行完成；保存所有trigger与失败原件，待可用reviewer接续。
+
+## 2026-09-15 三lane收尾职责明确
+执行者负责原已授权C3 GPU0/1/2三条put-back lane，不限于某一条通知点名的GPU。各HF-fixed终态按冻结100集/seed/身份/RNG/退出证据验收，成功归档后自动接该lane既定HF-event并登记；失败留痕报告。GPU0 job3f95aee4现已stopped，优先接续核验。无需等Manager逐卡再次授权；这不新增LR或扩大已冻结实验范围。
