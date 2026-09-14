@@ -14,6 +14,18 @@
 
 HF-fixed 原始计数合计为 268/300；matched-baseline 为 254/300，差值为 +14 successes（+4.67pp）。这只是冻结原件的描述性计数，尚非科学结论。停止的 fixed MAM jobs `236c12af-448f-486d-bae2-39229981ac6f`、`5bf35bb8-50b0-41a4-8caf-c5a439c14818`、`ea9bc114-9b5f-4d11-92fd-bf290273b661` 已在终态审计后归档。
 
+# 置顶：第一层 J rearrange HF-event formal100 已启动（2026-09-14）
+
+C3 在启动前确认 GPU0/1/2 都满足冻结资源门槛（`free>=20000MiB`、`used<=256MiB`、`util<=10%`），且 `19400/19402`、`19410/19412`、`19420/19422` 均无 listener。三个 detached outer 均以冻结入口 `$RUN_ROOT/RMBench/.venv/bin/python $STATE/tools/launch_first_layer.py lane --formal-run <formal-run>` 启动；两秒后仍存活，随后立即登记为 MAM long-running jobs。
+
+| GPU / 端口 | formal run | outer PID | MAM job |
+| --- | --- | ---: | --- |
+| GPU0 / `19400,19402` | `c_hf_j_hf_event_rearrange_trainseed0_evalseed0_100ep` | `2112144` | `380ad209-d5c5-432e-9718-247c2cced46a` |
+| GPU1 / `19410,19412` | `c_hf_j_hf_event_rearrange_trainseed0_evalseed1_100ep` | `2112145` | `9776cd89-0dad-447b-a772-ceba29ff1539` |
+| GPU2 / `19420,19422` | `c_hf_j_hf_event_rearrange_trainseed0_evalseed2_100ep` | `2112146` | `a79b70de-9c74-4d72-977f-7eb2060dabc5` |
+
+写一次启动收据为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/rearrange_j_hf_event_lanes_started_20260914.json`；各 outer log 位于同一 state 根的 `logs/<formal-run>.lane.outer.log`。eval0 仅通过 launcher 的既有 accepted engineering smoke identity/smoke gate 复用 matching smoke；eval1/2 将各自运行 strict smoke2、完成 quiescence handoff 后进入 formal。未运行 `prelaunch_static_validation.py`，也未删除 engineering smoke 或修改冻结输入。此处只记录启动状态，不从运行中过程推断正式结果。
+
 # 置顶：第一层 J rearrange matched-baseline formal100 终态审计（2026-09-14）
 
 三条已授权 formal100 都通过终态审计，结果来自各自连续的 100 个 accepted episode，而非 smoke 或日志推断：
