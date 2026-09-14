@@ -4,7 +4,7 @@ C3 GPU1 的 `c_hf_j_matched_baseline_put_back_trainseed0_evalseed1_100ep` 已完
 
 同一 per-eval audit 使用实际 `validate_smoke_run()`、每集 `check_rolling_evidence(..., required=True)`，以及 source/checkpoint/manifest/scheduler/RNG、baseline 无 probe、normal query/queue/completed triplet、5 个 MP4 decode 和完整 102-process teardown 检查。它硬编码并核对 manifest SHA-256 `786aa7e9a8ce6df9f6f6ffeeb426110443400c3c7fe2d3380553dcd177350e5f` 与 matching-smoke config SHA-256 `e65b4f68c715a47c7f7d89c5b64e0b852e7182fb640abd9c8f82827731458add`；100 scheduler 都 exit 0，robot/policy 均为受控 `-15` shutdown，记录 PID 全部已退出。
 
-终态 receipt 为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_matched_baseline_put_back_evalseed1_terminal_audit_20260914.json`，SHA-256 `c7db28b8399a8138d77b78d11b47eb6b3a32ec7eacad7dd33009eddbb69034dd`，task-private state commit 为 `befeee3e0462696fef78052e388cb740a07ac9b8`。按冻结顺序，下一步直接启动 GPU1 HF-fixed lane `c_hf_j_hf_fixed_put_back_trainseed0_evalseed1_100ep`；它将运行新的 strict matching smoke2，然后才可进入 formal100。
+终态 receipt 为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_matched_baseline_put_back_evalseed1_terminal_audit_20260914.json`，SHA-256 `c7db28b8399a8138d77b78d11b47eb6b3a32ec7eacad7dd33009eddbb69034dd`，task-private state commit 为 `befeee3e0462696fef78052e388cb740a07ac9b8`。按冻结顺序，GPU1 HF-fixed lane `c_hf_j_hf_fixed_put_back_trainseed0_evalseed1_100ep` 已以 outer PID `2834611` 启动并登记为 MAM job `0283a094-b073-4a95-ba7c-be67cadbd924`；它将运行新的 strict matching smoke2，然后才可进入 formal100。eval2 保持未审计、未归档、未启动后继 lane。
 
 # 置顶：第一层 J put-back matched-baseline eval0 终态审计（2026-09-14）
 
