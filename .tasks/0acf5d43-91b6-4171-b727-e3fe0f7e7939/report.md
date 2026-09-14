@@ -1,3 +1,15 @@
+## 最新工程轨迹状态（2026-09-14；C3 rearrange J HF-fixed）
+
+授权队列的第四个两集 leaf `c_hf_j_hf_fixed_rearrange_trainseed0_evalseed0_smoke2` 已完成、通过逐条 rolling 合同验证和原工具单 leaf audit，且其 stopped MAM job 已在资源释放后归档。它仍是 **engineering candidate / matching-smoke-only** 证据：`formal100_started=false`，两集 Success 不构成 formal 准入或效果结论。
+
+- 冻结 C3 运行树、GPU0、端口 `19400/19402`、checkpoint 和三库身份保持不变。execution return code 为 0、`ports_released_after=true`；审计后两端口无 listener，OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4` 均 clean。`hf_engineering.py` SHA-256 为 `dcf93891de82adaf21e676c55ee30901309f9c9a6097841ff4be4c7ba7f29c87`。
+- 恰有两个连续 accepted seed：episode 0 / `100000` 与 episode 1 / `100001`。benchmark `completed`、`error=null`、target episodes 为 2；两集都以 `episode_terminal`、scheduler return code 0 和 Success 结束，logical step 分别为 392 与 402。video 策略正确：episode 0 启用、392 frames、检查通过；episode 1 禁用、检查通过。robot 与 policy 以受控 `runner_shutdown` / `-15` 收尾。
+- 实际完成 action rows 分别为 392 与 402：各 14 次 ordinary action，probe 分别为 65 与 67 次，实执行 K 分布为 `{30: 13, 2: 1}` 与 `{30: 13, 12: 1}`。最终未执行的 28/18 行来自 terminal 后缀，不计为 clear。每集都有一个保存的 `policy_rng_reset`；action/probe 只报告 wire 可见的 `stream`/`call`（action 1–14，probe 1–65/67），不把它们称为内部 sampler key。
+- J rolling 合同逐条复算通过：每个 progress 的完成时刻由 `source_step + completed_rows` 重建；消费行使用 `u - forecast_source_step - 1`，并同时核对到保存 forecast 的 selected IDs、下一 probe 输入和下一 K30 boundary 的 ordinary-action 输入。probe 只发生在已完成的 `+5/+10/+15/+20/+25`，不发生在 K30 boundary 或 terminal 后；phase comparison 使用当前 action plan 的 reference、old `d:d+3`、new `0:3` 和 absolute targets `[u+1,u+2,u+3]`。HF-fixed 的两集均 `trigger_count=0`、`clear_count=0`、ordinary action replan 为 0；少量高偏差均只形成最大 streak 1，未改变队列。
+- task-private trace contract 为 `trace_contract_validation.json`，SHA-256 `649bf10718a99346ce453c167e8384c5383a19167db8d2558c06bc4dbf8e42c2`，`all_pass=true`。execution SHA-256 为 `fa86ec8fea4524aff5f44fd79557160c6fdea13872aa008853d3f2b007d9010a`；官方 `audit --profile` stdout SHA-256 为 `e9405aa952cd283db9c2d64902876cb551ab48f939d08a878a12bc7405dd6a13`，review SHA-256 为 `2f95b8c50f94194aa62fcbca701efa9e2b01f8cd0876b7373e0f474a40a6e046`。完成的 stage receipt SHA-256 为 `831120a90e00f72563197cc87d591bedb8e0dc3a37b13d965093d44caa9c0912`；MAM job `7767615d-80d9-43e5-abd3-4404b31cb7ea` 已归档。
+
+下一项仅按已授权顺序运行 `c_hf_j_hf_event_rearrange_trainseed0_evalseed0_smoke2` 的两集；仍不调整参数、seed、checkpoint、runtime 或工具，也不启动 formal。
+
 # 交付报告
 
 ## 最新工程轨迹状态（2026-09-14；C3 put-back J HF-event）
