@@ -56,7 +56,7 @@ N robot-only 转换已经完成。命令收据、日志和 MAM job `63c47f63-d60
 
 `/mnt/public/xcj/Projects/workspace/f0011538-fbad-49f6-b117-4d628f2bf30c/RMBench/logs/wave1_missing_tasks_a/swap_T_n_conversion_20260915T0048/`
 
-processed HDF5 位于 `RMBench/policy/pi05/processed_data/swap_T-demo_clean_state-50`；LeRobot 数据位于 `/root/.cache/huggingface/lerobot/swap_T_demo_clean_state_shared_memory`（规范化到 `/mnt/public/xcj/cache`）。转换后为 50 集、17,151 帧、50 Hz，只有 14-D robot state/action、三路 RGB 与索引/时间列。端到端校验通过，报告：
+processed HDF5 位于 `/mnt/public/xcj/Projects/workspace/f0011538-fbad-49f6-b117-4d628f2bf30c/RMBench/policy/pi05/processed_data/swap_T-demo_clean_state-50`；LeRobot 数据位于 `/root/.cache/huggingface/lerobot/swap_T_demo_clean_state_shared_memory`（规范化到 `/mnt/public/xcj/cache`）。转换后为 50 集、17,151 帧、50 Hz，只有 14-D robot state/action、三路 RGB 与索引/时间列。端到端校验通过，报告：
 
 `/mnt/public/xcj/Projects/workspace/f0011538-fbad-49f6-b117-4d628f2bf30c/RMBench/logs/wave1_missing_tasks_a/swap_T_n_conversion_20260915T0048/swap_T_n_pipeline_validation.json`
 
@@ -64,8 +64,8 @@ processed HDF5 位于 `RMBench/policy/pi05/processed_data/swap_T-demo_clean_stat
 
 N sidecar 与 norm 已生成：
 
-- sidecar：`openpi/data/memory_v1/rmbench/swap_T_demo_clean_state_shared_memory/robot_only/`，SHA-256 `894faec572ad79c683e8112f418b7f5f2b148feafd242d3147a28d66d001de8a`；无 semantic series、availability 或 events。
-- norm：`openpi/assets/memory_v1/rmbench_swap_T_robot/norm_stats.json`，SHA-256 `9a249ce79bc5f3b744ff666578f79893ac1f8d6b680fa5f378d14b4d4e0c96be`；14-D state/actions 全部 finite，统计采样 17,120 行（535×32，丢弃尾部 31 行）。
+- sidecar：`/mnt/public/xcj/Projects/workspace/f0011538-fbad-49f6-b117-4d628f2bf30c/openpi/data/memory_v1/rmbench/swap_T_demo_clean_state_shared_memory/robot_only/`，SHA-256 `894faec572ad79c683e8112f418b7f5f2b148feafd242d3147a28d66d001de8a`；无 semantic series、availability 或 events。
+- norm：`/mnt/public/xcj/Projects/workspace/f0011538-fbad-49f6-b117-4d628f2bf30c/openpi/assets/memory_v1/rmbench_swap_T_robot/norm_stats.json`，SHA-256 `9a249ce79bc5f3b744ff666578f79893ac1f8d6b680fa5f378d14b4d4e0c96be`；14-D state/actions 全部 finite，统计采样 17,120 行（535×32，丢弃尾部 31 行）。
 - 实际 CPU batch：`/mnt/public/xcj/Projects/workspace/f0011538-fbad-49f6-b117-4d628f2bf30c/RMBench/logs/wave1_missing_tasks_a/swap_T_n_conversion_20260915T0048/real_cpu_batch_swap_t_n.json`，通过 `pi05_rmbench_swap_T_no_memory` 的 seed 0、batch 32、H50/K30、20,000-step 合同；raw sample 为 14-D state、50×14 action，模型 batch 为 32×32 与 32×50×32，padding tail zero，semantic key-state fields 全部 None。
 
 连续 swap_T schema 仍待 Manager 裁决；当前只准备并验收 N no-memory 链，不启动新的 swap_T 正式训练。
