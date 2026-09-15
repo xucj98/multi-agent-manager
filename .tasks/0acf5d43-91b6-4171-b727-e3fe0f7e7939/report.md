@@ -1,3 +1,28 @@
+# 置顶：第一层 J put-back HF-event 三个 eval formal100 终态审计（2026-09-15）
+
+C3 GPU0/1/2 的三个 put-back J HF-event formal100 lane 均已从完整结构化结果完成终态审计；MAM 的 stopped 状态只作为收尾信号，没有被当作结果。task-private `audit_formal_hf_event_put_back.py`（state commit `f04f087a8cc304afa27e916fdf83b76a5f637790`，SHA-256 `e5b31cbda18e6d1d83b9402b38136c3add088091da1e8e0079a7dd0cb64dbbc0`）先对每条 lane 做 dry audit，再写入不可变 receipts；receipt state commit 为 `f90af2f26b2622c5774205518ff2879087467397`。
+
+| Eval / GPU / 环境 seed | 结果 | 普通失败 | 触发次数 / episode 数 | manifest SHA-256 | smoke config SHA-256 | terminal receipt（SHA-256） |
+| --- | ---: | ---: | ---: | --- | --- | --- |
+| 0 / GPU0 / `100000..100099` | **100/100** | 0 | 20 / 20 | `cf51f1d0cdc7bb217a0fae059f6eebd5bf38b11aee8a4228c898b4dfd01ff569` | `ee6b086d6937b8d99ef903d8c485d79943548d8e332dcedf845bdd38fe27ec61` | [`formal_hf_event_put_back_evalseed0_terminal_audit_20260915.json`](/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_hf_event_put_back_evalseed0_terminal_audit_20260915.json) · `0d3dd125bda6be2f46f3a1bfc6b5997ccfe1e5adebde8da25d9978ab5067598d` |
+| 1 / GPU1 / `200000..200099` | **77/100** | 23 `button_not_pressed_after_center` | 50 / 50 | `2fdf8c2c4f79f3eaebdb6bce5b8f7f57e0062207fadf62f3440c1791df78d822` | `1886b6a83ffb471017e67646203d6174c0e6be507a21da88dab7c244525545f2` | [`formal_hf_event_put_back_evalseed1_terminal_audit_20260915.json`](/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_hf_event_put_back_evalseed1_terminal_audit_20260915.json) · `99f354446eb6c0249b334f2b44fcad94ac87540abe2ac89be6182700263d696d` |
+| 2 / GPU2 / `300000..300099` | **100/100** | 0 | 79 / 79 | `b33a05c37268aabea2947b17b6bedf56fdd0c5b9c6ed9a4ffea0bbcfb9312231` | `758b79c7e8e1175d2eb9418549c66c0a32f2df96e8480169efa0c15f4075bb07` | [`formal_hf_event_put_back_evalseed2_terminal_audit_20260915.json`](/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_hf_event_put_back_evalseed2_terminal_audit_20260915.json) · `a12315ec9cc8d8b77180355bd3200bb0d1d49da1fb1d37b5fcfc349f70acc990` |
+| 合计（不同 seed cohort） | **277/300** | 23 | 149 / 149 | — | — | — |
+
+三条 lane 都由 RMBench recorder 的 `validate_smoke_run()` 和每集 `check_rolling_evidence(..., required=True)` 通过后才判定为可验收。每条结构化 summary 都是 `benchmark.status=completed`、`error=null`、target `100`；episode IDs 连续 `0..99`，对应 100 个连续环境 seed，100 个 preflight 全部 accepted，100 个 episode 都有正常 terminal。冻结身份一致：OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abeb08d084d0be43aa56ebe158dc8395fa58e4`，checkpoint 为 `memory20k_e7e5ac54_put_back_full_t_plus_1_s0/20000`；scheduler 配置三条均为 `hf_event` / interval `5` / max-K `30`，scheduler SHA-256 `0e618ea24f040f60f30436ffeb3dbcae3636fb29579a604f5c188642b0690ab3`。eval0 合法复用了已验收 smoke（`reused_accepted_hf_eval0_smoke`），eval1/2 使用各自新的 strict smoke2；三条 input-audit SHA-256 均为 `9ed42457fc9f7d9978eeefff34bded060d86d568ef3d2bba7b71860749469c6c`。
+
+rolling evidence 的原始计数和 aggregate SHA-256 如下；三条 receipt 还保存每个 episode 文件、触发事件 map 以及 config、diagnostics、preflight、video、process、command、formal-start、quiescence、smoke 和 outer-log 的逐项 SHA-256。
+
+| Eval | action_plan | plan_progress / forecast_consumed | probe | plan_completed | plan_triggered | rolling aggregate SHA-256 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| 0 | 1,248 | 7,132 / 7,132 | 6,004 | 1,128 | 20 | `1d9c54654ababf8d27f193c0720236d223823949988e092994cb5c1cc936ac3c` |
+| 1 | 1,288 | 7,373 / 7,373 | 6,235 | 1,138 | 50 | `5f36da9b36949323ec70cc8606e050083b78f7b87d2471eca42df175a399447c` |
+| 2 | 1,200 | 6,826 / 6,826 | 5,805 | 1,021 | 79 | `92f76d23b804a32fcb0e33df4bd7d6a6c59a5f20d13179561a89bafc7ce4d83a` |
+
+逐事件检查重建了当前 action plan 的 old `d:d+3` 与新 probe `0:3` 的绝对 target 对齐，按冻结的 2/3 mismatch、连续两次、`10 <= d < 30` 判定 trigger；每个 `plan_triggered` 的 `clear_response` 都精确等于未执行后缀，下一 action 是 `event_trigger` 的正常 action infer，旧后缀没有回写。每集 evidence 以一次 `policy_rng_reset` 开始，协议为 `episode_reset_key0_independent_probe_v1` / `explicit_episode_reset`。前 5 个视频均通过 `ffprobe`/`ffmpeg` 解码；每条 process ledger 为 102 starts / 102 matching exits，100 个 scheduler exit 0，robot/policy 为 runner 受控 `-15` shutdown，记录 PID 全部退出。`random_light=false`、`crazy_random_light_rate=0` 保持不变，outer log 中的连接重试原件仍保留并只作为哈希证据。
+
+这些是三个不同环境 seed cohort 的冻结描述性结果；eval1 的 23 个普通 `button_not_pressed_after_center` 失败原样保留。成功数和 trigger 数不用于因果解释、样本选择、阈值调整或重跑。对应 stopped MAM jobs `6c38790b-bd22-4b58-8f4b-d070e2ef0c7a`、`88a440d4-60b1-464a-a492-84cdefecee8d`、`98e08565-865c-4ba4-b9ca-e75c6eef5d0c` 已在上述审计完成后归档。
+
 # 置顶：第一层 J put-back HF-fixed eval2 终态审计（2026-09-15）
 
 C3 GPU2 的 `c_hf_j_hf_fixed_put_back_trainseed0_evalseed2_100ep` 已停止，但停止本身没有被视为成功。task-private `audit_formal_hf_fixed_put_back.py --eval-seed 2` 先通过不写入 dry audit，再以 recorder 的 `validate_smoke_run()` 和每集 `check_rolling_evidence(..., required=True)` 做终态审计。结构化 BenchmarkRunner summary 为 `completed`、`error=null`、target `100`：连续 seed `300000..300099` 的 100 个 preflight 均 accepted、100 个 episode 均正常终态，结果为 **82/100 Success** 与 18 个普通 `button_not_pressed_after_center` 任务失败。该描述性结果不触发重跑、阈值调整或选择样本。
@@ -6,7 +31,7 @@ C3 GPU2 的 `c_hf_j_hf_fixed_put_back_trainseed0_evalseed2_100ep` 已停止，�
 
 100 份 rolling evidence 完整，均以一次 `policy_rng_reset` 开始，使用 `episode_reset_key0_independent_probe_v1` / `explicit_episode_reset`；HF-fixed 不含 trigger、clear 或 event replan record。原始汇总为 1,316 个 action plan、7,455 个 progress/forecast consumption、6,239 个 independent probe、1,216 个 completed plan 和 100 个 terminal plan，rolling aggregate SHA-256 为 `249174909d44d29b9f669f677b2501c4ec181a2924dc9407ecf273d33494f785`。前 5 个 MP4 均可解码；process ledger 有 102 starts / 102 matching exits，100 scheduler 均 exit 0，robot/policy 为 runner 受控 `-15` shutdown，全部记录 PID 已退出。
 
-MAM stopped job `9895bcfd-1cea-4ee3-b54a-4f13536ced18` 已在本终态报告发布后归档。按已授权固定 lane 顺序，GPU2 的 put-back HF-event eval2 `c_hf_j_hf_event_put_back_trainseed0_evalseed2_100ep` 已以 outer PID `3206493` 启动、登记为 MAM job `98e08565-865c-4ba4-b9ca-e75c6eef5d0c`。它正在运行新的 strict matching-smoke2，只有 identity/evidence/quiescence gate 通过才会 `exec` 原 formal100；不从 live 状态推断结果，seed、阈值、runtime、checkpoint、source 和冻结输入均未改变。
+MAM stopped job `9895bcfd-1cea-4ee3-b54a-4f13536ced18` 已归档；其后继 event job `98e08565-865c-4ba4-b9ca-e75c6eef5d0c` 已完成 formal100，并由上方 put-back HF-event 终态 receipt 验收后归档。
 
 # 置顶：第一层 J put-back HF-fixed eval0 终态审计（2026-09-15）
 
@@ -16,7 +41,7 @@ C3 GPU0 的 `c_hf_j_hf_fixed_put_back_trainseed0_evalseed0_100ep` 已停止；�
 
 该 lane 合法复用了已验收的 eval0 HF engineering matching-smoke (`reused_accepted_hf_eval0_smoke`)，并以实际 smoke config SHA-256 `9d8383040239c326f6388c11b50c35f3d3edf2caf868dcebf785a56e1f3c1838` 经 recorder 再验证。100 份 rolling evidence 均完整、每集第一条均为一次 `policy_rng_reset`，使用 `episode_reset_key0_independent_probe_v1` / `explicit_episode_reset`；HF-fixed 没有 trigger、clear 或 event-replan record。总计 1,551 个 action plan、8,893 个 progress/forecast consumption、7,442 个 independent probe、1,451 个 completed plan 和 100 个 terminal plan，rolling aggregate SHA-256 为 `05273bd893bf2689ac5577195e569aed732bc2252486cf9f5f695601c0d7141c`。前 5 个 MP4 均解码；process ledger 记录 102 starts / 102 matching exits，100 scheduler 均 exit 0，robot/policy 为 runner 受控 `-15` shutdown，全部记录 PID 已退出。
 
-MAM stopped job `3f95aee4-08aa-4c18-a763-915e3cccc0db` 已在终态报告发布后归档。按已授权固定 lane 顺序，GPU0 的 put-back HF-event eval0 `c_hf_j_hf_event_put_back_trainseed0_evalseed0_100ep` 已以 outer PID `3198209` 启动、登记为 MAM job `6c38790b-bd22-4b58-8f4b-d070e2ef0c7a`；formal-start receipt 已确认它复用已验收 eval0 matching smoke 后进入原 BenchmarkRunner formal100。当前只记录其 live 状态，不从中推断结果；seed、阈值、runtime、checkpoint、source 和冻结输入均未改变。
+MAM stopped job `3f95aee4-08aa-4c18-a763-915e3cccc0db` 已归档；其后继 event job `6c38790b-bd22-4b58-8f4b-d070e2ef0c7a` 已完成 formal100，并由上方 put-back HF-event 终态 receipt 验收后归档。
 
 # 置顶：第一层 J put-back HF-fixed eval1 终态审计（2026-09-15）
 
@@ -26,7 +51,7 @@ C3 GPU1 的 `c_hf_j_hf_fixed_put_back_trainseed0_evalseed1_100ep` 已停止，�
 
 100 份 rolling evidence 均完整：每集第一条为一次 `policy_rng_reset`，协议为 `episode_reset_key0_independent_probe_v1` / `explicit_episode_reset`，HF-fixed 无 trigger、clear 或 event replan 记录。总计为 1,173 个 action plan、6,783 个 progress/forecast consumption、5,710 个 independent probe、1,073 个 completed plan 和 100 个 terminal plan；rolling-file aggregate SHA-256 是 `c045d41d306296d1349fceb832e0f0ed2c262d6a4ad9da32e5b19000790d36c2`。前 5 个 MP4 均经 `ffprobe` 和 `ffmpeg` 解码；process ledger 有 102 starts / 102 matching exits，100 个 scheduler 均 exit 0，robot/policy 均是 runner 受控 `-15` shutdown，所有记录 PID 已退出。outer log 中的连接重试原件仍保留并被哈希，但不会覆盖上述 completed 结构化终态。
 
-GPU1 的两个端口已释放、GPU1 为 `2 MiB` / `0%`，stopped MAM job `0283a094-b073-4a95-ba7c-be67cadbd924` 已在终态报告发布后归档。GPU1 已按固定 lane 顺序启动 put-back HF-event `c_hf_j_hf_event_put_back_trainseed0_evalseed1_100ep`：outer PID `3187488` 在启动三秒及 MAM 登记时均存活，MAM job 为 `88a440d4-60b1-464a-a492-84cdefecee8d`。该 outer 正在运行新的 strict matching smoke2，只有 identity/evidence/quiescence gate 通过才会 `exec` 原 formal100；seed、阈值、runtime、checkpoint 和冻结输入均未改变。GPU0 和 GPU2 的 HF-fixed 也均已独立终审，两个 event successor 已按同一固定 lane 顺序启动。
+GPU1 的两个端口已释放、GPU1 为 `2 MiB` / `0%`，stopped MAM job `0283a094-b073-4a95-ba7c-be67cadbd924` 已归档；其后继 event job `88a440d4-60b1-464a-a492-84cdefecee8d` 已完成 formal100，并由上方 put-back HF-event 终态 receipt 验收后归档。
 
 # 置顶：第一层 J put-back matched-baseline eval2 终态与三 eval 原始汇总（2026-09-14）
 
@@ -45,7 +70,7 @@ task-private summary receipt `/mnt/public/xcj/Projects/state-vla/workspace/0acf5
 
 该比较也明确记录了设计上的 lane 差异：三个环境 seed cohort 两两交集均为 0，GPU/端口各自固定；因此不能断言跨 eval 的物理 scene 初始状态相同。保留的 `task_context.origin_mat` 分布也不同（eval0 `back/front/left/right=32/31/17/20`，eval1 `23/31/19/27`，eval2 `26/21/35/18`）。这些是可证事实，不构成对 100/73/61 差异的因果解释，不触发重跑、调参或阈值变化。
 
-按冻结顺序，GPU2 HF-fixed lane `c_hf_j_hf_fixed_put_back_trainseed0_evalseed2_100ep` 已以 outer PID `2851971` 启动，并登记为 MAM job `9895bcfd-1cea-4ee3-b54a-4f13536ced18`。它正在运行自身 strict matching smoke2，只有既有 identity/evidence/quiescence gate 通过后才进入 formal100；seed、阈值、runtime 和冻结输入均未改动。
+按冻结顺序，GPU2 HF-fixed lane `c_hf_j_hf_fixed_put_back_trainseed0_evalseed2_100ep` 已完成终态审计并归档 MAM job `9895bcfd-1cea-4ee3-b54a-4f13536ced18`；对应 event successor 也已在上方终态审计后归档。
 
 # 置顶：第一层 J put-back matched-baseline eval1 终态审计（2026-09-14）
 
@@ -53,7 +78,7 @@ C3 GPU1 的 `c_hf_j_matched_baseline_put_back_trainseed0_evalseed1_100ep` 已完
 
 同一 per-eval audit 使用实际 `validate_smoke_run()`、每集 `check_rolling_evidence(..., required=True)`，以及 source/checkpoint/manifest/scheduler/RNG、baseline 无 probe、normal query/queue/completed triplet、5 个 MP4 decode 和完整 102-process teardown 检查。它硬编码并核对 manifest SHA-256 `786aa7e9a8ce6df9f6f6ffeeb426110443400c3c7fe2d3380553dcd177350e5f` 与 matching-smoke config SHA-256 `e65b4f68c715a47c7f7d89c5b64e0b852e7182fb640abd9c8f82827731458add`；100 scheduler 都 exit 0，robot/policy 均为受控 `-15` shutdown，记录 PID 全部已退出。
 
-终态 receipt 为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_matched_baseline_put_back_evalseed1_terminal_audit_20260914.json`，SHA-256 `c7db28b8399a8138d77b78d11b47eb6b3a32ec7eacad7dd33009eddbb69034dd`，task-private state commit 为 `befeee3e0462696fef78052e388cb740a07ac9b8`。按冻结顺序，GPU1 HF-fixed lane `c_hf_j_hf_fixed_put_back_trainseed0_evalseed1_100ep` 已以 outer PID `2834611` 启动并登记为 MAM job `0283a094-b073-4a95-ba7c-be67cadbd924`；它将运行新的 strict matching smoke2，然后才可进入 formal100。eval2 保持未审计、未归档、未启动后继 lane。
+终态 receipt 为 `/mnt/public/xcj/Projects/state-vla/workspace/0acf5d43-91b6-4171-b727-e3fe0f7e7939/formal_first_layer_j_20260914/receipts/formal_matched_baseline_put_back_evalseed1_terminal_audit_20260914.json`，SHA-256 `c7db28b8399a8138d77b78d11b47eb6b3a32ec7eacad7dd33009eddbb69034dd`，task-private state commit 为 `befeee3e0462696fef78052e388cb740a07ac9b8`。GPU1 HF-fixed lane 已完成并归档 MAM job `0283a094-b073-4a95-ba7c-be67cadbd924`；其 event successor 也已在上方终态审计后归档。
 
 # 置顶：第一层 J put-back matched-baseline eval0 终态审计（2026-09-14）
 
