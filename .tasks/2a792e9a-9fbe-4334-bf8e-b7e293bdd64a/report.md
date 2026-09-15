@@ -102,4 +102,18 @@ max_attempts: 300
 
 N 使用当前图像和 14D robot state、无任务 memory；配置固定 pi05 base 新初始化、seed 0、batch 32、20k steps、H50/K30 metadata。S/J 的来源合同目前仅为草案，不能视为最终科学合同。
 
+press_button 的正式 N 训练命令已准备但未启动，需 Manager 验收本报告后执行：
+
+```bash
+CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda \
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.90 \
+OPENPI_DATA_HOME=/mnt/public/cache/openpi \
+env -u HF_LEROBOT_HOME PYTHONPATH=. \
+.venv/bin/python -u -B scripts/train.py pi05_rmbench_no_memory \
+  --checkpoint-base-dir=/mnt/public/xcj/Projects/openpi/checkpoints/press_button_n_formal_2bcf3a1_20260915 \
+  --exp-name=memory20k_2bcf3a1_press_button_n_s0 \
+  --num-train-steps=20000 --save-interval=20000 --log-interval=100 \
+  --seed=0 --batch-size=32 --no-wandb-enabled
+```
+
 在不启动训练的前提下，两个数据集各自完成时会依次提供：完整性审计、来源/标签合同、CPU norm stats、一次真实 CPU data/training-pipeline batch 和短 recovery/training candidate，供 Manager 验收后再决定是否准入训练。
