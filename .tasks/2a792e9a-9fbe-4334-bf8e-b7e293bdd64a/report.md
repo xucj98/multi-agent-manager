@@ -102,7 +102,7 @@ max_attempts: 300
 
 N 使用当前图像和 14D robot state、无任务 memory；配置固定 pi05 base 新初始化、seed 0、batch 32、20k steps、H50/K30 metadata。S/J 的来源合同目前仅为草案，不能视为最终科学合同。
 
-press_button 的正式 N 训练命令已准备但未启动，需 Manager 验收本报告后执行：
+Manager 已验收 smoke gate，press_button 的正式 N 训练已启动：
 
 ```bash
 CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda \
@@ -116,4 +116,11 @@ env -u HF_LEROBOT_HOME PYTHONPATH=. \
   --seed=0 --batch-size=32 --no-wandb-enabled
 ```
 
-在不启动训练的前提下，两个数据集各自完成时会依次提供：完整性审计、来源/标签合同、CPU norm stats、一次真实 CPU data/training-pipeline batch 和短 recovery/training candidate，供 Manager 验收后再决定是否准入训练。
+当前正式 run：MAM job `275739b6-d6f2-498c-a67f-1fc02beadca6`、PID `1760007`、GPU1；独立 root 为
+`/mnt/public/xcj/Projects/openpi/checkpoints/press_button_n_formal_2bcf3a1_20260915`，日志为
+`logs/memory20k_2bcf3a1_press_button_n_s0.train.log`。数据 loader 和 train state 已初始化，首个进度已到 step 14，GPU1 约 73.4 GiB、100% utilization。启动收据为
+`/mnt/public/xcj/Projects/openpi/checkpoints/press_button_n_formal_2bcf3a1_20260915/formal_start_receipt.json`。
+
+该长作业完成后将等待 checkpoint finalize，再执行 CPU checkpoint-only restore 并回传 A；在验收与回传完成前不删除本机结果。ranking job `0a3a2f9c-c590-4f17-9ff7-556b06baf1b0` 继续运行于 GPU3。
+
+ranking 数据集完成后仍需依次提供完整性审计、来源/标签合同、CPU norm stats、真实 CPU data/training-pipeline batch 和短 recovery candidate；正式 ranking 训练继续等待同样的 Manager 验收。
