@@ -5,3 +5,13 @@ Manager负责科学设计与最终裁决；本任务负责 press_button、blocks
 press_button依据可见目标数字及实际按压事件累计计数，不以已发命令替代物理事件；ranking只保留过去尝试与可观察反馈，不能把隐藏正确排序输入策略。
 N使用14D机器人state+当前图像，无任务memory，pi05_base新初始化、seed0、bs32、20k、H50/K30；J固定joint逐行状态、上一chunk末执行行反馈。提交确切schema草案（字段、可获得时刻、目标时间、初值/unknown编码、连续归一化、source路径）由Manager裁决，先实现通用采集/N转换及必要接口，不能自行把草案当最终科学合同。S共用同任务字段，连续接口不支持须明确实现缺口，禁止偷换表示。
 交付不是只读调研：发布可运行生成入口、实际smoke/生成进度、数据来源清单与下一步可执行命令；每个数据集就绪即发布，不等另一个任务。正式20k训练前提交数据完整性、来源/标签合同、CPU测试与短恢复候选供Manager验收，禁止未验收开正式训练。不要新增训练seed，不改论文主张，不接管HF工作。
+
+## 2026-09-20 Manager 追加：新任务 J/S schema 缺口审计
+
+在 `blocks_ranking_try N` smoke/正式训练进入稳定状态后，追加一份只读 schema 缺口清单，覆盖 `observe_and_pickup`、`swap_T`、`blocks_ranking_try`、`press_button`：
+
+- 列出 J/S 所需字段、字段的可获得时刻、监督目标时刻、初值/unknown 编码和连续归一化方式；
+- 核对现有 raw state/event/provenance/trace 是否足以无歧义重建这些字段；
+- 明确哪些字段已有证据、哪些字段缺失、哪些字段需要 Manager 决策；
+- 只做审计和建议，不自行冻结科学合同，不启动 J/S 正式训练，不修改已有 N 数据或评测结果；
+- 将结果写入 report 并发布，供 Manager 裁决后再安排实现。
