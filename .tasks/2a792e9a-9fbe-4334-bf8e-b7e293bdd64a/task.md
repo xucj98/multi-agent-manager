@@ -15,3 +15,12 @@ N使用14D机器人state+当前图像，无任务memory，pi05_base新初始化�
 - 明确哪些字段已有证据、哪些字段缺失、哪些字段需要 Manager 决策；
 - 只做审计和建议，不自行冻结科学合同，不启动 J/S 正式训练，不修改已有 N 数据或评测结果；
 - 将结果写入 report 并发布，供 Manager 裁决后再安排实现。
+
+## 2026-09-20 Manager 追加：并行启动 swap_T N
+
+`swap_T N` 已有 50 集原始数据、N LeRobot 转换、manifest、norm、CPU batch 和端到端 state/action 校验；其 J/S schema 仍未冻结。为利用 wuwen-1 空闲 GPU，允许在 `blocks_ranking_try N` 的 gate 不被破坏、资源不冲突的前提下，并行启动 `swap_T N` 的正式训练：
+
+- 仍使用既定 N 合同：pi05_base fresh、train seed0、batch32、20k steps、H50/K30、model-only BF16、无 task memory；不使用正式 eval seeds；
+- 启动前再次核对 swap_T N manifest/norm/CPU batch 和数据路径，使用 wuwen-1 空闲卡并登记真实 PID/MAM job；
+- 先短 smoke/recovery gate，再 formal20k；若 gate 或资源检查失败，保留证据并停止该 lane，不修改 J/S schema；
+- 不影响或终止 blocks_ranking_try N，不抢占本机或 C1 正在运行的评测。
