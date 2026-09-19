@@ -37,3 +37,27 @@ N使用14D机器人state+当前图像，无任务memory，pi05_base新初始化�
 统一规则：训练字段来自同一帧或过去帧可获得的 source/provenance；未来字段只能作为 J target，不能作为输入；S train 用 reference、infer 用 selected；J train 输出逐行未来字段并按已执行行反馈；所有新增字段必须在 sidecar 中记录 source path、available_at、target_at、unknown mask、normalization 和 hash。若某个字段无法从现有 trace 无歧义恢复，立即报告并将该字段降为 unknown，不得猜测。
 
 连夜目标（2026-09-20 04:30–10:30）：四个新增任务的 J 与 S 至少各启动一个经过 smoke/recovery gate 的正式 20k 训练；N 训练继续。每个长进程登记真实 PID/MAM job，使用 wuwen-1 空闲 GPU，不能影响已有 ranking N、swap_T N 或 C1 评测。若 8 条 lane 超过可用卡，先每任务启动 J 一条，再启动 S；不得因并发不足修改合同。
+
+## 2026-09-20 Manager 追加：视觉歧义与按压边沿计数审计（J/S 启动前置）
+
+在启动四个新增任务的 J/S 正式训练前，执行者必须先对 schema 做独立的可观测性审计，并把结果写入 report：
+
+### press_button 的强制审计
+
+不能只在按钮回弹高位时累计一次。环境在按钮 joint 低于阈值时记录按下边沿，并通过 reset/回弹高位解除 press flag；如果只采样高位计数，会把“已按下但尚未释放”“低位持续帧”“按压失败/未越过阈值”和“完整按压完成”混为一类，造成监督时刻错位，也可能因重复低位帧重复计数。
+
+以边沿状态而非单一完成计数表达进度。优先核验如下候选编码的语义和逐帧可重建性：
+
+- `00`：无已确认按下/释放的初始状态；
+- `01`：按下边沿已发生、释放边沿尚未发生；
+- `11`：第一次按压完成（按下+释放）；
+- `12`：下一次按下边沿已发生、尚未释放；
+- `22`：第二次按压完成。
+
+实际编码须扩展到任务所需次数，并明确每一位分别代表哪一个按钮/哪一种边沿；不能只写一个整数。审计必须逐帧对照 `physical_press_events`、button joint qpos 阈值、reset 事件和 HDF5 observation 帧，验证同一按压不会因低位持续帧重复计数，也不会在 chunk 边界丢失按下或释放边沿。若某个边沿只能在事后 provenance 得到、在线时刻不可得，必须标为 source-only，不能作为在线输入。
+
+### 四任务视觉歧义审计
+
+对 `observe_and_pickup` 的 identity、`swap_T` 的初始 pose/yaw、`blocks_ranking_try` 的 visible order/attempt feedback、`press_button` 的数字卡片与按钮状态，逐字段记录：首次可见帧、遮挡/相似外观风险、是否能由当前 observation 区分、是否只能由 source provenance 区分、unknown mask 和训练目标时刻。禁止把隐藏目标排序、最终正确次数、未来 terminal feedback 或评测初始条件作为在线输入。
+
+只有完成该审计并发布证据后，才可为对应任务启动 J/S 正式训练；审计不通过的任务可以继续 N，但必须暂停其 J/S lane 并报告具体歧义。
