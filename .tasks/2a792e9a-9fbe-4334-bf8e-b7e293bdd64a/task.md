@@ -24,3 +24,16 @@ N使用14D机器人state+当前图像，无任务memory，pi05_base新初始化�
 - 启动前再次核对 swap_T N manifest/norm/CPU batch 和数据路径，使用 wuwen-1 空闲卡并登记真实 PID/MAM job；
 - 先短 smoke/recovery gate，再 formal20k；若 gate 或资源检查失败，保留证据并停止该 lane，不修改 J/S schema；
 - 不影响或终止 blocks_ranking_try N，不抢占本机或 C1 正在运行的评测。
+
+## 2026-09-20 Manager 冻结：四个新增任务的最小 J/S schema 与连夜启动目标
+
+为满足九任务覆盖目标，Manager 冻结以下最小、可由现有 source/provenance 重建的字段；不得输入隐藏答案、目标排序或评测信息：
+
+- `observe_and_pickup`：`target_identity`（遮挡前首帧可见的 object model/id，categorical，未知值为 `unknown`）和 `phase`（`visible_target`、`occluded`、`pickup`，依据 wall/动作边界；无法可靠标注的帧为 unknown）。identity 只在 episode 首次可见时获得，之后作为缓存；S 使用 query-30 的参考字段，J 预测 query+1..horizon 的字段；N 不变。
+- `swap_T`：`red_initial_pose`、`blue_initial_pose`（episode 起始的环境坐标二维 xy+yaw，连续，xy 与 yaw 用固定 model normalization/xy_sincos；unknown 仅在起始观测不可用时使用）和 `phase`（`initial`、`first_placed`、`second_placed`、`completed`，依据已有动作/事件边界）。初始 pose 在 episode 首帧获得并缓存，不用未来目标 pose；S/J 分别按既有 serial lag30/full_t_plus_1 合同监督。
+- `blocks_ranking_try`：`attempt_count`（0–5 的已完成尝试计数，integer categorical/normalized scalar）和 `last_feedback`（`unknown`、`failure`、`success`，仅来自已经发生的物理按压/环境 terminal feedback）；保留 visible order 仅作 provenance，不输入隐藏 target ranking。S/J 不使用未来 terminal feedback，目标按 query-30/query+1 截断。
+- `press_button`：`phase`（`left_button_presses`、`middle_button_presses`、`confirm_button`、`completed`）、`left_press_count`、`middle_press_count`（0–9，按物理 joint threshold 事件累计）和 `confirm_pressed`（binary）；数字卡面值是初始可见事实，可作为 provenance/初始缓存，不把最终正确次数写入在线输入。S/J 按既有 lag30/full_t_plus_1 合同监督。
+
+统一规则：训练字段来自同一帧或过去帧可获得的 source/provenance；未来字段只能作为 J target，不能作为输入；S train 用 reference、infer 用 selected；J train 输出逐行未来字段并按已执行行反馈；所有新增字段必须在 sidecar 中记录 source path、available_at、target_at、unknown mask、normalization 和 hash。若某个字段无法从现有 trace 无歧义恢复，立即报告并将该字段降为 unknown，不得猜测。
+
+连夜目标（2026-09-20 04:30–10:30）：四个新增任务的 J 与 S 至少各启动一个经过 smoke/recovery gate 的正式 20k 训练；N 训练继续。每个长进程登记真实 PID/MAM job，使用 wuwen-1 空闲 GPU，不能影响已有 ranking N、swap_T N 或 C1 评测。若 8 条 lane 超过可用卡，先每任务启动 J 一条，再启动 S；不得因并发不足修改合同。
