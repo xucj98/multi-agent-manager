@@ -50,3 +50,16 @@ matching formal `c_wave1_swap_blocks_n_trainseed0_evalseed0_100ep_r3` 的独立 
 ```text
 workspace/f3488141-90fd-4d2c-8998-934614d1b098/transfer/c1_uv_cache_read_repair_20260915/full_overlay_validation_20260915/
 ```
+
+## 2026-09-20 live formal status
+
+C1 的 eval0 formal100 正在按已接受 matching smoke 运行，未启动 HF/V/机制实验：
+
+| lane | GPU/ports | MAM job/PID | accepted episodes | latest state |
+| --- | --- | --- | ---: | --- |
+| swap_blocks J, eval0 | GPU2 / 19420,19422 | `74f550ad-b8d7-4480-9cde-913cbe640ea5` / 2162806 | 约20/100 | running; preflight rejects are normal expert-seed rejections |
+| battery_try N, eval0 | GPU3 / 19430,19432 | `a98c0bc6-e386-4bb4-ad12-651e80407908` / 2189992 | 约9/100 | running; preflight rejects are normal expert-seed rejections |
+
+截至 2026-09-20 02:15 Asia/Shanghai，两个 formal 的 `episode_diagnostics.jsonl` 只含已完成 accepted episodes，scheduler 子进程均以 `episode_terminal`、returncode 0 退出；目前未发现 RPC、身份、renderer 或路径错误。每个 formal 都引用自身的 accepted `smoke2_r1`，保持单 policy server 跨 episode continuous action RNG、H50/K30、首 infer 90 秒与后续 30 秒。
+
+完成 100 个 accepted episode 后，将核对全部 diagnostics/video/processes/seed preflight、归档对应 MAM jobs，并发布 success/failure 汇总；在此之前不把 partial formal 当作完整结果，也不启动后续 eval0 lane。
