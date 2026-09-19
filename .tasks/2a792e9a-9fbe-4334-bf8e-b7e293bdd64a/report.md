@@ -1,126 +1,36 @@
 # press_button / blocks_ranking_try 数据与 N 接入进度
 
-## 已提交实现
+## 代码与来源合同
 
-- RMBench worktree：`/mnt/public/xcj/Projects/workspace/2a792e9a-9fbe-4334-bf8e-b7e293bdd64a/RMBench`
-  - `f4e84c0252dd777c9f066a401a0970ad4a274c76`：确定性 seed stream、保留 eval seed 拒绝、planning/replay append-only audit、成功 replay 校验、两任务来源记录和 S/J 来源合同草案。
-  - `74db6317bb4b690abc7b49258c5a2d402861f1f0`：修正物理 event 到 HDF5 observation 行的对齐；保存边界保留以供复查。
-- OpenPI worktree：`/mnt/public/xcj/Projects/workspace/2a792e9a-9fbe-4334-bf8e-b7e293bdd64a/openpi`
-  - `2bcf3a1551445d73777a959d5050872a4333f5af`：审计过的 N 转换器、`pi05_rmbench_no_memory` 配置、测试和 CPU norm-stat 入口。
+- RMBench worktree：`/mnt/public/xcj/Projects/workspace/2a792e9a-9fbe-4334-bf8e-b7e293bdd64a/RMBench`，当前提交 `74db6317bb4b690abc7b49258c5a2d402861f1f0`。
+- OpenPI worktree：`/mnt/public/xcj/Projects/workspace/2a792e9a-9fbe-4334-bf8e-b7e293bdd64a/openpi`，当前提交 `2bcf3a1551445d73777a959d5050872a4333f5af`。
+- 来源与标签合同草案：`RMBench/docs/press_button_blocks_ranking_source_contract_draft.zh-CN.md`。N 只使用当前图像、14D robot state 和 raw `q(t+1)` action；scene、事件、候选答案和 hidden ranking 不进入 N rows。S/J 字段、目标时间和连续表示仍由 Manager 裁决。
+- RMBench 编译检查和 OpenPI converter/config 测试已通过（OpenPI `12 passed`，`git diff --check` clean）。
 
-来源合同草案位于：
-`RMBench/docs/press_button_blocks_ranking_source_contract_draft.zh-CN.md`。
+## press_button：数据、转换和正式 N 已完成
 
-它将 `press_button` 的可见 card 数字与按 qpos 阈值确认的实际按压事件分开；ranking 仅允许可见 RGB/位置、过去尝试、物理按压和标为 `manager_confirmation_required` 的反馈。采样 permutation、正确排序和 block internal identity 不写入训练行或 provenance。
+canonical source：`RMBench/data/press_button/demo_clean_state/`。
 
-## press_button：50 条 canonical 原始数据、N 转换和 smoke 已验收
+- `metadata/acceptance_audit.json` 为 PASS：50 selected planning/replay episodes，seeds `410000..410049`，26,029 raw HDF5 observation rows，三路同步 RGB，physical press 均由 qpos threshold event 确认，保留评测 seed 区间不存在。
+- N LeRobot repo：`/mnt/public/xcj/cache/huggingface/lerobot/press_button_demo_clean_state_no_memory`。验收为 50 episodes、25,979 query rows、14D state/action、三路 RGB、memory absent、source scene labels 不复制到 rows。
+- norm stats：`/mnt/public/xcj/Projects/openpi/assets/pi05_rmbench_no_memory/press_button_demo_clean_state_no_memory/norm_stats.json`，sha256 `1690aec41ac1a07ff4ea6913463429c943cefb5df83ea23ce1c04e921128f9f0`。
+- 真实 CPU loader batch 证据：`RMBench/data/press_button/demo_clean_state/metadata/no_memory_cpu_loader_batch.json`，batch 32，state `[32,32]`，action `[32,50,32]`，三路 `[32,224,224,3]`，均 finite，key-state/memory fields absent。
+- 50-step N smoke 已通过：`/mnt/public/xcj/Projects/openpi/checkpoints/press_button_n_smoke_2bcf3a1_20260915/.../50`；50/50 optimizer steps finite，checkpoint-only CPU restore PASS。
+- 正式 N seed0、bs32、H50/K30、20k 已完成并 finalized：`/mnt/public/xcj/Projects/openpi/checkpoints/press_button_n_formal_2bcf3a1_20260915/pi05_rmbench_no_memory/memory20k_2bcf3a1_press_button_n_s0/20000`。CPU restore 证据 `.../checkpoint-transfer-20260920/press_cpu_restore.json`：51 leaves、3,353,433,872 elements、BF16、finite、shape complete、source reads rejected。MAM job `275739b6-d6f2-498c-a67f-1fc02beadca6` 已归档。
 
-canonical source：
+## blocks_ranking_try：canonical 数据审计 PASS，N 转换仍在运行
 
-```text
-RMBench/data/press_button/demo_clean_state/
-```
+canonical source：`RMBench/data/blocks_ranking_try/demo_clean_state/`。
 
-正式生成 job `b45e86f0-7de1-4647-a5d0-71eeaa73bd7c` 已在通过验收后归档。验收结果写入：
+- 独立审计证据：`/mnt/public/xcj/Projects/workspace/2a792e9a-9fbe-4334-bf8e-b7e293bdd64a/checkpoint-transfer-20260920/blocks_ranking_dataset_audit.json`，状态 PASS。
+- 50 planning successes、50 successful replays；deterministic seed stream `420000..420049`，68,083 raw HDF5 rows，186 physical button events，186 terminal feedback events；reserved eval seed absent；`hidden_permutation_or_target_ranking: not_recorded`。
+- N conversion 已在 `wuwen-1` CPU 启动，MAM job `8c8cebda-18ba-4b0a-a4a9-033ef598a327`，PID `2987214`，命令使用 `convert_rmbench_no_memory_to_lerobot.py --episode-count 50`，目标 repo `blocks_ranking_try_demo_clean_state_no_memory`。截至本报告更新，进程仍运行、manifest 尚未写完；不得读取中间目录作为完成数据，也未启动 ranking 正式训练。
 
-```text
-RMBench/data/press_button/demo_clean_state/metadata/acceptance_audit.json
-```
+## 转换完成后的受控步骤
 
-证据：
+1. 确认 conversion 进程退出且 `meta/rmbench_no_memory/conversion_manifest.json` 完整，回读 50 episodes、每集 state/action 与 source HDF5 对齐、三路 RGB 解码、memory absent 和 provenance 不进 rows。
+2. 按 `examples/rmbench/README.md` 用 CPU 生成 ranking norm stats，并运行真实 CPU batch/data-loader gate（batch 32、H50、model action dim 32、无 memory fields）。
+3. 通过 gate 后，仅在 `wuwen-1` 空闲单卡做 50-step N smoke；保存 receipt、loss/grad finite 和 checkpoint-only recovery 证据。
+4. smoke 通过后才可启动 ranking N seed0、bs32、H50/K30、20k；启动前登记新的 MAM job，保存独立 formal root、日志和启动收据。
 
-- 恰有 50 条 selected planning trajectories 和 50 条成功 replay。
-- training seeds 恰为 `410000..410049`，未使用任一保留 eval seed。
-- 50 个 HDF5，合计 26,029 个 observation rows；每条均为 `[rows,14]` joint vector 和同步的 head/left/right RGB。
-- 所有 physical press 都由 qpos threshold event 确认，event 的 `frame` 有效，`control_frame_boundary == frame + 1`。
-- 可见 card digits、physical events、micro-stage 与离线最终状态均与来源合同一致，未使用隐藏任务数据。
-
-完整转换已经完成。CPU 转换 job
-`4f4aa392-7ceb-4d5f-9b72-db78c3160c85` 已归档（正常完成后的进程消失）：
-
-```text
-source: RMBench/data/press_button/demo_clean_state/
-destination: /root/.cache/huggingface/lerobot/press_button_demo_clean_state_no_memory
-log: RMBench/data/press_button/demo_clean_state/metadata/convert_no_memory.stdout.log
-pid: RMBench/data/press_button/demo_clean_state/metadata/convert_no_memory.pid
-```
-
-该进程为 CPU-only，`HF_LEROBOT_HOME` 未设置、`CUDA_VISIBLE_DEVICES=`。转换器只写 current 14D state、`q(t+1)` 14D action、当前三路 RGB 与确定性 `seen` prompt；不写 memory 或 scene labels。
-
-转换后的全量回读结果：50 episodes、50 Parquet、25,979 rows（26,029 个 source observation rows 减去每集最后一行 target 缺失）、50 个 source hashes/seeds；逐集核验 `observation.state == source q(t)[:14]`、`action == source q(t+1)[:14]`、三路 RGB 同步、14D state/action，manifest 为 `memory: absent` 且 `source_scene_labels_copied_to_rows: false`。job archive note 保留了同一核验结论。
-
-CPU norm stats 已生成：
-
-```text
-/mnt/public/xcj/Projects/openpi/assets/pi05_rmbench_no_memory/press_button_demo_clean_state_no_memory/norm_stats.json
-sha256=1690aec41ac1a07ff4ea6913463429c943cefb5df83ea23ce1c04e921128f9f0
-```
-
-真实 CPU JAX data-loader batch 也已通过，证据为
-`RMBench/data/press_button/demo_clean_state/metadata/no_memory_cpu_loader_batch.json`：CPU backend、batch 32，state `[32,32]`（14D state 加 18D zero padding），action `[32,50,32]`，三路图像均 `[32,224,224,3]`，prompt `[32,200]`，值均 finite；`memory_config`、`memory_bindings` 和 key-state input/target 均 absent。该证据 sha256 为 `46e12b832787692709310e85d3517969626f1949c7c01994ee5b451826b9222c`。
-
-按 Manager 验收前置要求，已在 GPU1 完成 N seed0 的 50-step 短 smoke（没有启动正式 20k）：
-
-```text
-root: /mnt/public/xcj/Projects/openpi/checkpoints/press_button_n_smoke_2bcf3a1_20260915
-run:  pi05_rmbench_no_memory/smoke50_2bcf3a1_press_button_n_s0/50
-receipt: /mnt/public/xcj/Projects/openpi/checkpoints/press_button_n_smoke_2bcf3a1_20260915/press_button_n_smoke50_receipt.json
-```
-
-50/50 optimizer steps 的 loss、grad norm 和参数 norm 均为 finite；首步 loss `0.2856`，末步 loss `0.0329`，末步 grad norm `0.2516`。checkpoint 已正常 finalize，包含 `params`、`assets`、`metadata` 且没有 `train_state`。CPU checkpoint-only restore 通过（51 leaves、3,353,433,872 elements、全 BF16、全 finite、shape 完整，且拒绝读取训练 source），日志及 receipt 均在上述 smoke root 中。
-
-## blocks_ranking_try：formal 采集仍在运行
-
-MAM job `0a3a2f9c-c590-4f17-9ff7-556b06baf1b0` 正在 GPU3 运行：
-
-```text
-RMBench/data/blocks_ranking_try/demo_clean_state/
-seed stream: 420000 + attempt_index
-max_attempts: 300
-```
-
-此前两条 smoke 已通过：seed `420000` 和 `420001` 均为成功 replay，HDF5 分别 555 / 2,431 rows；可见 provenance、物理 event 和 terminal feedback 均可审计，且 `hidden_permutation_or_target_ranking: not_recorded`。
-
-最新状态（截至本报告更新）：formal audit 已完成 50 个 selected planning trajectory；已完成 32 个成功 replay，episode 32 的 replay 正在运行（job PID `1550791`，GPU3）。正式 50 个 replay 全部结束前，不宣称 ranking dataset 就绪；因此尚未进行 ranking 的转换、norm stats 或 data-loader 验证。结束后仍需对所有 50 条做同等级的 row/event/provenance/leakage audit，再独立转换为 N 数据并验证。
-
-## 已完成验证
-
-- RMBench：`PYTHONPATH=. .venv/bin/python -m py_compile script/collect_data.py envs/_base_task.py envs/press_button.py envs/blocks_ranking_try.py` 和 `git diff --check` 通过。
-- event 对齐回归：control boundary `0, 1, 65, 629` 分别映射 HDF5 行 `0, 0, 64, 628`。
-- OpenPI：
-
-  ```bash
-  PYTHONPATH=. .venv/bin/python -m pytest -q \
-    src/openpi/training/config_test.py \
-    examples/rmbench/test_convert_rmbench_no_memory_to_lerobot.py
-  ```
-
-  结果为 `12 passed`。
-- post-commit press smoke 已回读为 2 episodes / 1,155 rows / 14D state-action / 三路 `(3,480,640)` RGB，manifest 为 `memory: absent` 和 `source_scene_labels_copied_to_rows: false`；其 CPU-only norm stats 已成功。
-
-## 等待 Manager 的科学裁决与后续受控步骤
-
-N 使用当前图像和 14D robot state、无任务 memory；配置固定 pi05 base 新初始化、seed 0、batch 32、20k steps、H50/K30 metadata。S/J 的来源合同目前仅为草案，不能视为最终科学合同。
-
-Manager 已验收 smoke gate，press_button 的正式 N 训练已启动：
-
-```bash
-CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda \
-XLA_PYTHON_CLIENT_MEM_FRACTION=0.90 \
-OPENPI_DATA_HOME=/mnt/public/cache/openpi \
-env -u HF_LEROBOT_HOME PYTHONPATH=. \
-.venv/bin/python -u -B scripts/train.py pi05_rmbench_no_memory \
-  --checkpoint-base-dir=/mnt/public/xcj/Projects/openpi/checkpoints/press_button_n_formal_2bcf3a1_20260915 \
-  --exp-name=memory20k_2bcf3a1_press_button_n_s0 \
-  --num-train-steps=20000 --save-interval=20000 --log-interval=100 \
-  --seed=0 --batch-size=32 --no-wandb-enabled
-```
-
-当前正式 run：MAM job `275739b6-d6f2-498c-a67f-1fc02beadca6`、PID `1760007`、GPU1；独立 root 为
-`/mnt/public/xcj/Projects/openpi/checkpoints/press_button_n_formal_2bcf3a1_20260915`，日志为
-`logs/memory20k_2bcf3a1_press_button_n_s0.train.log`。数据 loader 和 train state 已初始化，首个进度已到 step 14，GPU1 约 73.4 GiB、100% utilization。启动收据为
-`/mnt/public/xcj/Projects/openpi/checkpoints/press_button_n_formal_2bcf3a1_20260915/formal_start_receipt.json`。
-
-该长作业完成后将等待 checkpoint finalize，再执行 CPU checkpoint-only restore 并回传 A；在验收与回传完成前不删除本机结果。ranking job `0a3a2f9c-c590-4f17-9ff7-556b06baf1b0` 继续运行于 GPU3。
-
-ranking 数据集完成后仍需依次提供完整性审计、来源/标签合同、CPU norm stats、真实 CPU data/training-pipeline batch 和短 recovery candidate；正式 ranking 训练继续等待同样的 Manager 验收。
+当前没有新增训练 seed、没有把 hidden ranking 注入策略，也没有启动 blocks 正式训练。
