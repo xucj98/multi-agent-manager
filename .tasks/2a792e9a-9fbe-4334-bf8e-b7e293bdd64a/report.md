@@ -21,7 +21,7 @@
 
 ### press_button 边沿编码
 
-要求的每个按钮采用 `(released_count, pressed_count)` 作为有序 pair：`00 → 01 → 11 → 12 → 22` 分别表示初始、第一次低位按下、第一次回弹完成、第二次低位按下、第二次回弹完成。left/middle/confirm 各自独立维护该 pair；count 范围 0–9，另有显式 unknown mask。
+要求的每个按钮采用 `(released_count, pressed_count)` 作为有序 pair：`00 → 01 → 11 → 12 → 22` 分别表示初始、第一次低位按下、第一次回弹完成、第二次低位按下、第二次回弹完成。明确记作 `L=(left_release_edges,left_press_edges)`、`M=(middle_release_edges,middle_press_edges)`、`C=(confirm_release_edges,confirm_press_edges)`：每个 pair 的第一位是已确认回弹/reset 边沿数，第二位是已确认 `qpos < -0.005` 按下边沿数。三个 pair 各自独立，count 范围 0–9，另有显式 unknown mask。
 
 本 source 只保存低位 threshold event（`qpos < -0.005`）和 `press_count_after`，没有 `qpos > -0.001` reset 的逐帧 trace。left/middle 的 source-code reset 位于 press boundary 后 10 或 11 帧的 micro-stage end，confirm 没有后续 release trace。因此目前只能离线标出 press edge；`01→11` 等 release transition 必须是 unknown/source-only，不能将 `event_derived_final_state` 或最终正确次数作为在线输入。
 
