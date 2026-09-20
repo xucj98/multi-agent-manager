@@ -42,6 +42,8 @@
 
 本次核对时已稳定越过 step 5,100。此前转换、norm、CPU loader、50-step smoke retry 和 checkpoint-only CPU restore 均已通过。
 
+已完成的 canonical demo producer job `0a3a2f9c-c590-4f17-9ff7-556b06baf1b0` 与 conversion/gate job `8c8cebda-18ba-4b0a-a4a9-033ef598a327` 已收尾归档；只有 formal N job 保持运行。
+
 ### swap_T N
 
 重新核对的 N source 是历史目录名 `swap_T_demo_clean_state_shared_memory`，但 config `pi05_rmbench_swap_T_no_memory` 的 memory fields 为空，LeRobot rows 只有 RGB、14D robot state 和 action；它不是 J/S 数据。manifest SHA-256 为 `8afc1a90fb140cb159a58d6ea7d232dcae0c6a4b76acdc3470878024bbd79e25`，norm SHA-256 为 `9a249ce79bc5f3b744ff666578f79893ac1f8d6b680fa5f378d14b4d4e0c96be`。
