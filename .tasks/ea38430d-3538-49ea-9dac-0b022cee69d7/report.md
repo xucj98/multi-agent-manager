@@ -67,15 +67,15 @@ HF result leaf 命名和原始证据：
 - eval0 fixed：right/front 为 `(fail,500)`，back/left 为 `(success,422/343)`；
 - eval0 event：四 cluster 均成功，长度为 `323/359/361/382`。
 
-eval1/2 同样各为四 cluster；所有 mode 在对应 eval 的 cluster 计数相同。因而 300 episode 行实际上最多 12 个 cluster-level 初始条件，普通独立 Bernoulli 置信区间、按 300 集强调显著性或把每集当独立重复都不成立。Manager 的 pairs 表（如 fixed vs baseline `48/51`、event vs baseline `66/23`）可作为逐 seed 行迁移描述，但应同时报告 cluster 结构，不能用作独立样本因果证据。
+eval1/2 同样各为四 cluster；所有 mode 在对应 eval 的 cluster 计数相同。这只能说明每个 eval 有四个已观察到的 `origin_mat` 行为分组，且组内 outcome/length 有重复；首动作、结果和步数的重复并不证明完整 RGB、物理初态或全轨迹只有四类，也不能据此计算有效独立样本量或推出最多 12 个独立初始条件。普通独立 Bernoulli 置信区间和按 300 集强调显著性不应直接套用，应考虑组内依赖并报告分组敏感性。Manager 的 pairs 表（如 fixed vs baseline `48/51`、event vs baseline `66/23`）可作为逐 seed 行迁移描述，但不能用作独立样本因果证据。
 
 进一步的 `manager_hf_preflight_comparison.json` 显示 HF 同一 task/eval 各臂 `origin_mat` 和 `initial_block_pose` **100/100 完全相同**；跨臂差异集中在 provenance 的 `final_block_pose`（末态）。因此不能把 HF preflight 差异解释为初始场景重新随机化。`manager_hf_first_actions.json` 的首动作比较还显示：eval0 event 与 baseline 的 first 30 actions 相同 100/100，但 fixed 与 baseline 全部不同；eval1/2 各模式首动作均有差异（最大绝对差约 0.0035–0.00524）。这支持先审计 action/RNG/协议差异，再谨慎解释成功率，不把结果直接归因于 probe 看到的新状态。
 
 ## 已验收与待验收边界
 
-已具备最强原始证据的是：四个 wave1 eval0 leaf 的 terminal/seed/summary 复算；HF 18 leaf 的 outcome/seed/preflight/rolling 文件存在性与计数；9 月 14–15 日已有独立 reviewer 报告的 rearrange matched baseline、rearrange fixed、put-back HF-event 等 formal 证据。相关 reviewer reports 包括 `.tasks/8274a212-a7de-42af-8b6d-e5cd2670f3d2/report.md`、`.tasks/93858e54-40e7-4e1a-ab86-ccf9039ab86f/report.md` 与 `.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/report.md`。
+已具备最强原始证据的是：四个 wave1 eval0 leaf 的 terminal/seed/summary 复算；HF 18 leaf 的 outcome/seed/preflight/rolling 文件存在性与计数；9 月 14–15 日已有独立 reviewer 报告的 rearrange matched baseline 与 rearrange fixed formal 证据。相关独立 reviewer reports 包括 `.tasks/8274a212-a7de-42af-8b6d-e5cd2670f3d2/report.md` 与 `.tasks/93858e54-40e7-4e1a-ab86-ccf9039ab86f/report.md`。put-back HF-event 的 `.tasks/0acf5d43-91b6-4171-b727-e3fe0f7e7939/report.md` 是 owner 终态审计/验收材料，不是独立 review；本报告也没有完成全部 source/video/rolling 的独立终验。
 
-本任务没有重新解码全部 MP4、没有重哈希多 GB checkpoint params/assets、没有修改共享论文或结果、没有启动新任务。wave1 的 battery/swap owner 报告仍可能保留历史“运行中”快照；终态判断应继续以各 leaf 的 JSON/summary 和后续独立验收为准。新任务 `observe_and_pickup`、`swap_T`、`press_button`、`blocks_ranking_try` 的 J/S schema 审计在 `.tasks/2a792e9a-9f43-4bf4-bf8e-b7e293bdd64a/report.md` 中明确为 BLOCKED；该任务的 N checkpoint/训练状态不应被误报为 J/S 已可评。
+本任务没有重新解码全部 MP4、没有重哈希多 GB checkpoint params/assets、没有修改共享论文或结果、没有启动新任务。wave1 的 battery/swap owner 报告仍可能保留历史“运行中”快照；终态判断应继续以各 leaf 的 JSON/summary 和后续独立验收为准。新任务 `observe_and_pickup`、`swap_T`、`press_button`、`blocks_ranking_try` 的 J/S schema 审计在 `.tasks/2a792e9a-9fbe-4334-bf8e-b7e293bdd64a/report.md` 中明确为 BLOCKED；该任务的 N checkpoint/训练状态不应被误报为 J/S 已可评。
 
 ## 建议给 Manager
 
