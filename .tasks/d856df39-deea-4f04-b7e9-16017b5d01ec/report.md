@@ -18,7 +18,7 @@
 ## eval记录
 
 - 审计开始时A侧`memory_chunk_20260910`仅有30个名称含`100ep`的目录，未包含当前进展引用的全部C侧canonical原件。
-- 当前计划记录的46批为：原协议28批加HF独立协议18批。缺少A侧原始目录的40个completed/100结果已确认在C侧，Manager已登记MAM传输job `6d2940d1-0e0f-4735-a32f-6055529c51ee`回传A；完成后需重新核对summary和目录数。
+- 当前计划记录的46批为：原协议28批加HF独立协议18批。A侧原缺少40个canonical目录，现已由C回传；逐目录summary均为`completed/100/error=null`，源/目标文件数与总字节数40/40一致。加上原有6个canonical eval0，A侧当前46/46计划批次原始目录自包含。
 - A侧未发现额外计划内完成批次；PROJECT_PROGRESS的成功数与已知终态一致。
 
 ## workspace
@@ -38,10 +38,9 @@
 
 ## 已执行清理
 
-Manager删除了明确被正式20k替代且无活跃PID的A侧中间目录：battery、blocks-ranking、press-button、swap_T、wave1 N/J/S的smoke，observe候选失败目录，swap_T失败formal/lock，以及V单/双卡OOM profile。按清理前目录表合计约55GB以上；未删除任何正式20k checkpoint。
+Manager删除了明确被正式20k替代且无活跃PID的A侧中间目录：battery、blocks-ranking、press-button、swap_T、wave1 N/J/S的smoke，observe候选失败目录，swap_T失败formal/lock，以及V单/双卡OOM profile。按清理前目录表合计约55GB以上；未删除任何正式20k checkpoint。结果侧另删除4个smoke/诊断目录和4个summary为failed的历史目录，约0.08GB；删除后46/46 canonical计划结果再次通过门禁。
 
 ## 剩余阻塞
 
 1. `swap_T.N`和`blocks_ranking_try.N`的两个stopped MAM job需在第4项归档，随后可将训练状态升级为accepted。
-2. C结果回传完成前，A侧不是自包含的当前计划结果存档。
-3. V两个pending任务和约32G A workspace已不在当前主计划，应在第4项归档任务后物理清理。
+2. V两个pending任务和约32G A workspace已不在当前主计划，应在第4项归档任务后物理清理。
