@@ -1,3 +1,13 @@
+## 2026-09-21 新Manager收尾裁决（当前有效）
+
+状态：训练已完成且已恢复；待报告/证据归档同步。
+
+发布report仍停留在20k在训，已过时。MAM job bf02cc2d于9月19日归档，记录20k完成、回传、CPU恢复PASS、B副本删除。Manager已核对A正式20000目录及f0011538/checkpoint-transfer-20260920/battery_cpu_restore_final.json：step20000、56 leaves、3353450260 elements、全部BF16/finite/shape complete、source_reads_rejected=true。无需重训或重做已存在的全参数恢复；不声称本轮重新GPU恢复。保存transfer-staging中的唯一收据和worktree证据后可归档，后续评测属于覆盖队列。
+
+本轮依据用户要求先交接并讨论计划，未启动新的训练/评测；不把无job自动解释为科学验收完成。
+
+---
+
 # 补 battery S seed0
 先读AGENTS.md、涉及库指南、源任务e3bc64f1-7f0d-46d2-9e54-831aa1727384最终报告。基于冻结J/S源34002dce65962734c59725a0f6d982ae2c438a2d独立worktree，核实battery serial config是否已有，缺失则以同源swap/cover S模式做最小接入。
 科学合同由Manager固定：与已经验收的battery J共享原50条demo_clean_state、phase-only字段/编码/current_truth及availability_at_row，不新增试错集合字段；S serial_token lag30，seed0，bs32，20k，H50/K30，pi05_base独立初始化，BF16 model-only，恢复不依赖训练source。保留phase-only不表达完整试错历史的限制，不能据此改标签。
