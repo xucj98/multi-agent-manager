@@ -1,3 +1,9 @@
+## 2026-09-21 Manager最终验收（审计结束）
+
+已审阅报告451aed36，接受纠正后的算术与有限证据判断；其残留的结果去重建议、event固定K30等措辞不采纳。完整裁决：/root/Documents/task-state-vla-paper/docs/reviews/20260921-handoff-manager-adjudication.zh-CN.md。不授权新实验，不改变正式episode分母。准备归档本只读审计。
+
+---
+
 # 管理交接审计（2026-09-21）
 用户要求先理解论文与当前实验，和用户梳理后再推进后续。模型固定 GPT 5.6-terra，reasoning max。
 先读 MAM AGENTS/README 核心与任务管理/.local/README，再 mam task show 本 959d76e3-aa68-4e74-af29-33e9a21b24e3。创建自己的 RMBench worktree：mam workspace add 959d76e3-aa68-4e74-af29-33e9a21b24e3 --repo RMBench --base HEAD；阅读 AGENTS 及实验规范。仅只读审计旧任务、结果、模型、远端状态，不启动训练/评测，不终止进程、不删除文件、不改旧任务或共享论文。报告写自己 .tasks/959d76e3-aa68-4e74-af29-33e9a21b24e3/report.md 并 mam task publish --file report，支持资料写自己的 workspace。可通过 SSH 只读访问集群，但先读 .local 对应集群说明。避免递归遍历巨型模型/视频目录，优先最新 report 与 JSON/日志定位。
