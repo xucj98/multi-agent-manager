@@ -1,3 +1,13 @@
+## 2026-09-21 新Manager收尾裁决（当前有效）
+
+状态：交付事实已核验；保留工作区待证据迁移与schema裁决。
+
+observe N 20k与CPU恢复PASS已核验；swap-T N的数据/转换交付已完成，正式训练由2a792e9a接续。原7 jobs均归档。workspace/checkpoint-transfer-20260920保存observe/battery/press恢复证据，RMBench数据与代码仍用于后续S/J，不直接删除workspace。下一步是先迁移稳定证据并核对依赖，再完成任务归档。四任务S/J新执行合同待与用户讨论后另行发布。
+
+本轮依据用户要求先交接并讨论计划，未启动新的训练/评测；不把无job自动解释为科学验收完成。
+
+---
+
 # 九任务优先补齐执行合同
 Manager负责科学设计与最终裁决；本任务负责 observe_and_pickup、swap_T 的数据与工程实现。先读AGENTS.md、涉及仓库AGENTS.md，以及论文docs/EXPERIMENT_PLAN.zh-CN.md、ASSET_AUDIT.zh-CN.md（旧缺口必须实查）。创建独立worktree，禁止修改既有运行树。
 立即检查现有可复用资产与生成入口；缺少demo_clean_state时执行必要代码适配、短smoke，然后生成每任务50条成功且完整的训练示范。固定确定性生成seed序列并保存所有尝试/失败/筛选记录；不得用正式eval种子100000..100099、200000..200099、300000..300099做训练数据。遵循benchmark原demo生成成功筛选规则，不改环境成功判据。原始轨迹须保存足够状态/事件/动作与来源，以便之后定义标签；生成时不要将未来/隐藏答案注入在线策略。
