@@ -4,6 +4,8 @@
 
 MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job` 和可选的 `mam wait`，并自动唤醒需要处理后续工作的负责人。本集群的信息查看[本地说明](.local/README.md)，所有 `mam` 命令以及 agent 均在本机运行。
 
+每个 MAM 项目实例的任务状态和唤醒服务都保存在自己的 `MAM_ROOT/.local`；不同的 `PROJECT_ROOT`/`MAM_ROOT` 可以并行运行，互不复用任务、workspace 或 service 状态。
+
 使用细节可用 `mam --help` 查询，语法中的大写词需要替换为实际值，方括号表示可选参数。
 
 MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 由 codex 生成，标识执行 agent。
@@ -40,6 +42,7 @@ mam task archive TASK-ID --note NOTE
 ```
 
 - `create` 返回 `TASK-ID`；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求；然后发布任务。
+- `archive` 要求该任务的所有 job 已归档；归档时移除已登记的 worktree、任务分支和 `workspace/TASK-ID`，但保留 `.tasks/TASK-ID` 的任务、简报和历史登记。
 - 使用 codex 工具创建 subagent，要求其查看 `AGENTS.md` 并使用 `mam task show TASK-ID` 查看任务；获取 `AGENT-ID`，绑定执行 agent。
 - 需要交接已有任务时，Manager 先让旧执行者和新执行者结束当前 turn；新执行者可先只读查看已发布内容，再用 `rebind` 接续原 `TASK-ID`、workspace、worktree 和 job。不要为交接后的 agent 再次运行 `workspace add`。
 - 途中追加要求时，先更新 `task.md` 并发布，再通知执行者读取新版本。
@@ -75,7 +78,7 @@ mam workspace add TASK-ID --repo REPO --base COMMIT
 mam task publish TASK-ID --file report
 ```
 
-交付后清理临时文件，保留 worktree 供 Manager 验收、归档。
+交付后清理临时文件，保留 worktree 供 Manager 验收；验收完成后使用 `mam task archive` 清理 worktree、任务分支和 workspace。
 
 ## 进程管理
 
