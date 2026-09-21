@@ -5,3 +5,11 @@
 
 ## 范围：最新实验结果
 审阅 RMBench experiments/memory_chunk_20260910 与 eval_result 最新正式实验，MAM 0acf5d43、f3488141 reports、其他最新已归档HF评测/验收任务，及论文 docs/analysis。重点找9月15日之后的新数据：两任务HF baseline/fixed/event 三eval，swap/battery/cover最新N/S/J，原协议52批之后增量。原始诊断直接复算每批完成数、成功数、seed身份，列accepted与待验收候选，不把smoke算入。对HF尽可能做按初始seed配对差异、trigger覆盖、成本可得性。只读远端C1/C2/C3定位本地尚未回传结果。产出紧凑结果表和最强/最弱证据。
+
+## 2026-09-21 Manager报告精确性修订
+
+本轮不新增审计扫描。请依据现有证据修订report后发布：
+1. 删除“300行最多12个cluster-level初始条件”的过强结论。origin只有4类别且首动作/结果/步数重复，不证明完整RGB/物理初态/全轨迹仅4种；写为每eval四个已观察行为分组，须考虑组内依赖，不能由此算有效独立样本量。
+2. 修正错误TASK-ID `2a792e9a-9f43-4bf4-bf8e-b7e293bdd64a` 为 `2a792e9a-9fbe-4334-bf8e-b7e293bdd64a`。
+3. 0acf5d43的put-back HF-event是owner终态审计，不是独立review；分清证据层级。不得宣称本次完成全部source/video/rolling独立终验。
+4. 报告修订完成后结束turn，不启动新工作。
