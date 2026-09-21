@@ -18,7 +18,7 @@ B 侧 `openpi/checkpoints` 顶层只有 7 个目录：battery S formal/smoke、o
 | setting | B 侧状态（相对路径） | A 侧核对 | 结论 |
 | --- | --- | --- | --- |
 | `battery_try.S.t0` | `battery_s_formal20k_34002dce_nocmdbuf_20260914T120610Z`；step 20,000。模型删除后保留约 922K 的 log/validation；删除收据 `validation/model_deletion_receipt_20260920.json`：`deleted_verified`，删除前 43 文件/5,258,067,697 bytes。 | A 有同名正式 checkpoint；`_CHECKPOINT_METADATA` 386 bytes，SHA-256 `6a5beb...e318`，与 B 收据一致。A CPU restore PASS：56 leaves、6,706,900,520 BF16 bytes、finite/shape complete。 | **已回传、已验证、B 模型已删除**；B 只保留审计记录。 |
-| `observe_and_pickup.N.t0` | `observe_and_pickup_n_b_formal20k_ec86d857_20260914T162824Z`；step 20,000。模型删除后保留约 920K 的 log/validation；收据 `deleted_verified`，删除前 258 文件/5,261,987,027 bytes。 | A 有同名正式 checkpoint；`_CHECKPOINT_METADATA` 386 bytes，SHA-256 `2e7e3b...e9e8`，与 B 收据一致。A CPU restore PASS：51 leaves、6,706,867,744 BF16 bytes、finite/shape complete。A/B transfer receipt 记录 `zx-data -> wuwen-nx-aic -> A`。 | **已回传、已验证、B 模型已删除**；B 只保留审计记录。 |
+| `observe_and_pickup.N.t0` | `observe_and_pickup_n_b_formal20k_ec86d857_20260914T162824Z`；step 20,000。模型删除后保留约 920K 的 log/validation；收据 `deleted_verified`，删除前 258 文件/5,261,987,027 bytes。 | A 有同名正式 checkpoint；`_CHECKPOINT_METADATA` 386 bytes，SHA-256 `2e7e3b...e9e8`，与 B 收据一致。A CPU restore PASS：51 leaves、6,706,867,744 BF16 bytes、finite/shape complete。A 侧 `checkpoint-transfer-20260920/observe-command.txt` 记录 source `zx-data`（B via `wuwen-nx-aic`）到 A。 | **已回传、已验证、B 模型已删除**；B 只保留审计记录。 |
 | 其它九任务 N/S/J | B 正式 checkpoint 根未发现对应目录。 | A 侧有既有 wave1/legacy N/S/J；`swap_T.N`、`blocks_ranking_try.N`、`press_button.N` 也有 A 侧目录。 | 这些是 A 侧资产或尚未在 B 训练；不能把它们记为 B 回传。 |
 
 关键文件大小核对仅针对 metadata、日志和收据；未对参数树做全量 hash。A 侧正式目录仍完整存在，B 侧两份正式模型不存在是有收据的验证删除，不是传输失败。
@@ -38,10 +38,10 @@ B 侧 `openpi/checkpoints` 顶层只有 7 个目录：battery S formal/smoke、o
 
 ## B 独有资产、失败/缓存与清理候选
 
-- `battery_s_smoke_34002dce_nocmdbuf_20260914T120610Z`：约 4.9G，step 50；CPU full restore 和 GPU policy restore 均 PASS。A 侧没有同名完整 smoke 模型（仅有另一时间戳的精简记录），因此当前视为 B-only。可在保留 validation receipt/归档包、确认无 eval 依赖后清理。
-- `observe_and_pickup_n_b_smoke_ec86d857_20260914T162824Z`：约 27K，首因是 multiprocessing spawn 导致 CUDA OOM，`checkpoint_step=none`；保留失败 receipt 后可候选清理。
-- `observe_and_pickup_n_b_smoke_ec86d857_retry1_20260914T165414Z`：约 5.0G，step 50，CPU restore PASS；A 侧无同名完整 smoke 模型。可在保留 receipt、确认 formal 不再引用后清理。
-- `fa928.../deployment` 约 5.6M：v3-v7 控制包、v5/v6 失败 probe、v7 最终 launcher/receipt 和多个 tar.gz。只可在保留 v7 与失败原因的 MAM retained evidence、确认无 active dependency 后清理旧版本；本审计未删除。
+- `battery_s_smoke_34002dce_nocmdbuf_20260914T120610Z`：约 4.9G，step 50；CPU full restore 和 GPU policy restore 均 PASS。A 侧没有同名完整 smoke 模型（仅有另一时间戳的精简记录），因此当前视为 B-only；没有已证明的 A 接收位置，按规则当前保留。只有建立 A 侧归档/证据位置并确认无 eval 依赖后，才可列候选。
+- `observe_and_pickup_n_b_smoke_ec86d857_20260914T162824Z`：约 27K，首因是 multiprocessing spawn 导致 CUDA OOM，`checkpoint_step=none`；这是 B-only 失败记录，当前保留，需先把精简 receipt 放入 A/MAM retained evidence 后再评估清理。
+- `observe_and_pickup_n_b_smoke_ec86d857_retry1_20260914T165414Z`：约 5.0G，step 50，CPU restore PASS；A 侧无同名完整 smoke 模型，当前保留。只有建立 A 侧归档位置、保留 receipt 并确认 formal 不再引用后，才可列候选。
+- `fa928.../deployment` 约 5.6M：v3-v7 控制包、v5/v6 失败 probe、v7 最终 launcher/receipt 和多个 tar.gz。MAM retained evidence 位置为 `/mnt/public/xcj/Projects/multi-agent-manager/.local/retained-workspaces/fa928e8d-a486-426b-8381-16c207d37262`；仅在该证据完整、确认无 active dependency 后才可清理旧版本，本审计未删除。
 - 两个 V profile 目录为空（0 bytes），但 `a98...`/`e34...` 仍 pending；在 review/archive 前不清理。
 - 共享 `/mnt/public3/xcj/cache`（battery 数据约 7.4G、observe 数据约 1.9G、pi05_base 约 12G）是预训练/数据缓存，按任务约束不列为清理候选。
 
