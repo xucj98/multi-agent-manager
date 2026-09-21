@@ -5,3 +5,12 @@
 
 ## 范围：科学评估
 完整阅读 /root/Documents/task-state-vla-paper 论文源文件与 docs/EXPERIMENT_PLAN、RESEARCH_POSITIONING、RESULT_ANALYSIS_AND_FOLLOWUPS、STATE_PREDICTION_FREQUENCY、reviews/20260915-plan-independent-review；查看最新MAM cba8b004科学审稿报告及用户研究决策记录。独立判断：核心主张、先前实验如何回答问题、已支持/尚不支持的假设、哪些计划保留/降级/应补最小区分实验；特别单seed、S/J整套协议混杂、HF固定vs边界刷新LR、J forecast≠已发生状态、V成本。不要外网扩展文献或新跑实验。交付简洁科学裁决建议和关键风险；最新数由另一个agent核查，不重复原始数据遍历。
+
+## 2026-09-21 Manager必修项：算术与证据边界
+
+不做新扫描/实验，只修订report并发布后结束：
+1. pooled成功数差误写成pp：rearrange fixed-baseline +14/300=+4.67pp，event-baseline +4/300=+1.33pp，event-fixed -10/300=-3.33pp；put-back分别-3/300=-1.00pp、+43/300=+14.33pp、+46/300=+15.33pp。全文所有+43pp/+4pp等相同错误一起纠正（逐eval分母100的pp保持）。
+2. 删除“只有四类重复轨迹/100 seed只是四种初态/信息量接近4”等过强推断。已证明的是origin分组内首动作、结果、步数重复，不证明完整RGB/物理初态或全轨迹等同，不能由此算有效独立样本数；报告依赖性与需分层即可。
+3. cover N 0/100正常completed和unspecified_failure不证明adapter错误，也不能说不是科学null。它是有效观察到的零成功、诊断分类不足。保留cover为预定验证任务；HF扩展依赖其J入口及整体HF可比性，不能仅因N为0新增必须过的故障门槛或暂停正常J/S覆盖评测。
+4. 初态字段核对一致而expert final pose不同，是provenance差异，不等于完整初态已经发现不一致；将“未核对完整RGB/内部RNG”与“已核对相同初始pose”区分。最直接的新证据是干预之前first actions已不同，请以它作为协议可比性的优先诊断依据。
+5. 不建议用结果去重删除正式评测episode或改变分母；保留全量，新增分组描述与独立运行设计。
