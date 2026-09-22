@@ -9,3 +9,5 @@
 搬迁后修复必要的本地环境、路径和软链接，验证每个仓库 .local/create_worktree.sh；不添加大面积兼容层/历史入口。不盲目全局替换历史流水中的路径。迁移新 MAM 的 .local 配置应只保留现行需要的内容。根 manager 负责最终独立空白 agent 验收 mam workspace add。
 
 可复用变更进对应仓库；一次性临时检查放本任务 workspace/tmp 并归档前手动清理；简洁 report.md 记录必要结果和限制。禁止生成海量清单/hash/重复交接文件。独立验收和最终归档前不要声称迁移全部完成。项目进展由 manager 协调更新。
+
+用户补充：新 MAM 实例必须继续使用当前 MAM_BRANCH=project/state-vla，保留该分支全部已提交历史，不能只 clone main。新旧实例的 PROJECT_ROOT/MAM_ROOT 分别定位各自目录。
