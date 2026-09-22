@@ -1,6 +1,6 @@
 # 项目迁移执行简报
 
-本执行阶段已完成四个业务仓库的物理搬迁和新 MAM 实例配置；独立空白 agent 验收及最终 `.tasks` 同步仍待 manager 收尾。
+本任务的四库物理迁移、新 MAM 实例配置、环境修复和独立验收均已完成。报告发布后仅同步本轮旧实例受跟踪的 task/report 文档到新实例；manager 核对后归档本任务。
 
 ## 已完成
 
@@ -13,11 +13,11 @@
 ## 验证
 
 - 四个迁后仓库的 `git rev-parse`、`git status` 与 primary worktree 均正常；RMBench、OpenDM、robot-bridge 的 CPU import 分别通过 simulator imports、`opendm` editable import、`robot_bridge` editable import。
-- 四个 `.local/create_worktree.sh` 均通过 `bash -n` 和 `--help` 入口检查；实际 `mam workspace add` 留给独立空白 agent 验收。
-- 从新项目根读取 `mam task show` 成功；新 service 状态为 `disabled`、无 Manager/job/runtime。旧 MAM service 仍为 `healthy`，未停止或改写；OpenDM 编辑器/terminal 未终止，cwd 已解析到新目录。
+- 四个 `.local/create_worktree.sh` 均通过 `bash -n` 和 `--help` 入口检查。独立 reviewer `d0ffda49-3c4f-49c2-851d-d06ca91b7510` 验收通过；新实例的临时验收任务 `04ca83bb-fa82-477a-8369-8968508bb6c8` 已实际完成五库 `mam workspace add`、CPU-only smoke 和清理，报告已发布并归档。
+- 从新项目根读取 `mam task show` 成功；新 service 始终为 `disabled`、无 Manager/job/runtime。旧 MAM service 仍为 `healthy`，未停止或改写；OpenDM 编辑器/terminal 未终止，cwd 已解析到新目录。
 
-## 待收尾
+## 最终收尾边界
 
-- manager 安排独立空白 agent 对新实例执行实际 `mam workspace add` 验收。
-- 本报告发布后，最终验收/归档阶段仅把旧实例新产生的本任务 `.tasks` 内容同步到新 `project/state-vla`，不得回带旧代码树或 runtime/session。
+- 本报告发布后，仅将旧实例当前受跟踪 `.tasks` 树中尚未进入新 clone 的本轮 task/report 同步到新 `project/state-vla`；保留新实例的 `04ca83bb` 验收文档和原有未跟踪 `838bfe79` report，不回带旧代码树、service、task runtime 或 session。
+- manager 核对新旧 task/job 状态和非 `.tasks` 树后归档本任务；新的 manager session 由用户在新实例创建。
 - RMBench 的既有未映射 submodule 状态及 openpi 的未初始化 submodule 保持原状，未做远端或子模块初始化操作。
