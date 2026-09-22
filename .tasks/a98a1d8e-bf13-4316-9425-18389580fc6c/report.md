@@ -71,3 +71,11 @@ MAM job `d420f9ce-6515-4f5c-bb21-87492f4b2dfe` 已按 stopped 结果归档。远
 在不降低冻结输入合同的前提下，必须先由 Manager 批准并实现新的资源方案；当前单卡 FSDP=1 配置不能通过。方案在新的精确 profile 成功生成 step-2 checkpoint 后，仍须从该 checkpoint 创建 policy，在不访问训练 source dataset 的条件下执行六帧满 history（18 个有效 image slots）推理，记录 metadata/run kind、`[50,14]` 输出、mean/p95 和显存。完成这些证据前，formal V training 与 eval 保持不准入。
 
 所有本地 review worktree、作者 worktree 和远端 profile worktree 均无源码改动；定向 `git diff --check` 通过。
+
+## 2026-09-22 当前交付与归档状态
+
+V 仍搁置，正式训练和运行时评测不准入；本轮没有重试 GPU、CPU 审查或数据生成。作者 `e34ba9b3-34e2-4df4-92d8-4cea983b7303` 后续记录的双卡 OOM 不属于本 review 已独立验收的证据，资源和合同改动须由 Manager 另行裁决。
+
+已只读核对代码引用：OpenPI `66d9253cf1bdc4971e59cdae7827846eccdb4714` 与 RMBench `f402babca5e7621be83f1725033e858aef69d091` 分别保留在 `review/a98a1d8e-vfix-openpi`、`review/a98a1d8e-vfix-rmbench`；robot-bridge `20dae84e5fc2e48f93e72b5c1b8a0001071fec94` 当前没有非任务引用。这项 bridge 代码交付是任务归档前的实际阻塞。先前报告所列的 capacity-profile receipt 稳定路径当前不存在；它属于旧 GPU 审查收据，按当前搁置裁决不迁移、不补建，也不作为本任务继续保留附件的条件。
+
+本 review 的 1 个 MAM job 已归档。待 bridge 提交交付后，由 Manager 发布本简报草稿并决定 task archive。
