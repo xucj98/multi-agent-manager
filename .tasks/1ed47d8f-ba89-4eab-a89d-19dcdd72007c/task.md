@@ -13,3 +13,6 @@
 用户补充：新 MAM 实例必须继续使用当前 MAM_BRANCH=project/state-vla，保留该分支全部已提交历史，不能只 clone main。新旧实例的 PROJECT_ROOT/MAM_ROOT 分别定位各自目录。
 
 预检补充：manager 发现 4b77c25 合并 main 时仍保留了此前 84bef8c 的过期入口片段：git diff main..project/state-vla -- AGENTS.md docs/install.md 可见。main@ec047d3 是用户审阅并要求合入当前 MAM_BRANCH 的最终文档版本。迁移配置阶段请将这两个文件对齐 main@ec047d3（仅这两个文件），在旧 project/state-vla 提交修正后带入新 clone，报告说明；这是落实此前授权、修复遗漏，不引入新文档规则。先检查若期间用户又有改动不得覆盖。
+
+
+用户明确修正：新 MAM 的代码和文档全部以 main 为准；只有 .tasks/ 内容从当前 project/state-vla 延续。不要把 project/state-vla 的 AGENTS.md、README.md、docs 或其他代码状态直接作为新 MAM 基线。新实例应从 main checkout/clone，再迁入 .tasks，并配置 MAM_BRANCH=project/state-vla。
