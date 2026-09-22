@@ -16,3 +16,5 @@
 
 
 用户明确修正：新 MAM 的代码和文档全部以 main 为准；只有 .tasks/ 内容从当前 project/state-vla 延续。不要把 project/state-vla 的 AGENTS.md、README.md、docs 或其他代码状态直接作为新 MAM 基线。新实例应从 main checkout/clone，再迁入 .tasks，并配置 MAM_BRANCH=project/state-vla。
+
+Manager 预检裁决：放行物理迁移。OpenDM 编辑器/terminal 旧 cwd 不阻塞，不杀用户进程；报告提示用户切新目录。新 clone 使用 --no-local 保留全部项目分支历史，再用新提交对齐 origin/main 非 .tasks 树（取代此前从 main 新建历史的表述）；旧 MAM 不改。新 .local 必须也保留当前仍需使用的 wuwen-11.md 与 wuwen-4090.md（审核其中 A 路径引用；远端路径不盲改）。保留旧 untracked .tasks/838bfe79-ab08-4c58-9843-f8e84423f0e1/report.md 到新同目录，除非与现有 tracked 文件冲突；当前迁移任务简报稍后正式发布后同步。最终验收/归档后需将旧实例新产生的本次 task/report 文档提交同步到新 project/state-vla，仅同步 .tasks，不能把旧代码树重新带回；确保新实例没有指向旧实例的 active executor/job/runtime。执行者先完成迁移及自检、发布报告并返回，独立验收由 manager 安排。
