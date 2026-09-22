@@ -17,8 +17,8 @@ PROJECT_ROOT/
 
 ```json
 {
-  "MAM_ROOT": "/absolute/path/to/PROJECT_ROOT/multi-agent-manager",
-  "PROJECT_ROOT": "/absolute/path/to/PROJECT_ROOT",
+  "MAM_ROOT": "/mnt/public/xcj/Projects/multi-agent-manager",
+  "PROJECT_ROOT": "/mnt/public/xcj/Projects",
   "MAM_BRANCH": "project/state-vla"
 }
 ```

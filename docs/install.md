@@ -4,19 +4,6 @@
 
 首次安装时选择项目管理分支并创建项目配置：
 
-## 本地入口文件
-
-`.local/` 是按集群维护的运行入口目录，默认被 Git 忽略；fresh clone 不会自动包含它。首次在某个集群初始化 MAM 项目时，只从该集群的可信旧实例或受控部署包复制以下文件：
-
-```text
-.local/README.md
-.local/wuwen-11.md       # 使用集群 B 时需要
-.local/wuwen-4090.md     # 使用集群 C 时需要
-.local/create_worktree.sh
-```
-
-不要复制旧实例的 `.local/service/`、`.local/tasks/`、`.local/waits/`、`.local/retained-workspaces/` 或其他 runtime、历史探针和临时目录。新项目的 service、task 和 workspace 状态必须由当前 `PROJECT_ROOT`、`MAM_ROOT` 和新的 Manager 身份重新生成。
-
 ```bash
 project=/absolute/path/to/PROJECT_ROOT
 mam_branch=project/PROJECT_NAME
