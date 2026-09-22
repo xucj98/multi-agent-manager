@@ -1,3 +1,11 @@
+# 2026-09-22 归档准备草稿（未发布）
+
+为保留未合入的可复用代码，已建立稳定 ref，未合入主线：RMBench `codex/state-vla-delivery-f0011538` 指向 `05e512f529a4dea393d2f730b1f34ed6d5b5f212`，OpenPI `codex/state-vla-delivery-f0011538` 指向 `ec86d857d075cd8e1dc7aba2445e557d76ab2069`。robot-bridge 的 task HEAD `f45c6a472d51365e60847cd028502395c47f1575` 已由非 task ref `codex/unified-sim-real-runtime` 承载，不另建重复 ref。
+
+正式产物仍在稳定业务路径：observe checkpoint 位于 `openpi/checkpoints/observe_and_pickup_n_b_formal20k_ec86d857_20260914T162824Z/.../20000`，swap_T 原始数据和转换验证位于 `RMBench/data/swap_T/demo_clean_state` 与 `RMBench/logs/wave1_missing_tasks_a/swap_T_n_conversion_20260915T0048`。workspace 内历史 `checkpoint-transfer-20260920/`、`deployment/`、三个 `.venv`、pytest/ruff 缓存及 15 个 source `__pycache__` 目录已删除；其中前七个根目录清理 133,850 个文件、逻辑约 15.7 GiB。删除范围均为 task-local 普通目录，未遍历符号链接，也未删除正式产物。
+
+全部 7 条 MAM job 已 archive；workspace 顶层仅剩登记的 RMBench、OpenPI、robot-bridge worktree，满足 `outer_check` 的结构条件。下方对已删除 workspace receipt/transfer 路径的历史引用不再是交付要求。Manager 可在本草稿发布后 archive task；不再存在本 task 的代码 ref、job 或 workspace 外层目录阻塞。
+
 # observe_and_pickup N 已完成；swap_T N 链已就绪
 
 ## observe_and_pickup N
