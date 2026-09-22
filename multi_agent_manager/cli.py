@@ -8,7 +8,6 @@ from dataclasses import dataclass
 import fcntl
 import hashlib
 import json
-import math
 import os
 from pathlib import Path
 import re
@@ -19,10 +18,6 @@ import time
 import uuid
 
 ENV_FILE = Path(".mam") / "env.json"
-WAIT_POLL_SECONDS = 0.2
-WAIT_PROBE_TIMEOUT_SECONDS = 0.5
-
-
 class Error(RuntimeError):
     pass
 
@@ -173,6 +168,7 @@ class Store:
     def __init__(self, config):
         if not isinstance(config, ProjectConfig):
             raise Error("Store requires a project configuration")
+        self.config = config
         self.root = config.mam_root
         self.project_root = config.project_root
         self.branch = config.branch
@@ -324,7 +320,12 @@ def create(store, args):
     data = {"id": task, "title": args.title, "agent": None, "status": "working", "created_at": now(),
             "workspace": str(store.workspaces / task), "repos": {}, "jobs": [], "report": None,
             "review": review, "archive": None, "error": None}
-    with store.lock(task):
+    with store.lock("bindings"), store.lock(task):
+        try:
+            from . import wake_runtime
+            wake_runtime.capture_manager_for_task(store)
+        except RuntimeError as exc:
+            raise Error(str(exc)) from exc
         store.write(data)  # record intent before allocating directories
         try:
             safe_path(data["workspace"]).mkdir(parents=True)
@@ -345,6 +346,11 @@ def create(store, args):
 
 def bind(store, args):
     with store.lock("bindings"), store.lock(args.task):
+        try:
+            from . import wake_runtime
+            wake_runtime.capture_manager_for_task(store, excluded_agent=args.agent)
+        except RuntimeError as exc:
+            raise Error(str(exc)) from exc
         data = store.read(args.task, writable=True)
         if data["agent"] and data["agent"] != args.agent:
             raise Error("task already has another agent")
@@ -352,6 +358,142 @@ def bind(store, args):
             raise Error("agent is already bound to another task")
         data["agent"] = args.agent
         store.write(data)
+    return data
+
+
+def rebind_agent(value, *, field="--agent"):
+    """Return one well-formed Agent identity for a task handoff."""
+
+    if not isinstance(value, str) or not value or value != value.strip() or any(character in value for character in "\r\n\t"):
+        raise Error(f"{field} must be a non-empty single-line AGENT-ID")
+    return value
+
+
+def rebind_note(value):
+    if not isinstance(value, str) or not value.strip():
+        raise Error("--note must describe the executor handoff")
+    return value
+
+
+def _rebind_quiescent(agent, state, *, role):
+    status = state.get("status") if isinstance(state, dict) else None
+    detail = state.get("error") if isinstance(state, dict) and isinstance(state.get("error"), str) else None
+    if status in {"idle", "notLoaded"} and not detail:
+        return
+    if status == "active":
+        if role == "current executor":
+            raise Error("current executor is active; wait for its current turn to end before rebind")
+        raise Error("replacement agent is active; finish its read-only preparation before rebind")
+    message = f"cannot verify {role} state ({status or 'unknown'})"
+    if detail:
+        message += f": {detail}"
+    raise Error(message + "; retry after the App Server can confirm the thread")
+
+
+def _rebind_wait_quiescent(store, agent, *, role):
+    path = store.wait_path(agent)
+    if path.exists() or path.is_symlink():
+        if path.is_symlink() or not path.is_file():
+            raise Error(f"cannot verify {role} optional-wait identity (invalid registration); resolve it before rebind")
+        try:
+            raw = json.loads(path.read_text())
+        except (OSError, ValueError) as exc:
+            raise Error(f"cannot verify {role} optional-wait identity (invalid registration): {exc}") from exc
+        if not valid_wait_record(raw, agent):
+            raise Error(f"cannot verify {role} optional-wait identity (invalid registration); resolve it before rebind")
+    try:
+        record, state = active_wait(store, agent)
+    except Exception as exc:
+        raise Error(f"cannot verify {role} optional-wait identity: {exc}") from exc
+    if not record:
+        return
+    if state == "running":
+        raise Error(f"{role} has an active optional wait; stop or finish that wait before rebind")
+    raise Error(f"cannot verify {role} optional-wait identity ({state}); resolve it before rebind")
+
+
+def rebind(store, args):
+    """Atomically hand an existing task and its retained workspace to an agent.
+
+    A normal bind intentionally remains permissive for initial task setup.  A
+    rebind is different: it coordinates a live scheduler, optional waits, and
+    an existing writer's worktree, so the manager must prove both threads are
+    dormant while the binding is replaced.
+    """
+
+    task = identifier(args.task)
+    replacement = rebind_agent(args.agent)
+    note = rebind_note(args.note)
+    caller = rebind_agent(os.environ.get("CODEX_THREAD_ID"), field="CODEX_THREAD_ID")
+    try:
+        from . import wake_runtime
+    except ImportError as exc:
+        raise Error("multi_agent_manager.wake_runtime is required for task rebind") from exc
+
+    # The scheduler owns these first two locks for a complete cycle.  Taking
+    # them before bindings prevents a delivery to the old executor between its
+    # final quiescence observation and the durable binding replacement.
+    with wake_runtime.task_rebind_lock(store, task):
+        try:
+            manager = wake_runtime.resolve_manager(store)
+        except RuntimeError as exc:
+            raise Error(str(exc)) from exc
+        if manager is None:
+            raise Error("task rebind requires a recorded Manager; run mam service start --manager AGENT-ID first")
+        if caller != manager:
+            raise Error("task rebind must be called by the recorded Manager")
+        if replacement == manager:
+            raise Error("replacement agent is the recorded Manager")
+
+        data = store.read(task, writable=True)
+        current = data.get("agent")
+        if not current:
+            raise Error("task has no current executor; use task bind instead")
+        current = rebind_agent(current, field="current task executor")
+        conflicts = [
+            item["id"]
+            for item in store.all()
+            if item.get("id") != task and item.get("status") != "archived" and item.get("agent") == replacement
+        ]
+        if conflicts:
+            raise Error("replacement agent is already bound to another task: " + ", ".join(conflicts))
+
+        # A repeated Manager command is safe after a lost CLI response.  It
+        # does not re-probe a newly active replacement or append another audit
+        # row; the previous handoff remains the durable result.
+        if current == replacement:
+            return {**data, "unchanged": True}
+
+        # Optional waits represent live turns independently of metadata.  Hold
+        # both registrations through the write so begin/stop/delivery cannot
+        # race an apparently idle thread into a second owner.
+        with contextlib.ExitStack() as waits:
+            for agent in sorted({current, replacement}):
+                waits.enter_context(store.lock(wait_lock(agent)))
+            _rebind_wait_quiescent(store, current, role="current executor")
+            _rebind_wait_quiescent(store, replacement, role="replacement agent")
+            try:
+                observations = agent_observations([current, replacement])
+            except Exception as exc:
+                raise Error(f"cannot verify executor thread states: {exc}") from exc
+            _rebind_quiescent(current, agent_state(current, observations), role="current executor")
+            _rebind_quiescent(replacement, agent_state(replacement, observations), role="replacement agent")
+
+            handoffs = data.get("handoffs")
+            if handoffs is None:
+                handoffs = []
+                data["handoffs"] = handoffs
+            if not isinstance(handoffs, list):
+                raise Error("task handoff audit is invalid")
+            handoffs.append({
+                "from_agent": current,
+                "to_agent": replacement,
+                "at": now(),
+                "note": note,
+                "manager": caller,
+            })
+            data["agent"] = replacement
+            store.write(data)
     return data
 
 
@@ -620,6 +762,21 @@ def render_task_status(data, docs, drafts):
     archive = archive_summary(data.get("archive"))
     if archive:
         result["archive"] = archive
+    handoffs = data.get("handoffs")
+    if isinstance(handoffs, list):
+        displayed_handoffs = []
+        for handoff in handoffs:
+            if not isinstance(handoff, dict):
+                continue
+            row = {
+                key: handoff[key]
+                for key in ("from_agent", "to_agent", "at", "note", "manager")
+                if handoff.get(key) is not None
+            }
+            if row:
+                displayed_handoffs.append(row)
+        if displayed_handoffs:
+            result["handoffs"] = displayed_handoffs
     if data.get("error"):
         result["error"] = data["error"]
     review = data.get("review")
@@ -689,10 +846,6 @@ def job_archive(store, args):
             data = store.read(item["id"])
             job = next(job for job in data["jobs"] if job["id"] == args.job)
             if job["status"] != "archived":
-                refresh_jobs(data)
-                store.write(data)
-                if job["probe"]["status"] != "stopped":
-                    raise Error("process must be confirmed stopped before job archive")
                 job["status"] = "archived"
                 job["archive"] = {"note": args.note, "at": now()}
                 store.write(data)
@@ -711,20 +864,70 @@ def status(store, args):
 
 
 def wait_agent(args):
-    supplied = getattr(args, "agent", None)
-    source = "--agent" if supplied is not None else "CODEX_THREAD_ID"
-    agent = supplied if supplied is not None else os.environ.get("CODEX_THREAD_ID")
+    agent = getattr(args, "agent", None)
     if not isinstance(agent, str) or not agent or agent != agent.strip() or any(char in agent for char in "\r\n\t"):
-        raise Error(f"{source} must be a non-empty single-line AGENT-ID")
+        raise Error("--agent must be a non-empty single-line AGENT-ID")
     return agent
 
 
-def wait_timeout(value):
-    if value is None:
-        return None
-    if not math.isfinite(value) or value < 0:
-        raise Error("--timeout must be a finite number of seconds greater than or equal to zero")
-    return value
+def wait_caller():
+    agent = os.environ.get("CODEX_THREAD_ID")
+    if not isinstance(agent, str) or not agent or agent != agent.strip() or any(char in agent for char in "\r\n\t"):
+        raise Error("CODEX_THREAD_ID must be a non-empty canonical AGENT-ID")
+    try:
+        if str(uuid.UUID(agent)) != agent:
+            raise ValueError()
+    except ValueError:
+        raise Error("CODEX_THREAD_ID must be a canonical AGENT-ID") from None
+    return agent
+
+
+def wait_compat_module():
+    try:
+        from . import wait_compat
+    except ImportError as exc:
+        raise Error("multi_agent_manager.wait_compat is required for mam wait") from exc
+    return wait_compat
+
+
+def wait_compatibility(module=None):
+    wait_compat = module or wait_compat_module()
+    try:
+        result = wait_compat.require_compatible()
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
+    if not isinstance(result, dict):
+        raise Error("wait compatibility check returned no runtime paths")
+    socket_path, log_path = result.get("socket_path"), result.get("log_path")
+    if not isinstance(socket_path, str) or not socket_path or not isinstance(log_path, str) or not log_path:
+        raise Error("wait compatibility check returned invalid runtime paths")
+    return result
+
+
+def wait_trace_path(wait_compat):
+    # The compatibility module is the authority for configured runtime paths.
+    # Discover its trace path before the intentionally thorough probe, so an
+    # input received during that probe remains in this wait's trace tail.
+    discover = getattr(wait_compat, "configured_paths", None)
+    if not callable(discover):
+        discover = getattr(wait_compat, "_configured_paths", None)
+    if not callable(discover):
+        raise Error("wait compatibility module cannot discover its configured trace path")
+    try:
+        _, log_path = discover()
+        path = Path(log_path)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise Error(f"cannot discover App Server trace path: {exc}") from exc
+    if not path.is_absolute():
+        raise Error("wait compatibility module returned a non-absolute trace path")
+    return str(path)
+
+
+def wait_session_messages(wait_runtime, caller, started_at):
+    try:
+        return wait_runtime.SessionMessages.from_environment(caller, started_at=started_at)
+    except (wait_runtime.WaitRuntimeError, OSError, ValueError) as exc:
+        raise Error(str(exc)) from exc
 
 
 def wait_lock(agent):
@@ -823,12 +1026,13 @@ def wait_stop_manager(store):
         return cancel_wait(store, target["agent"], expected=target)
 
 
-def begin_wait(store, agent, task, timeout):
+def begin_wait(store, agent, role, task, turn_id):
     observation = runtime().probe_process("local", os.getpid())
     if observation["status"] != "running" or not isinstance(observation.get("identity"), dict):
         raise Error("cannot confirm this wait process identity")
     record = {"agent": agent, "pid": os.getpid(), "identity": observation["identity"], "token": str(uuid.uuid4()),
-              "kind": "jobs", "task": task, "timeout": timeout, "started_at": now(), "cancelled": None}
+              "kind": "unified", "role": role, "task": task, "turn_id": turn_id, "timeout": 3600,
+              "started_at": now(), "cancelled": None}
     with store.lock(wait_lock(agent)):
         existing, state = active_wait(store, agent)
         if existing:
@@ -842,8 +1046,9 @@ def begin_wait(store, agent, task, timeout):
 def wait_cancelled(store, record):
     with store.lock(wait_lock(record["agent"])):
         current = store.read_wait(record["agent"])
-        return (not current or current.get("token") != record["token"]
-                or current.get("identity") != record["identity"] or bool(current.get("cancelled")))
+        if not current or current.get("token") != record["token"] or current.get("identity") != record["identity"]:
+            raise Error("current wait registration changed unexpectedly")
+        return bool(current.get("cancelled"))
 
 
 def finish_wait(store, record):
@@ -853,69 +1058,59 @@ def finish_wait(store, record):
             store.remove_wait(record["agent"])
 
 
-def wait_targets(store, task):
-    tasks = [store.read(task)] if task else store.all()
-    return [{"task": data["id"], "job": dict(job)} for data in tasks if data["status"] != "archived"
-            for job in data["jobs"] if job["status"] != "archived"]
-
-
-def stopped_target(target):
-    probe = target["job"].get("probe")
-    return target["job"].get("status") == "stopped" or isinstance(probe, dict) and probe.get("status") == "stopped"
-
-
-def wait_result(status, agent, task, target=None, observation=None):
-    result = {"status": status, "agent": agent}
-    if task:
-        result["task_filter"] = task
-    if target:
-        result.update({"task": target["task"], "job": target["job"]["id"]})
-    if observation:
-        result["probe"] = observation
-    return result
-
-
-def wait_jobs(store, args):
-    agent, timeout = wait_agent(args), wait_timeout(args.timeout)
-    targets = wait_targets(store, args.task)
-    stopped = next((target for target in targets if stopped_target(target)), None)
-    if stopped:
-        return wait_result("stopped", agent, args.task, stopped)
-    if not targets:
-        return wait_result("empty", agent, args.task)
-    if timeout == 0:
-        return wait_result("timeout", agent, args.task)
-    record = begin_wait(store, agent, args.task, timeout)
-    deadline = None if timeout is None else time.monotonic() + timeout
-    try:
-        while True:
-            if wait_cancelled(store, record):
-                return wait_result("cancelled", agent, args.task)
-            if deadline is not None and time.monotonic() >= deadline:
-                return wait_result("timeout", agent, args.task)
-            for target in targets:
-                if wait_cancelled(store, record):
-                    return wait_result("cancelled", agent, args.task)
-                budget = WAIT_PROBE_TIMEOUT_SECONDS
-                if deadline is not None:
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0:
-                        return wait_result("timeout", agent, args.task)
-                    budget = min(budget, remaining)
-                job = target["job"]
-                observation = runtime().probe_process(job["host"], job["pid"], job["identity"], budget)
-                if observation["status"] == "stopped":
-                    return wait_result("stopped", agent, args.task, target, observation)
-            if deadline is not None and time.monotonic() >= deadline:
-                return wait_result("timeout", agent, args.task)
-            remaining = WAIT_POLL_SECONDS if deadline is None else max(0, deadline - time.monotonic())
-            time.sleep(min(WAIT_POLL_SECONDS, remaining))
-    finally:
-        finish_wait(store, record)
-
-
 def wait_description(record):
-    return f"jobs TASK-ID={record['task']}" if record.get("task") else "jobs (all unarchived)"
+    if record.get("kind") == "unified":
+        role = record.get("role", "unknown")
+        return f"unified {role} TASK-ID={record['task']}" if record.get("task") else f"unified {role}"
+    return "legacy jobs wait"
+
+
+def active_wait_states(store):
+    return {record["agent"]: state for record, state in active_wait_records(store)}
+
+
+def wait_unified(store, args):
+    caller = wait_caller()
+    try:
+        from . import wait_runtime
+    except ImportError as exc:
+        raise Error("multi_agent_manager.wait_runtime is required for mam wait") from exc
+    started_at = time.time()
+    wait_compat = wait_compat_module()
+    trace_path = wait_trace_path(wait_compat)
+    trace = None
+    messages = None
+    try:
+        trace = wait_runtime.TraceMessages(trace_path, started_at=started_at)
+        messages = wait_session_messages(wait_runtime, caller, started_at)
+        compatible = wait_compatibility(wait_compat)
+        if compatible["log_path"] != trace_path:
+            raise Error("App Server trace path changed while validating compatibility")
+
+        def begin(role, task, turn_id):
+            return begin_wait(store, caller, role, task, turn_id)
+
+        return wait_runtime.wait(
+            store,
+            caller,
+            socket_path=compatible["socket_path"],
+            log_path=compatible["log_path"],
+            begin_wait=begin,
+            cancelled=lambda record: wait_cancelled(store, record),
+            finish_wait=lambda record: finish_wait(store, record),
+            active_wait_states=lambda: active_wait_states(store),
+            process_probe=runtime().probe_process,
+            trace=trace,
+            messages=messages,
+            message_floor_ms=int(started_at * 1000),
+        )
+    except wait_runtime.WaitRuntimeError as exc:
+        raise Error(str(exc)) from exc
+    finally:
+        if trace is not None:
+            trace.close()
+        if messages is not None:
+            messages.close()
 
 
 def wait_list(store, args):
@@ -933,6 +1128,35 @@ def wait_stop(store, args):
     if manager is not None:
         return wait_stop_manager(store)
     return cancel_wait(store, wait_agent(args))
+
+
+def service_module():
+    try:
+        from . import wake_runtime
+    except ImportError as exc:
+        raise Error("multi_agent_manager.wake_runtime is required for service commands") from exc
+    return wake_runtime
+
+
+def service_start(store, args):
+    try:
+        return service_module().start_service(store.config, manager=args.manager)
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
+
+
+def service_stop(store, args):
+    try:
+        return service_module().stop_service(store.config)
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
+
+
+def service_status(store, args):
+    try:
+        return service_module().service_status(store.config)
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
 
 
 def task_list(store, args):
@@ -1052,11 +1276,9 @@ def archive(store, args):
         data = store.read(args.task)
         if data["status"] == "archived":
             return data["archive"]
-        refresh_jobs(data)
-        store.write(data)
-        blocked = [job["id"] for job in data["jobs"] if job["status"] != "archived" and job["probe"]["status"] != "stopped"]
+        blocked = [job["id"] for job in data["jobs"] if job["status"] != "archived"]
         if blocked:
-            raise Error("archive refused; running or unknown registered processes: " + ", ".join(blocked))
+            raise Error("archive refused; unarchived registered jobs: " + ", ".join(blocked))
         workspace = safe_path(data["workspace"])
         outer_check(workspace, data["repos"])
         for name, record in data["repos"].items():  # preflight every repo before removing any
@@ -1128,6 +1350,11 @@ def parser():
     p.add_argument("task", metavar="TASK-ID", help="registered task")
     p.add_argument("--agent", required=True, metavar="AGENT-ID", help="execution AGENT-ID; one active task per agent")
     p.set_defaults(func=bind)
+    p = command(sub, "rebind", "hand an existing task to a dormant replacement agent")
+    p.add_argument("task", metavar="TASK-ID", help="registered task with a current executor")
+    p.add_argument("--agent", required=True, metavar="AGENT-ID", help="dormant replacement AGENT-ID")
+    p.add_argument("--note", required=True, metavar="NOTE", help="short Manager handoff reason")
+    p.set_defaults(func=rebind)
     p = command(sub, "show", "read a published document")
     p.add_argument("task", metavar="TASK-ID", help="registered task")
     p.add_argument("--file", choices=("task", "report"), default="task", metavar="FILE", help="published document: task or report (default: task)")
@@ -1145,7 +1372,7 @@ def parser():
     p = command(sub, "status", "show concise task, repo and cached job status")
     p.add_argument("task", metavar="TASK-ID", help="registered task")
     p.set_defaults(func=status)
-    p = command(sub, "archive", "remove owned worktrees and task branches; retain task records")
+    p = command(sub, "archive", "remove owned worktrees and task branches after all jobs are archived; retain task records")
     p.add_argument("task", metavar="TASK-ID", help="registered task")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
     p.set_defaults(func=archive)
@@ -1164,22 +1391,27 @@ def parser():
     p = command(jobs, "status", "refresh and show one registered process summary as JSON")
     p.add_argument("job", metavar="JOB-ID", help="registered job")
     p.set_defaults(func=job_status)
-    p = command(jobs, "archive", "record the handling of a stopped process; retain history")
+    p = command(jobs, "archive", "archive one registered job; retain history without probing or stopping its process")
     p.add_argument("job", metavar="JOB-ID", help="registered job")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
     p.set_defaults(func=job_archive)
-    waits = command(commands, "wait", "wait for registered jobs and manage wakeups").add_subparsers(required=True)
-    p = command(waits, "jobs", "wait until a selected unarchived job stops")
-    p.add_argument("--task", metavar="TASK-ID", help="limit monitoring to one TASK-ID")
-    p.add_argument("--timeout", type=float, metavar="TIMEOUT", help="return timeout after this many seconds")
-    p.add_argument("--agent", metavar="AGENT-ID", help="waiter AGENT-ID; defaults to CODEX_THREAD_ID")
-    p.set_defaults(func=wait_jobs)
+    wait = command(commands, "wait", "wait for this agent's MAM work and manage wakeups")
+    wait.set_defaults(func=wait_unified)
+    waits = wait.add_subparsers(dest="wait_command")
     p = command(waits, "list", "list current waits")
     p.set_defaults(func=wait_list, renderer="wait_list")
     p = command(waits, "stop", "wake one waiter without changing its monitored jobs")
     p.add_argument("manager", nargs="?", choices=("manager",), help="stop the unique unbound manager wait")
     p.add_argument("--agent", metavar="AGENT-ID", help="waiter AGENT-ID")
     p.set_defaults(func=wait_stop)
+    service = command(commands, "service", "manage the project-local proactive wakeup scheduler").add_subparsers(required=True)
+    p = command(service, "start", "start the detached project-local scheduler")
+    p.add_argument("--manager", metavar="AGENT-ID", help="explicit Manager identity for an existing project")
+    p.set_defaults(func=service_start)
+    p = command(service, "stop", "gracefully stop this project's scheduler")
+    p.set_defaults(func=service_stop)
+    p = command(service, "status", "show scheduler health, pending items and diagnostics")
+    p.set_defaults(func=service_status)
     w = command(commands, "workspace", "manage repository worktrees and their environments").add_subparsers(required=True)
     p = command(w, "add", "create a repository worktree using its local environment entry")
     p.add_argument("task", metavar="TASK-ID", help="registered task")
@@ -1209,3 +1441,7 @@ def main(argv=None, *, cwd=None):
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

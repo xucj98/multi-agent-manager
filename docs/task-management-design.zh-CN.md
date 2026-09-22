@@ -1,8 +1,19 @@
-# 任务管理 CLI 接口说明
+# MAM 设计细节
 
-MAM 通过文件和 CLI 管理当前集群的任务，顶层命令为 `mam task`、`mam job`、`mam wait`、`mam workspace`。所有 agent 和管理命令在本机运行；GPU 作业可通过 SSH 在 wuwen-1 运行，两端共享 `/mnt/public`。除 `--help` 外，命令从当前目录逐级向上寻找最近的 `.mam/env.json`；没有配置或最近配置无效都会报错，且不会回退到更上层的配置。
+本文档提供 MAM 设计细节，开发 MAM 请参考并同步本文档；日常使用参考[README](../README.md)，安装见[安装说明](install.md)。MAM 顶层命令为 `mam task`、`mam job`、`mam wait`、`mam service`、`mam workspace`。默认项目结构如下：
 
-配置是唯一的项目选择来源，不提供 `--root` 或环境变量默认值。文件必须包含绝对路径的 `MAM_ROOT`、`PROJECT_ROOT` 和现有本地分支名 `MAM_BRANCH`：
+```text
+PROJECT_ROOT/
+  .mam/env.json               # 项目配置
+  MAM_ROOT/                   # MAM 根目录
+    .tasks/TASK-ID/task.md    # Manager 编辑任务要求
+    .tasks/TASK-ID/report.md  # 执行者编辑结果简报
+  REPO/                       # 一个项目下可以有多个 git 仓库
+  workspace/TASK-ID/          # 执行者的独立工作空间
+    REPO/                     # 按需创建的 worktree，分支为 task/TASK-ID
+```
+
+除 `--help` 外，命令从当前目录逐级向上寻找最近的 `.mam/env.json`；没有配置或最近配置无效都会报错，且不会回退到更上层的配置。配置是唯一的项目选择来源，文件必须包含绝对路径的 `MAM_ROOT`、`PROJECT_ROOT` 和现有本地分支名 `MAM_BRANCH`：
 
 ```json
 {
@@ -12,41 +23,38 @@ MAM 通过文件和 CLI 管理当前集群的任务，顶层命令为 `mam task`
 }
 ```
 
-`MAM_ROOT` 是保存任务、job、wait、锁和归档登记的 Git worktree 根，可为普通 checkout 或 linked worktree；工具不会将 linked worktree 归并到 primary checkout。`PROJECT_ROOT` 包含业务仓库和 workspace。路径在读取配置时解析为实际目录，避免同一目录的别名形成不同边界。
-
-日常命令和交付步骤见 [README 的任务管理](../README.md#任务管理)、[执行与交付](../README.md#执行与交付)、[进程管理](../README.md#进程管理)与[休眠管理](../README.md#休眠管理)。本文保留接口设计、状态语义和归档保护；安装见[安装说明](install.md)。
+`MAM_ROOT` 是保存任务、结果简报、job、可选 wait、服务状态、锁和归档登记的根目录。`PROJECT_ROOT` 包含业务仓库和 workspace。`MAM_BRANCH`
+用于记录该项目的任务和结果简报，所有 `MAM_ROOT/.tasks` 的内容只保存在该分支，不进入 `main`。
 
 使用者分为 Manager 和执行者。Manager 为 subagent 登记任务，自己的工作无需创建任务。代码实现、review、实验等是不同的任务内容，负责完成任务的 agent 统一称为执行者。
 
 ## 文件与发布
 
-任务、workspace 和工作分支使用同一个 `TASK-ID`，由工具生成：
-
-```text
-MAM_ROOT/
-  .tasks/TASK-ID/task.md       # Manager 编辑任务要求
-  .tasks/TASK-ID/report.md     # 执行者编辑结果简报
-  .local/tasks/TASK-ID.json    # 工具维护的登记与状态，不进入 Git
-  .local/waits/*.json          # 当前等待登记，不进入 Git
-
-PROJECT_ROOT/workspace/TASK-ID/
-  REPO/                        # 按需创建的 worktree，分支为 task/TASK-ID
-```
-
-`MAM_BRANCH` 上的 task.md、report.md 是已发布内容，工作目录中的修改是草稿。读取已发布内容无需切换 checkout；发布前 `MAM_ROOT` 必须已 checkout 到 `MAM_BRANCH`，CLI 不自动切换分支。这样代码可从 `main` 安装或开发，而生产管理 worktree 使用独立的项目分支保存项目记录。
+任务、workspace 和工作分支使用同一个 `TASK-ID`，由 MAM 在创建任务时生成。`MAM_BRANCH` 上的 task.md、report.md 是已发布内容，工作目录中的修改是草稿。读取已发布内容无需切换 checkout；发布前 `MAM_ROOT` 必须已 checkout 到 `MAM_BRANCH`，CLI 不自动切换分支。这样代码可从 `main` 安装或开发，而生产管理 worktree 使用独立的项目分支保存项目记录。
 
 ## 创建与执行
 
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
 | `mam task create --title TITLE` | Manager | 生成 `TASK-ID`，登记任务，创建 task.md、report.md 草稿和空 workspace；返回 `TASK-ID` 与文件、目录路径，状态为“进行中” |
-| `mam task create --title TITLE --review TASK-ID` | Manager | 创建任务，并在任务草稿中引用源 `TASK-ID` 当前已发布的要求、简报及已登记的交付代码 commit，供执行者 review |
+| `mam task create --title TITLE --review TARGET-TASK-ID` | Manager | 创建任务，并在任务草稿中引用源 `TASK-ID` 当前已发布的要求、简报及已登记的交付代码 commit，供执行者 review |
 | `mam task bind TASK-ID --agent AGENT-ID` | Manager | 将已启动的 subagent 绑定到任务；一个未归档任务对应一个执行 agent，一个 agent 同时绑定一个任务 |
+| `mam task rebind TASK-ID --agent AGENT-ID --note NOTE` | Manager | 将已有执行者已停止接续的未归档任务交接给一个已确认 dormant 的新 agent；保留原 `TASK-ID`、workspace、worktree、job 和发布记录，并写入最小交接审计 |
 | `mam workspace add TASK-ID --repo REPO --base COMMIT` | 执行者 | 从 `PROJECT_ROOT/REPO` 调用该库的 `.local/create_worktree.sh`，从 base commit 新建 `task/TASK-ID` 分支及对应 `PROJECT_ROOT/workspace` worktree，同时创建环境和受控共享软链接；登记并返回路径与分支名 |
 
 `REPO` 不使用固定注册表，而是 `PROJECT_ROOT` 下非空的单层目录名；绝对路径、`.`、`..`、正反斜杠和其他路径逃逸形式都会被拒绝。MAM 仍会确认该目录是 primary Git checkout，并要求其中存在非软链接的 `.local/create_worktree.sh`。涉及哪些库及其 base commit 由任务说明确定，每个库分别调用 workspace add。具体安装和软链接规则由各库脚本负责。同一任务在不同库使用同名 `task/TASK-ID` 分支。
 
 MAM 自身的 `scripts/create_worktree.sh` 在源 MAM 根存在 `.local/README.md` 时，才会在新 worktree 建立指向它的单文件 `.local/README.md` 软链接；不会共享整个 `.local`。源文件缺失或目标已有文件时仍可创建 worktree，且不会覆盖目标。归档只将目录内仅有、且精确指向 primary MAM 根该 README 的链接视为已知忽略内容，其他 `.local` 内容仍会阻止删除。
+
+### 执行者交接
+
+`rebind` 是已有任务的受控交接，不能替代初次 `bind`，后者保持原有行为。调用者的 `CODEX_THREAD_ID` 必须等于项目已记录的 Manager；没有已记录 Manager、调用者不匹配、目标是 Manager、目标已绑定其他未归档任务、原任务已归档或尚未绑定执行者都会明确拒绝。`--note` 是必填的简短交接理由。
+
+Manager 应先协调旧执行者停止接续；新执行者可以先只读 `task show`、`report` 与原 workspace，但也要在交接前结束当前 turn。换绑时以只读 App Server `thread/read` 确认旧执行者和目标分别为 `idle` 或可查询的 `notLoaded`；`active`、unknown、systemError、无效身份或无法联系都不是 idle，操作会拒绝并给出处理提示。`notLoaded` 不会因此调用 `thread/resume`。另外，换绑会在旧/新 agent 的 optional-wait 登记锁中核验其进程身份；存在 running wait 或无法核验的 wait 同样拒绝。这个快照不能阻止外部客户端在随后另开旧线程 turn，因此交接仍依赖 Manager 让旧执行者停止接续，MAM 不改写 Codex parent 或 UI 元数据。
+
+成功时只替换任务记录的 `agent`，并向 `handoffs` 追加 `{from_agent, to_agent, at, note, manager}`。原 task/report、publication、workspace、仓库路径和分支、job 的 ID/PID/identity/观测/归档历史以及 review 关系都不复制、移动、重建、重启或归档；新执行者接续原 workspace，不再次运行同一任务的 `workspace add`。若同一 Manager 因丢失 CLI 响应以同一目标重试，`rebind` 返回 `unchanged`，不重新探测、不改写登记也不追加审计；目标已在其他活跃任务中的冲突仍会拒绝。
+
+换绑持锁顺序固定为 `service-start → service-cycle → bindings → TASK-ID → 按 agent 排序的 wait-*`。scheduler 的完整 cycle 在前两个锁内运行，因而不能在旧执行者最终状态核验和绑定落盘之间投递；`wait stop manager` 使用其已有的 `bindings → wait-*` 顺序，不会与交接反向等待。交接不清空 service state、history 或队列：下一轮 scheduler 通过现有 task agent/currentness 检查将旧收件人的 pending、accepted 或 uncertain 待办标记为陈旧并移入历史，之后同一 stopped job 按新执行者投递；review 和 Manager 路由随任务当前 agent 重新计算。
 
 ## 编辑、发布与查看
 
@@ -63,9 +71,9 @@ MAM 自身的 `scripts/create_worktree.sh` 在源 MAM 根存在 `.local/README.m
 
 ## 长任务进程
 
-job 指执行者登记的一个长时间运行的进程。预计运行超过 1 小时的程序（如正式数据生成、训练、评估）通过 `mam job add` 登记，通常的短 smoke 无需登记。同一执行者可为自己的任务登记多个进程，每条登记记录生成一个 `JOB-ID`，并关联所属任务，以便 Manager 找到对应执行者。
+job 指执行者登记的一个长时间运行的进程。预计运行超过 30 分钟的程序（如正式数据生成、训练、评估）通过 `mam job add` 登记，通常的短 smoke 无需登记。同一执行者可为自己的任务登记多个进程，每条登记记录生成一个 `JOB-ID`，并关联所属任务，以便 Manager 找到对应执行者。
 
-job 状态为“进行中／已停止／已归档”：查询确认进程结束后变为“已停止”，表示尚待执行者处理；执行者完成结果记录、文件清理等任务要求后，通过 job archive 标记“已归档”。
+job 状态为“进行中／已停止／已归档”：查询确认进程结束后变为“已停止”，表示尚待执行者处理；job archive 可在 running、stopped 或 unknown/待核实观测下标记“已归档”，只结束 MAM 跟踪，不停止进程。
 
 `STATUS` 可为 `running`、`stopped`、`archived` 或 `all`。
 
@@ -75,41 +83,73 @@ job 状态为“进行中／已停止／已归档”：查询确认进程结束�
 | `mam job list [--task TASK-ID] [--status STATUS]` | 所有人 | 默认有表头，每行固定为描述、job 状态、开始时间、`JOB-ID`、任务描述、`TASK-ID`；保留筛选，不提供 `--json`。unknown 探测显示 `unknown/待核实`，不冒充 running 或 stopped |
 | `mam job list --attention` | Manager | 查询进程和 agent 状态，筛选已停止、未归档且执行者已不在运行的 job；不确定项仍在同一表中显示 `unknown/待核实` |
 | `mam job status JOB-ID` | 所有人 | 只刷新该 job，不扫描其他进程；返回该次探测的精简 JSON 展示及所属任务和 agent |
-| `mam job archive JOB-ID --note NOTE` | 执行者 | 记录简短的处理结论或成果位置，将该 job 标记为“已归档”，保留历史记录 |
+| `mam job archive JOB-ID --note NOTE` | 执行者 | 记录简短的处理结论或成果位置，将该 job 标记为“已归档”，保留身份、最后观测和历史记录；不探测或停止进程 |
 
-进程查询在其所属主机执行，远端通过 SSH 查询，核对 PID 和启动时间；查询失败时保留上次状态与时间，并标注“本次查询失败”，不据此判定进程停止。agent 状态由 CLI 连接承载这些线程的现有 Codex App Server，通过 `thread/read` 查询；`active` 对应执行者仍在运行，查询失败显示“待核实”。本机现有 Unix socket 的只读查询已验证可用，接口见 [App Server 文档](https://learn.chatgpt.com/docs/app-server)。
+进程查询在其所属主机执行，远端通过 SSH 查询，核对 PID 和启动时间；查询失败时保留上次状态与时间，并标注“本次查询失败”，不据此判定进程停止。job archive 不触发进程查询。agent 状态由 CLI 连接承载这些线程的现有 Codex App Server，通过 `thread/read` 查询；`active` 对应执行者仍在运行，查询失败显示“待核实”。本机现有 Unix socket 的只读查询已验证可用，接口见 [App Server 文档](https://learn.chatgpt.com/docs/app-server)。
 
-“需要 Manager 处理”是 job 与 agent 状态的组合筛选，不增加 job 状态。已停止但执行者仍为 running 的 job 由执行者继续处理；进程仍在运行或 job 已归档时，不进入该筛选。已归档 job 保持已归档状态。
+“需要 Manager 处理”是 job 与 agent 状态的组合筛选，不增加 job 状态。已停止但执行者仍为 active 的 job 仍由执行者继续处理；进程仍在运行或 job 已归档时，不进入该筛选。已归档 job 保持已归档状态，不再周期探测或触发主动唤醒。
 
-job archive 只记录收尾结果，不删除 workspace；任务归档也保留各 job 的独立状态与历史。
+job archive 只记录归档结论，不删除 workspace，也不要求进程已停止；任务归档也保留各 job 的独立状态与历史。
 
 ## 状态展示
 
-`task status` 是对登记的轻量展示，不改变存储记录，也不探测进程。它保留任务的 `id`、标题、状态、agent 和 workspace；每个仓库保留路径、分支、状态、必要的 base 与交付 commit。`publications` 中可显示 task.md 和 report.md 各自最后一次发布的 Git commit。
+`task status` 是对登记的轻量展示，不改变存储记录，也不探测进程。它保留任务的 `id`、标题、状态、agent 和 workspace；每个仓库保留路径、分支、状态、必要的 base 与交付 commit。`publications` 中可显示 task.md 和 report.md 各自最后一次发布的 Git commit。发生执行者交接时，`handoffs` 以最小审计项展示旧/新 agent、时间、note 和 Manager 调用者。
 
 未归档 job 位于 `jobs.unarchived`，每项只含 `id`、`note`、`status` 和 `checked_at`；`jobs.cached` 明确这些是已保存的观测，已归档 job 只给出 `archived_count`。有未发布改动时才显示 `drafts`。任务归档或出错时保留归档结论或失败原因；review 任务保留源任务和成果代码 commit 引用。旧登记中不再使用的字段在读取时忽略，无需迁移。空值及正常的 false 清理标记可省略。
 
 `job status` 只刷新所请求的 `JOB-ID` 一次。正常结果保留该 job 的 `id`、`note`、所属任务与标题、agent、主机、PID、启动时间、状态和检查时间，不重复输出 `identity` 或 `probe`。探测为 unknown 时，`status` 为 `unknown`，并返回 `error` 及必要的最后已知状态和时间；进程身份不匹配等诊断以错误文本给出。已归档 job 保持 `archived`，并保留归档结论。
 
-## 可停止等待
+## 主动唤醒服务
 
-等待只读取已登记的 job，不启动 daemon、数据库或调度器。临时登记保存在本机共享 `.local/waits/`；每个 agent 一条活跃等待，记录本地 PID、启动身份和 token。start、stop、退出清理使用同一 agent 锁和 token，因此陈旧等待不能取消后来者；异常退出后 PID 身份已停止的登记会被清理，不会显示为仍在等待或阻止重开。
+默认流程是 Agent 做完可执行工作后直接结束当前 turn，由服务按 task/job 状态主动跟进；turn 结束不表示任务或 job 已归档。`mam wait` 仍是可选的当前 turn 内等待方式，可替代原生 `wait_agent`；它的等待超时、手动取消和“收到新消息”结果仅属于该可选命令，daemon 不产生这些事件。普通用户和 Manager 输入仍由 Codex 原生处理。
 
-| 接口 | 使用者 | 具体操作 |
-| --- | --- | --- |
-| `mam wait jobs [--task TASK-ID] [--timeout TIMEOUT] [--agent AGENT-ID]` | 所有人 | 默认监控当前所有未归档 job，`--task` 缩小范围。已有确定 stopped job 立即返回 `stopped`；任一运行 job 停止时返回 `stopped`；空集返回 `empty`，超时返回 `timeout`。unknown 探测不视作 stopped。轮询只探测必要 job，不探测 agent，也不持有任务锁睡眠 |
-| `mam wait list` | 所有人 | 即使为空也输出表头；每行是 `AGENT-ID`、绑定任务标题、`TASK-ID`、等待内容、等待开始时间。绑定取等待者自己的未归档任务；没有绑定显示“未绑定”，不使用被监控 job 的负责人代替 |
-| `mam wait stop --agent AGENT-ID` | 所有人 | 仅为该 agent 写取消标记并唤醒等待，返回 `cancelled`；不存在当前等待返回 `not_waiting`。不向 job 进程发信号，不归档 job |
-| `mam wait stop manager` | Manager | 从当前有效等待及未归档任务绑定中找出唯一未绑定任务的等待者并写取消标记。零个、多个或身份无法确认都会报错；等待中的 `--task` 只是监控范围，不是绑定。选中后若原等待已结束或被替换，返回 `not_waiting`，不会取消替换后的等待 |
+服务是每个 MAM 项目一个的 detached daemon，不依赖 systemd。状态、待投递事项、投递回执、job 探测计划和日志均位于未纳入 Git 的 `MAM_ROOT/.local/service/`；每条状态都带项目根、项目根目录和管理分支，不能被另一项目复用。服务的唯一生命周期接口如下：
 
-`mam wait stop` 必须且只能使用 `manager` 或 `--agent AGENT-ID` 之一。等待者未指定 `--agent` 时，只读取 `CODEX_THREAD_ID`；不从继承的 `CODEX_SESSION_ID` 推测身份。`AGENT-ID` 缺失、空白或含换行会明确报错。每次 target 探测前检查 deadline，单次远端探测预算不超过 0.5 秒与剩余时限的较小值；允许小幅运行时调度开销。stop 不会被长 SSH 查询无限拖住。
+| 接口 | 具体操作 |
+| --- | --- |
+| `mam service start [--manager AGENT-ID]` | 身份安全地启动或复用本项目 daemon。已有 Manager 时先运行安装方提供的 App Server 兼容性检查；返回 JSON 状态。 |
+| `mam service stop` | 只向已核验身份的本项目 daemon 请求优雅退出；不停止 job、不归档任务、不删除 workspace。 |
+| `mam service status` | 返回 `running`、`healthy`、Manager、`pending`、计数、诊断和错误。状态可为 `healthy`、`pending`、`awaiting_manager`、`disabled` 或 `error`。 |
 
-`job list --attention` 中，即使 job 已确认 stopped，只要 agent 状态未知或查询失败，也明确显示 `unknown/待核实`，与普通待处理项区分。
+可选 wait 的登记位于 `MAM_ROOT/.local/waits/`，与服务状态隔离：
+
+| 接口 | 具体操作 |
+| --- | --- |
+| `mam wait` | 以 `CODEX_THREAD_ID` 的当前 active turn 识别调用者，先检查当前 task/job 待办；有待办立即返回，否则最多等待 3600 秒。保留 stopped job 的 `JOB-ID`、note 和 task 上下文；原生输入返回 `message`，兼容性或身份无法确认明确返回错误。 |
+| `mam wait list` | 显示当前项目可验证的等待者、绑定任务、等待内容和开始时间。 |
+| `mam wait stop --agent AGENT-ID` | 解除该 agent 的等待登记，不停止 job、不归档任务。 |
+| `mam wait stop manager` | 解除当前项目唯一未绑定任务的 Manager 等待；无法唯一确认时明确报错。 |
+
+Manager 的 wait 只在 inactive 执行者没有未归档 job 时返回 `agent_completed`；running job 保持等待，stopped job 始终作为含 `JOB-ID` 和 note 的执行者交接返回，即使源任务有活动 review。
+
+每次 wait 用调用进程身份和本次 token 登记，旧登记不能取消后续等待。服务在最终 `turn/start` 前持有同一 agent 的 wait 登记锁：发现可验证的等待者或无法核验其身份时保留待办，不并行启动新 turn；wait 返回后，服务按最新 task/job 状态重新判断，已归档的 job 或任务不会产生冗余唤醒。
+
+`start` 在返回前会等待子进程确认已读取本项目的 token、PID 和身份记录；已存活但尚未完成首个调度周期的 active 服务显示为 `pending`，不会提前报告为 `healthy`。无法核验已有 PID/身份时拒绝启动第二个 daemon，保留可见错误供人工处理。
+
+daemon 保留 `MAM_ROOT` 作为项目状态和日志的 cwd，但不从该目录导入代码。启动子进程以隔离 Python bootstrap 将当前调用方 `wake_runtime.__file__` 所在包的已解析父目录置于导入路径首位，并忽略 cwd、继承的 `PYTHONPATH` 与 site-package 回退；因此独立状态 worktree 中的旧/缺失同名包不能覆盖当前安装或 source-checkout 调用方，未预安装的 CPU source 测试也可启动同一代码。
+
+安装方调用同一组同步 Python API：`start_service(config, manager=None)`、`stop_service(config)`、`service_status(config)`。它不另行实现 supervisor。启动或重连时由 `multi_agent_manager.wake_compat.require_compatible()` 验证现有 App Server；验证失败会明确报错或保留错误状态，而不会在每次 job 探测时重复运行行为探测。
+
+Manager 身份只可由显式 `--manager` 或既有项目记录确定。首次未绑定的 Manager 执行 `task create` 或 `task bind` 时，CLI 才会从 `CODEX_THREAD_ID` 自动登记它；已绑定的执行者和即将被绑定的 agent 都不能被误记为 Manager。全新项目还没有绑定 task 时，服务可以处于 `awaiting_manager`，不宣称可投递；首次 Manager create/bind 后会自动继续。已有绑定任务却没有可确定的 Manager 时，服务必须失败并提示 `mam service start --manager AGENT-ID`，不能猜测任意未绑定线程。
+
+每个 probe 周期独立读取所有未归档任务。归档 job 从不探测或唤醒。对未归档 job，已保存或新探测到的 `stopped` 优先于 `running`：它形成指向该任务执行者的待办；执行者 active/busy 时保留。`idle` 与已知、可查询的 `notLoaded` 都是 dormant 既有线程：后者会在目标投递路径中先 `thread/resume` 并用 `thread/read` 复核，只有复核为 idle 才可启动。只有没有 stopped 或未归档 running/unknown job 的任务，执行者 idle/notLoaded 才形成 Manager 待办。running-only job 仅监控，执行者 turn 结束不会自动唤醒 Manager。未归档 review 会抑制源任务的 idle Manager 待办；源任务的 stopped job 永远不被抑制，review 归档后源任务重新可见。循环 review、缺少执行者、删除/不可读取的线程状态列为可见诊断。
+
+监控使用批量 `thread/read` 元数据查询；不会为归档、空闲历史线程批量调用 `thread/resume` 或 hydrate turn 历史。仅在某个收件人的待办已经存在、其元数据为 idle/notLoaded、且即将投递时，服务才调用 `thread/resume`；notLoaded 必须再由 `thread/read` 复核为 idle。服务只对这一收件人读取一条最新 turn 元数据，以避免重启被用户暂停或中断的任务；发现 paused/interrupted 时会持久化该 turn 边界并保留可见待办。后续只在同一收件人再次被元数据确认 idle/notLoaded 时，用一次 `latest_turn` 读取重查，不会为此调用 `resume`；边界未变、仍为 paused/interrupted 或当前 turn active 都继续阻断，只有边界已变且最新 turn 为 completed 才重新允许投递。随后才对同一既有线程调用 `turn/start`。请求不覆写 model、effort、cwd、sandbox 或 workspace，也不创建替代线程。capacity、缺失/未加载线程和 App Server 断线会显示在服务状态中，保留待办并以有上限的退避重试；不会创建无关线程或中断 active turn。
+
+待办先持久化，再投递；每项记录 `created_at`、`last_observed_at`、观测次数、尝试次数、`accepted_at`、发送前最新 turn 边界和错误。相同未变化条件在获得 `turn/start` RPC 回应后标记为 accepted，因此安静期产生零次新的 `turn/start`。`task_ready` 的源 executor 元数据为 unknown、systemError 或发送前读取失败时，既有 pending/accepted 待办保留，不据此生成新待办；只有可确认的归档、review 抑制、执行者/收件人变更或 source active 才会使其失效。除下述 native-v2 精确拒绝外，明确 JSON-RPC error 记录为 rejected，可在收件人再次 idle 后按退避重试，不参与应答丢失的歧义判断。只有发送后无响应、连接/传输失败或 daemon 在应答前退出才记录 uncertain；重试前只读取该收件人的最新 turn，并与发送前边界比较。边界未变时才按退避重试；边界已变时标记 ambiguous，保留给人工核对而不声称 exactly-once 或盲目再启动模型。条件消失、job 被归档、任务被归档或收件人变更时，陈旧待办移入有限历史而不投递。
+
+若 executor 为收件人的 `job_stopped` 待办收到**完全匹配**的 `App Server request turn/start failed: direct app-server input is not allowed for multi-agent v2 sub-agents`，它表示当前原生 multi-agent v2 子 agent 不支持 direct App Server input。服务把 source 持久化为 `delivery: blocked`、`failure_kind`/`block_kind: unsupported_multi_agent_v2_direct_input`、`next_attempt_at: null`，不再对同一未变 source 盲重试；已由旧版本保存为 `rejected`/`explicit_rpc_rejection` 的同一精确错误也会在下次 cycle、早于 retry 前升级为该状态。这个特例不适用于其他 JSON-RPC 错误、transport/response-loss，或没有 executor 而本来就路由给 Manager 的 stopped job。防御性异常记录若使 `manager == executor == recipient`，该精确 `job_stopped` source 仍可成为 `blocked`；它不是普通 Manager 待办，但也不能据此改写或丢弃 source。
+
+每个仍 current 的 blocked source 用其 source signature 生成一个持久 `manager_native_followup` 待办，收件人为当前、有效且不同于 executor 的 Manager，内容含 TASK-ID、JOB-ID、executor、原始错误，以及由 Manager 使用 parent-native `collaboration.followup_task` 协调的动作。相同 source 在 restart 和重复 cycle 中复用同一 escalation；多个 source 可在一个 Manager turn 合批，新 stopped job 因 source signature 不同仍可形成新 escalation。Manager active、paused、optional wait 或 unknown 时沿用普通收件人保护而保留它；notLoaded 仍只走原有的 targeted resume/recheck。两种情况都不创建替代 thread 或打断 active turn。Manager 缺失时 service 保留现有 error；若 Manager 恰为原 source 收件人，不生成 self-escalation，以免递归走同一 direct-input 路径。executor 变为 `active` 只说明可能已开始处理，不表示 stopped job 已归档；因此同一 escalation 可保持到 job/archive、task archive 或 rebind 改变 executor 时才作为 stale 转入 history。Manager 收到升级后应先查看 executor 的状态和 report，确认尚未处理后再发送 native follow-up，避免重复 follow-up；native follow-up 后 executor 归档 job 不会再产生旧 escalation。
+
+因此 service 可以同时报告 `running: true`、`healthy: true` 与 `status: pending`：前两者表示 daemon 和兼容性仍存活，`pending.events` 中的 blocked source 及 `native_v2_wake_blocked` diagnostics 表示投递受阻、等待 Manager 人工原生协调，不能被解释为子 agent direct wake 已恢复。
+
+每条由 daemon 发起的唤醒文本首行固定为 `[MAM Message]`，其余内容保持事实且可批量：停止 job 使用 `JOB-ID`、note 和 `TASK-ID`/标题；Manager 待办使用执行者 `AGENT-ID`、`TASK-ID` 和标题。停止进程不被解释为实验成功或任务完成。
 
 ## 归档
 
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
-| `mam task archive TASK-ID --note NOTE` | Manager | 记录结束结论，移除已登记的各库 worktree 及独立环境，删除对应的本地任务分支，移除 workspace；保留任务说明、简报和历史登记，状态改为“已归档” |
+| `mam task archive TASK-ID --note NOTE` | Manager | 要求所有 job 已归档，不检查已归档 job 的实际存活；记录结束结论，移除已登记的各库 worktree 及独立环境，删除对应的本地任务分支，移除 workspace；保留任务说明、简报和历史登记，状态改为“已归档” |
 
 分支删除使用创建时登记的“仓库＋分支名”。移除软链接时保留其指向的共享数据。归档返回各项清理结果；未全部完成则保留未归档状态，再次调用继续清理。是否归档由 Manager 根据任务要求决定。

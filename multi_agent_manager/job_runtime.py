@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from collections import deque
 import hashlib
 import json
 import math
@@ -11,12 +12,17 @@ import re
 import shlex
 import socket
 import subprocess
+import time
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
 
 PROCESS_TIMEOUT_SECONDS = 3.0
 APP_SERVER_TIMEOUT_SECONDS = 3.0
+# ``thread/resume`` carries a complete thread snapshot.  A busy Codex thread
+# can exceed the old 4 MiB transport cap, while a finite bound still protects
+# the client from an untrusted frame header.
+MAX_WEBSOCKET_FRAME_BYTES = 16 * 1024 * 1024
 DEFAULT_SOCKET_PATH = "/root/.codex/app-server-control/app-server-control.sock"
 _IDENTITY_KEYS = ("host", "boot_id", "start_ticks")
 _SAFE_REMOTE_HOST = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@-]*\Z")
@@ -306,7 +312,7 @@ class _WebSocket:
             size = int.from_bytes(self._take(2), "big")
         elif size == 127:
             size = int.from_bytes(self._take(8), "big")
-        if size > 4 * 1024 * 1024:
+        if size > MAX_WEBSOCKET_FRAME_BYTES:
             raise _ProbeError("WebSocket frame is too large")
         mask = self._take(4) if second & 0x80 else None
         payload = self._take(size)
@@ -340,6 +346,200 @@ class _WebSocket:
 
     def close(self) -> None:
         self.connection.close()
+
+
+class AppServerEventError(RuntimeError):
+    """A failure while subscribing to App Server thread notifications."""
+
+
+class AppServerRpcError(AppServerEventError):
+    """An App Server JSON-RPC request received an explicit error response.
+
+    This is deliberately distinct from a socket failure or a response timeout:
+    the server has acknowledged the request and no turn/start ambiguity exists.
+    """
+
+
+class AppServerEventStream:
+    """One App Server connection that preserves notifications during requests.
+
+    ``thread/resume`` both returns a snapshot and subscribes this connection to
+    future thread events.  A normal request/response helper would discard
+    notifications received before its response; waiters must retain them to
+    avoid a completion race during subscription.
+    """
+
+    def __init__(self, websocket: _WebSocket) -> None:
+        self.websocket = websocket
+        self._next_request_id = 1
+        self._events: deque[dict[str, Any]] = deque()
+
+    @classmethod
+    def connect(cls, socket_path: str | None = None) -> "AppServerEventStream":
+        websocket: _WebSocket | None = None
+        try:
+            websocket = _WebSocket.connect(socket_path or DEFAULT_SOCKET_PATH)
+            stream = cls(websocket)
+            stream.request(
+                "initialize",
+                {
+                    "clientInfo": {"name": "multi-agent-manager", "title": "Multi-agent manager", "version": "1.0"},
+                    "capabilities": {"experimentalApi": True},
+                },
+            )
+            stream.notify("initialized", {})
+            return stream
+        except AppServerRpcError:
+            if websocket is not None:
+                websocket.close()
+            raise
+        except (OSError, TimeoutError, _ProbeError, AppServerEventError) as exc:
+            if websocket is not None:
+                websocket.close()
+            raise AppServerEventError(f"App Server event subscription failed: {exc}") from exc
+
+    def notify(self, method: str, params: dict[str, Any]) -> None:
+        try:
+            self.websocket.send_text(json.dumps({"method": method, "params": params}, separators=(",", ":")))
+        except (OSError, TimeoutError, _ProbeError) as exc:
+            raise AppServerEventError(f"App Server notification failed: {exc}") from exc
+
+    def _read(self, timeout: float | None) -> dict[str, Any] | None:
+        if timeout is not None and timeout <= 0:
+            return None
+        connection = self.websocket.connection
+        previous_timeout = connection.gettimeout()
+        try:
+            connection.settimeout(timeout)
+            raw = self.websocket.receive_text()
+        except socket.timeout:
+            return None
+        except (OSError, TimeoutError, UnicodeDecodeError, _ProbeError) as exc:
+            raise AppServerEventError(f"App Server event connection failed: {exc}") from exc
+        finally:
+            connection.settimeout(previous_timeout)
+        try:
+            message = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise AppServerEventError("App Server event stream returned invalid JSON") from exc
+        if not isinstance(message, dict):
+            raise AppServerEventError("App Server event stream returned a non-object message")
+        return message
+
+    def _queue(self, message: dict[str, Any]) -> None:
+        if isinstance(message.get("method"), str):
+            self._events.append(message)
+            return
+        raise AppServerEventError("App Server event stream returned an unexpected response")
+
+    def request(self, method: str, params: dict[str, Any]) -> Any:
+        request_id = self._next_request_id
+        self._next_request_id += 1
+        try:
+            self.websocket.send_text(json.dumps({"method": method, "id": request_id, "params": params}, separators=(",", ":")))
+        except (OSError, TimeoutError, _ProbeError) as exc:
+            raise AppServerEventError(f"App Server request {method} failed: {exc}") from exc
+        deadline = time.monotonic() + APP_SERVER_TIMEOUT_SECONDS
+        while True:
+            message = self._read(max(0.0, deadline - time.monotonic()))
+            if message is None:
+                raise AppServerEventError(f"App Server request {method} timed out")
+            if message.get("id") != request_id:
+                self._queue(message)
+                continue
+            if "error" in message:
+                error = message["error"]
+                detail = error.get("message") if isinstance(error, Mapping) else str(error)
+                raise AppServerRpcError(f"App Server request {method} failed: {detail or 'unspecified server error'}")
+            if "result" not in message:
+                raise AppServerEventError(f"App Server request {method} has no result")
+            return message["result"]
+
+    def resume(self, thread_id: str) -> Any:
+        """Subscribe without applying model, sandbox, or other overrides."""
+
+        snapshot = self.request("thread/resume", {"threadId": thread_id, "excludeTurns": True})
+        if not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("thread"), Mapping):
+            return snapshot
+        thread = snapshot["thread"]
+        raw_status = thread.get("status")
+        status = raw_status.get("type") if isinstance(raw_status, Mapping) else raw_status
+        if status != "active":
+            return snapshot
+
+        # ``thread/resume`` normally hydrates every turn and its items.  Its
+        # metadata-only mode still subscribes this connection, so page only
+        # the newest turn to identify the currently active one.
+        page = self.request(
+            "thread/turns/list",
+            {"threadId": thread_id, "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded"},
+        )
+        if not isinstance(page, Mapping) or not isinstance(page.get("data"), list):
+            raise AppServerEventError("App Server thread/turns/list returned no turns page")
+        turns = page["data"]
+        if not any(isinstance(turn, Mapping) and turn.get("status") == "inProgress" for turn in turns):
+            # The active turn can complete between resume and the bounded page
+            # request. Re-read metadata in that narrow case so the waiter
+            # starts from the current status while retaining queued events.
+            current = self.request("thread/read", {"threadId": thread_id, "includeTurns": False})
+            if isinstance(current, Mapping) and isinstance(current.get("thread"), Mapping):
+                current_status = current["thread"].get("status")
+                current_type = current_status.get("type") if isinstance(current_status, Mapping) else current_status
+                if current_type != "active":
+                    thread = {**thread, "status": current_status}
+        return {**snapshot, "thread": {**thread, "turns": turns}}
+
+    def read(self, thread_id: str) -> Any:
+        """Read only current thread metadata after a targeted resume."""
+
+        return self.request("thread/read", {"threadId": thread_id, "includeTurns": False})
+
+    def latest_turn(self, thread_id: str) -> Mapping[str, Any] | None:
+        """Return one metadata-only newest turn for delivery reconciliation.
+
+        This is intentionally a per-recipient operation.  Monitoring itself
+        never pages a thread's history or invokes this method in bulk.
+        """
+
+        page = self.request(
+            "thread/turns/list",
+            {"threadId": thread_id, "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded"},
+        )
+        if not isinstance(page, Mapping) or not isinstance(page.get("data"), list):
+            raise AppServerEventError("App Server thread/turns/list returned no turns page")
+        if not page["data"]:
+            return None
+        turn = page["data"][0]
+        if not isinstance(turn, Mapping):
+            raise AppServerEventError("App Server thread/turns/list returned an invalid turn")
+        return turn
+
+    def start_turn(self, thread_id: str, text: str) -> Any:
+        """Start one input turn on an already-resumed existing thread.
+
+        The caller supplies no model, effort, cwd, sandbox, or workspace
+        override.  ``thread/resume`` is deliberately separate so a scheduler
+        can prove the recipient remains idle immediately before this request.
+        """
+
+        if not isinstance(thread_id, str) or not thread_id:
+            raise AppServerEventError("App Server turn/start requires a thread id")
+        if not isinstance(text, str) or not text:
+            raise AppServerEventError("App Server turn/start requires non-empty text")
+        return self.request("turn/start", {"threadId": thread_id, "input": [{"type": "text", "text": text}]})
+
+    def poll(self, timeout: float | None) -> dict[str, Any] | None:
+        if self._events:
+            return self._events.popleft()
+        message = self._read(timeout)
+        if message is None:
+            return None
+        if not isinstance(message.get("method"), str):
+            raise AppServerEventError("App Server event stream returned an unexpected response")
+        return message
+
+    def close(self) -> None:
+        self.websocket.close()
 
 
 def _rpc(websocket: _WebSocket, request_id: int, method: str, params: dict[str, Any]) -> Any:

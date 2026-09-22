@@ -14,10 +14,30 @@ import types
 import unittest
 from unittest.mock import patch
 
-from multi_agent_manager import cli
+from multi_agent_manager import cli, wake_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
-MAM = Path(sys.executable).with_name("mam")
+_CLI_BOOTSTRAP = (
+    "import sys; "
+    "sys.path.insert(0, sys.argv.pop(1)); "
+    "from multi_agent_manager.cli import main; "
+    "raise SystemExit(main())"
+)
+
+
+def mam_command(*args: str, python: str | Path | None = None) -> list[str]:
+    """Run this checkout's CLI without requiring an installed ``mam`` script."""
+
+    return [
+        str(python or sys.executable),
+        "-I",
+        "-S",
+        "-B",
+        "-c",
+        _CLI_BOOTSTRAP,
+        str(ROOT),
+        *args,
+    ]
 
 
 class TaskTests(unittest.TestCase):
@@ -68,7 +88,7 @@ printf env > "$target/.venv/marker"
         return cli.project_config(location)
 
     def call(self, *args, command="task", ok=True):
-        result = subprocess.run([str(MAM), command, *args], capture_output=True, text=True, cwd=self.projects)
+        result = subprocess.run(mam_command(command, *args), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0 if ok else 2, result.stdout + result.stderr)
         return json.loads(result.stdout if ok else result.stderr)
 
@@ -85,28 +105,46 @@ printf env > "$target/.venv/marker"
         self.store.doc(task, "report").write_text("Completed the task; tests passed.\n")
         return self.publish(task, "report")
 
+    def prepare_rebind(self, task, current="old-executor", replacement="new-executor", manager="manager-agent"):
+        data = self.store.read(task)
+        data["agent"] = current
+        self.store.write(data)
+        manager = wake_runtime.recorded_manager(self.store) or manager
+        wake_runtime._record_manager(self.store, manager, source="test")
+        states = {
+            current: {"status": "idle", "checked_at": "test", "error": None},
+            replacement: {"status": "idle", "checked_at": "test", "error": None},
+        }
+        args = types.SimpleNamespace(task=task, agent=replacement, note="handoff after old executor completed")
+        return args, states, manager
+
+    def rebind_direct(self, args, states, manager):
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": manager}, clear=False), \
+                patch.object(cli, "agent_observations", return_value=states):
+            return cli.rebind(self.store, args)
+
     def task_output(self, *args):
         with patch("sys.stdout", new_callable=io.StringIO) as output:
             self.assertEqual(cli.main(["task", *args], cwd=self.projects), 0)
         return output.getvalue()
 
     def task_command_output(self, *args):
-        result = subprocess.run([str(MAM), "task", *args], capture_output=True, text=True, cwd=self.projects)
+        result = subprocess.run(mam_command("task", *args), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
     def job_command_output(self, *args):
-        result = subprocess.run([str(MAM), "job", *args], capture_output=True, text=True, cwd=self.projects)
+        result = subprocess.run(mam_command("job", *args), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
     def wait_call(self, *args, env=None, ok=True):
-        result = subprocess.run([str(MAM), "wait", *args], capture_output=True, text=True, env=env, cwd=self.projects)
+        result = subprocess.run(mam_command("wait", *args), capture_output=True, text=True, env=env, cwd=self.projects)
         self.assertEqual(result.returncode, 0 if ok else 2, result.stdout + result.stderr)
         return json.loads(result.stdout if ok else result.stderr)
 
     def wait_list_lines(self):
-        result = subprocess.run([str(MAM), "wait", "list"], capture_output=True, text=True, cwd=self.projects)
+        result = subprocess.run(mam_command("wait", "list"), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout.splitlines()
 
@@ -116,6 +154,37 @@ printf env > "$target/.venv/marker"
                 "token": token, "kind": "jobs", "task": task, "timeout": None,
                 "started_at": "test", "cancelled": None}
 
+    def test_source_cli_launcher_needs_no_adjacent_mam_or_site_package(self):
+        launcher = Path(self.temp.name) / "bare-python"
+        launcher.symlink_to(Path(sys.executable).resolve())
+        self.assertFalse(launcher.with_name("mam").exists())
+
+        shadow = Path(self.temp.name) / "shadow"
+        package = shadow / "multi_agent_manager"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        marker = Path(self.temp.name) / "shadow-cli-ran"
+        (package / "cli.py").write_text(
+            "from pathlib import Path\n"
+            "import os\n"
+            "Path(os.environ['MAM_TEST_SHADOW_MARKER']).write_text('shadow', encoding='utf-8')\n"
+            "raise SystemExit(91)\n",
+            encoding="utf-8",
+        )
+        environment = dict(os.environ)
+        environment.update({"PYTHONPATH": str(shadow), "MAM_TEST_SHADOW_MARKER": str(marker)})
+        result = subprocess.run(
+            mam_command("task", "list", python=launcher),
+            capture_output=True,
+            cwd=self.projects,
+            env=environment,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["标题\t任务状态\tTASK-ID\tAGENT-ID\tagent状态"])
+        self.assertFalse(marker.exists())
+
+
     def test_parallel_publications_preserve_drafts_and_index(self):
         first, second, draft = self.task(), self.task(), self.task()
         (self.root / "code.py").write_text("staged = True\n")
@@ -123,7 +192,7 @@ printf env > "$target/.venv/marker"
         (self.root / "code.py").write_text("unstaged = True\n")
         index = self.git(self.root, "ls-files", "--stage", "--", "code.py", ".gitignore")
         draft_bytes = self.store.doc(draft, "task").read_bytes()
-        commands = [[str(MAM), "task", "publish", task, "--file", "task"] for task in (first, second)]
+        commands = [mam_command("task", "publish", task, "--file", "task") for task in (first, second)]
         processes = [subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.projects) for command in commands]
         for process in processes:
             stdout, stderr = process.communicate(timeout=20)
@@ -203,7 +272,7 @@ printf env > "$target/.venv/marker"
     def test_task_list_text_has_header_and_status_keeps_records(self):
         header = "标题\t任务状态\tTASK-ID\tAGENT-ID\tagent状态"
         self.assertEqual(self.task_command_output("list").splitlines(), [header])
-        rejected = subprocess.run([str(MAM), "task", "list", "--json"], capture_output=True, text=True, cwd=self.projects)
+        rejected = subprocess.run(mam_command("task", "list", "--json"), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(rejected.returncode, 2)
         unbound = self.call("create", "--title", "中文\n标题\twith whitespace")["id"]
         self.assertEqual(self.task_command_output("list").splitlines()[1].split("\t"),
@@ -233,7 +302,7 @@ printf env > "$target/.venv/marker"
         self.assertEqual(json.loads(self.task_command_output("show", task, "--json"))["content"],
                          "# 更新后的要求\n\n正文不应被 JSON 转义。\n")
         self.assertEqual(self.task_command_output("show", task), "# 更新后的要求\n\n正文不应被 JSON 转义。\n")
-        rejected = subprocess.run([str(MAM), "task", "show", task, "--revision", first],
+        rejected = subprocess.run(mam_command("task", "show", task, "--revision", first),
                                   capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(rejected.returncode, 2)
 
@@ -416,6 +485,142 @@ printf env > "$target/.venv/marker"
         self.assertTrue(self.store.doc(first, "task").exists())
         self.assertEqual(self.call("status", first)["status"], "archived")
 
+    def test_rebind_preserves_workspace_jobs_publications_and_audits_handoff(self):
+        task = self.task()
+        workspace = self.add(task)
+        task_revision = self.publish(task)
+        report_revision = self.report(task)
+        data = self.store.read(task)
+        data["jobs"] = [{
+            "id": "handoff-job", "note": "formal evaluation", "host": "remote", "pid": 42,
+            "identity": {"host": "remote", "boot_id": "boot", "start_ticks": 42},
+            "status": "running", "checked_at": "before", "started_at": "before",
+            "probe": {"status": "running", "checked_at": "before", "error": None}, "archive": None,
+        }]
+        data["review"] = {"task": "source-task", "commits": {"multi-agent-manager": "source-commit"}}
+        self.store.write(data)
+        args, states, manager = self.prepare_rebind(task)
+        before = self.store.read(task)
+        result = self.rebind_direct(args, states, manager)
+        after = self.store.read(task)
+
+        self.assertEqual(result["agent"], "new-executor")
+        self.assertEqual(after["workspace"], before["workspace"])
+        self.assertEqual(after["repos"], before["repos"])
+        self.assertEqual(after["jobs"], before["jobs"])
+        self.assertEqual(after["report"], before["report"])
+        self.assertEqual(after["review"], before["review"])
+        self.assertEqual(self.call("status", task)["publications"], {"task": task_revision, "report": report_revision})
+        self.assertEqual(after["repos"]["multi-agent-manager"]["path"], workspace["path"])
+        self.assertEqual(after["handoffs"], [{
+            "from_agent": "old-executor", "to_agent": "new-executor", "at": after["handoffs"][0]["at"],
+            "note": args.note, "manager": manager,
+        }])
+        self.assertEqual(self.call("status", task)["handoffs"], after["handoffs"])
+
+    def test_rebind_accepts_readonly_not_loaded_threads(self):
+        task = self.task()
+        args, states, manager = self.prepare_rebind(task)
+        states["old-executor"]["status"] = "notLoaded"
+        states["new-executor"]["status"] = "notLoaded"
+        result = self.rebind_direct(args, states, manager)
+        self.assertEqual(result["agent"], "new-executor")
+
+    def test_rebind_rejects_busy_or_unverifiable_executor_or_replacement(self):
+        cases = (
+            ("old-executor", "active", "current executor is active"),
+            ("old-executor", "unknown", "cannot verify current executor state"),
+            ("new-executor", "active", "replacement agent is active"),
+            ("new-executor", "unknown", "cannot verify replacement agent state"),
+            ("new-executor", "idle", "cannot verify replacement agent state"),
+        )
+        for agent, state, message in cases:
+            with self.subTest(agent=agent, state=state):
+                task = self.task()
+                args, states, manager = self.prepare_rebind(task)
+                states[agent] = {"status": state, "checked_at": "test", "error": "App Server unavailable"}
+                with self.assertRaisesRegex(cli.Error, message):
+                    self.rebind_direct(args, states, manager)
+                self.assertEqual(self.store.read(task)["agent"], "old-executor")
+                self.assertNotIn("handoffs", self.store.read(task))
+
+    def test_rebind_rejects_conflicts_manager_invalid_archived_and_unbound_tasks(self):
+        task = self.task()
+        args, states, manager = self.prepare_rebind(task)
+        other = self.task()
+        other_data = self.store.read(other)
+        other_data["agent"] = args.agent
+        self.store.write(other_data)
+        with self.assertRaisesRegex(cli.Error, "already bound to another task"):
+            self.rebind_direct(args, states, manager)
+
+        other_data["status"] = "archived"
+        self.store.write(other_data)
+        manager_args = types.SimpleNamespace(task=task, agent=manager, note=args.note)
+        with self.assertRaisesRegex(cli.Error, "recorded Manager"):
+            self.rebind_direct(manager_args, states, manager)
+        invalid_args = types.SimpleNamespace(task=task, agent="bad\nagent", note=args.note)
+        with self.assertRaisesRegex(cli.Error, "single-line AGENT-ID"):
+            self.rebind_direct(invalid_args, states, manager)
+
+        unbound = self.task()
+        unbound_args = types.SimpleNamespace(task=unbound, agent="new-unbound", note=args.note)
+        unbound_states = {"new-unbound": {"status": "idle", "checked_at": "test", "error": None}}
+        with self.assertRaisesRegex(cli.Error, "no current executor"):
+            self.rebind_direct(unbound_args, unbound_states, manager)
+
+        archived = self.task()
+        archived_data = self.store.read(archived)
+        archived_data.update({"agent": "old-archived", "status": "archived"})
+        self.store.write(archived_data)
+        archived_args = types.SimpleNamespace(task=archived, agent="new-archived", note=args.note)
+        archived_states = {
+            "old-archived": {"status": "idle", "checked_at": "test", "error": None},
+            "new-archived": {"status": "idle", "checked_at": "test", "error": None},
+        }
+        with self.assertRaisesRegex(cli.Error, "is archived"):
+            self.rebind_direct(archived_args, archived_states, manager)
+
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": "another-manager"}, clear=False), \
+                patch.object(cli, "agent_observations", return_value=states):
+            with self.assertRaisesRegex(cli.Error, "must be called by the recorded Manager"):
+                cli.rebind(self.store, args)
+
+    def test_rebind_same_target_is_a_non_mutating_retry(self):
+        task = self.task()
+        args, states, manager = self.prepare_rebind(task)
+        self.rebind_direct(args, states, manager)
+        path = self.store.state / f"{task}.json"
+        before = path.read_bytes()
+        repeated = types.SimpleNamespace(task=task, agent=args.agent, note="lost CLI response retry")
+        result = self.rebind_direct(repeated, {args.agent: {"status": "active", "checked_at": "later", "error": None}}, manager)
+        self.assertTrue(result["unchanged"])
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(len(self.store.read(task)["handoffs"]), 1)
+
+    def test_rebind_rejects_active_optional_wait_even_with_idle_thread_metadata(self):
+        cases = (
+            ("old-executor", "running", "current executor has an active optional wait"),
+            ("old-executor", "unknown", "cannot verify current executor optional-wait identity"),
+            ("new-executor", "running", "replacement agent has an active optional wait"),
+        )
+        for waiter, wait_state, message in cases:
+            with self.subTest(waiter=waiter, wait_state=wait_state):
+                self.store.remove_wait("old-executor")
+                self.store.remove_wait("new-executor")
+                task = self.task()
+                args, states, manager = self.prepare_rebind(task)
+                self.store.write_wait(self.wait_record(waiter, 77, "agent-wait", task=task))
+                fake = types.SimpleNamespace(probe_process=lambda host, pid, identity, timeout=None: {
+                    "status": wait_state, "identity": identity, "checked_at": "test", "error": "identity query unavailable",
+                })
+                with patch.dict(os.environ, {"CODEX_THREAD_ID": manager}, clear=False), \
+                        patch.object(cli, "agent_observations", return_value=states), \
+                        patch.object(cli, "runtime", return_value=fake):
+                    with self.assertRaisesRegex(cli.Error, message):
+                        cli.rebind(self.store, args)
+                self.assertEqual(self.store.read(task)["agent"], "old-executor")
+
     def test_partial_creation_retry_and_no_foreign_branch_adoption(self):
         source = self.source("robot-bridge")
         task = self.task()
@@ -450,7 +655,7 @@ printf env > "$target/.venv/marker"
                 self.assertIn("repository name must be a non-empty single directory name", rejected["error"])
                 self.assertEqual(state.read_bytes(), before)
 
-        help_result = subprocess.run([str(MAM), "workspace", "add", "--help"], capture_output=True, text=True)
+        help_result = subprocess.run(mam_command("workspace", "add", "--help"), capture_output=True, text=True)
         self.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
         self.assertIn("below PROJECT_ROOT", help_result.stdout)
         self.assertNotIn("robot-bridge", help_result.stdout)
@@ -631,7 +836,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         other_config = self.configure(other_projects, other_root)
 
         def create(project, title):
-            result = subprocess.run([str(MAM), "task", "create", "--title", title], cwd=project,
+            result = subprocess.run(mam_command("task", "create", "--title", title), cwd=project,
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             return json.loads(result.stdout)["id"]
@@ -667,7 +872,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         (invalid / "env.json").write_text(json.dumps({"MAM_ROOT": str(self.root)}))
         with self.assertRaisesRegex(cli.Error, "missing required keys"):
             cli.project_config(nested)
-        rejected = subprocess.run([str(MAM), "task", "list"], cwd=nested, capture_output=True, text=True)
+        rejected = subprocess.run(mam_command("task", "list"), cwd=nested, capture_output=True, text=True)
         self.assertEqual(rejected.returncode, 2)
         self.assertIn("invalid project configuration", rejected.stderr)
         (invalid / "env.json").write_text("{")
@@ -685,10 +890,10 @@ base=$(git rev-parse --verify "$1^{commit}")
 
         outside = Path(self.temp.name) / "without configuration"
         outside.mkdir()
-        missing = subprocess.run([str(MAM), "task", "list"], cwd=outside, capture_output=True, text=True)
+        missing = subprocess.run(mam_command("task", "list"), cwd=outside, capture_output=True, text=True)
         self.assertEqual(missing.returncode, 2)
         self.assertIn("no .mam/env.json found", missing.stderr)
-        help_result = subprocess.run([str(MAM), "--help"], cwd=outside, capture_output=True, text=True)
+        help_result = subprocess.run(mam_command("--help"), cwd=outside, capture_output=True, text=True)
         self.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
 
     def test_configuration_resolves_path_aliases_and_keeps_linked_mam_root_distinct(self):
@@ -710,7 +915,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.assertEqual(cli.primary(linked), self.root)
         self.assertEqual(store.workspaces, self.projects / "workspace")
 
-        created = subprocess.run([str(MAM), "task", "create", "--title", "linked MAM root"], cwd=self.projects,
+        created = subprocess.run(mam_command("task", "create", "--title", "linked MAM root"), cwd=self.projects,
                                  capture_output=True, text=True)
         self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
         task = json.loads(created.stdout)["id"]
@@ -718,7 +923,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.assertFalse((self.root / ".local" / "tasks" / f"{task}.json").exists())
         main_before = self.git(self.root, "rev-parse", "main")
         state_before = self.git(self.root, "rev-parse", "project/state-vla")
-        published = subprocess.run([str(MAM), "task", "publish", task, "--file", "task"], cwd=self.projects,
+        published = subprocess.run(mam_command("task", "publish", task, "--file", "task"), cwd=self.projects,
                                    capture_output=True, text=True)
         self.assertEqual(published.returncode, 0, published.stdout + published.stderr)
         self.assertEqual(self.git(self.root, "rev-parse", "main"), main_before)
@@ -729,7 +934,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.git(self.root, "branch", "project/state-vla")
         config = self.configure(self.projects, self.root, "project/state-vla")
         store = cli.Store(config)
-        created = subprocess.run([str(MAM), "task", "create", "--title", "wrong publication branch"], cwd=self.projects,
+        created = subprocess.run(mam_command("task", "create", "--title", "wrong publication branch"), cwd=self.projects,
                                  capture_output=True, text=True)
         self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
         task = json.loads(created.stdout)["id"]
@@ -744,7 +949,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         main_before = self.git(self.root, "rev-parse", "main")
         branch_before = self.git(self.root, "rev-parse", "project/state-vla")
 
-        rejected = subprocess.run([str(MAM), "task", "publish", task, "--file", "task"], cwd=self.projects,
+        rejected = subprocess.run(mam_command("task", "publish", task, "--file", "task"), cwd=self.projects,
                                   capture_output=True, text=True)
         self.assertEqual(rejected.returncode, 2)
         self.assertIn("must be checked out on MAM_BRANCH", rejected.stderr)
@@ -772,10 +977,10 @@ base=$(git rev-parse --verify "$1^{commit}")
     def test_job_and_workspace_are_top_level_only(self):
         for command, description in (("job", "register, query and archive process records"),
                                      ("workspace", "manage repository worktrees and their environments")):
-            help_result = subprocess.run([str(MAM), command, "--help"], capture_output=True, text=True)
+            help_result = subprocess.run(mam_command(command, "--help"), capture_output=True, text=True)
             self.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
             self.assertIn(description, help_result.stdout)
-            old = subprocess.run([str(MAM), "task", command, "--help"], capture_output=True, text=True)
+            old = subprocess.run(mam_command("task", command, "--help"), capture_output=True, text=True)
             self.assertEqual(old.returncode, 2, old.stdout + old.stderr)
         self.assertEqual(self.job_command_output("list").splitlines(), ["描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID"])
 
@@ -793,13 +998,13 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.call("archive", task, "--note", "unsafe", ok=False)
         self.assertTrue((self.root / "code.py").exists())
 
-    def test_real_process_runtime_contract(self):
+    def test_running_process_archive_stops_tracking_without_stopping_process(self):
         try:
             process_runtime = cli.runtime()
         except cli.Error:
             self.skipTest("parallel job_runtime module has not been integrated")
         task = self.task()
-        child = subprocess.Popen([sys.executable, "-c", "import sys; sys.stdin.read()"], stdin=subprocess.PIPE)
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         try:
             args = types.SimpleNamespace(task=task, note="owned smoke", host="localhost", pid=child.pid)
             job = cli.job_add(self.store, args)
@@ -813,106 +1018,95 @@ base=$(git rev-parse --verify "$1^{commit}")
             rows = self.job_command_output("list", "--task", task, "--status", "running").splitlines()
             self.assertEqual(rows[0], "描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID")
             self.assertEqual(rows[1].split("\t"), ["owned smoke", "running", detail["started_at"], job["id"], "test task", task])
-            child.stdin.close()
-            child.wait(timeout=10)
-            self.assertEqual(process_runtime.probe_process("localhost", child.pid, job["identity"])["status"], "stopped")
-            saved = cli.job_archive(self.store, types.SimpleNamespace(job=job["id"], note="test exited"))
+            before = self.store.read(task)["jobs"][0]
+            saved = cli.job_archive(self.store, types.SimpleNamespace(job=job["id"], note="tracking complete"))
             self.assertEqual(saved["status"], "archived")
+            self.assertEqual(saved["identity"], before["identity"])
+            self.assertEqual(saved["probe"], before["probe"])
+            self.assertEqual(saved["checked_at"], before["checked_at"])
+            self.assertEqual(saved["probe"]["status"], "running")
+            self.assertIsNone(child.poll())
+            self.assertEqual(process_runtime.probe_process("localhost", child.pid, job["identity"])["status"], "running")
+            repeated = cli.job_archive(self.store, types.SimpleNamespace(job=job["id"], note="ignored retry note"))
+            self.assertEqual(repeated["archive"], saved["archive"])
             archived = self.call("status", job["id"], command="job")
             self.assertEqual(archived["status"], "archived")
-            self.assertEqual(archived["archive"]["note"], "test exited")
+            self.assertEqual(archived["archive"]["note"], "tracking complete")
             cli.archive(self.store, types.SimpleNamespace(task=task, note="smoke complete"))
+            self.assertEqual(self.store.read(task)["status"], "archived")
+            self.assertIsNone(child.poll())
+            self.assertEqual(process_runtime.probe_process("localhost", child.pid, job["identity"])["status"], "running")
         finally:
             if child.poll() is None:
                 child.terminate()
                 child.wait(timeout=10)
 
-    def test_wait_stop_keeps_process_and_uses_waiter_binding(self):
-        monitored = self.call("create", "--title", "monitored task")["id"]
-        waiter_task = self.call("create", "--title", "waiter binding")["id"]
-        self.call("bind", monitored, "--agent", "job-owner")
-        self.call("bind", waiter_task, "--agent", "waiter-one")
-        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
-        waiter = None
-        try:
-            self.call("add", monitored, "--note", "wait smoke", "--host", "localhost", "--pid", str(child.pid), command="job")
-            environment = {**os.environ, "CODEX_THREAD_ID": "waiter-one"}
-            waiter = subprocess.Popen([str(MAM), "wait", "jobs", "--task", monitored,
-                                       "--timeout", "10"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                                       env=environment, cwd=self.projects)
-            deadline = time.monotonic() + 3
-            while time.monotonic() < deadline:
-                rows = self.wait_list_lines()
-                if len(rows) == 2:
-                    break
-                time.sleep(0.05)
-            else:
-                self.fail("waiter was not registered")
-            self.assertEqual(rows[0], "AGENT-ID\t绑定任务标题\tTASK-ID\t等待内容\t等待开始时间")
-            self.assertEqual(rows[1].split("\t")[:4], ["waiter-one", "waiter binding", waiter_task, f"jobs TASK-ID={monitored}"])
-            duplicate = self.wait_call("jobs", "--task", monitored, "--agent", "waiter-one", "--timeout", "1", ok=False)
-            self.assertIn("already waiting", duplicate["error"])
-            self.assertEqual(self.wait_call("stop", "--agent", "waiter-one")["status"], "cancelled")
-            stdout, stderr = waiter.communicate(timeout=3)
-            self.assertEqual(waiter.returncode, 0, stderr)
-            self.assertEqual(json.loads(stdout)["status"], "cancelled")
-            self.assertIsNone(child.poll(), "wait stop must not signal the monitored process")
-            self.assertEqual(self.wait_list_lines(), ["AGENT-ID\t绑定任务标题\tTASK-ID\t等待内容\t等待开始时间"])
-            self.assertEqual(self.wait_call("stop", "--agent", "waiter-one")["status"], "not_waiting")
-        finally:
-            if waiter and waiter.poll() is None:
-                subprocess.run([str(MAM), "wait", "stop", "--agent", "waiter-one"], capture_output=True, cwd=self.projects)
-                waiter.terminate()
-                waiter.wait(timeout=3)
-            if child.poll() is None:
-                child.terminate()
-                child.wait(timeout=3)
+    def test_job_archive_skips_unknown_remote_probe_and_preserves_history(self):
+        task = self.task()
+        data = self.store.read(task)
+        data["jobs"] = [{
+            "id": "unreachable-job", "note": "remote results", "host": "unreachable.example", "pid": 42,
+            "identity": {"host": "unreachable.example", "boot_id": "boot", "start_ticks": 42},
+            "status": "running", "checked_at": "last-running",
+            "probe": {"status": "unknown", "checked_at": "offline", "error": "SSH query timed out"},
+            "archive": None,
+        }]
+        self.store.write(data)
+        before = json.loads(json.dumps(data["jobs"][0]))
+        with patch.object(cli, "runtime", side_effect=AssertionError("job archive must not probe processes")):
+            archived = cli.job_archive(self.store, types.SimpleNamespace(job="unreachable-job", note="results copied"))
+            repeated = cli.job_archive(self.store, types.SimpleNamespace(job="unreachable-job", note="ignored retry note"))
+        self.assertEqual(archived["status"], "archived")
+        self.assertEqual(archived["identity"], before["identity"])
+        self.assertEqual(archived["probe"], before["probe"])
+        self.assertEqual(archived["checked_at"], before["checked_at"])
+        self.assertEqual(archived["archive"]["note"], "results copied")
+        self.assertEqual(repeated["archive"], archived["archive"])
 
-    def test_wait_stop_manager_selects_unbound_waiter_and_keeps_job_running(self):
-        monitored, execution = self.task(), self.task()
-        self.call("bind", monitored, "--agent", "job-owner")
-        self.call("bind", execution, "--agent", "execution-agent")
-        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
-        waiters = []
-        try:
-            self.call("add", monitored, "--note", "manager stop smoke", "--host", "localhost", "--pid", str(child.pid), command="job")
-            for agent in ("manager-agent", "execution-agent"):
-                waiters.append((agent, subprocess.Popen([str(MAM), "wait", "jobs", "--task", monitored,
-                                                          "--agent", agent, "--timeout", "10"], stdout=subprocess.PIPE,
-                                                         stderr=subprocess.PIPE, text=True, cwd=self.projects)))
-            deadline = time.monotonic() + 3
-            while time.monotonic() < deadline:
-                if {row.split("\t")[0] for row in self.wait_list_lines()[1:]} == {"manager-agent", "execution-agent"}:
-                    break
-                time.sleep(0.05)
-            else:
-                self.fail("manager and execution waits were not registered")
-            self.assertIn("choose exactly one", self.wait_call("stop", ok=False)["error"])
-            self.assertIn("choose exactly one", self.wait_call("stop", "manager", "--agent", "manager-agent", ok=False)["error"])
+    def test_task_archive_requires_all_jobs_archived_without_probing(self):
+        task = self.task()
+        data = self.store.read(task)
+        data["jobs"] = [{
+            "id": "unarchived-job", "note": "remote results", "host": "unreachable.example", "pid": 42,
+            "identity": {"host": "unreachable.example", "boot_id": "boot", "start_ticks": 42},
+            "status": "running", "checked_at": "last-running",
+            "probe": {"status": "unknown", "checked_at": "offline", "error": "SSH query timed out"},
+            "archive": None,
+        }]
+        self.store.write(data)
+        with patch.object(cli, "runtime", side_effect=AssertionError("archive must not probe processes")):
+            with self.assertRaisesRegex(cli.Error, "unarchived registered jobs: unarchived-job"):
+                cli.archive(self.store, types.SimpleNamespace(task=task, note="blocked"))
+            self.assertEqual(self.store.read(task)["status"], "working")
+            cli.job_archive(self.store, types.SimpleNamespace(job="unarchived-job", note="results copied"))
+            cli.archive(self.store, types.SimpleNamespace(task=task, note="complete"))
+        self.assertEqual(self.store.read(task)["status"], "archived")
 
-            started = time.monotonic()
-            stopped = self.wait_call("stop", "manager")
-            self.assertLess(time.monotonic() - started, 2)
-            self.assertEqual(stopped, {"status": "cancelled", "agent": "manager-agent"})
-            manager_waiter = waiters[0][1]
-            stdout, stderr = manager_waiter.communicate(timeout=3)
-            self.assertEqual(manager_waiter.returncode, 0, stderr)
-            self.assertEqual(json.loads(stdout)["status"], "cancelled")
-            self.assertIsNone(waiters[1][1].poll(), "bound execution wait must be excluded")
-            self.assertIsNone(child.poll(), "manager stop must not signal the monitored job")
-            self.assertEqual(self.wait_call("stop", "--agent", "execution-agent")["status"], "cancelled")
-            stdout, stderr = waiters[1][1].communicate(timeout=3)
-            self.assertEqual(waiters[1][1].returncode, 0, stderr)
-            self.assertEqual(json.loads(stdout)["status"], "cancelled")
-        finally:
-            for agent, waiter in waiters:
-                if waiter.poll() is None:
-                    subprocess.run([str(MAM), "wait", "stop", "--agent", agent], capture_output=True, cwd=self.projects)
-                    waiter.terminate()
-                    waiter.wait(timeout=3)
-            if child.poll() is None:
-                child.terminate()
-                child.wait(timeout=3)
+
+    def test_wait_list_and_manual_stop_preserve_the_wait_process(self):
+        observation = cli.runtime().probe_process("local", os.getpid())
+        self.assertEqual(observation["status"], "running")
+        record = {
+            "agent": "manager-agent",
+            "pid": os.getpid(),
+            "identity": observation["identity"],
+            "token": "manager-token",
+            "kind": "unified",
+            "role": "manager",
+            "task": None,
+            "turn_id": "turn-id",
+            "timeout": 3600,
+            "started_at": "test",
+            "cancelled": None,
+        }
+        self.store.write_wait(record)
+        rows = cli.wait_list(self.store, types.SimpleNamespace())
+        self.assertEqual(rows, [{"agent": "manager-agent", "task_title": "未绑定", "task": "未绑定",
+                                 "waiting": "unified manager", "started_at": "test"}])
+        stopped = cli.wait_stop(self.store, types.SimpleNamespace(agent="manager-agent", manager=None))
+        self.assertEqual(stopped, {"status": "cancelled", "agent": "manager-agent"})
+        self.assertEqual(self.store.read_wait("manager-agent")["cancelled"] is not None, True)
+        self.assertEqual(cli.runtime().probe_process("local", os.getpid(), observation["identity"])["status"], "running")
 
     def test_wait_stop_manager_requires_unique_verifiable_unbound_waiter(self):
         states = {1: "running", 2: "running", 3: "unknown", 4: "running", 5: "running", 6: "running"}
@@ -985,107 +1179,19 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.assertTrue(self.store.read_wait("first-manager")["cancelled"])
         self.assertIsNone(other_store.read_wait("second-manager")["cancelled"])
 
-    def test_waiters_for_two_agents_are_independent(self):
-        task = self.task()
-        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
-        waiters = []
-        try:
-            self.call("add", task, "--note", "shared wait", "--host", "localhost", "--pid", str(child.pid), command="job")
-            for agent in ("waiter-left", "waiter-right"):
-                waiters.append(subprocess.Popen([str(MAM), "wait", "jobs", "--task", task,
-                                                  "--agent", agent, "--timeout", "10"], stdout=subprocess.PIPE,
-                                                 stderr=subprocess.PIPE, text=True, cwd=self.projects))
-            deadline = time.monotonic() + 3
-            while time.monotonic() < deadline:
-                agents = {row.split("\t")[0] for row in self.wait_list_lines()[1:]}
-                if agents == {"waiter-left", "waiter-right"}:
-                    break
-                time.sleep(0.05)
-            else:
-                self.fail("both waiters were not registered")
-            self.wait_call("stop", "--agent", "waiter-left")
-            stdout, stderr = waiters[0].communicate(timeout=3)
-            self.assertEqual(waiters[0].returncode, 0, stderr)
-            self.assertEqual(json.loads(stdout)["status"], "cancelled")
-            self.assertIsNone(waiters[1].poll())
-            self.assertEqual({row.split("\t")[0] for row in self.wait_list_lines()[1:]}, {"waiter-right"})
-            self.wait_call("stop", "--agent", "waiter-right")
-            stdout, stderr = waiters[1].communicate(timeout=3)
-            self.assertEqual(waiters[1].returncode, 0, stderr)
-            self.assertEqual(json.loads(stdout)["status"], "cancelled")
-        finally:
-            for agent, waiter in zip(("waiter-left", "waiter-right"), waiters):
-                if waiter.poll() is None:
-                    subprocess.run([str(MAM), "wait", "stop", "--agent", agent], capture_output=True, cwd=self.projects)
-                    waiter.terminate()
-                    waiter.wait(timeout=3)
-            if child.poll() is None:
-                child.terminate()
-                child.wait(timeout=3)
-
-    def test_wait_reports_empty_timeout_stopped_unknown_and_stale_records(self):
-        empty = self.task()
-        environment = {key: value for key, value in os.environ.items() if key != "CODEX_THREAD_ID"}
-        environment["CODEX_SESSION_ID"] = "inherited-root-session"
-        missing = self.wait_call("jobs", "--task", empty, env=environment, ok=False)
-        self.assertIn("CODEX_THREAD_ID", missing["error"])
-        self.assertEqual(self.wait_call("jobs", "--task", empty, "--agent", "empty-agent")["status"], "empty")
-
-        task = self.task()
-        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
-        try:
-            job = self.call("add", task, "--note", "timeout smoke", "--host", "localhost", "--pid", str(child.pid), command="job")
-            self.assertEqual(self.wait_call("jobs", "--task", task, "--agent", "timeout-agent", "--timeout", "0.05")["status"], "timeout")
-            self.assertIsNone(child.poll())
-            child.terminate()
-            child.wait(timeout=3)
-            self.assertEqual(self.call("status", job["id"], command="job")["status"], "stopped")
-            stopped = self.wait_call("jobs", "--task", task, "--agent", "stopped-agent")
-            self.assertEqual((stopped["status"], stopped["job"]), ("stopped", job["id"]))
-        finally:
-            if child.poll() is None:
-                child.terminate()
-                child.wait(timeout=3)
-
-        unknown = self.task()
-        data = self.store.read(unknown)
-        data["jobs"] = [{"id": "unknown-job", "note": "offline", "host": "invalid;host", "pid": 1,
-                         "identity": {"host": "invalid;host", "boot_id": "boot", "start_ticks": 1}, "status": "running",
-                         "checked_at": "saved", "probe": {"status": "unknown", "checked_at": "saved", "error": "offline"},
-                         "archive": None}]
-        self.store.write(data)
-        self.assertEqual(self.wait_call("jobs", "--task", unknown, "--agent", "unknown-agent", "--timeout", "0.05")["status"], "timeout")
-        self.store.write_wait({"agent": "stale-agent", "pid": 999999, "identity": {"host": "local", "boot_id": "old", "start_ticks": 1},
-                               "token": "stale", "kind": "jobs", "task": unknown, "timeout": None, "started_at": "old", "cancelled": None})
-        self.assertEqual(self.wait_list_lines(), ["AGENT-ID\t绑定任务标题\tTASK-ID\t等待内容\t等待开始时间"])
-        self.assertEqual(self.wait_call("jobs", "--task", unknown, "--agent", "stale-agent", "--timeout", "0.05")["status"], "timeout")
-
-    def test_wait_deadline_limits_each_remote_probe(self):
-        task = self.task()
-        data = self.store.read(task)
-        data["jobs"] = [{"id": str(index), "status": "running", "host": "remote",
-                         "pid": index + 1, "identity": None} for index in range(8)]
-        self.store.write(data)
-        real_probe = cli.runtime().probe_process
-        for duration, expected in ((0.01, [0.01]), (0.75, [0.5, 0.25])):
-            clock, budgets = [100.0], []
-
-            def probe(host, pid, identity=None, timeout=None):
-                if host == "local":
-                    return real_probe(host, pid, identity)
-                budgets.append(timeout)
-                clock[0] += timeout
-                return {"status": "unknown", "error": "SSH query timed out"}
-
-            with self.subTest(duration=duration), patch.object(cli.time, "monotonic", side_effect=lambda: clock[0]), \
-                    patch.object(cli, "runtime", return_value=types.SimpleNamespace(probe_process=probe)):
-                result = cli.wait_jobs(self.store, types.SimpleNamespace(
-                    task=task, agent="deadline-agent", timeout=duration))
-            self.assertEqual(result["status"], "timeout")
-            self.assertEqual(len(budgets), len(expected))
-            for actual, wanted in zip(budgets, expected):
-                self.assertAlmostEqual(actual, wanted)
-            self.assertFalse(self.store.wait_path("deadline-agent").exists())
+    def test_two_manual_wait_records_are_independent(self):
+        observation = cli.runtime().probe_process("local", os.getpid())
+        for agent, token in (("waiter-left", "left"), ("waiter-right", "right")):
+            record = self.wait_record(agent, os.getpid(), token)
+            record.update({"kind": "unified", "role": "manager", "turn_id": f"{agent}-turn", "timeout": 3600})
+            record["identity"] = observation["identity"]
+            self.store.write_wait(record)
+        self.assertEqual(cli.wait_stop(self.store, types.SimpleNamespace(agent="waiter-left", manager=None)),
+                         {"status": "cancelled", "agent": "waiter-left"})
+        self.assertTrue(self.store.read_wait("waiter-left")["cancelled"])
+        self.assertIsNone(self.store.read_wait("waiter-right")["cancelled"])
+        self.assertEqual(cli.wait_stop(self.store, types.SimpleNamespace(agent="waiter-right", manager=None)),
+                         {"status": "cancelled", "agent": "waiter-right"})
 
     def test_attention_marks_stopped_job_with_unknown_agent(self):
         task = self.task()
@@ -1134,12 +1240,13 @@ base=$(git rev-parse --verify "$1^{commit}")
             agent["status"] = "active"
             self.assertFalse(cli.job_list(self.store, query)["jobs"])
             cli.job_archive(self.store, types.SimpleNamespace(job=one["id"], note="results saved"))
-            cli.archive(self.store, types.SimpleNamespace(task=task, note="done"))
+            with self.assertRaisesRegex(cli.Error, "unarchived registered jobs"):
+                cli.archive(self.store, types.SimpleNamespace(task=task, note="done"))
             process["status"] = "running"
             saved = self.store.read(task)
             cli.refresh_jobs(saved)
             self.assertEqual(saved["jobs"][0]["status"], "archived")
-            self.assertEqual(saved["jobs"][1]["status"], "stopped")
+            self.assertEqual(saved["jobs"][1]["status"], "running")
 
 
 if __name__ == "__main__":
