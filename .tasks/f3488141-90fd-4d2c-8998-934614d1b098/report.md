@@ -1,3 +1,11 @@
+# 2026-09-22 清理交接核对（manager 审计）
+
+本次只核对本 task 的 `.tasks` 附件、现有简报和保存的 MAM task 记录；没有创建或修改 workspace、远端内容、实验或 job。该目录没有未跟踪附件，也没有待提交 diff；仅有已跟踪的 `task.md` 与本 `report.md`，两者均应保留。没有附件需要提交、迁移或删除。
+
+task 当前仍为 `pending`。保存的 MAM 记录显示 `swap_blocks J` formal job `74f550ad-b8d7-4480-9cde-913cbe640ea5`（C1 GPU2，PID 2162806）和 `battery_try N` formal job `a98c0bc6-e386-4bb4-ad12-651e80407908`（C1 GPU3，PID 2189992）均为 `stopped`，最近检查时间分别为 2026-09-21T20:24:08Z 和 2026-09-21T20:24:09Z，且均未 archive。下方“运行中”文字是 2026-09-20 的历史状态，不作为当前运行结论；本轮未扩展到远端结果审计。
+
+归档当前至少受这两条未归档 stopped job 阻塞，并须由后续负责人按正式结果的稳定留存位置与代码交付状态复核后收尾。未获 Manager 的共享 Git 授权，本次未 commit、publish 或 archive。
+
 # 六个首波 N/J 模型的 Cluster-C 评测执行（C1 GPU1 r3 formal100 运行中）
 
 六个 20k checkpoint 已传输并验收，冻结 runtime 为 RMBench `ad7f9d6ba9acd16c31243ad4811e0dfa31cef514`、robot-bridge `f9626636c4776d8eb15f9c556775cb2d12c000e5`、OpenPI `a869498f01a246752d7e5c6ed5ccd5dfdd9b3ff4`。C3 的 `c3-highfreq-engineering-20260914` 未被读取、修改或删除；未启动训练。C1 GPU1 的 `swap_blocks` N/eval0 已完成 r3 smoke 并启动 matching formal100。
