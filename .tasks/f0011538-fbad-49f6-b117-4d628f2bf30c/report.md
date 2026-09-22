@@ -45,3 +45,13 @@ N processed/LeRobot pipeline validation：
 ## MAM 状态
 
 observe formal 已完成、回传、CPU restore 和 B 删除收据；swap_T N 链已就绪。当前没有新的 swap_T S/J 训练。f001 的 7 个 jobs 均已归档。
+
+## 2026-09-22 当前交付与归档状态
+
+已核对稳定产物：observe formal checkpoint 位于
+`/mnt/public/xcj/Projects/openpi/checkpoints/observe_and_pickup_n_b_formal20k_ec86d857_20260914T162824Z/pi05_rmbench_observe_and_pickup_no_memory/memory20k_ec86d857_observe_and_pickup_n_s0/20000`；swap_T 的 source validation、pipeline validation 和 CPU batch 分别位于
+`/mnt/public/xcj/Projects/RMBench/data/swap_T/demo_clean_state/metadata/validation_report.json`、
+`/mnt/public/xcj/Projects/RMBench/logs/wave1_missing_tasks_a/swap_T_n_conversion_20260915T0048/swap_T_n_pipeline_validation.json` 和
+`/mnt/public/xcj/Projects/RMBench/logs/wave1_missing_tasks_a/swap_T_n_conversion_20260915T0048/real_cpu_batch_swap_t_n.json`。
+
+当前归档阻塞是代码尚未交付：RMBench `05e512f529a4dea393d2f730b1f34ed6d5b5f212` 与 openpi `ec86d857d075cd8e1dc7aba2445e557d76ab2069` 尚未被任何非 `task/f0011538-fbad-49f6-b117-4d628f2bf30c` 分支包含。workspace 中的 transfer/restore 收据仅按历史要求暂留，不构成当前归档阻塞；本轮未迁移产物或扩展清理 workspace。
