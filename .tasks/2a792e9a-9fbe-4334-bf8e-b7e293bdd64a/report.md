@@ -5,8 +5,8 @@
 - 已删除 workspace 内 119,400 个可再生或重复文件（清理前 `du` 约 15.809 GiB）：`data_smoke/`、`data_smoke_postcommit/`、`checkpoint-transfer-20260920/`、两个 `.venv`、pytest/ruff 缓存及 15 个 `__pycache__` 目录。环境中存在跨 workspace hardlink，实际释放磁盘空间可能小于此逻辑占用。误识别的 6 个 tracked `.worklogs/` 文件已立即从 HEAD 恢复并保留。
 - 稳定产物存在且未修改：50 集原始数据为 `RMBench/data/press_button/demo_clean_state` 和 `RMBench/data/blocks_ranking_try/demo_clean_state`；转换数据为 `/mnt/public/xcj/cache/huggingface/lerobot/{press_button_demo_clean_state_no_memory,blocks_ranking_try_demo_clean_state_no_memory,swap_T_demo_clean_state_shared_memory}`；20k checkpoint 为 `openpi/checkpoints/{press_button_n_formal_2bcf3a1_20260915,blocks_ranking_try_n_formal_2bcf3a1_20260920,swap_T_n_formal_retry1_ec86d857_20260920}`。三个 checkpoint 都有已提交的 `20000` 目录。
 - 代码还未交付到业务主 checkout：RMBench `74db6317...` 和 OpenPI `2bcf3a155...` 仅由本 task 分支持有，均非当前 primary HEAD 的祖先。在 Manager 协调合入或保留可以承载代码的 ref 前，不能 archive 并删除任务分支。
-- MAM 记录中仅剩 stopped jobs `8a828bdf-4711-400e-89c3-1526b1694f22` 与 `f39ba4a8-a6ca-4b6c-9cd2-b6a9f5330a57`。对应 PID 已不存在，定稳日志显示两者均到 step 20,000 并完成 checkpoint finalize。未在本轮重做 restore 验证或 archive job；Manager 核定这一证据边界后可为两 job 写实际完成说明并 archive。
-- workspace 现仅留 clean 的登记 RMBench/OpenPI worktree；剩余 ignored 项都是稳定产物软链接或 `.local` 入口，符合 MAM archive preflight。当前 archive 阻塞是两个未归档 job 和上述代码交付。
+- MAM stopped jobs `8a828bdf-4711-400e-89c3-1526b1694f22`（`blocks_ranking_try N`）与 `f39ba4a8-a6ca-4b6c-9cd2-b6a9f5330a57`（`swap_T N retry1`）均已 archive。对应 PID 的最后观测为不存在；定稳日志与上述稳定 `20000` checkpoint 的 `_CHECKPOINT_METADATA` 支持训练完成和 checkpoint finalize。两条 archive note 均明确记录已有 CPU restore PASS，本轮未重做 restore。
+- workspace 现仅留 clean 的登记 RMBench/OpenPI worktree；剩余 ignored 项都是稳定产物软链接或 `.local` 入口，符合 MAM archive preflight。两个 job 阻塞已解除；在 Manager 协调代码合入或保留承载 `RMBench 74db6317...` 与 `OpenPI 2bcf3a155...` 的 ref 前，仍不得 archive task。
 
 ---
 
