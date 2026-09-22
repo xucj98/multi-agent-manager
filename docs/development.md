@@ -2,6 +2,14 @@
 
 本文只适用于修改 Multi-Agent Manager（MAM）代码。
 
+# 文档修改原则
+
+修改文档时，应该明确阅读对象和使用场景。
+1. mam/AGENTS.md 主要是给 subagent 看的，包括manager，需要管mam如何安装。
+2. install.md 是给首次使用，需要安装 mam 的人看的，不应该包含如何开发 mam 的内容，如 `.local/create_worktree.sh` 是用作开发的，使用者不需要准备。
+3. development.md 是给 mam 的开发者用的。
+4. 上述几个文档都随 MAM 上传 git，MAM 可以被部署到各个集群，因此其中不应该有本地环境特定的说明。本地环境说明保留在 `.local/README.md` 中不上传 git。
+
 ## Python 与 editable 安装
 
 首次开发 MAM 需要先准备 `.local/create_worktree.sh` 并验证可用性，已有 `.local/create_worktree.sh` 可跳过此条。MAM 的 `pyproject.toml` 要求 Python >=3.10，应选择可用的解释器；`scripts/local_create_worktree.sh` 只是没有站点默认值的复制模板。

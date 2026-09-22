@@ -18,10 +18,20 @@ PROJECT_ROOT/
   MAM_ROOT/                   # MAM 根目录
     .tasks/TASK-ID/task.md    # Manager 编辑任务要求
     .tasks/TASK-ID/report.md  # 执行者编辑结果简报
+    .tasks/TASK-ID/files      # 其他有必要保留的一次性文件
   REPO/                       # 一个项目下可以有多个 git 仓库
   workspace/TASK-ID/          # 执行者的独立工作空间
     REPO/                     # 按需创建的 worktree，分支为 task/TASK-ID
+    tmp/                      # 存放临时文件，任务归档时被清理
 ```
+
+### 文件留存原则
+
+为了保证项目的长期可维护性，需要严格控制留存的内容。项目文件根据用途分成4类：
+1. 后续会**重复使用**的代码、配置、分析工具。进入各个 `REPO`，随 git 提交。
+2. 一次性，但有必要保留以解释本次结论的分析代码。进入 `.tasks/TASK-ID/`，随 git 提交。
+3. 正式数据、checkpoint、评测原始结果。放在 `REPO` 约定的稳定产物目录，不进入 git。
+4. 一次性检查脚本、调试输出、中间版本。放在 `workspace/<task-id>/tmp/`。无需手动清理，`mam task archive` 时自动清理。
 
 ## 安装
 
@@ -40,6 +50,7 @@ mam task archive TASK-ID --note NOTE
 ```
 
 - `create` 返回 `TASK-ID`；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求；然后发布任务。
+- `archive` 要求该任务的所有 job 已归档；归档时移除已登记的 worktree、任务分支和 `workspace/TASK-ID`，但保留 `.tasks/TASK-ID` 的任务、简报和历史登记。
 - 使用 codex 工具创建 subagent，要求其查看 `AGENTS.md` 并使用 `mam task show TASK-ID` 查看任务；获取 `AGENT-ID`，绑定执行 agent。
 - 需要交接已有任务时，Manager 先让旧执行者和新执行者结束当前 turn；新执行者可先只读查看已发布内容，再用 `rebind` 接续原 `TASK-ID`、workspace、worktree 和 job。不要为交接后的 agent 再次运行 `workspace add`。
 - 途中追加要求时，先更新 `task.md` 并发布，再通知执行者读取新版本。
@@ -69,13 +80,15 @@ mam task show TASK-ID
 mam workspace add TASK-ID --repo REPO --base COMMIT
 ```
 
-完成后，在 `MAM_ROOT` 的 `.tasks/TASK-ID/report.md` 写结果简报，记录完成项、workspace 与交付 commit、验证结果和成果位置。然后发布简报：
+完成任务后，根据 [文件留存原则](#文件留存原则) 整理文件。然后在 `MAM_ROOT` 的 `.tasks/TASK-ID/report.md` 写结果简报，记录完成项、交付 commit、验证结果和成果位置。然后发布简报：
 
 ```text
 mam task publish TASK-ID --file report
 ```
 
-交付后清理临时文件，保留 worktree 供 Manager 验收、归档。
+任务需要长期保留的一次性附件由执行者单独提交到 `MAM_BRANCH`；`mam task publish --file report` 只发布结果简报。Manager 归档前确认本任务需要保留的附件已提交，workspace 中的临时文件已经清理。
+
+Manager 验收后，根据情况返工或合入主分支。全部工作完成后，由 Manager 调用 `mam task archive` 清理 worktree、git branch 和 workspace。
 
 ## 进程管理
 
