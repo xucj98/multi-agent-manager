@@ -78,3 +78,9 @@ git diff --check
 ```
 
 双卡容量证据应交回原独立 review 增量验收；Manager 如需继续，只能在新授权下决定资源或冻结合同的后续处理。
+
+## 2026-09-22 文件与交付状态
+
+- `.tasks/e34ba9b3-34e2-4df4-92d8-4cea983b7303/` 仅有已跟踪的 `task.md` 和 `report.md`，没有未跟踪或 ignored 附件，无需迁移旧收据。
+- 三个登记 commit 均存在于各 primary repository，但尚未进入 primary HEAD：OpenPI `66d9253cf1bdc4971e59cdae7827846eccdb4714`、RMBench `4db38c1f936c3e1bed1c85114d8173b07a472243`、robot-bridge `20dae84e5fc2e48f93e72b5c1b8a0001071fec94`；归档前需要 Manager 决定合入或保留相应 task/review 分支。
+- V 当前搁置且没有未归档 job。归档前仍需 Manager 决定将搁置任务关闭、处置上述代码交付，并在授权时发布本段 report 草稿；本轮未更改 workspace、运行或审查。
