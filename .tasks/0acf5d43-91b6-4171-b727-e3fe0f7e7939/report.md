@@ -450,3 +450,12 @@ baseline scheduler receipt SHA-256 为 `f56e3438c911ce76232b9e69b0928b3860f2df8d
 ## 历史：修正 shadow 前的未执行项
 
 此前的源码修复验证仍是 CPU-only；早先 C3 有界诊断已完成 6 次首 query 采样，本报告的“原入口有界首 query 执行”节另记录随后授权的 baseline 1 次真实 action request。未启动新的完整轨迹、matching smoke、formal 100、`r_s=30` 或 HF 效果试验，未训练、未改 checkpoint、未部署，也没有新增生产源码提交。累计已使用 `7/8` 个正常 action samples；剩余 1 个仅可在 Manager 对新的有界假设明确授权后使用。
+
+## 2026-09-22 文件整理与交接
+
+- 已移除 16 个可再生的 `first_query_diagnostic/tools/__pycache__/*.pyc`，以及 workspace 中两个未登记的 `patches/*-before-f401.patch` 备份；未删除 task/report、已跟踪文件、代码 worktree 或正式产物。
+- 本轮再删除历史 launcher、插桩、CPU 准备 test、交接 JSON 与计数收据等 13 个未跟踪附件。报告早先指向这些本机附件的链接仅保留为历史执行记录；关键结论以本 report、正式结果和已留存的远端原件为准。
+- 仅保留并提交三个一次性离线分析文件：`first_query_diagnostic/tools/analyze_first_query.py` 比较两次有界 capture，`align_historical_first_query.py` 对齐历史首 query 证据，`capture_common.py` 为前者提供稳定序列化和哈希辅助。三者解释尚未解决的首动作差异，不是可复用业务代码。
+- 三个登记 worktree 均 clean，交付 commit 为 OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`。三个 commit 尚未进入各 primary HEAD，归档前需要 Manager 决定合入或保留其交付分支。
+- 正式 HF 原始结果已位于稳定目录 `/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/`：18 个 `c_hf_j_*_100ep` run 均包含 `config.yaml`、`episode_diagnostics.jsonl`、`diagnostics_summary.json` 和 `rolling_evidence/`。27 个 MAM job 已归档。
+- 三个脚本随本 task 的 MAM Git 提交保留，简报随即发布；此后归档阻塞仅为上述代码交付处置。本轮未运行实验或 archive。
