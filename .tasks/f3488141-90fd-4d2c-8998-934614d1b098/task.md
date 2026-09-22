@@ -1,3 +1,11 @@
+## 2026-09-22 当前清理交接要求（覆盖下文历史执行授权）
+
+本轮只整理文件及交付状态，禁止启动训练、eval、数据生成、GPU smoke或继续旧实验计划。按当前 README 文件留存原则清理本 task 的附件：复用代码归业务库；确有必要的一次性分析附件留在本目录并提交；正式数据/checkpoint/原始评测结果留稳定产物目录不进 Git；临时脚本、调试输出、重复副本删除。保留 task.md/report.md 和既有已跟踪文件，不因为历史报告引用或旧保留要求而保留无价值副本。不清理其他 task，不迁移项目，不改 MAM 功能。
+
+接手已有 workspace/worktree，不重复 workspace add。先核对必要代码/正式产物是否已交付到稳定位置。对 .tasks 未提交附件执行分类清理；workspace 中临时内容可以清理，正式产物不删。共享 MAM Git 操作须等待 Manager 单独授权；先报告需留附件清单及理由，Manager 批准后提交和发布简报。不自行 archive task；报告是否具备归档条件和具体阻塞。对原 stopped job 核对结果并建议收尾，不重启。交付简报应简洁记录清理数量、必要成果位置、未交付内容和阻塞，不另造审计文件体系。
+
+---
+
 # 六个首波N/J模型的集群C评测准备
 
 terra/max；Manager负责设计与裁决，沿九任务覆盖优先。读MAM AGENTS/README/.local与集群C评测手册、涉及库AGENTS。旧e690任务已归档，本机worktrees已删除，但远端e690运行树/资产和全部正式结果保留，不能删除或更改HF正在使用的c3-highfreq-engineering-20260914。新任务建立自己的workspace/worktrees。
