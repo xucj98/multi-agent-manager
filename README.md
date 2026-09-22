@@ -4,8 +4,6 @@
 
 MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job` 和可选的 `mam wait`，并自动唤醒需要处理后续工作的负责人。本集群的信息查看[本地说明](.local/README.md)，所有 `mam` 命令以及 agent 均在本机运行。
 
-每个 MAM 项目实例的任务状态和唤醒服务都保存在自己的 `MAM_ROOT/.local`；不同的 `PROJECT_ROOT`/`MAM_ROOT` 可以并行运行，互不复用任务、workspace 或 service 状态。
-
 使用细节可用 `mam --help` 查询，语法中的大写词需要替换为实际值，方括号表示可选参数。
 
 MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 由 codex 生成，标识执行 agent。
@@ -20,10 +18,20 @@ PROJECT_ROOT/
   MAM_ROOT/                   # MAM 根目录
     .tasks/TASK-ID/task.md    # Manager 编辑任务要求
     .tasks/TASK-ID/report.md  # 执行者编辑结果简报
+    .tasks/TASK-ID/files      # 其他有必要保留的一次性文件
   REPO/                       # 一个项目下可以有多个 git 仓库
   workspace/TASK-ID/          # 执行者的独立工作空间
     REPO/                     # 按需创建的 worktree，分支为 task/TASK-ID
+    tmp/                      # 存放临时文件，任务归档时被清理
 ```
+
+### 文件留存原则
+
+为了保证项目的长期可维护性，需要严格控制留存的内容。项目文件根据用途分成4类：
+1. 后续会**重复使用**的代码、配置、分析工具。进入各个 `REPO`，随 git 提交。
+2. 一次性，但有必要保留以解释本次结论的分析代码。进入 `.tasks/TASK-ID/`，随 git 提交。
+3. 正式数据、checkpoint、评测原始结果。放在 `REPO` 约定的稳定产物目录，不进入 git。
+4. 一次性检查脚本、调试输出、中间版本。放在 `workspace/<task-id>/tmp/`。无需手动清理，`mam task archive` 时自动清理。
 
 ## 安装
 
@@ -72,13 +80,15 @@ mam task show TASK-ID
 mam workspace add TASK-ID --repo REPO --base COMMIT
 ```
 
-完成后，在 `MAM_ROOT` 的 `.tasks/TASK-ID/report.md` 写结果简报，记录完成项、workspace 与交付 commit、验证结果和成果位置。然后发布简报：
+完成任务后，根据 [文件留存原则](#文件留存原则) 整理文件。然后在 `MAM_ROOT` 的 `.tasks/TASK-ID/report.md` 写结果简报，记录完成项、交付 commit、验证结果和成果位置。然后发布简报：
 
 ```text
 mam task publish TASK-ID --file report
 ```
 
-交付后清理临时文件，保留 worktree 供 Manager 验收；验收完成后使用 `mam task archive` 清理 worktree、任务分支和 workspace。
+任务需要长期保留的一次性附件由执行者单独提交到 `MAM_BRANCH`；`mam task publish --file report` 只发布结果简报。Manager 归档前确认本任务需要保留的附件已提交，workspace 中的临时文件已经清理。
+
+Manager 验收后，根据情况返工或合入主分支。全部工作完成后，由 Manager 调用 `mam task archive` 清理 worktree、git branch 和 workspace。
 
 ## 进程管理
 
