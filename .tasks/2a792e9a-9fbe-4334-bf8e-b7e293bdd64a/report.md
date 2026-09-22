@@ -2,7 +2,7 @@
 
 为保留未合入的可复用代码，已在业务仓库建立稳定 ref，未合入主线：RMBench `codex/state-vla-delivery-2a792e9a` 指向 `74db6317bb4b690abc7b49258c5a2d402861f1f0`，OpenPI `codex/state-vla-delivery-2a792e9a` 指向 `2bcf3a1551445d73777a959d5050872a4333f5af`。两条 ref 均已核对覆盖各 task branch 的最终提交。
 
-正式原始数据和 checkpoint 仍位于业务仓库的稳定 `RMBench/data/...`、`/mnt/public/xcj/cache/huggingface/lerobot/...` 与 `openpi/checkpoints/.../20000` 路径，未随 workspace 清理。全部 9 条 MAM job 已 archive；workspace 顶层仅剩登记的 RMBench 和 OpenPI worktree，满足 `outer_check` 的结构条件。Manager 可在本草稿发布后 archive task；不再存在本 task 的代码 ref、job 或 workspace 外层目录阻塞。
+正式原始数据和 checkpoint 仍位于业务仓库的稳定 `RMBench/data/...`、`/mnt/public/xcj/cache/huggingface/lerobot/...` 与 `openpi/checkpoints/.../20000` 路径，未随 workspace 清理。全部 9 条 MAM job 已 archive；workspace 顶层仅剩登记的 RMBench 和 OpenPI worktree，满足 `outer_check` 的结构条件。Manager 已于 `2026-09-22T08:37:15Z` archive task，MAM 已移除 task worktree 与 task branch；delivery ref 继续承载代码。
 
 # 2026-09-22 清理交接（当前有效）
 
@@ -81,3 +81,7 @@ retry1 checkpoint root：
 - RMBench worktree：`/mnt/public/xcj/Projects/workspace/2a792e9a-9fbe-4334-bf8e-b7e293bdd64a/RMBench`，commit `74db6317bb4b690abc7b49258c5a2d402861f1f0`。
 - blocks OpenPI worktree：`/mnt/public/xcj/Projects/workspace/2a792e9a-9fbe-4334-bf8e-b7e293bdd64a/openpi`，commit `2bcf3a1551445d73777a959d5050872a4333f5af`。
 - swap_T N uses the existing clean worktree `/mnt/public/xcj/Projects/workspace/f0011538-fbad-49f6-b117-4d628f2bf30c/openpi`，commit `ec86d857d075cd8e1dc7aba2445e557d76ab2069`。
+
+## 2026-09-22 最终归档
+
+Manager 已于 `2026-09-22T08:37:15Z` 归档本 task。RMBench `codex/state-vla-delivery-2a792e9a` = `74db6317bb4b690abc7b49258c5a2d402861f1f0` 与 OpenPI `codex/state-vla-delivery-2a792e9a` = `2bcf3a1551445d73777a959d5050872a4333f5af` 保留交付代码；稳定数据和 checkpoint 未随 workspace 删除，MAM 已移除 task worktree 与 `task/*` 分支。本段是未发布草稿，供 Manager 串行发布。

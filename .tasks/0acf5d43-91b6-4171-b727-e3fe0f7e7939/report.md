@@ -459,3 +459,7 @@ baseline scheduler receipt SHA-256 为 `f56e3438c911ce76232b9e69b0928b3860f2df8d
 - 三个登记 worktree 均 clean，交付 commit 为 OpenPI `0ce566bd34f99cb4775422f012ab67c16aa53885`、robot-bridge `ffa122494c19e1c0154e877010f7b470967ccfc6`、RMBench `6abebf08d084d0be43aa56ebe158dc8395fa58e4`。三个 commit 尚未进入各 primary HEAD，归档前需要 Manager 决定合入或保留其交付分支。
 - 正式 HF 原始结果已位于稳定目录 `/mnt/public/xcj/Projects/RMBench/eval_result/memory_chunk_20260910/`：18 个 `c_hf_j_*_100ep` run 均包含 `config.yaml`、`episode_diagnostics.jsonl`、`diagnostics_summary.json` 和 `rolling_evidence/`。27 个 MAM job 已归档。
 - 三个脚本随本 task 的 MAM Git 提交保留，简报随即发布；此后归档阻塞仅为上述代码交付处置。本轮未运行实验或 archive。
+
+## 2026-09-22 最终归档
+
+Manager 已于 `2026-09-22T08:37:15Z` 归档本 task。代码由本地持久分支继续承载：OpenPI `codex/delivered-0acf5d43` = `0ce566bd34f99cb4775422f012ab67c16aa53885`、RMBench `codex/delivered-0acf5d43` = `6abebf08d084d0be43aa56ebe158dc8395fa58e4`、robot-bridge `codex/delivered-0acf5d43` = `ffa122494c19e1c0154e877010f7b470967ccfc6`。18 个正式 HF run 仍在 `RMBench/eval_result/memory_chunk_20260910/`；task worktree 和 `task/*` 分支已由 MAM 移除。本段是未发布草稿，供 Manager 串行发布。

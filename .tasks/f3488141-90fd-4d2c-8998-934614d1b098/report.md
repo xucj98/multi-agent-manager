@@ -69,3 +69,7 @@ C1 eval0 formal100 两条 lane 仍在运行，第三批未启动：
 | battery_try N, eval0 | GPU3 / 19430,19432 | `a98c0bc6-e386-4bb4-ad12-651e80407908` / 2189992 | 46 / 85 | running; 46 preflights accepted, latest seed 100130 rejected |
 
 两条 formal 都持续产生 episode 结果；scheduler 子进程正常 terminal、无 RPC/renderer/身份/路径错误。每个 run 继续保持自身 matching smoke、单 policy server 跨 episode continuous action RNG、H50/K30、首 infer 90 秒与后续 30 秒。必须达到 100 个 accepted episode 后，才验收完整 diagnostics/video/processes、归档对应 MAM jobs并发布完整结果；在此之前不启动第三批。
+
+## 2026-09-22 最终归档
+
+两个遗留 eval job 已归档。Manager 核对 C1 与本机稳定 `RMBench/eval_result/memory_chunk_20260910/` 的 diagnostics_summary：`c_wave1_swap_blocks_j_trainseed0_evalseed0_100ep_r1` 为 completed、90/100；`c_wave1_battery_try_n_trainseed0_evalseed0_100ep_r1` 为 completed、23/100，均无 benchmark error。这只是已存在单 seed 结果的收尾核对，不是新增完整三 seed eval 或重新科学验收。task 于 2026-09-22T08:45:21Z 归档，旧 workspace 已删除，稳定结果和代码引用保留。

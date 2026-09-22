@@ -4,6 +4,8 @@
 
 正式产物仍在稳定业务路径：observe checkpoint 位于 `openpi/checkpoints/observe_and_pickup_n_b_formal20k_ec86d857_20260914T162824Z/.../20000`，swap_T 原始数据和转换验证位于 `RMBench/data/swap_T/demo_clean_state` 与 `RMBench/logs/wave1_missing_tasks_a/swap_T_n_conversion_20260915T0048`。workspace 内历史 `checkpoint-transfer-20260920/`、`deployment/`、三个 `.venv`、pytest/ruff 缓存及 15 个 source `__pycache__` 目录已删除；其中前七个根目录清理 133,850 个文件、逻辑约 15.7 GiB。删除范围均为 task-local 普通目录，未遍历符号链接，也未删除正式产物。
 
+`policy/pi05/processed_data` 中的两组 50-episode HDF5 输入与 `RMBench/data` 的原始 HDF5 并非同一字节副本，故未删除：已迁移至主 RMBench checkout 的稳定 ignored 路径 `/mnt/public/xcj/Projects/RMBench/policy/pi05/processed_data`（100 个 HDF5，约 2.5 GiB），workspace 路径改为该位置的符号链接。两组 2-episode smoke 副本已删除。
+
 全部 7 条 MAM job 已 archive；workspace 顶层仅剩登记的 RMBench、OpenPI、robot-bridge worktree，满足 `outer_check` 的结构条件。下方对已删除 workspace receipt/transfer 路径的历史引用不再是交付要求。Manager 可在本草稿发布后 archive task；不再存在本 task 的代码 ref、job 或 workspace 外层目录阻塞。
 
 # observe_and_pickup N 已完成；swap_T N 链已就绪
@@ -63,3 +65,7 @@ observe formal 已完成、回传、CPU restore 和 B 删除收据；swap_T N �
 `/mnt/public/xcj/Projects/RMBench/logs/wave1_missing_tasks_a/swap_T_n_conversion_20260915T0048/real_cpu_batch_swap_t_n.json`。
 
 当前归档阻塞是代码尚未交付：RMBench `05e512f529a4dea393d2f730b1f34ed6d5b5f212` 与 openpi `ec86d857d075cd8e1dc7aba2445e557d76ab2069` 尚未被任何非 `task/f0011538-fbad-49f6-b117-4d628f2bf30c` 分支包含。workspace 中的 transfer/restore 收据仅按历史要求暂留，不构成当前归档阻塞；本轮未迁移产物或扩展清理 workspace。
+
+## 最终状态
+
+Task 已于 2026-09-22T08:43:57Z 归档，旧 workspace 与 task 分支已删除；上述稳定数据、checkpoint 和交付分支保留。

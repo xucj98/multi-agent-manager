@@ -79,3 +79,7 @@ V 仍搁置，正式训练和运行时评测不准入；本轮没有重试 GPU�
 已只读核对代码引用：OpenPI `66d9253cf1bdc4971e59cdae7827846eccdb4714` 与 RMBench `f402babca5e7621be83f1725033e858aef69d091` 分别保留在 `review/a98a1d8e-vfix-openpi`、`review/a98a1d8e-vfix-rmbench`；robot-bridge `20dae84e5fc2e48f93e72b5c1b8a0001071fec94` 当前没有非任务引用。这项 bridge 代码交付是任务归档前的实际阻塞。先前报告所列的 capacity-profile receipt 稳定路径当前不存在；它属于旧 GPU 审查收据，按当前搁置裁决不迁移、不补建，也不作为本任务继续保留附件的条件。
 
 本 review 的 1 个 MAM job 已归档。待 bridge 提交交付后，由 Manager 发布本简报草稿并决定 task archive。
+
+## 2026-09-22 最终归档
+
+Manager 已于 `2026-09-22T08:37:16Z` 归档本 review。审查对象由 OpenPI `review/a98a1d8e-vfix-openpi` = `66d9253cf1bdc4971e59cdae7827846eccdb4714`、RMBench `review/a98a1d8e-vfix-rmbench` = `f402babca5e7621be83f1725033e858aef69d091` 与 robot-bridge `codex/delivered-e34ba9b3` = `20dae84e5fc2e48f93e72b5c1b8a0001071fec94` 持久承载。MAM 已移除 review worktree 和 `task/*` 分支；V 的 OOM 结论保持为历史结论，未追加运行。本段是未发布草稿，供 Manager 串行发布。

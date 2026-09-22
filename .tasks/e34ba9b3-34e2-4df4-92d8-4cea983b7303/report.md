@@ -84,3 +84,7 @@ git diff --check
 - `.tasks/e34ba9b3-34e2-4df4-92d8-4cea983b7303/` 仅有已跟踪的 `task.md` 和 `report.md`，没有未跟踪或 ignored 附件，无需迁移旧收据。
 - 三个登记 commit 均存在于各 primary repository，但尚未进入 primary HEAD：OpenPI `66d9253cf1bdc4971e59cdae7827846eccdb4714`、RMBench `4db38c1f936c3e1bed1c85114d8173b07a472243`、robot-bridge `20dae84e5fc2e48f93e72b5c1b8a0001071fec94`；归档前需要 Manager 决定合入或保留相应 task/review 分支。
 - V 当前搁置且没有未归档 job。归档前仍需 Manager 决定将搁置任务关闭、处置上述代码交付，并在授权时发布本段 report 草稿；本轮未更改 workspace、运行或审查。
+
+## 2026-09-22 最终归档
+
+Manager 已于 `2026-09-22T08:37:17Z` 归档本 task。OpenPI `review/a98a1d8e-vfix-openpi` = `66d9253cf1bdc4971e59cdae7827846eccdb4714`、RMBench `codex/delivered-e34ba9b3` = `4db38c1f936c3e1bed1c85114d8173b07a472243`、robot-bridge `codex/delivered-e34ba9b3` = `20dae84e5fc2e48f93e72b5c1b8a0001071fec94` 保留代码。双卡容量 profile 未产生模型 checkpoint；MAM 已移除 task worktree 与 `task/*` 分支，未启动后续训练或评测。本段是未发布草稿，供 Manager 串行发布。
