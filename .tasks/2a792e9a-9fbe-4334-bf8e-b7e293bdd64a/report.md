@@ -1,3 +1,9 @@
+# 2026-09-22 归档准备草稿（未发布）
+
+为保留未合入的可复用代码，已在业务仓库建立稳定 ref，未合入主线：RMBench `codex/state-vla-delivery-2a792e9a` 指向 `74db6317bb4b690abc7b49258c5a2d402861f1f0`，OpenPI `codex/state-vla-delivery-2a792e9a` 指向 `2bcf3a1551445d73777a959d5050872a4333f5af`。两条 ref 均已核对覆盖各 task branch 的最终提交。
+
+正式原始数据和 checkpoint 仍位于业务仓库的稳定 `RMBench/data/...`、`/mnt/public/xcj/cache/huggingface/lerobot/...` 与 `openpi/checkpoints/.../20000` 路径，未随 workspace 清理。全部 9 条 MAM job 已 archive；workspace 顶层仅剩登记的 RMBench 和 OpenPI worktree，满足 `outer_check` 的结构条件。Manager 可在本草稿发布后 archive task；不再存在本 task 的代码 ref、job 或 workspace 外层目录阻塞。
+
 # 2026-09-22 清理交接（当前有效）
 
 本轮仅清理文件并核对交付，未启动训练、eval、数据生成或 GPU smoke。`.tasks/2a792e9a-9fbe-4334-bf8e-b7e293bdd64a/` 无未跟踪附件，不需留存或提交新的一次性审计材料。
