@@ -32,7 +32,8 @@ if (( python_major < 3 || (python_major == 3 && python_minor < 10) )); then
   fail "shared Python must be a runnable Python >= 3.10: $python"
 fi
 base=$(git -C "$source_root" rev-parse --verify "$base^{commit}")
-worktree="$workspace/multi-agent-manager"
+repo_name=$(basename "$source_root")
+worktree="$workspace/$repo_name"
 mkdir -p -- "$workspace"
 if [[ -e "$worktree" || -L "$worktree" ]]; then
   [[ ! -L "$worktree" && -f "$worktree/.git" && ! -L "$worktree/.git" ]] || fail "existing worktree must have a regular .git file: $worktree"

@@ -791,6 +791,28 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.call("archive", task, "--note", "stdlib smoke finished")
         self.assertFalse(path.parent.exists())
 
+    def test_real_environment_uses_source_checkout_name(self):
+        source = self.source("mam-dev")
+        scripts = source / "scripts"
+        scripts.mkdir()
+        (scripts / "create_worktree.sh").write_bytes((ROOT / "scripts/create_worktree.sh").read_bytes())
+        shutil.copytree(ROOT / "multi_agent_manager", source / "multi_agent_manager",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copyfile(ROOT / "pyproject.toml", source / "pyproject.toml")
+        self.git(source, "add", "scripts", "multi_agent_manager", "pyproject.toml")
+        self.git(source, "commit", "-m", "environment entry")
+        entry = (ROOT / "scripts/local_create_worktree.sh").read_text()
+        entry = entry.replace("python=${MAM_SHARED_PYTHON:-}", f"python={shlex.quote(sys.executable)}")
+        (source / ".local/create_worktree.sh").write_text(entry)
+
+        task = self.task()
+        path = Path(self.add(task, "mam-dev")["path"])
+        self.assertEqual(path, self.projects / "workspace" / task / "mam-dev")
+        self.assertTrue((path / ".venv/bin/mam").is_file())
+        self.assertEqual(cli.Store(cli.project_config(path)).root, self.root)
+        self.call("archive", task, "--note", "renamed source smoke finished")
+        self.assertFalse(path.parent.exists())
+
     def test_worktree_entry_rejects_non_python_with_diagnostic(self):
         fake = Path(self.temp.name) / "not Python"
         fake.write_text("#!/usr/bin/env bash\nprintf 'not-a-python\\n'\n")

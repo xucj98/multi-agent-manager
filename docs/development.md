@@ -27,7 +27,7 @@ MAM 使用 `flit_core` 作为 PEP 517 构建后端，因此首次安装需要配
 先从 github 同步 MAM 的 `main`，再为代码任务从该分支创建独立 worktree：
 
 ```text
-mam workspace add TASK-ID --repo multi-agent-manager --base main
+mam workspace add TASK-ID --repo mam-dev --base main
 ```
 
 在该 worktree 中修改和提交。任务、报告和 review 的日常流程见 [README](../README.md#任务管理) 与 [执行与交付](../README.md#执行与交付)。
