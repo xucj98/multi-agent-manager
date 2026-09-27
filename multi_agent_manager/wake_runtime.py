@@ -267,6 +267,49 @@ def capture_manager_for_task(store: Store, *, excluded_agent: str | None = None)
     return _record_manager(store, caller, source="unbound Manager task create/bind")
 
 
+def rebind_manager(store: Store, note: str) -> dict[str, Any]:
+    """Transfer a project Manager after proving the old owner has stopped."""
+    from . import cli, identity
+    if not isinstance(note, str) or not note.strip():
+        raise WakeRuntimeError("--note must describe the Manager handoff")
+    try:
+        caller = identity.read(cli.wait_caller())
+    except (cli.Error, identity.IdentityError) as exc:
+        raise WakeRuntimeError(str(exc)) from exc
+    if caller.path != "/root" or caller.tree_root != caller.agent:
+        raise WakeRuntimeError("Manager takeover requires a native root thread")
+    with _service_start_lock(store), store.lock("service-cycle"), store.lock("bindings"), store.lock("service-manager"):
+        if caller.agent in _active_bindings(store):
+            raise WakeRuntimeError("a bound executor cannot become Manager")
+        previous = _manager_record(store)
+        old = previous["manager"] if previous else None
+        if old == caller.agent:
+            return {"manager": old, "unchanged": True}
+        if old is not None:
+            with store.lock(cli.wait_lock(old)):
+                try:
+                    cli._rebind_wait_quiescent(store, old, role="current Manager")
+                    states = cli.agent_observations([old])
+                    cli._rebind_quiescent(old, cli.agent_state(old, states), role="current Manager")
+                except Exception as exc:
+                    raise WakeRuntimeError(str(exc)) from exc
+        record = {"manager": caller.agent, "source": "service rebind-manager", "recorded_at": _timestamp(),
+                  "handoffs": list(previous.get("handoffs", [])) if previous else []}
+        record["handoffs"].append({"from_agent": old, "to_agent": caller.agent, "at": _timestamp(), "note": note})
+        state = _load_state(store)
+        _write_json(_service_path(store, "manager.json"), record)
+        if old is not None:
+            for signature, event in list(state.get("events", {}).items()):
+                if isinstance(event, Mapping) and event.get("recipient") == old:
+                    scheduler_event = state["events"].pop(signature)
+                    state.setdefault("history", []).append({**scheduler_event, "resolved_at": _timestamp(),
+                                                               "resolution": "Manager identity changed"})
+            state["history"] = state["history"][-HISTORY_LIMIT:]
+        state["manager"] = caller.agent
+        _save_state(store, state)
+    return {"manager": caller.agent, "previous_manager": old, "unchanged": False}
+
+
 def _compatibility() -> dict[str, Any]:
     try:
         from . import wake_compat
@@ -847,6 +890,7 @@ class WakeScheduler:
             job=source["job"],
             note=source["note"],
             executor=source["executor"],
+            **({"executor_path": source["executor_path"]} if source.get("executor_path") else {}),
             source_event=source["signature"],
             error=source["last_error"],
             action="use_native_followup_task",
@@ -862,6 +906,8 @@ class WakeScheduler:
             task=task_id,
             task_title=title,
             executor=executor,
+            **({"executor_path": task["identity"]["path"]} if isinstance(task.get("identity"), Mapping)
+               and task["identity"].get("path") else {}),
             task_status=task.get("status"),
             report_revision=report.get("revision"),
         )
@@ -955,6 +1001,8 @@ class WakeScheduler:
                         job=job_id,
                         note=note,
                         executor=agent,
+                        **({"executor_path": task["identity"]["path"]} if agent and
+                           isinstance(task.get("identity"), Mapping) and task["identity"].get("path") else {}),
                     )
                     desired[event["signature"]] = event
                 continue
@@ -1160,14 +1208,19 @@ class WakeScheduler:
                     f"TASK-ID {event['task']}: {event['task_title']}."
                 )
             elif event.get("kind") == "task_ready":
+                executor = (f"{event['executor_path']} (AGENT-ID {event['executor']})"
+                            if event.get("executor_path") else f"AGENT-ID {event['executor']}")
                 lines.append(
-                    f"Executor AGENT-ID {event['executor']} has no unarchived jobs for TASK-ID {event['task']}: {event['task_title']}."
+                    f"Executor {executor} "
+                    f"has no unarchived jobs for TASK-ID {event['task']}: {event['task_title']}."
                 )
             elif event.get("kind") == "task_unbound":
                 lines.append(f"TASK-ID {event['task']}: {event['task_title']} has no bound executor.")
             elif event.get("kind") == _MANAGER_NATIVE_FOLLOWUP:
+                executor = (f"{event['executor_path']} (AGENT-ID {event['executor']})"
+                            if event.get("executor_path") else f"AGENT-ID {event['executor']}")
                 lines.append(
-                    f"Direct MAM input to executor AGENT-ID {event['executor']} was explicitly rejected for native "
+                    f"Direct MAM input to executor {executor} was explicitly rejected for native "
                     f"multi-agent v2 while handling JOB-ID {event['job']} ({event['note']}); "
                     f"TASK-ID {event['task']}: {event['task_title']}. Error: {event['error']} "
                     "Manager action required: use parent-native collaboration.followup_task to notify the executor; "

@@ -11,6 +11,8 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -103,13 +105,22 @@ def primary(repo):
 
 
 def head(repo, ref="HEAD"):
-    if ref.startswith("-"):
+    if not isinstance(ref, str) or not ref or ref.startswith("-"):
         raise Error(f"invalid commit: {ref}")
     return value(repo, "rev-parse", "--verify", f"{ref}^{{commit}}")
 
 
 def branch_exists(repo, branch):
     return git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}", check=False).returncode == 0
+
+
+def retention_branch(repo):
+    for branch in ("main", "master"):
+        if branch_exists(repo, branch):
+            return branch
+    current = git(repo, "symbolic-ref", "--quiet", "--short", "HEAD", check=False)
+    branch = current.stdout.decode().strip() if current.returncode == 0 else ""
+    return branch if branch and not branch.startswith("task/") and branch_exists(repo, branch) else None
 
 
 @dataclass(frozen=True)
@@ -271,6 +282,61 @@ def optional_doc(store, task, kind):
         return None
 
 
+def caller_identity():
+    from . import identity
+    try:
+        return identity.read(wait_caller())
+    except identity.IdentityError as exc:
+        raise Error(str(exc)) from exc
+
+
+def task_target(store, target):
+    """Resolve a TASK-ID or a path only within the caller's native tree."""
+    if target is None:
+        caller = wait_caller()
+        found = [data for data in store.all() if data.get("status") != "archived" and data.get("agent") == caller]
+        if len(found) != 1:
+            raise Error("current executor has no unique active task; specify TASK-ID")
+        return found[0]["id"]
+    if not target.startswith("/"):
+        return identifier(target)
+    current = caller_identity()
+    matches = []
+    for data in store.all():
+        if data.get("status") == "archived" or not data.get("agent"):
+            continue
+        known = data.get("identity")
+        if not isinstance(known, dict) or not known.get("tree_root") or not known.get("path"):
+            from . import identity
+            try:
+                observed = identity.read(data["agent"])
+            except identity.IdentityError as exc:
+                raise Error(f"cannot verify legacy executor identity for {data['id']}: {exc}") from exc
+            known = {"path": observed.path, "tree_root": observed.tree_root}
+        if known["tree_root"] == current.tree_root and known["path"] == target:
+            matches.append(data["id"])
+    if len(matches) != 1:
+        raise Error(f"native path {target} has {len(matches)} matching active tasks in this collaboration tree")
+    return matches[0]
+
+
+def task_link(store, data):
+    workspace = safe_path(data["workspace"])
+    workspace.mkdir(parents=True, exist_ok=True)
+    link = workspace / ".task"
+    target = safe_path(store.logs / identifier(data["id"]))
+    if not target.is_dir():
+        raise Error(f"task directory is missing: {target}")
+    if link.is_symlink():
+        if os.readlink(link) != str(target):
+            raise Error(f"conflicting .task link: {link}")
+    elif link.exists():
+        raise Error(f"conflicting .task path: {link}")
+    else:
+        link.symlink_to(target, target_is_directory=True)
+    return link
+
+
 def repo_context(store, data, name, record):
     name = repository_name(name)
     source = safe_path(store.project_root / name)
@@ -305,6 +371,7 @@ def live(store, data, name, record):
 def create(store, args):
     review = None
     if args.review:
+        args.review = task_target(store, args.review)
         with store.lock(identifier(args.review)):
             source = store.read(args.review)
             task_doc = published(store, args.review, "task")
@@ -337,6 +404,8 @@ def create(store, args):
                 content += "\nSource task requirements:\n\n" + task_doc["content"] + "\nSource report:\n\n" + report_doc["content"]
             draft.write_text(content)
             store.doc(task, "report").write_text("")
+            (draft.parent / "files").mkdir(exist_ok=True)
+            task_link(store, data)
         except OSError as exc:
             data["error"] = str(exc)
             store.write(data)
@@ -345,20 +414,47 @@ def create(store, args):
 
 
 def bind(store, args):
-    with store.lock("bindings"), store.lock(args.task):
-        try:
-            from . import wake_runtime
-            wake_runtime.capture_manager_for_task(store, excluded_agent=args.agent)
-        except RuntimeError as exc:
-            raise Error(str(exc)) from exc
-        data = store.read(args.task, writable=True)
-        if data["agent"] and data["agent"] != args.agent:
-            raise Error("task already has another agent")
-        if any(item["agent"] == args.agent and item["id"] != args.task and item["status"] != "archived" for item in store.all()):
-            raise Error("agent is already bound to another task")
-        data["agent"] = args.agent
-        store.write(data)
-    return data
+    if args.agent != wait_caller():
+        raise Error("task bind may only register the calling executor; use task start")
+    return start(store, args)
+
+
+def start(store, args):
+    identity = caller_identity()
+    if identity.path == "/root":
+        raise Error("task start requires a native subagent executor")
+    from . import wake_runtime
+    task = task_target(store, args.task)
+    with wake_runtime.task_rebind_lock(store, task):
+        if wake_runtime.recorded_manager(store) == identity.agent:
+            raise Error("the recorded Manager cannot become a task executor")
+        data = store.read(task, writable=True)
+        conflicts = [item["id"] for item in store.all() if item["id"] != task and
+                     item["status"] != "archived" and item.get("agent") == identity.agent]
+        if conflicts:
+            raise Error("executor is already bound to another task: " + ", ".join(conflicts))
+        current = data.get("agent")
+        if current and current != identity.agent:
+            with store.lock(wait_lock(current)):
+                _rebind_wait_quiescent(store, current, role="current executor")
+                states = agent_observations([current])
+                _rebind_quiescent(current, agent_state(current, states), role="current executor")
+            data.setdefault("handoffs", []).append({
+                "from_agent": current, "to_agent": identity.agent, "at": now(),
+                "note": "replacement executor started", "manager": wake_runtime.recorded_manager(store),
+            })
+        task_link(store, data)
+        changed = current != identity.agent or data["status"] != "working" or data.get("identity") != {
+            "path": identity.path, "tree_root": identity.tree_root,
+        }
+        data["agent"] = identity.agent
+        data["identity"] = {"path": identity.path, "tree_root": identity.tree_root}
+        data["status"] = "working"
+        if changed:
+            store.write(data)
+    return {"id": task, "agent": identity.agent, "path": identity.path,
+            "tree_root": identity.tree_root, "status": data["status"], "workspace": data["workspace"],
+            "unchanged": not changed}
 
 
 def rebind_agent(value, *, field="--agent"):
@@ -381,9 +477,9 @@ def _rebind_quiescent(agent, state, *, role):
     if status in {"idle", "notLoaded"} and not detail:
         return
     if status == "active":
-        if role == "current executor":
-            raise Error("current executor is active; wait for its current turn to end before rebind")
-        raise Error("replacement agent is active; finish its read-only preparation before rebind")
+        if role == "replacement agent":
+            raise Error("replacement agent is active; finish its read-only preparation before rebind")
+        raise Error(f"{role} is active; wait for its current turn to end before rebind")
     message = f"cannot verify {role} state ({status or 'unknown'})"
     if detail:
         message += f": {detail}"
@@ -415,13 +511,10 @@ def _rebind_wait_quiescent(store, agent, *, role):
 def rebind(store, args):
     """Atomically hand an existing task and its retained workspace to an agent.
 
-    A normal bind intentionally remains permissive for initial task setup.  A
-    rebind is different: it coordinates a live scheduler, optional waits, and
-    an existing writer's worktree, so the manager must prove both threads are
-    dormant while the binding is replaced.
+    The manager must prove both threads are dormant while the binding is replaced.
     """
 
-    task = identifier(args.task)
+    task = task_target(store, args.task)
     replacement = rebind_agent(args.agent)
     note = rebind_note(args.note)
     caller = rebind_agent(os.environ.get("CODEX_THREAD_ID"), field="CODEX_THREAD_ID")
@@ -442,8 +535,21 @@ def rebind(store, args):
             raise Error("task rebind requires a recorded Manager; run mam service start --manager AGENT-ID first")
         if caller != manager:
             raise Error("task rebind must be called by the recorded Manager")
+        from . import identity as thread_identity
+        try:
+            manager_identity = thread_identity.read(caller)
+        except thread_identity.IdentityError as exc:
+            raise Error(str(exc)) from exc
+        if manager_identity.path != "/root" or manager_identity.tree_root != caller:
+            raise Error("task rebind requires the recorded native root Manager")
         if replacement == manager:
             raise Error("replacement agent is the recorded Manager")
+        try:
+            replacement_identity = thread_identity.read(replacement)
+        except thread_identity.IdentityError as exc:
+            raise Error(str(exc)) from exc
+        if replacement_identity.path == "/root" or replacement_identity.tree_root == replacement:
+            raise Error("replacement executor must be a native subagent")
 
         data = store.read(task, writable=True)
         current = data.get("agent")
@@ -478,7 +584,6 @@ def rebind(store, args):
                 raise Error(f"cannot verify executor thread states: {exc}") from exc
             _rebind_quiescent(current, agent_state(current, observations), role="current executor")
             _rebind_quiescent(replacement, agent_state(replacement, observations), role="replacement agent")
-
             handoffs = data.get("handoffs")
             if handoffs is None:
                 handoffs = []
@@ -493,6 +598,8 @@ def rebind(store, args):
                 "manager": caller,
             })
             data["agent"] = replacement
+            data["identity"] = {"path": replacement_identity.path, "tree_root": replacement_identity.tree_root}
+            data["status"] = "working"
             store.write(data)
     return data
 
@@ -501,6 +608,7 @@ def workspace_add(store, args):
     name = repository_name(args.repo)
     with store.lock(args.task):
         data = store.read(args.task, writable=True)
+        task_link(store, data)
         source = safe_path(store.project_root / name)
         if primary(source) != source:
             raise Error(f"source is not a primary checkout: {source}")
@@ -549,10 +657,84 @@ def publish_branch(store):
         raise Error(f"MAM_ROOT must be checked out on MAM_BRANCH {store.branch}; current branch is {observed}")
 
 
+def files_snapshot(store, task):
+    root = safe_path(store.logs / identifier(task) / "files")
+    if root.is_symlink() or (root.exists() and not root.is_dir()):
+        raise Error(f"invalid task files directory: {root}")
+    entries = {}
+    if not root.exists():
+        return entries
+    for directory, folders, names in os.walk(root, followlinks=False):
+        for name in folders:
+            if (Path(directory) / name).is_symlink():
+                raise Error("task files cannot contain symlinked directories")
+        for name in names:
+            path = Path(directory) / name
+            if not stat.S_ISREG(path.lstat().st_mode):
+                raise Error(f"task files must be regular files: {path}")
+            relative = path.relative_to(store.root).as_posix()
+            mode = "100755" if path.stat().st_mode & 0o111 else "100644"
+            entries[relative] = (mode, path.read_bytes())
+    return entries
+
+
+def published_files(store, task):
+    prefix = f".tasks/{identifier(task)}/files/"
+    output = git(store.root, "ls-tree", "-r", "-z", store.branch, "--", prefix).stdout
+    entries = {}
+    for row in output.split(b"\0"):
+        if not row:
+            continue
+        meta, raw = row.split(b"\t", 1)
+        mode, kind, blob = meta.decode().split()
+        path = os.fsdecode(raw)
+        if not path.startswith(prefix) or kind != "blob" or mode not in ("100644", "100755"):
+            raise Error(f"published task files contain an unsupported entry: {path}")
+        entries[path] = (mode, blob)
+    return entries
+
+
+def draft_file_blobs(store, files):
+    return {path: (mode, git(store.root, "hash-object", "--stdin", input=content).stdout.decode().strip())
+            for path, (mode, content) in files.items()}
+
+
+def publish_files(store, task):
+    current = published_files(store, task)
+    draft = files_snapshot(store, task)
+    blobs = draft_file_blobs(store, draft)
+    if current == blobs:
+        revision = value(store.root, "log", "-1", "--format=%H", store.branch, "--", f".tasks/{task}/files")
+        return {"id": task, "file": "files", "revision": revision or head(store.root, store.branch), "unchanged": True}
+    parent = head(store.root, store.branch)
+    for _, content in draft.values():
+        git(store.root, "hash-object", "-w", "--stdin", input=content)
+    with tempfile.TemporaryDirectory(prefix="task-files-publish-") as temporary:
+        env = {**os.environ, "GIT_INDEX_FILE": str(Path(temporary) / "index")}
+        git(store.root, "read-tree", parent, env=env)
+        for path in current.keys() - blobs.keys():
+            git(store.root, "update-index", "--force-remove", "--", path, env=env)
+        for path, (mode, blob) in blobs.items():
+            git(store.root, "update-index", "--add", "--cacheinfo", mode, blob, path, env=env)
+        tree = git(store.root, "write-tree", env=env).stdout.decode().strip()
+        commit = git(store.root, "commit-tree", tree, "-p", parent, "-m", f"Publish {task} files").stdout.decode().strip()
+        git(store.root, "update-ref", f"refs/heads/{store.branch}", commit, parent)
+    for path in current.keys() - blobs.keys():
+        git(store.root, "update-index", "--force-remove", "--", path)
+    for path, (mode, blob) in blobs.items():
+        git(store.root, "update-index", "--add", "--cacheinfo", mode, blob, path)
+    return {"id": task, "file": "files", "revision": commit,
+            "added": sorted(blobs.keys() - current.keys()),
+            "updated": sorted(path for path in blobs.keys() & current.keys() if blobs[path] != current[path]),
+            "deleted": sorted(current.keys() - blobs.keys())}
+
+
 def publish(store, args):
     with store.lock(args.task), store.lock("publish"):
         publish_branch(store)
         data = store.read(args.task, writable=True)
+        if args.file == "files":
+            return publish_files(store, args.task)
         draft = store.doc(args.task, args.file)
         if not draft.is_file():
             raise Error(f"missing draft: {draft}")
@@ -569,9 +751,11 @@ def publish(store, args):
         path = f".tasks/{args.task}/{args.file}.md"
         existing = optional_doc(store, args.task, args.file)
         if existing and existing["content"].encode() == content:
-            if report is not None and (not data["report"] or report["commits"] != data["report"]["commits"]):
-                raise Error("delivery HEAD changed; update the report draft before publishing")
             git(store.root, "update-index", "--add", "--cacheinfo", "100644", existing["blob"], path)
+            if report is not None:
+                data["report"] = {**report, "revision": existing["revision"]}
+                data["status"] = "pending"
+                store.write(data)
             return {"id": args.task, "file": args.file, "revision": existing["revision"], "unchanged": True}
         parent = head(store.root, store.branch)
         with tempfile.TemporaryDirectory(prefix="task-publish-") as temporary:
@@ -663,9 +847,13 @@ def static_jobs(data, args):
 def job_list(store, args):
     tasks = [store.read(args.task)] if args.task else store.all()
     entries = []
+    paths = {}
     for item in tasks:
         with store.lock(item["id"]):
             data = store.read(item["id"])
+            known = data.get("identity")
+            if isinstance(known, dict) and known.get("path"):
+                paths[data["id"]] = known["path"]
             if data["status"] == "archived" and args.attention:
                 continue
             jobs = static_jobs(data, args)
@@ -689,6 +877,8 @@ def job_list(store, args):
     selected, uncertain = [], []
     for task, task_title, agent, _, job in entries:
         row = {"task": task, "task_title": task_title, "agent": agent, **job}
+        if task in paths:
+            row["agent_path"] = paths[task]
         row["agent_state"] = agent_state(agent, agents)
         if args.attention:
             if row["status"] == "archived":
@@ -744,6 +934,10 @@ def render_task_status(data, docs, drafts):
     report = data.get("report") if isinstance(data.get("report"), dict) else {}
     commits = report.get("commits") if isinstance(report.get("commits"), dict) else {}
     result = {key: data.get(key) for key in ("id", "title", "status", "agent", "workspace")}
+    known = data.get("identity")
+    if isinstance(known, dict) and known.get("path") and known.get("tree_root"):
+        result["agent_path"] = known["path"]
+        result["tree_root"] = known["tree_root"]
     result["repos"] = {name: repo_summary(record, commits.get(name)) for name, record in data["repos"].items()}
     publications = {kind: document["revision"] for kind, document in docs.items() if document}
     if publications:
@@ -806,6 +1000,9 @@ def render_job_status(data, job):
         error = probe.get("error")
     result = {"id": job["id"], "note": job.get("note"), "task": data["id"], "task_title": data["title"],
               "agent": data.get("agent"), "host": job.get("host"), "pid": job.get("pid"), "status": status}
+    known = data.get("identity")
+    if isinstance(known, dict) and known.get("path"):
+        result["agent_path"] = known["path"]
     if job.get("started_at") is not None:
         result["started_at"] = job["started_at"]
     if checked_at is not None:
@@ -860,6 +1057,9 @@ def status(store, args):
     for kind, document in docs.items():
         path = store.doc(args.task, kind)
         drafts[kind] = path.exists() and (document is None or path.read_text() != document["content"])
+    files = files_snapshot(store, args.task)
+    committed = published_files(store, args.task)
+    drafts["files"] = draft_file_blobs(store, files) != committed
     return render_task_status(data, docs, drafts)
 
 
@@ -1033,7 +1233,21 @@ def begin_wait(store, agent, role, task, turn_id):
     record = {"agent": agent, "pid": os.getpid(), "identity": observation["identity"], "token": str(uuid.uuid4()),
               "kind": "unified", "role": role, "task": task, "turn_id": turn_id, "timeout": 3600,
               "started_at": now(), "cancelled": None}
-    with store.lock(wait_lock(agent)):
+    with store.lock("bindings"), store.lock(wait_lock(agent)):
+        bindings = [data for data in store.all() if data.get("status") != "archived" and data.get("agent")]
+        bound = [data for data in bindings if data["agent"] == agent]
+        if role == "executor":
+            if len(bound) != 1 or bound[0]["id"] != task:
+                raise Error("executor wait no longer matches the current task binding")
+        elif role == "manager":
+            from . import wake_runtime
+            manager = wake_runtime.recorded_manager(store)
+            if bound or (manager is not None and manager != agent):
+                raise Error("manager wait no longer matches the current Manager identity")
+            if manager is None and bindings:
+                raise Error("manager wait requires a recorded Manager while executor tasks are bound")
+        else:
+            raise Error(f"invalid wait role: {role}")
         existing, state = active_wait(store, agent)
         if existing:
             if state == "unknown":
@@ -1090,7 +1304,7 @@ def wait_unified(store, args):
         def begin(role, task, turn_id):
             return begin_wait(store, caller, role, task, turn_id)
 
-        return wait_runtime.wait(
+        result = wait_runtime.wait(
             store,
             caller,
             socket_path=compatible["socket_path"],
@@ -1104,6 +1318,13 @@ def wait_unified(store, args):
             messages=messages,
             message_floor_ms=int(started_at * 1000),
         )
+        agent = result.get("agent") if isinstance(result, dict) else None
+        if agent and isinstance(store, Store):
+            match = next((data for data in store.all() if data.get("status") != "archived" and data.get("agent") == agent), None)
+            known = match.get("identity") if match else None
+            if isinstance(known, dict) and known.get("path"):
+                result["agent_path"] = known["path"]
+        return result
     except wait_runtime.WaitRuntimeError as exc:
         raise Error(str(exc)) from exc
     finally:
@@ -1116,9 +1337,17 @@ def wait_unified(store, args):
 def wait_list(store, args):
     records = [record for record, state in active_wait_records(store) if state == "running"]
     bindings = {data["agent"]: data for data in store.all() if data["status"] != "archived" and data["agent"]}
-    return [{"agent": record["agent"], "task_title": bindings[record["agent"]]["title"] if record["agent"] in bindings else "未绑定",
-             "task": bindings[record["agent"]]["id"] if record["agent"] in bindings else "未绑定",
-             "waiting": wait_description(record), "started_at": record["started_at"]} for record in records]
+    result = []
+    for record in records:
+        binding = bindings.get(record["agent"])
+        row = {"agent": record["agent"], "task_title": binding["title"] if binding else "未绑定",
+               "task": binding["id"] if binding else "未绑定",
+               "waiting": wait_description(record), "started_at": record["started_at"]}
+        known = binding.get("identity") if binding else None
+        if isinstance(known, dict) and known.get("path"):
+            row["agent_path"] = known["path"]
+        result.append(row)
+    return result
 
 
 def wait_stop(store, args):
@@ -1127,7 +1356,10 @@ def wait_stop(store, args):
         raise Error("choose exactly one wait stop target: manager or --agent AGENT-ID")
     if manager is not None:
         return wait_stop_manager(store)
-    return cancel_wait(store, wait_agent(args))
+    target = wait_agent(args)
+    if target.startswith("/"):
+        target = store.read(task_target(store, target)).get("agent")
+    return cancel_wait(store, target)
 
 
 def service_module():
@@ -1159,10 +1391,21 @@ def service_status(store, args):
         raise Error(str(exc)) from exc
 
 
+def service_rebind_manager(store, args):
+    try:
+        return service_module().rebind_manager(store, args.note)
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
+
+
 def task_list(store, args):
     tasks = [data for data in store.all() if args.all or (data["status"] == "archived") == args.archived]
     agents = agent_observations(data["agent"] for data in tasks if data["agent"])
     return [{**data, "agent_state": agent_state(data["agent"], agents, unbound="unbound")} for data in tasks]
+
+
+def show(store, args):
+    return published(store, args.task, args.file)
 
 
 def one_line(value):
@@ -1179,11 +1422,11 @@ def print_table(header, rows):
 def print_task_list(tasks):
     rows = []
     for task in tasks:
-        agent = task["agent"] or "未绑定"
+        agent = task.get("identity", {}).get("path") or task["agent"] or "未绑定"
         state = task["agent_state"]["status"]
         rows.append("\t".join((one_line(task["title"]), one_line(task["status"]), task["id"], one_line(agent),
                               "未绑定" if state == "unbound" else one_line(state))))
-    print_table(("标题", "任务状态", "TASK-ID", "AGENT-ID", "agent状态"), (row.split("\t") for row in rows))
+    print_table(("标题", "任务状态", "TASK-ID", "执行者", "agent状态"), (row.split("\t") for row in rows))
 
 
 def displayed_job_status(job):
@@ -1208,13 +1451,14 @@ def print_job_list(result):
     for group in ("jobs", "needs_verification"):
         for job in result[group]:
             state = "unknown/待核实" if group == "needs_verification" else displayed_job_status(job)
-            rows.append((job["note"], state, job_started_at(job), job["id"], job["task_title"], job["task"]))
-    print_table(("描述", "job状态", "开始时间", "JOB-ID", "任务描述", "TASK-ID"), rows)
+            rows.append((job["note"], state, job_started_at(job), job["id"], job["task_title"], job["task"],
+                         job.get("agent_path") or job.get("agent") or "未绑定"))
+    print_table(("描述", "job状态", "开始时间", "JOB-ID", "任务描述", "TASK-ID", "执行者"), rows)
 
 
 def print_wait_list(records):
-    print_table(("AGENT-ID", "绑定任务标题", "TASK-ID", "等待内容", "等待开始时间"),
-                ((record["agent"], record["task_title"], record["task"], record["waiting"], record["started_at"])
+    print_table(("执行者", "绑定任务标题", "TASK-ID", "等待内容", "等待开始时间"),
+                ((record.get("agent_path") or record["agent"], record["task_title"], record["task"], record["waiting"], record["started_at"])
                  for record in records))
 
 
@@ -1266,6 +1510,7 @@ def outer_check(workspace, records):
     if not workspace.exists():
         return
     known = {Path(record["path"]).name for record in records.values() if not record["removed"]}
+    known.update({"tmp", ".task"})
     unknown = [str(path) for path in workspace.iterdir() if path.name not in known]
     if unknown:
         raise Error("archive refused; unregistered workspace entries: " + ", ".join(unknown))
@@ -1281,6 +1526,58 @@ def archive(store, args):
             raise Error("archive refused; unarchived registered jobs: " + ", ".join(blocked))
         workspace = safe_path(data["workspace"])
         outer_check(workspace, data["repos"])
+        link = workspace / ".task"
+        if link.is_symlink():
+            if os.readlink(link) != str(store.logs / args.task):
+                raise Error(f"archive refused; conflicting .task link: {link}")
+        elif link.exists():
+            raise Error(f"archive refused; conflicting .task path: {link}")
+        tmp = workspace / "tmp"
+        if tmp.is_symlink() or (tmp.exists() and not tmp.is_dir()):
+            raise Error(f"archive refused; invalid tmp directory: {tmp}")
+        docs = {kind: optional_doc(store, args.task, kind) for kind in ("task", "report")}
+        drafts = [kind for kind, doc in docs.items() if store.doc(args.task, kind).exists() and
+                  (doc is None or store.doc(args.task, kind).read_bytes() != doc["content"].encode())]
+        files = files_snapshot(store, args.task)
+        committed = published_files(store, args.task)
+        if "report" in drafts and not store.doc(args.task, "report").read_bytes():
+            drafts.remove("report")
+        if ("task" in drafts and docs["task"] is None and
+                store.doc(args.task, "task").read_text() == f"# {data['title']}\n" and
+                data.get("report") is None and not files and not committed):
+            drafts.remove("task")
+        if draft_file_blobs(store, files) != committed:
+            drafts.append("files")
+        if drafts and not getattr(args, "discard_drafts", False):
+            raise Error("archive refused; unpublished drafts: " + ", ".join(drafts) + "; use --discard-drafts with --note")
+        unmerged = []
+        for name, record in data["repos"].items():
+            source, path, branch = repo_context(store, data, name, record)
+            if record["branch_removed"]:
+                if branch_exists(source, branch):
+                    raise Error(f"removed task branch reappeared: {branch}")
+                continue
+            retained_by = retention_branch(source)
+            commits = set()
+            if branch_exists(source, branch):
+                commits.add(head(source, branch))
+            report = data.get("report") or {}
+            delivery = report.get("commits") if isinstance(report, dict) else None
+            if isinstance(delivery, dict) and name in delivery:
+                try:
+                    commits.add(head(source, delivery[name]))
+                except Error:
+                    unmerged.append(name)
+            if commits and (retained_by is None or any(
+                git(source, "merge-base", "--is-ancestor", commit, retained_by, check=False).returncode
+                for commit in commits
+            )):
+                unmerged.append(name)
+        if unmerged and not getattr(args, "discard_code", False):
+            raise Error("archive refused; delivery is not retained in the source main branch: " + ", ".join(unmerged) +
+                        "; use --discard-code with --note")
+        if (getattr(args, "discard_drafts", False) or getattr(args, "discard_code", False)) and not args.note.strip():
+            raise Error("archive discard requires a non-empty --note")
         for name, record in data["repos"].items():  # preflight every repo before removing any
             source, path, branch = repo_context(store, data, name, record)
             if path.exists():
@@ -1288,15 +1585,29 @@ def archive(store, args):
                     raise Error(f"removed worktree path reappeared: {path}")
                 live(store, data, name, record)
                 dirty(path)
-            elif record["state"] == "ready" and not record["removed"]:
+            elif record["state"] == "ready" and not record["removed"] and data.get("archive") is None:
                 raise Error(f"registered worktree unexpectedly missing: {path}")
             registrations = git(source, "worktree", "list", "--porcelain").stdout.decode().split("\n\n")
             for entry in registrations:
                 if f"branch refs/heads/{branch}" in entry.splitlines() and f"worktree {path}" not in entry.splitlines():
                     raise Error(f"task branch is checked out elsewhere: {branch}")
         result = data["archive"] or {"note": args.note, "removed": [], "at": None}
+        if data["archive"] is None:
+            result["discard_drafts"] = bool(getattr(args, "discard_drafts", False))
+            result["discard_code"] = bool(getattr(args, "discard_code", False))
+        elif getattr(args, "discard_drafts", False) or getattr(args, "discard_code", False):
+            result.setdefault("discard_confirmations", []).append({
+                "note": args.note, "at": now(),
+                "drafts": bool(getattr(args, "discard_drafts", False)),
+                "code": bool(getattr(args, "discard_code", False)),
+            })
+            result["discard_drafts"] = result.get("discard_drafts", False) or bool(getattr(args, "discard_drafts", False))
+            result["discard_code"] = result.get("discard_code", False) or bool(getattr(args, "discard_code", False))
         data["archive"] = result
         try:
+            if tmp.exists():
+                shutil.rmtree(tmp)
+                result["removed"].append({"tmp": str(tmp)})
             for name, record in data["repos"].items():
                 source, path, branch = repo_context(store, data, name, record)
                 if not record["removed"]:
@@ -1319,6 +1630,9 @@ def archive(store, args):
                         result["removed"].append({"repo": name, "branch": branch})
                     record["branch_removed"] = True
                     store.write(data)
+            if link.is_symlink():
+                link.unlink()
+                result["removed"].append({"task_link": str(link)})
             outer_check(workspace, data["repos"])
             if workspace.exists():
                 workspace.rmdir()
@@ -1347,22 +1661,25 @@ def parser():
     p.add_argument("--review", metavar="TASK-ID", help="source TASK-ID; read its latest published task/report and delivery commits")
     p.set_defaults(func=create)
     p = command(sub, "bind", "bind one execution agent")
-    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("task", metavar="TARGET", help="registered TASK-ID or native collaboration path")
     p.add_argument("--agent", required=True, metavar="AGENT-ID", help="execution AGENT-ID; one active task per agent")
     p.set_defaults(func=bind)
+    p = command(sub, "start", "register or resume the calling executor")
+    p.add_argument("task", nargs="?", metavar="TASK-ID", help="required for first registration or handoff")
+    p.set_defaults(func=start)
     p = command(sub, "rebind", "hand an existing task to a dormant replacement agent")
     p.add_argument("task", metavar="TASK-ID", help="registered task with a current executor")
     p.add_argument("--agent", required=True, metavar="AGENT-ID", help="dormant replacement AGENT-ID")
     p.add_argument("--note", required=True, metavar="NOTE", help="short Manager handoff reason")
     p.set_defaults(func=rebind)
     p = command(sub, "show", "read a published document")
-    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("task", nargs="?", metavar="TARGET", help="TASK-ID or native collaboration path; defaults to caller task")
     p.add_argument("--file", choices=("task", "report"), default="task", metavar="FILE", help="published document: task or report (default: task)")
     p.add_argument("--json", action="store_true", help="emit the published document as JSON")
-    p.set_defaults(func=lambda s, a: published(s, a.task, a.file), renderer="published")
+    p.set_defaults(func=show, renderer="published")
     p = command(sub, "publish", "publish one draft to the configured branch using an isolated index")
-    p.add_argument("task", metavar="TASK-ID", help="registered task")
-    p.add_argument("--file", choices=("task", "report"), required=True, metavar="FILE", help="draft to publish: task or report")
+    p.add_argument("task", nargs="?", metavar="TARGET", help="TASK-ID or native collaboration path; defaults to caller task")
+    p.add_argument("--file", choices=("task", "report", "files"), required=True, metavar="FILE", help="draft to publish")
     p.set_defaults(func=publish)
     p = command(sub, "list", "list registered task records")
     group = p.add_mutually_exclusive_group()
@@ -1370,21 +1687,23 @@ def parser():
     group.add_argument("--all", action="store_true", help="include archived tasks")
     p.set_defaults(func=task_list, renderer="task_list")
     p = command(sub, "status", "show concise task, repo and cached job status")
-    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("task", nargs="?", metavar="TARGET", help="TASK-ID or native collaboration path; defaults to caller task")
     p.set_defaults(func=status)
     p = command(sub, "archive", "remove owned worktrees and task branches after all jobs are archived; retain task records")
-    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("task", metavar="TARGET", help="registered TASK-ID or native collaboration path")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
+    p.add_argument("--discard-drafts", action="store_true", help="acknowledge unpublished task, report or files drafts")
+    p.add_argument("--discard-code", action="store_true", help="acknowledge unmerged delivery commits")
     p.set_defaults(func=archive)
     jobs = command(commands, "job", "register, query and archive process records").add_subparsers(required=True)
     p = command(jobs, "add", "register a running process with its startup identity")
-    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("task", nargs="?", metavar="TARGET", help="TASK-ID or native collaboration path; defaults to caller task")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
     p.add_argument("--host", required=True, metavar="HOST", help="host running the process")
     p.add_argument("--pid", type=int, required=True, metavar="PID", help="running process ID")
     p.set_defaults(func=job_add)
     p = command(jobs, "list", "query process and agent states; never wake agents")
-    p.add_argument("--task", metavar="TASK-ID", help="filter jobs by TASK-ID")
+    p.add_argument("--task", metavar="TARGET", help="filter jobs by TASK-ID or native collaboration path")
     p.add_argument("--status", choices=("running", "stopped", "archived", "all"), metavar="STATUS", help="filter jobs; default excludes archived records")
     p.add_argument("--attention", action="store_true", help="show stopped jobs with inactive agents; list unknowns separately")
     p.set_defaults(func=job_list, renderer="job_list")
@@ -1412,9 +1731,12 @@ def parser():
     p.set_defaults(func=service_stop)
     p = command(service, "status", "show scheduler health, pending items and diagnostics")
     p.set_defaults(func=service_status)
+    p = command(service, "rebind-manager", "transfer this instance to the calling native Manager")
+    p.add_argument("--note", required=True, metavar="NOTE", help="reason for Manager handoff")
+    p.set_defaults(func=service_rebind_manager)
     w = command(commands, "workspace", "manage repository worktrees and their environments").add_subparsers(required=True)
     p = command(w, "add", "create a repository worktree using its local environment entry")
-    p.add_argument("task", metavar="TASK-ID", help="registered task")
+    p.add_argument("task", nargs="?", metavar="TARGET", help="TASK-ID or native collaboration path; defaults to caller task")
     p.add_argument("--repo", required=True, metavar="REPO", help="single source repository directory below PROJECT_ROOT")
     p.add_argument("--base", required=True, metavar="COMMIT", help="base commit for the task branch")
     p.set_defaults(func=workspace_add)
@@ -1424,9 +1746,12 @@ def parser():
 def main(argv=None, *, cwd=None):
     args = parser().parse_args(argv)
     try:
-        if getattr(args, "task", None):
-            identifier(args.task)
-        result = args.func(Store(project_config(cwd)), args)
+        store = Store(project_config(cwd))
+        if args.func in {show, publish, status, workspace_add, job_add, archive}:
+            args.task = task_target(store, args.task)
+        elif args.func == job_list and args.task:
+            args.task = task_target(store, args.task)
+        result = args.func(store, args)
         if getattr(args, "renderer", None) == "task_list":
             print_task_list(result)
         elif getattr(args, "renderer", None) == "job_list":
