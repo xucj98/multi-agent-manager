@@ -6,11 +6,11 @@ MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`�
 
 使用细节可用 `mam --help` 查询，语法中的大写词需要替换为实际值，方括号表示可选参数。
 
-MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 是 Codex 线程 ID。`TARGET` 可用 TASK-ID 或当前原生协作树内的完整执行者路径，如 `/root/worker`；已绑定执行者的日常操作可省略 TARGET。
+MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 是 Codex 线程 ID。`TARGET` 可用 TASK-ID，或绑定后当前原生协作树内的完整执行者路径，如 `/root/worker`；已绑定执行者的日常操作可省略 TARGET。
 
 MAM 使用共享根目录 `MAM_ROOT`：Manager 编辑其中的 `task.md`，执行者编辑自己的 `report.md`。任务和报告通过 `mam task publish` 发布，并使用 `mam task show` 查看，未发布的修改是草稿。
 
-MAM 的未归档任务 TASK-ID 和当前执行者 AGENT-ID 一一绑定。每个任务有独立的 workspace `PROJECT_ROOT/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。交接给新执行者时，沿用原目录、分支、环境和 job。**原则上每个 subagent 都只能读写自己的 workspace**。`mam` 需在 `PROJECT_ROOT` 或其各级子目录中使用。
+每个未归档任务最多绑定一个执行者，每个执行者同时只绑定一个未归档任务。每个任务有独立的 workspace `PROJECT_ROOT/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。交接给新执行者时，沿用原目录、分支、环境和 job。**原则上每个 subagent 都只能读写自己的 workspace**。`mam` 需在 `PROJECT_ROOT` 或其各级子目录中使用。
 
 ```text
 PROJECT_ROOT/
@@ -48,11 +48,11 @@ Manager 创建任务、填写并发布要求，再通过 Codex 原生工具创�
 
 ```text
 mam task create --title TITLE [--review TARGET]
-mam task publish TARGET --file task
+mam task publish TASK-ID --file task
 mam task archive TARGET --note NOTE
 ```
 
-- `create` 返回 TASK-ID；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求，再发布。
+- `create` 返回 TASK-ID；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求，再用该 TASK-ID 首次发布，无需先绑定 subagent。
 - 途中追加要求时，先更新并发布 task.md，再通知执行者读取。执行者和 reviewer 始终以最新已发布要求为准；report 无需绑定要求版本。
 - Review 任务用 `--review TARGET` 指定源任务，结合最新 task.md、report.md 和交付代码独立验收。
 - 返工时通知原执行者调用 `mam task start` 后继续；需要换人时，先确认旧执行者已结束 turn 和 wait，再让新执行者 `mam task start TASK-ID` 接手。原 workspace、分支、环境和 job 保留，无需再次创建。
