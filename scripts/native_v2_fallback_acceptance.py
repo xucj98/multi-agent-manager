@@ -985,7 +985,7 @@ def command_prepare(args: argparse.Namespace) -> int:
                 "state": str(state),
                 "receipts": str(receipts),
                 **source_identity,
-                "next": "Root Manager must manually create/publish/bind the fixture task, then explicitly delegate its existing native child.",
+                "next": "Root Manager creates and publishes the fixture task, then delegates its existing native child to run task start.",
             },
             ensure_ascii=False,
             indent=2,
