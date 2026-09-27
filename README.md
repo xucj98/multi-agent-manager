@@ -53,7 +53,7 @@ Manager 先创建任务、填写并发布要求，再通过 Codex 原生工具�
 ```text
 mam task create --title TITLE [--review TASK-ID|AGENT-PATH]
 mam task publish TASK-ID|AGENT-PATH
-mam task archive TASK-ID|AGENT-PATH --note NOTE
+mam task archive TASK-ID|AGENT-PATH --note NOTE [--force]
 ```
 
 - `create` 返回 TASK-ID；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求。
@@ -93,17 +93,17 @@ subagent 执行任务过程中应及时更新任务进度。直接修改 `worksp
 mam task report
 ```
 
-report 在同一次提交中发布报告及 `.task/files/` 的新增、修改和删除，没有附件也可提交。
+report 在同一次提交中发布报告及 `.task/files/` 的新增、修改和删除。
 
 ### 任务收尾
 
 1. 执行者整理代码和产物，同步相关文档；需保留的文件按[文件留存原则](#文件留存原则)、具体项目和代码库要求处理。报告说明结果、验证方法、未解决问题和产物位置，让接手者不依赖原对话也能理解。
 2. 确认全部 job 已归档。job 的逐次收尾见[进程管理](#进程管理)，不能留到 task 归档时一并处理。
-3. 执行者 `git commit` 提交代码，发布附件和最终 report；Manager 按最新 task.md 验收，需要时独立 review，并对 review 结论作出裁决。返工继续原任务。
-4. Manager 按项目规则确认代码去向，并确认 `.tasks/TASK-ID/` 下的任务要求、报告和附件均已发布，再调用 `mam task archive TASK-ID|AGENT-PATH --note NOTE`；明确舍弃时使用 `--discard-code` 或 `--discard-drafts` 并在 note 说明理由。归档删除任务分支及整个 workspace，包括 ignored 文件和未提交修改；须提前保存成果，中央任务记录和软链接目标保留。
+3. 执行者按项目要求提交需保留的代码，发布附件和最终 report；Manager 按最新 task.md 验收，需要时独立 review，并对 review 结论作出裁决。返工继续原任务。
+4. Manager 按项目规则确认成果去向，再调用 `mam task archive TASK-ID|AGENT-PATH --note NOTE`。归档只检查全部 job 已归档、`.tasks/TASK-ID/` 下 Git 干净、项目归档 hook 通过（没有则跳过）。通过后清理 worktree 登记、任务分支和整个 workspace，含 ignored 内容；须提前保存成果，中央任务记录和软链接目标保留。
 5. Manager 核对归档结果，确认任务已归档、工作目录和分支已清理。失败时按提示处理后重试；阶段结束时也检查自己的 workspace/tmp，将必要内容转存后清理其余文件。
 
-交付代码可以合入项目指定的主分支、明确舍弃，或按项目规则用 tag/branch 留存；主分支不必叫 main。当前归档的支持范围与限制见 [mam task](docs/commands/task.md#附件与归档)。
+执行者默认应先整理干净 worktree。归档使用 `git worktree remove` 和 `git branch -d`；明确舍弃剩余改动或未合并代码时，`--force` 改用 `git worktree remove --force` 和 `git branch -D`，不跳过上述归档条件。详见 [mam task](docs/commands/task.md#附件与归档)。
 
 ## 进程管理
 

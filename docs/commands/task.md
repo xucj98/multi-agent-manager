@@ -18,29 +18,29 @@ Manager 用原生工具创建或通知 subagent。换人前让旧执行者结束
 | --- | --- |
 | `mam task show [TASK-ID\|AGENT-PATH] [--file task\|report] [--json]` | 读取 MAM_BRANCH 当前最新已发布文档，默认 task；不读取草稿，--json 同时返回正文和发布信息。 |
 | `mam task publish TASK-ID\|AGENT-PATH` | Manager 发布任务要求，必须显式指定任务，返回发布 commit。 |
-| `mam task report [TASK-ID\|AGENT-PATH]` | 执行者一起提交报告和 `.task/files/` 附件，记录交付代码，任务进入 pending；返回发布 commit。 |
+| `mam task report [TASK-ID\|AGENT-PATH]` | 一起提交报告和 `.task/files/` 附件，任务进入 pending；返回发布 commit。 |
 | `mam task status [TASK-ID\|AGENT-PATH]` | 返回任务、执行者路径与树根、仓库交付、发布记录、草稿提示和保存的 job 观测；不探测 job。 |
 
 Manager 编辑 task.md；执行者经 workspace 的 `.task/report.md` 和 `.task/files/` 编辑简报、附件。report 草稿用于记录当前进展，更新草稿不改变状态；完成交付后再发布。publish 只提交 task.md；report 将报告与附件放入同一个提交，校验失败时不发布。
 
 附件先整理到 `.task/files/`，report 同步其中的新增、修改、删除和可执行位变化。仅附件变化也会发布；报告和附件均无变化时不创建新 commit。附件仅接受普通文件（包括可执行文件），不接受符号链接。发布保留无关暂存内容和其他草稿。
 
-`report` 记录各就绪 worktree HEAD 为交付 commit，任务进入 pending；返工后即使报告文字不变，重新发布也会更新交付 HEAD 并进入 pending。`publish` 发布 task.md、线程活跃或普通问答不会自动改变任务状态。执行者和 reviewer 始终以最新已发布 task.md 为准；report 不绑定要求版本。
+`report` 附带记录可读取的 worktree HEAD，供 review 参考；重新发布会更新这些 HEAD，任务进入 pending。执行者和 reviewer 始终以最新已发布 task.md 为准。
 
 ## 附件与归档
 
 | 接口 | 操作 |
 | --- | --- |
-| `mam task archive TASK-ID\|AGENT-PATH --note NOTE [--discard-drafts] [--discard-code]` | Manager 显式指定任务，完整预检后清理资源，保留中央任务记录和发布历史。 |
+| `mam task archive TASK-ID\|AGENT-PATH --note NOTE [--force]` | Manager 显式指定任务，检查通过后清理资源，保留中央任务记录和发布历史。 |
 
-归档要求所有 job 已归档、任务/报告/附件无未发布草稿，且交付代码已包含在各源仓库的主分支中（优先检查 main/master，否则检查主 checkout 当前分支）。仅在 `--note` 说明舍弃理由时，才使用 `--discard-drafts` 忽略草稿或 `--discard-code` 舍弃未合入提交。报告中的 commit hash 本身不是 Git 对象的永久留存。取消无交付的空任务可直接归档。
+归档只要求：
 
-MAM 检查通过后执行已配置的项目[归档前 hook](../install.md#项目-hooks)；hook 拒绝时不开始删除。通过后，MAM 删除登记的 worktree、任务分支和整个 workspace，包括独立环境、tmp、ignored、未跟踪文件和未提交修改。使用者负责提前保存成果；软链接只删除链接本身，中央 `.tasks/TASK-ID` 和 Manager 的 `workspace/tmp` 保留。
+1. 该任务所有 job 已归档。
+2. `.tasks/TASK-ID/` 下 Git 干净：没有暂存、未暂存或未跟踪的变更；按 Git 规则忽略的文件不影响检查。检查覆盖整个任务目录，不影响其他任务的草稿。
+3. 项目[归档前 hook](../install.md#项目-hooks) 通过；没有配置则跳过。
 
-清理中途失败会保留进度；重试时重新核对已发布文档、代码留存和资源归属，并重新执行 hook。归档任务仍可用 TASK-ID 查询历史记录。
+通过后，MAM 清理登记的 worktree、任务分支和整个 workspace，包括独立环境、tmp 和 ignored 文件。使用者负责提前保存成果；软链接只删除链接本身，中央 `.tasks/TASK-ID` 和 Manager 的 `workspace/tmp` 保留。
 
-## 待开发
+默认先由执行者整理干净 worktree，归档使用 `git worktree remove` 和 `git branch -d`。显式 `--force` 时改用 `git worktree remove --force` 和 `git branch -D`，允许清理 worktree 中未提交、未跟踪内容和未合并的任务分支，但不跳过三项归档条件。项目需要的交付检查由 hook 实现。
 
-按项目指定主分支或保留的 tag/branch 检查交付留存，并记录代码去向。当前仅支持上述主分支检查和明确舍弃，不支持用其他 tag/branch 通过留存检查；不能将 `--discard-code` 当作保留代码的接口。具体配置方式待定。
-
-环境创建失败或任务取消时，也应允许提交诊断报告和附件，明确哪些仓库没有代码交付。
+Git 或文件删除失败会保留清理进度，按错误处理后重试；此前已清理的资源不会恢复。重试重新检查归档条件，已归档任务重复调用直接返回。归档任务仍可用 TASK-ID 查询历史记录。

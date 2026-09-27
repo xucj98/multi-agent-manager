@@ -79,7 +79,7 @@ PROJECT_ROOT/REPO/.local/hooks/        # 项目入口可调用的仓库入口
 | 项目入口 | 时机与职责 | 缺失时 |
 | --- | --- | --- |
 | `workspace_add` | 登记本次创建后执行；创建指定 worktree，按需安装环境、建立共享软链接。返回成功后 MAM 核对所属仓库、路径和分支。 | 拒绝创建 |
-| `before_task_archive` | MAM 自身检查通过后、删除任何资源之前，检查项目收尾条件。 | 直接继续归档 |
+| `before_task_archive` | 全部 job 已归档、中央任务目录 Git 干净后，删除资源前检查项目收尾条件。 | 直接继续归档 |
 
 已有 ready worktree 的重复 add 不执行 hook；创建失败后修复并以相同 base 重试，会再次执行。归档前检查应可重复执行，每次归档重试均重新检查；已归档任务不再执行。归档 hook 只检查，实验记录更新、成果转存和远端清理由项目流程提前完成。
 
@@ -95,7 +95,7 @@ PROJECT_ROOT/REPO/.local/hooks/        # 项目入口可调用的仓库入口
 | `repos` | 登记仓库数组：`name`、`source`、`path`、`branch`、`base`、`state`、`removed`、`branch_removed`、交付 `commit`；无交付时 commit 为 null |
 | `repo` | 创建时为本次仓库名；归档时为 null |
 | `jobs` | 已保存的 job 摘要；不隐式探测进程 |
-| `options` | 本次 `note`、`discard_code`、`discard_drafts`；不适用时为空值或 false |
+| `options` | 本次 `note` 与 `force`；创建时为 null 和 false。force 表示是否强制删除 worktree 和任务分支，不能绕过 hook。 |
 
 退出码 0 表示成功；非 0、启动失败或超时使本次操作失败，MAM 返回入口和错误摘要。输出只作诊断，不作为 MAM 状态。归档 hook 拒绝时 MAM 不开始删除；创建失败可能留下部分 worktree，修复后重试。hook 内不要调用修改 MAM 状态的命令。
 

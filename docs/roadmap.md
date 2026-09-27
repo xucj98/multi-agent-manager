@@ -1,10 +1,9 @@
 # MAM 后续开发规划
 
-已完成：报告与附件提交、任务归档与 workspace 清理、执行者开始与接续、Manager 接管、项目 hooks。后续按以下顺序推进。
+任务 1–4 已完成：报告与附件提交、任务归档与 workspace 清理、执行者开始与接续、Manager 接管、项目 hooks。后续按以下顺序推进。
 
 | 顺序 | 任务 | 要做什么 |
 | --- | --- | --- |
-| 4 | [项目适配与归档](commands/task.md#待开发) | 配置代码留存目标，支持环境创建失败或任务取消时发布报告。 |
 | 5 | [job 提交](commands/job.md#待开发) | 用 `mam job submit --command` 一次完成登记与启动，返回 JOB-ID。 |
 | 6 | [跨集群同步](commands/workspace.md#跨集群同步) | 同步任务的 worktree 和指定文件，支持远端运行及结果取回。 |
 | 7 | [GPU 排队](commands/job.md#待开发) | 为 job 指定 GPU 数量、空闲显存和平均利用率条件，在当前实例内排队启动。 |
