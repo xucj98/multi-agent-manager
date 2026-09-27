@@ -17,15 +17,16 @@ Manager 用原生工具创建或通知 subagent。换人前让旧执行者结束
 | 接口 | 操作 |
 | --- | --- |
 | `mam task show [TASK-ID\|AGENT-PATH] [--file task\|report] [--json]` | 读取 MAM_BRANCH 当前最新已发布文档，默认 task；不读取草稿，--json 同时返回正文和发布信息。 |
-| `mam task publish TASK-ID\|AGENT-PATH --file task` | Manager 发布任务要求，必须显式指定任务，返回发布 commit。 |
-| `mam task publish [TASK-ID\|AGENT-PATH] --file report\|files` | 执行者单独发布简报或附件，可省略任务参数，返回发布 commit。 |
+| `mam task publish TASK-ID\|AGENT-PATH` | Manager 发布任务要求，必须显式指定任务，返回发布 commit。 |
+| `mam task report [TASK-ID\|AGENT-PATH]` | 执行者提交报告，记录交付代码，任务进入 pending；返回发布 commit。 |
+| `mam task attach [TASK-ID\|AGENT-PATH]` | 执行者发布 `.task/files/` 中的附件，不改变任务状态；返回发布 commit。 |
 | `mam task status [TASK-ID\|AGENT-PATH]` | 返回任务、执行者路径与树根、仓库交付、发布记录、草稿提示和保存的 job 观测；不探测 job。 |
 
-Manager 编辑 task.md；执行者经 workspace 的 `.task/report.md` 和 `.task/files/` 编辑简报、附件。report 草稿用于记录当前进展，更新草稿不改变状态；完成交付后再发布。发布 task 或 report 只提交对应文件。
+Manager 编辑 task.md；执行者经 workspace 的 `.task/report.md` 和 `.task/files/` 编辑简报、附件。report 草稿用于记录当前进展，更新草稿不改变状态；完成交付后再发布。publish 和 report 只提交各自对应的文件。
 
-`--file files` 一次同步本任务 files/ 中的新增、更新、删除和可执行位变化；无变化时返回已有发布 commit（初次空目录则返回当前 HEAD）并标记 `unchanged`，不创建 commit。附件仅接受普通文件（包括可执行文件），不接受符号链接。发布只同步本次文件的暂存内容，保留无关暂存内容和其他草稿。
+`attach` 不接收文件路径；先将附件整理到 `.task/files/`，再一次同步其中的新增、更新、删除和可执行位变化；无变化时返回已有发布 commit（初次空目录则返回当前 HEAD）并标记 `unchanged`，不创建 commit。附件仅接受普通文件（包括可执行文件），不接受符号链接。发布只同步本次文件的暂存内容，保留无关暂存内容和其他草稿。
 
-发布 report 记录各就绪 worktree HEAD 为交付 commit，任务进入 pending；返工后即使报告文字不变，重新发布也会更新交付 HEAD 并进入 pending。Manager 发布 task.md、线程活跃或普通问答不会自动改变任务状态。执行者和 reviewer 始终以最新已发布 task.md 为准；report 不绑定要求版本。
+`report` 记录各就绪 worktree HEAD 为交付 commit，任务进入 pending；返工后即使报告文字不变，重新发布也会更新交付 HEAD 并进入 pending。`publish` 发布 task.md、线程活跃或普通问答不会自动改变任务状态。执行者和 reviewer 始终以最新已发布 task.md 为准；report 不绑定要求版本。
 
 ## 附件与归档
 

@@ -8,7 +8,7 @@ MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`�
 
 MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 是 Codex 线程 ID。`AGENT-PATH` 是当前原生协作树内的完整执行者路径，如 `/root/worker`，绑定后可用于定位任务。Manager 显式指定任务；已绑定执行者的日常操作可省略任务参数。
 
-MAM 使用共享根目录 `MAM_ROOT`：Manager 编辑其中的 `task.md`，执行者编辑自己的 `report.md`。任务和报告通过 `mam task publish` 发布，并使用 `mam task show` 查看，未发布的修改是草稿。
+MAM 使用共享根目录 `MAM_ROOT`：Manager 编辑其中的 `task.md`，执行者编辑自己的 `report.md`。任务要求通过 `mam task publish` 发布，报告通过 `mam task report` 提交，使用 `mam task show` 查看；未发布的修改是草稿。
 
 每个未归档任务最多绑定一个执行者，每个执行者同时只绑定一个未归档任务。每个任务有独立的 workspace `PROJECT_ROOT/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。交接给新执行者时，沿用原目录、分支、环境和 job。**原则上每个 subagent 都只能读写自己的 workspace**。`mam` 需在 `PROJECT_ROOT` 或其各级子目录中使用。
 
@@ -32,7 +32,7 @@ Manager 主要负责任务的推进，进行排期，派遣 subagent 工作，�
 
 为了保证项目的长期可维护性，需要严格控制留存的内容。项目文件根据用途分成4类：
 1. 后续会**重复使用**的代码、配置、分析工具。进入各个 `REPO`，随 git 提交。
-2. 一次性，但有必要保留以解释本次结论的分析代码或附件。进入 `.tasks/TASK-ID/files/`，通过 `mam task publish --file files` 发布。
+2. 一次性，但有必要保留以解释本次结论的分析代码或附件。进入 `.tasks/TASK-ID/files/`，通过 `mam task attach` 发布。
 3. 正式数据、checkpoint、评测原始结果。放在 `REPO` 约定的稳定产物目录，不进入 git。
 4. 一次性检查脚本、调试输出、中间版本和验收校验记录。无论由 Manager 还是执行者生成，都放在关联任务的 `workspace/<task-id>/tmp/`，归档时自动清理。
 
@@ -48,7 +48,7 @@ Manager 创建任务、填写并发布要求，再通过 Codex 原生工具创�
 
 ```text
 mam task create --title TITLE [--review TASK-ID|AGENT-PATH]
-mam task publish TASK-ID|AGENT-PATH --file task
+mam task publish TASK-ID|AGENT-PATH
 mam task archive TASK-ID|AGENT-PATH --note NOTE
 ```
 
@@ -86,11 +86,11 @@ MAM 从 CODEX_THREAD_ID 自动确认执行者身份与协作路径。已绑定�
 完成后按[文件留存原则](#文件留存原则)整理成果，并提交 worktree 中的交付代码。通过 workspace 根目录的 `.task/report.md` 写简报，说明完成项、交付 commit、验证结果和成果位置；需要保留的一次性附件放 `.task/files/`。发布前将进度草稿整理为交付简报，再分别发布：
 
 ```text
-mam task publish --file files
-mam task publish --file report
+mam task attach
+mam task report
 ```
 
-没有附件时可省略 files 发布。发布附件会同步新增、修改和删除，report 不自动包含附件。执行者无需在共享管理仓库手工 git add/commit。读取要求仍用 `mam task show`，不能以 `.task/task.md` 中的未发布草稿代替。
+没有附件时可省略 attach。attach 发布 `.task/files/` 中的新增、修改和删除，不改变任务状态；report 不自动发布附件。执行者无需在共享管理仓库手工 git add/commit。读取要求仍用 `mam task show`，不能以 `.task/task.md` 中的未发布草稿代替。
 
 ### 任务收尾
 

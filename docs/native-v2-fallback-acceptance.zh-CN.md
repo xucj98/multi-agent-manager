@@ -106,7 +106,7 @@ TASK_ID="$("${MAM[@]}" task create --title 'native-v2 fallback isolated acceptan
   "$SOURCE_PYTHON" -I -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
 printf '# native-v2 fallback isolated acceptance\n\nOnly register the owned short fixture job; do not archive it until the root Manager follows up after the fallback notification.\n' \
   > "$FIXTURE_ROOT/state/.tasks/$TASK_ID/task.md"
-"${MAM[@]}" task publish "$TASK_ID" --file task
+"${MAM[@]}" task publish "$TASK_ID"
 "${MAM[@]}" task bind "$TASK_ID" --agent "$NATIVE_CHILD"
 ```
 
