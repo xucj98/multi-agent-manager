@@ -20,9 +20,9 @@ Manager 用原生工具创建或通知 subagent。换人前让旧执行者结束
 | `mam task publish [TARGET] --file task\|report\|files` | 单独发布指定草稿，返回发布 commit。 |
 | `mam task status [TARGET]` | 返回任务、执行者路径与树根、仓库交付、发布记录、草稿提示和保存的 job 观测；不探测 job。 |
 
-Manager 编辑 task.md；执行者经 workspace 的 `.task/report.md` 和 `.task/files/` 编辑简报、附件。发布 task 或 report 只提交对应文件。`--file files` 对本任务 files/ 递归同步：新增、更新和删除各自形成一次发布；内容无变化时返回已有发布 commit（初次空目录则返回当前 HEAD）并标记 `unchanged`，不创建 commit。附件仅接受普通文件，不接受可越出任务目录的符号链接。发布使用独立 Git index，保留无关暂存内容及其他任务草稿。
+Manager 编辑 task.md；执行者经 workspace 的 `.task/report.md` 和 `.task/files/` 编辑简报、附件。发布 task 或 report 只提交对应文件。`--file files` 对本任务 files/ 递归同步：新增、更新、删除或可执行位变化各自形成一次发布；内容及模式无变化时返回已有发布 commit（初次空目录则返回当前 HEAD）并标记 `unchanged`，不创建 commit。附件仅接受普通文件（包括可执行文件），不接受可越出任务目录的符号链接。发布使用独立 Git index，保留无关暂存内容及其他任务草稿。
 
-发布 report 记录各就绪 worktree HEAD 为交付 commit，任务进入 pending；返工后即使报告内容和交付 HEAD 未变，重新发布仍进入 pending。Manager 发布 task.md、线程活跃或普通问答不会自动改变任务状态。执行者和 reviewer 始终以最新已发布 task.md 为准；report 不绑定要求版本。
+发布 report 记录各就绪 worktree HEAD 为交付 commit，任务进入 pending；返工后即使报告文字不变，重新发布也会更新交付 HEAD 并进入 pending。Manager 发布 task.md、线程活跃或普通问答不会自动改变任务状态。执行者和 reviewer 始终以最新已发布 task.md 为准；report 不绑定要求版本。
 
 ## 附件与归档
 
@@ -32,4 +32,4 @@ Manager 编辑 task.md；执行者经 workspace 的 `.task/report.md` 和 `.task
 
 归档要求所有 job 已归档、仓库 worktree 无未提交或未知内容、任务/报告/附件无未发布草稿，且交付代码已包含在各源仓库的主分支中（优先检查 main/master，否则检查主 checkout 当前分支）。仅在 `--note` 说明舍弃理由时，才使用 `--discard-drafts` 忽略草稿或 `--discard-code` 舍弃未合入提交。报告中的 commit hash 本身不是 Git 对象的永久留存。取消无交付的空任务可直接归档。
 
-预检通过后，MAM 清理本任务 tmp、worktree、独立环境、分支、`.task` 链接和 workspace；不跟随共享链接，也不删除中央 `.tasks/TASK-ID` 或 Manager 的 `workspace/tmp`。清理中途失败会保留进度，可修复后重试。归档任务仍可用 TASK-ID 查询历史记录。
+预检通过后，MAM 清理本任务 tmp、worktree、独立环境、分支、`.task` 链接和 workspace；不跟随共享链接，也不删除中央 `.tasks/TASK-ID` 或 Manager 的 `workspace/tmp`。清理中途失败会保留进度；重试时重新检查仍存在的草稿和交付分支，新增内容需要重新发布或在本次命令中明确舍弃。归档任务仍可用 TASK-ID 查询历史记录。

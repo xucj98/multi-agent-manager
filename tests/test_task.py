@@ -448,7 +448,10 @@ printf env > "$target/.venv/marker"
         self.git(worktree, "add", "code.py")
         self.git(worktree, "commit", "-m", "record delivery")
         delivery = self.git(worktree, "rev-parse", "HEAD")
-        self.call("publish", task, "--file", "report", ok=False)
+        reused = self.call("publish", task, "--file", "report")
+        self.assertTrue(reused["unchanged"])
+        self.assertEqual(reused["revision"], report_publication)
+        self.assertEqual(self.store.read(task)["report"]["commits"]["multi-agent-manager"], delivery)
         self.store.doc(task, "report").write_text("Completed latest requirements and recorded delivery.\n")
         report_publication = self.publish(task, "report")
         final_status = self.call("status", task)
@@ -630,7 +633,8 @@ printf env > "$target/.venv/marker"
                 with patch.dict(os.environ, {"CODEX_THREAD_ID": manager}, clear=False), \
                         patch.object(cli, "agent_observations", return_value=states), \
                         patch.object(cli, "runtime", return_value=fake), \
-                        patch.object(identity, "read", return_value=identity.ThreadIdentity(manager, "/root", manager)):
+                        patch.object(identity, "read", side_effect=lambda agent: identity.ThreadIdentity(
+                            agent, "/root" if agent == manager else "/root/replacement", manager)):
                     with self.assertRaisesRegex(cli.Error, message):
                         cli.rebind(self.store, args)
                 self.assertEqual(self.store.read(task)["agent"], "old-executor")
@@ -1469,6 +1473,90 @@ base=$(git rev-parse --verify "$1^{commit}")
             result = cli.wait_stop(self.store, types.SimpleNamespace(agent="/root/worker", manager=None))
         self.assertEqual(result["status"], "cancelled")
         self.assertEqual(result["agent"], agent)
+
+
+    def test_rebind_rejects_another_native_root_as_executor(self):
+        task = self.task()
+        args, states, manager = self.prepare_rebind(task)
+        other_root = str(uuid.uuid4())
+        args.agent = other_root
+        states[other_root] = {"status": "idle"}
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": manager}), \
+                patch.object(cli, "agent_observations", return_value=states), \
+                patch.object(identity, "read", side_effect=lambda agent: identity.ThreadIdentity(
+                    agent, "/root", agent)):
+            with self.assertRaisesRegex(cli.Error, "native subagent"):
+                cli.rebind(self.store, args)
+        self.assertNotEqual(self.store.read(task)["agent"], other_root)
+
+    def test_executable_attachment_mode_survives_publication_and_archive(self):
+        task = self.task()
+        self.publish(task)
+        attachment = self.store.logs / task / "files" / "run.sh"
+        attachment.write_text("#!/bin/sh\nexit 0\n")
+        attachment.chmod(0o755)
+        self.call("publish", task, "--file", "files")
+        path = f".tasks/{task}/files/run.sh"
+        self.assertTrue(self.git(self.root, "ls-tree", "main", "--", path).startswith("100755 blob "))
+        self.assertNotIn("files", self.call("status", task).get("drafts", {}))
+        self.assertTrue(self.call("publish", task, "--file", "files")["unchanged"])
+        attachment.chmod(0o644)
+        self.assertTrue(self.call("status", task)["drafts"]["files"])
+        changed = self.call("publish", task, "--file", "files")
+        self.assertEqual(changed["updated"], [path])
+        self.assertTrue(self.git(self.root, "ls-tree", "main", "--", path).startswith("100644 blob "))
+        attachment.chmod(0o755)
+        self.call("publish", task, "--file", "files")
+        self.call("archive", task, "--note", "published executable retained")
+
+    def test_archive_retry_rechecks_new_drafts_and_unmerged_head(self):
+        task = self.task()
+        second = self.source("second-repo")
+        first_tree = Path(self.add(task)["path"])
+        second_tree = Path(self.add(task, "second-repo")["path"])
+        self.publish(task)
+        self.git(first_tree, "commit", "--allow-empty", "-m", "first delivery")
+        self.git(second_tree, "commit", "--allow-empty", "-m", "second delivery")
+        self.report(task)
+        self.git(second, "worktree", "lock", str(second_tree))
+        failed = self.call("archive", task, "--note", "discard initial commits", "--discard-code", ok=False)
+        self.assertIn("archive incomplete", failed["error"])
+        self.assertFalse(first_tree.exists())
+        self.assertTrue(second_tree.exists())
+        self.git(second, "worktree", "unlock", str(second_tree))
+
+        attachment = self.store.logs / task / "files" / "new.txt"
+        attachment.write_text("new evidence\n")
+        refused = self.call("archive", task, "--note", "retry", ok=False)
+        self.assertIn("unpublished drafts", refused["error"])
+        self.call("publish", task, "--file", "files")
+        old_head = self.git(second_tree, "rev-parse", "HEAD")
+        self.git(second, "update-ref", "refs/heads/main", old_head)
+        self.git(second_tree, "commit", "--allow-empty", "-m", "new delivery")
+        refused = self.call("archive", task, "--note", "retry", ok=False)
+        self.assertIn("delivery is not retained", refused["error"])
+        self.assertIn("second-repo", refused["error"])
+        self.assertTrue(second_tree.exists())
+        self.call("archive", task, "--note", "discard newly made commit", "--discard-code")
+        archived = self.store.read(task)
+        self.assertEqual(archived["status"], "archived")
+        self.assertEqual(archived["archive"]["discard_confirmations"][-1]["note"], "discard newly made commit")
+
+    def test_unchanged_report_republishes_new_delivery_head(self):
+        task = self.task()
+        worktree = Path(self.add(task)["path"])
+        self.publish(task)
+        revision = self.report(task)
+        self.git(worktree, "commit", "--allow-empty", "-m", "rework")
+        data = self.store.read(task)
+        data["status"] = "working"
+        self.store.write(data)
+        result = self.call("publish", task, "--file", "report")
+        self.assertTrue(result["unchanged"])
+        self.assertEqual(result["revision"], revision)
+        data = self.store.read(task)
+        self.assertEqual(data["report"]["commits"]["multi-agent-manager"], self.git(worktree, "rev-parse", "HEAD"))
+        self.assertEqual(data["status"], "pending")
 
 
 if __name__ == "__main__":

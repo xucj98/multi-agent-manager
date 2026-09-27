@@ -511,10 +511,7 @@ def _rebind_wait_quiescent(store, agent, *, role):
 def rebind(store, args):
     """Atomically hand an existing task and its retained workspace to an agent.
 
-    A normal bind intentionally remains permissive for initial task setup.  A
-    rebind is different: it coordinates a live scheduler, optional waits, and
-    an existing writer's worktree, so the manager must prove both threads are
-    dormant while the binding is replaced.
+    The manager must prove both threads are dormant while the binding is replaced.
     """
 
     task = task_target(store, args.task)
@@ -547,6 +544,12 @@ def rebind(store, args):
             raise Error("task rebind requires the recorded native root Manager")
         if replacement == manager:
             raise Error("replacement agent is the recorded Manager")
+        try:
+            replacement_identity = thread_identity.read(replacement)
+        except thread_identity.IdentityError as exc:
+            raise Error(str(exc)) from exc
+        if replacement_identity.path == "/root" or replacement_identity.tree_root == replacement:
+            raise Error("replacement executor must be a native subagent")
 
         data = store.read(task, writable=True)
         current = data.get("agent")
@@ -581,11 +584,6 @@ def rebind(store, args):
                 raise Error(f"cannot verify executor thread states: {exc}") from exc
             _rebind_quiescent(current, agent_state(current, observations), role="current executor")
             _rebind_quiescent(replacement, agent_state(replacement, observations), role="replacement agent")
-            try:
-                replacement_identity = thread_identity.read(replacement)
-            except thread_identity.IdentityError as exc:
-                raise Error(str(exc)) from exc
-
             handoffs = data.get("handoffs")
             if handoffs is None:
                 handoffs = []
@@ -675,7 +673,8 @@ def files_snapshot(store, task):
             if not stat.S_ISREG(path.lstat().st_mode):
                 raise Error(f"task files must be regular files: {path}")
             relative = path.relative_to(store.root).as_posix()
-            entries[relative] = path.read_bytes()
+            mode = "100755" if path.stat().st_mode & 0o111 else "100644"
+            entries[relative] = (mode, path.read_bytes())
     return entries
 
 
@@ -689,15 +688,15 @@ def published_files(store, task):
         meta, raw = row.split(b"\t", 1)
         mode, kind, blob = meta.decode().split()
         path = os.fsdecode(raw)
-        if not path.startswith(prefix) or kind != "blob" or mode != "100644":
+        if not path.startswith(prefix) or kind != "blob" or mode not in ("100644", "100755"):
             raise Error(f"published task files contain an unsupported entry: {path}")
-        entries[path] = blob
+        entries[path] = (mode, blob)
     return entries
 
 
 def draft_file_blobs(store, files):
-    return {path: git(store.root, "hash-object", "--stdin", input=content).stdout.decode().strip()
-            for path, content in files.items()}
+    return {path: (mode, git(store.root, "hash-object", "--stdin", input=content).stdout.decode().strip())
+            for path, (mode, content) in files.items()}
 
 
 def publish_files(store, task):
@@ -708,22 +707,22 @@ def publish_files(store, task):
         revision = value(store.root, "log", "-1", "--format=%H", store.branch, "--", f".tasks/{task}/files")
         return {"id": task, "file": "files", "revision": revision or head(store.root, store.branch), "unchanged": True}
     parent = head(store.root, store.branch)
-    for content in draft.values():
+    for _, content in draft.values():
         git(store.root, "hash-object", "-w", "--stdin", input=content)
     with tempfile.TemporaryDirectory(prefix="task-files-publish-") as temporary:
         env = {**os.environ, "GIT_INDEX_FILE": str(Path(temporary) / "index")}
         git(store.root, "read-tree", parent, env=env)
         for path in current.keys() - blobs.keys():
             git(store.root, "update-index", "--force-remove", "--", path, env=env)
-        for path, blob in blobs.items():
-            git(store.root, "update-index", "--add", "--cacheinfo", "100644", blob, path, env=env)
+        for path, (mode, blob) in blobs.items():
+            git(store.root, "update-index", "--add", "--cacheinfo", mode, blob, path, env=env)
         tree = git(store.root, "write-tree", env=env).stdout.decode().strip()
         commit = git(store.root, "commit-tree", tree, "-p", parent, "-m", f"Publish {task} files").stdout.decode().strip()
         git(store.root, "update-ref", f"refs/heads/{store.branch}", commit, parent)
     for path in current.keys() - blobs.keys():
         git(store.root, "update-index", "--force-remove", "--", path)
-    for path, blob in blobs.items():
-        git(store.root, "update-index", "--add", "--cacheinfo", "100644", blob, path)
+    for path, (mode, blob) in blobs.items():
+        git(store.root, "update-index", "--add", "--cacheinfo", mode, blob, path)
     return {"id": task, "file": "files", "revision": commit,
             "added": sorted(blobs.keys() - current.keys()),
             "updated": sorted(path for path in blobs.keys() & current.keys() if blobs[path] != current[path]),
@@ -752,10 +751,9 @@ def publish(store, args):
         path = f".tasks/{args.task}/{args.file}.md"
         existing = optional_doc(store, args.task, args.file)
         if existing and existing["content"].encode() == content:
-            if report is not None and (not data["report"] or report["commits"] != data["report"]["commits"]):
-                raise Error("delivery HEAD changed; update the report draft before publishing")
             git(store.root, "update-index", "--add", "--cacheinfo", "100644", existing["blob"], path)
             if report is not None:
+                data["report"] = {**report, "revision": existing["revision"]}
                 data["status"] = "pending"
                 store.write(data)
             return {"id": args.task, "file": args.file, "revision": existing["revision"], "unchanged": True}
@@ -1523,47 +1521,49 @@ def archive(store, args):
         tmp = workspace / "tmp"
         if tmp.is_symlink() or (tmp.exists() and not tmp.is_dir()):
             raise Error(f"archive refused; invalid tmp directory: {tmp}")
-        if data.get("archive") is None:
-            docs = {kind: optional_doc(store, args.task, kind) for kind in ("task", "report")}
-            drafts = [kind for kind, doc in docs.items() if store.doc(args.task, kind).exists() and
-                      (doc is None or store.doc(args.task, kind).read_bytes() != doc["content"].encode())]
-            files = files_snapshot(store, args.task)
-            committed = published_files(store, args.task)
-            if "report" in drafts and not store.doc(args.task, "report").read_bytes():
-                drafts.remove("report")
-            if ("task" in drafts and docs["task"] is None and
-                    store.doc(args.task, "task").read_text() == f"# {data['title']}\n" and
-                    data.get("report") is None and not files and not committed):
-                drafts.remove("task")
-            file_blobs = draft_file_blobs(store, files)
-            if file_blobs != committed:
-                drafts.append("files")
-            if drafts and not getattr(args, "discard_drafts", False):
-                raise Error("archive refused; unpublished drafts: " + ", ".join(drafts) + "; use --discard-drafts with --note")
-            unmerged = []
-            for name, record in data["repos"].items():
-                source, path, branch = repo_context(store, data, name, record)
-                retained_by = retention_branch(source)
-                commits = set()
+        docs = {kind: optional_doc(store, args.task, kind) for kind in ("task", "report")}
+        drafts = [kind for kind, doc in docs.items() if store.doc(args.task, kind).exists() and
+                  (doc is None or store.doc(args.task, kind).read_bytes() != doc["content"].encode())]
+        files = files_snapshot(store, args.task)
+        committed = published_files(store, args.task)
+        if "report" in drafts and not store.doc(args.task, "report").read_bytes():
+            drafts.remove("report")
+        if ("task" in drafts and docs["task"] is None and
+                store.doc(args.task, "task").read_text() == f"# {data['title']}\n" and
+                data.get("report") is None and not files and not committed):
+            drafts.remove("task")
+        if draft_file_blobs(store, files) != committed:
+            drafts.append("files")
+        if drafts and not getattr(args, "discard_drafts", False):
+            raise Error("archive refused; unpublished drafts: " + ", ".join(drafts) + "; use --discard-drafts with --note")
+        unmerged = []
+        for name, record in data["repos"].items():
+            source, path, branch = repo_context(store, data, name, record)
+            if record["branch_removed"]:
                 if branch_exists(source, branch):
-                    commits.add(head(source, branch))
-                report = data.get("report") or {}
-                delivery = report.get("commits") if isinstance(report, dict) else None
-                if isinstance(delivery, dict) and name in delivery:
-                    try:
-                        commits.add(head(source, delivery[name]))
-                    except Error:
-                        unmerged.append(name)
-                if commits and (retained_by is None or any(
-                    git(source, "merge-base", "--is-ancestor", commit, retained_by, check=False).returncode
-                    for commit in commits
-                )):
+                    raise Error(f"removed task branch reappeared: {branch}")
+                continue
+            retained_by = retention_branch(source)
+            commits = set()
+            if branch_exists(source, branch):
+                commits.add(head(source, branch))
+            report = data.get("report") or {}
+            delivery = report.get("commits") if isinstance(report, dict) else None
+            if isinstance(delivery, dict) and name in delivery:
+                try:
+                    commits.add(head(source, delivery[name]))
+                except Error:
                     unmerged.append(name)
-            if unmerged and not getattr(args, "discard_code", False):
-                raise Error("archive refused; delivery is not retained in the source main branch: " + ", ".join(unmerged) +
-                            "; use --discard-code with --note")
-            if (getattr(args, "discard_drafts", False) or getattr(args, "discard_code", False)) and not args.note.strip():
-                raise Error("archive discard requires a non-empty --note")
+            if commits and (retained_by is None or any(
+                git(source, "merge-base", "--is-ancestor", commit, retained_by, check=False).returncode
+                for commit in commits
+            )):
+                unmerged.append(name)
+        if unmerged and not getattr(args, "discard_code", False):
+            raise Error("archive refused; delivery is not retained in the source main branch: " + ", ".join(unmerged) +
+                        "; use --discard-code with --note")
+        if (getattr(args, "discard_drafts", False) or getattr(args, "discard_code", False)) and not args.note.strip():
+            raise Error("archive discard requires a non-empty --note")
         for name, record in data["repos"].items():  # preflight every repo before removing any
             source, path, branch = repo_context(store, data, name, record)
             if path.exists():
@@ -1581,6 +1581,14 @@ def archive(store, args):
         if data["archive"] is None:
             result["discard_drafts"] = bool(getattr(args, "discard_drafts", False))
             result["discard_code"] = bool(getattr(args, "discard_code", False))
+        elif getattr(args, "discard_drafts", False) or getattr(args, "discard_code", False):
+            result.setdefault("discard_confirmations", []).append({
+                "note": args.note, "at": now(),
+                "drafts": bool(getattr(args, "discard_drafts", False)),
+                "code": bool(getattr(args, "discard_code", False)),
+            })
+            result["discard_drafts"] = result.get("discard_drafts", False) or bool(getattr(args, "discard_drafts", False))
+            result["discard_code"] = result.get("discard_code", False) or bool(getattr(args, "discard_code", False))
         data["archive"] = result
         try:
             if tmp.exists():
