@@ -67,6 +67,12 @@ print(stat, end='')
 _AGENT_STATUSES = {"active", "idle", "notLoaded", "systemError"}
 
 
+def job_status(value: str | None) -> str | None:
+    """Read legacy stopped observations as exited without migrating records."""
+
+    return "exited" if value == "stopped" else value
+
+
 class _ProbeError(RuntimeError):
     """A transport or protocol failure that must not imply a stopped target."""
 
@@ -221,12 +227,12 @@ def probe_process(host: str, pid: int, identity: dict | None = None, timeout: fl
     except _ProbeError as exc:
         return _process_result("unknown", checked_at, error=str(exc))
     if current is None:
-        return _process_result("stopped", checked_at, error="process not found")
+        return _process_result("exited", checked_at, error="process not found")
     observed, state = current
     if state == "Z":
-        return _process_result("stopped", checked_at, observed, "process is a zombie")
+        return _process_result("exited", checked_at, observed, "process is a zombie")
     if identity is not None and not _same_identity(identity, observed):
-        return _process_result("stopped", checked_at, observed, "process identity changed")
+        return _process_result("exited", checked_at, observed, "process identity changed")
     return _process_result("running", checked_at, observed)
 
 
@@ -514,8 +520,8 @@ class AppServerEventStream:
             raise AppServerEventError("App Server thread/turns/list returned an invalid turn")
         return turn
 
-    def start_turn(self, thread_id: str, text: str) -> Any:
-        """Start one input turn on an already-resumed existing thread.
+    def start_turn(self, thread_id: str, text: str, *, message_channel: str = "tool") -> Any:
+        """Deliver one message on an already-resumed existing thread.
 
         The caller supplies no model, effort, cwd, sandbox, or workspace
         override.  ``thread/resume`` is deliberately separate so a scheduler
@@ -526,7 +532,18 @@ class AppServerEventStream:
             raise AppServerEventError("App Server turn/start requires a thread id")
         if not isinstance(text, str) or not text:
             raise AppServerEventError("App Server turn/start requires non-empty text")
-        return self.request("turn/start", {"threadId": thread_id, "input": [{"type": "text", "text": text}]})
+        if message_channel == "tool":
+            params = {"threadId": thread_id, "input": [],
+                      "toolOutput": {"name": "message", "namespace": "mam", "output": text}}
+        elif message_channel == "user":
+            params = {"threadId": thread_id, "input": [{"type": "text", "text": text}]}
+        else:
+            raise AppServerEventError(f"unsupported message channel: {message_channel}")
+        return self.request("turn/start", params)
+
+    def steer_turn(self, thread_id: str, turn_id: str, text: str) -> Any:
+        return self.request("turn/steer", {"threadId": thread_id, "expectedTurnId": turn_id,
+                                           "input": [{"type": "text", "text": text}]})
 
     def poll(self, timeout: float | None) -> dict[str, Any] | None:
         if self._events:

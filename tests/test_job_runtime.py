@@ -115,12 +115,12 @@ class ProcessProbeTests(unittest.TestCase):
             self.assertTrue(all(result["identity"] for result in running))
             changed = dict(running[0]["identity"])
             changed["start_ticks"] += 1
-            self.assertEqual(runtime.probe_process("localhost", processes[0].pid, changed)["status"], "stopped")
+            self.assertEqual(runtime.probe_process("localhost", processes[0].pid, changed)["status"], "exited")
         finally:
             for process in processes:
                 process.terminate()
                 process.wait(timeout=3)
-        self.assertEqual(runtime.probe_process("localhost", processes[0].pid)["status"], "stopped")
+        self.assertEqual(runtime.probe_process("localhost", processes[0].pid)["status"], "exited")
 
     def test_zombie_is_stopped(self) -> None:
         process = subprocess.Popen([sys.executable, "-c", "pass"])
@@ -130,7 +130,7 @@ class ProcessProbeTests(unittest.TestCase):
             while result["status"] == "running" and time.monotonic() < deadline:
                 time.sleep(0.01)
                 result = runtime.probe_process("localhost", process.pid)
-            self.assertEqual(result["status"], "stopped")
+            self.assertEqual(result["status"], "exited")
             self.assertIn("zombie", result["error"])
         finally:
             process.wait(timeout=3)
@@ -157,7 +157,7 @@ class ProcessProbeTests(unittest.TestCase):
         with mock.patch.object(runtime.subprocess, "run", side_effect=responses):
             missing = runtime.probe_process("wuwen-1", 123)
             unreadable = runtime.probe_process("wuwen-1", 124)
-        self.assertEqual(missing["status"], "stopped")
+        self.assertEqual(missing["status"], "exited")
         self.assertEqual(missing["error"], "process not found")
         self.assertEqual(unreadable["status"], "unknown")
         self.assertIn("cannot be accessed", unreadable["error"])
@@ -229,7 +229,8 @@ class EventStreamTests(unittest.TestCase):
             self.assertEqual(started["method"], "turn/start")
             self.assertEqual(
                 started["params"],
-                {"threadId": "existing-agent", "input": [{"type": "text", "text": "JOB-ID job-1 stopped"}]},
+                {"threadId": "existing-agent", "input": [],
+                 "toolOutput": {"name": "message", "namespace": "mam", "output": "JOB-ID job-1 stopped"}},
             )
             fixture.send_json(connection, {"id": started["id"], "result": {"turn": {"id": "new-turn"}}})
 
@@ -240,6 +241,33 @@ class EventStreamTests(unittest.TestCase):
             finally:
                 stream.close()
         self.assertEqual(result, {"turn": {"id": "new-turn"}})
+
+    def test_user_channel_uses_text_input_and_active_turn_steer(self) -> None:
+        def handler(fixture: AppServerFixture, connection: socket.socket) -> None:
+            initialize = fixture.read_json(connection)
+            fixture.send_json(connection, {"id": initialize["id"], "result": {}})
+            self.assertEqual(fixture.read_json(connection)["method"], "initialized")
+            started = fixture.read_json(connection)
+            self.assertEqual(started["method"], "turn/start")
+            self.assertEqual(started["params"], {
+                "threadId": "manager", "input": [{"type": "text", "text": "visible"}],
+            })
+            fixture.send_json(connection, {"id": started["id"], "result": {"turn": {"id": "turn-1"}}})
+            steered = fixture.read_json(connection)
+            self.assertEqual(steered["method"], "turn/steer")
+            self.assertEqual(steered["params"], {
+                "threadId": "manager", "expectedTurnId": "turn-1",
+                "input": [{"type": "text", "text": "urgent"}],
+            })
+            fixture.send_json(connection, {"id": steered["id"], "result": {"turnId": "turn-1"}})
+
+        with AppServerFixture(handler) as fixture:
+            stream = runtime.AppServerEventStream.connect(fixture.path)
+            try:
+                self.assertEqual(stream.start_turn("manager", "visible", message_channel="user")["turn"]["id"], "turn-1")
+                self.assertEqual(stream.steer_turn("manager", "turn-1", "urgent"), {"turnId": "turn-1"})
+            finally:
+                stream.close()
 
     def test_explicit_rpc_rejection_has_a_distinct_compatible_error_type(self) -> None:
         def handler(fixture: AppServerFixture, connection: socket.socket) -> None:

@@ -4,7 +4,7 @@ This module is intentionally separate from :mod:`wake_compat`.  The latter is
 safe to run at scheduler startup and reconnection because it never touches a
 registered thread.  This module is an installer-only, Manager-authorized
 acceptance run: it creates a disposable MAM project and dedicated persisted
-Codex threads, then proves the real detached scheduler delivers both a stopped
+Codex threads, then proves the real detached scheduler delivers both an exited
 job wakeup and a Manager-ready wakeup.
 
 It never reads or writes the caller's MAM project.  The fixture root must be a
@@ -33,7 +33,7 @@ from . import cli, job_runtime
 
 MODEL = "gpt-5.6-terra"
 EFFORT = "max"
-MAX_MODEL_TURNS = 6
+MAX_MODEL_TURNS = 12
 DEFAULT_TIMEOUT_SECONDS = 180.0
 POLL_SECONDS = 0.5
 _MARKER = ".mam-liveprobe.json"
@@ -249,7 +249,7 @@ class _LiveFixture:
                 "manager_delivery": False,
                 "manager_is_fixture_only": False,
                 "turn_budget": False,
-                "quiet_window_no_duplicate_starts": False,
+                "service_stopped_after_delivery": False,
                 "idle_executors_received_no_turn": False,
             },
             "resources": {"tasks": {}, "threads": {}, "jobs": {}, "turns": {}},
@@ -284,7 +284,7 @@ class _LiveFixture:
     def _create_tasks(self) -> None:
         self.stage = "register fixture tasks"
         titles = {
-            "job": "MAM liveprobe stopped-job delivery",
+            "job": "MAM liveprobe exited-job delivery",
             "idle": "MAM liveprobe no-job Manager delivery",
             "archived": "MAM liveprobe archived-job Manager delivery",
         }
@@ -387,23 +387,23 @@ class _LiveFixture:
                 process.kill()
                 process.wait(timeout=5)
 
-    def _register_jobs(self) -> tuple[str, str]:
+    def _register_jobs(self) -> str:
         self.stage = "register fixture jobs"
         job_process = self._spawn_blocker()
         try:
             job = cli.job_add(
                 self.store,
                 SimpleNamespace(
-                    task=self.tasks["job"], host="local", pid=job_process.pid, note="liveprobe-short-job-stop"
+                    task=self.tasks["job"], host="local", pid=job_process.pid, note="liveprobe-short-job-exit"
                 ),
             )
         except Exception as exc:
-            raise LiveProbeError(f"cannot register fixture stopped-job probe: {_redact(exc)}") from exc
+            raise LiveProbeError(f"cannot register fixture exited-job probe: {_redact(exc)}") from exc
         job_id = job.get("id") if isinstance(job, Mapping) else None
         if not isinstance(job_id, str) or not job_id:
-            raise LiveProbeError("fixture stopped-job registration returned no JOB-ID")
+            raise LiveProbeError("fixture exited-job registration returned no JOB-ID")
         self.jobs.append((self.tasks["job"], job_id))
-        self.evidence["resources"]["jobs"]["stopped"] = job_id
+        self.evidence["resources"]["jobs"]["exited"] = job_id
 
         archived_process = self._spawn_blocker()
         try:
@@ -423,7 +423,7 @@ class _LiveFixture:
             raise LiveProbeError(f"cannot archive fixture archived-job probe: {_redact(exc)}") from exc
         self.evidence["resources"]["jobs"]["archived_before_delivery"] = archived_id
         self._release_blocker(archived_process)
-        return job_id, "liveprobe-short-job-stop"
+        return job_id
 
     def _start_service(self) -> None:
         self.stage = "start isolated fixture scheduler"
@@ -669,17 +669,7 @@ class _LiveFixture:
 
     def _wait_for_manager_delivery(self) -> None:
         self.stage = "verify fixture Manager delivery"
-        manager_payloads = [
-            "[MAM Message]",
-            (
-                f"Executor AGENT-ID {self.threads['idle_executor']} has no unarchived jobs for "
-                f"TASK-ID {self.tasks['idle']}: MAM liveprobe no-job Manager delivery."
-            ),
-            (
-                f"Executor AGENT-ID {self.threads['archived_executor']} has no unarchived jobs for "
-                f"TASK-ID {self.tasks['archived']}: MAM liveprobe archived-job Manager delivery."
-            ),
-        ]
+        manager_payloads = ["[MAM Message]", "needs follow-up", self.tasks["idle"], self.tasks["archived"]]
         manager_turn = self._wait_for_turn_text(
             "manager", manager_payloads, 2, "Manager-ready scheduler turn", "manager_delivery"
         )
@@ -702,77 +692,63 @@ class _LiveFixture:
 
     def _verify_baseline_only_executors(self) -> None:
         self.stage = "verify fixture executors received no pre-stop scheduler turn"
-        expected = {"manager": 2, "job_executor": 1, "idle_executor": 1, "archived_executor": 1}
         counts = self._turn_counts_after_idle("before_job_stop")
-        if counts != expected:
+        if counts["manager"] < 2 or any(counts[role] != 1 for role in _ROLE_ORDER[1:]):
             raise LiveProbeError(f"fixture pre-stop turn distribution is unexpected: {counts}")
         self.evidence["checks"]["idle_executors_received_no_turn"] = True
 
-    def _wait_for_stopped_job_delivery(self, job_id: str, note: str) -> dict[str, int]:
-        self.stage = "verify stopped-job scheduler delivery"
-        job_payload = (
-            f"Stopped registered job: JOB-ID {job_id} ({note}); "
-            f"TASK-ID {self.tasks['job']}: MAM liveprobe stopped-job delivery."
-        )
+    def _wait_for_exited_job_delivery(self, job_id: str) -> dict[str, int]:
+        self.stage = "verify exited-job scheduler delivery"
         job_turn = self._wait_for_turn_text(
-            "job_executor", ["[MAM Message]", job_payload], 2, "stopped-job scheduler turn", "stopped_job_delivery"
+            "job_executor", ["[MAM Message]", f"Job {job_id} has exited.", "archive the job"],
+            2, "exited-job scheduler turn", "exited_job_delivery"
         )
         job_turn_id = job_turn.get("id")
         if not isinstance(job_turn_id, str) or not job_turn_id:
-            raise LiveProbeError("stopped-job scheduler delivery returned no turn id")
-        self.evidence["resources"]["turns"]["stopped_job_delivery"] = job_turn_id
+            raise LiveProbeError("exited-job scheduler delivery returned no turn id")
+        self.evidence["resources"]["turns"]["exited_job_delivery"] = job_turn_id
         self.evidence["checks"]["job_delivery"] = True
+        # The scheduler intentionally reminds again after a recipient becomes
+        # idle while work is still pending. End this isolated probe after the
+        # first required deliveries before counting fixture model turns.
+        self.runtime.stop_service(self.config)
+        deadline = self._deadline()
+        while self.clock() < deadline:
+            if self.runtime.service_status(self.config).get("running") is False:
+                break
+            self.sleeper(POLL_SECONDS)
+        else:
+            raise LiveProbeError("fixture scheduler did not stop after delivery")
+        self.evidence["checks"]["service_stopped_after_delivery"] = True
         counts = self._turn_counts_after_idle("after_job_stop")
-        expected = {"manager": 2, "job_executor": 2, "idle_executor": 1, "archived_executor": 1}
-        if counts != expected:
+        if counts["manager"] < 2 or counts["job_executor"] < 2 or any(
+            counts[role] != 1 for role in ("idle_executor", "archived_executor")
+        ):
             raise LiveProbeError(f"fixture model turn distribution is unexpected: {counts}")
         observed = sum(counts.values())
         if observed > MAX_MODEL_TURNS:
             raise LiveProbeError(
-                f"fixture observed {observed} model turns, exceeding the fixed acceptance limit of {MAX_MODEL_TURNS}"
+                f"fixture observed {observed} model turns, exceeding the acceptance limit of {MAX_MODEL_TURNS}"
             )
-        if observed != MAX_MODEL_TURNS:
-            raise LiveProbeError(f"fixture did not produce the required {MAX_MODEL_TURNS}-turn acceptance distribution: {counts}")
         self.evidence["checks"]["turn_budget"] = True
         self.evidence["model_turns"] = observed
         return counts
-
-    def _scheduler_interval(self) -> float:
-        raw = getattr(self.runtime, "POLL_SECONDS", POLL_SECONDS)
-        if isinstance(raw, bool) or not isinstance(raw, (int, float)) or raw <= 0:
-            raw = POLL_SECONDS
-        return min(max(float(raw), POLL_SECONDS), 30.0) + POLL_SECONDS
-
-    def _verify_quiet_window(self, expected: Mapping[str, int]) -> None:
-        self.stage = "verify unchanged fixture quiet window"
-        # Check across two actual daemon polling windows.  No fixture records
-        # change after the stopped job has been delivered, so another start is
-        # an observable duplicate rather than a timing assumption.
-        for index in range(1, 3):
-            deadline = self._deadline()
-            self.sleeper(min(self._scheduler_interval(), max(0.0, deadline - self.clock())))
-            self._expired(deadline, "fixture quiet window")
-            observed = self._turn_counts_after_idle(f"quiet_window_{index}")
-            if observed != dict(expected):
-                raise LiveProbeError(f"fixture quiet window started unexpected additional turns: {observed}")
-        self.evidence["checks"]["quiet_window_no_duplicate_starts"] = True
 
     def run(self) -> dict[str, Any]:
         self._create_tasks()
         self._connect()
         self._create_and_bind_threads()
         self._start_all_baseline_turns()
-        job_id, note = self._register_jobs()
+        job_id = self._register_jobs()
         self._start_service()
         self._wait_for_service()
         self._wait_for_manager_delivery()
         self._verify_baseline_only_executors()
         # Releasing EOF makes this fixture-owned, already-registered local
-        # process finish.  The detached scheduler must later observe the stop
+        # process finish.  The detached scheduler must later observe the exit
         # itself; this module does not refresh the job record on its behalf.
         self._release_blocker(self.blockers[0])
-        counts = self._wait_for_stopped_job_delivery(job_id, note)
-        self._verify_quiet_window(counts)
+        self._wait_for_exited_job_delivery(job_id)
         self.evidence["status"] = "passed"
         return self.evidence
 
@@ -991,7 +967,7 @@ def _main(argv: list[str] | None = None) -> int:
         return 1
     print("MAM isolated live delivery: PASS")
     print(f"model turns: {result.get('model_turns', '?')}/{MAX_MODEL_TURNS}")
-    print("checks: stopped-job executor delivery and fixture-Manager ready delivery")
+    print("checks: exited-job executor delivery and fixture-Manager ready delivery")
     return 0
 
 

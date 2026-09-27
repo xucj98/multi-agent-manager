@@ -72,8 +72,7 @@ def task_rebind_lock(store: Store, task: str):
 
     Keep this lock order aligned with :meth:`WakeScheduler.run_once`: service
     startup/cycle coordination comes before the global binding registry and
-    then the individual task.  Optional-wait locks, when a caller needs them,
-    are acquired only after this context.
+    then the individual task.
     """
 
     with _service_start_lock(store), store.lock("service-cycle"), store.lock("bindings"), store.lock(task):
@@ -155,6 +154,7 @@ def _default_state(config: ProjectConfig) -> dict[str, Any]:
         "enabled": False,
         "mode": "disabled",
         "manager": None,
+        "message_channel": "tool",
         "pid": None,
         "identity": None,
         "token": None,
@@ -273,7 +273,7 @@ def rebind_manager(store: Store, note: str) -> dict[str, Any]:
     if not isinstance(note, str) or not note.strip():
         raise WakeRuntimeError("--note must describe the Manager handoff")
     try:
-        caller = identity.read(cli.wait_caller())
+        caller = identity.read(cli.caller_agent())
     except (cli.Error, identity.IdentityError) as exc:
         raise WakeRuntimeError(str(exc)) from exc
     if caller.path != "/root" or caller.tree_root != caller.agent:
@@ -286,13 +286,11 @@ def rebind_manager(store: Store, note: str) -> dict[str, Any]:
         if old == caller.agent:
             return {"manager": old, "unchanged": True}
         if old is not None:
-            with store.lock(cli.wait_lock(old)):
-                try:
-                    cli._rebind_wait_quiescent(store, old, role="current Manager")
-                    states = cli.agent_observations([old])
-                    cli._rebind_quiescent(old, cli.agent_state(old, states), role="current Manager")
-                except Exception as exc:
-                    raise WakeRuntimeError(str(exc)) from exc
+            try:
+                states = cli.agent_observations([old])
+                cli._rebind_quiescent(old, cli.agent_state(old, states), role="current Manager")
+            except Exception as exc:
+                raise WakeRuntimeError(str(exc)) from exc
         record = {"manager": caller.agent, "source": "service rebind-manager", "recorded_at": _timestamp(),
                   "handoffs": list(previous.get("handoffs", [])) if previous else []}
         record["handoffs"].append({"from_agent": old, "to_agent": caller.agent, "at": _timestamp(), "note": note})
@@ -301,6 +299,9 @@ def rebind_manager(store: Store, note: str) -> dict[str, Any]:
         if old is not None:
             for signature, event in list(state.get("events", {}).items()):
                 if isinstance(event, Mapping) and event.get("recipient") == old:
+                    if event.get("kind") == "message":
+                        event["recipient"] = caller.agent
+                        continue
                     scheduler_event = state["events"].pop(signature)
                     state.setdefault("history", []).append({**scheduler_event, "resolved_at": _timestamp(),
                                                                "resolution": "Manager identity changed"})
@@ -370,6 +371,7 @@ def _status_mapping(store: Store, state: dict[str, Any]) -> dict[str, Any]:
         status = "healthy"
     result = {
         "status": status,
+        "message_channel": state.get("message_channel", "tool"),
         "running": alive,
         "healthy": bool(alive and state.get("healthy") and not state.get("error")),
         "manager": recorded_manager(store),
@@ -394,6 +396,43 @@ def service_status(config: ProjectConfig) -> dict[str, Any]:
     with store.lock("service-state"):
         state = _load_state(store)
         return _status_mapping(store, state)
+
+
+def set_message_channel(config: ProjectConfig, value: str) -> dict[str, Any]:
+    if value not in {"tool", "user"}:
+        raise WakeRuntimeError("message-channel must be tool or user")
+    store = Store(config)
+    with _service_start_lock(store), store.lock("service-cycle"):
+        state = _load_state(store)
+        state["message_channel"] = value
+        _save_state(store, state)
+        return {"message_channel": value}
+
+
+def enqueue_message(store: Store, *, sender: str, sender_path: str, sender_tree: str,
+                    message: str, defer: bool, task: str | None) -> dict[str, Any]:
+    if not message.strip():
+        raise WakeRuntimeError("--message must contain text")
+    with _service_start_lock(store), store.lock("service-cycle"):
+        manager = recorded_manager(store)
+        if manager is None:
+            raise WakeRuntimeError("this project has no recorded Manager")
+        state = _load_state(store)
+        message_id = str(uuid.uuid4())
+        state.setdefault("events", {})[message_id] = {
+            "signature": message_id, "kind": "message", "recipient": manager,
+            "sender": sender, "sender_path": sender_path, "sender_tree": sender_tree,
+            "task": task, "message": message, "defer": defer,
+            "created_at": _timestamp(), "delivery": "pending", "attempts": 0,
+            "next_attempt_at": 0.0,
+        }
+        _save_state(store, state)
+        alive, error = _probe_service_process(state) if state.get("pid") is not None else (False, None)
+        service = "running" if state.get("enabled") and alive else "disabled" if not state.get("enabled") else "unavailable"
+        result = {"id": message_id, "status": "queued", "service": service}
+        if error and service == "unavailable":
+            result["service_error"] = error
+        return result
 
 
 _DAEMON_BOOTSTRAP = """\
@@ -720,7 +759,8 @@ class WakeScheduler:
     @staticmethod
     def _job_stopped(job: Mapping[str, Any]) -> bool:
         probe = job.get("probe")
-        return job.get("status") == "stopped" or isinstance(probe, Mapping) and probe.get("status") == "stopped"
+        return job_runtime.job_status(job.get("status")) == "exited" or (isinstance(probe, Mapping)
+            and job_runtime.job_status(probe.get("status")) == "exited")
 
     def _probe_jobs(self, state: dict[str, Any], tasks: list[dict[str, Any]]) -> None:
         schedule = state.setdefault("job_schedule", {})
@@ -752,6 +792,7 @@ class WakeScheduler:
                     observation = {"status": "unknown", "checked_at": _timestamp(), "error": str(exc)}
                 if not isinstance(observation, Mapping) or not isinstance(observation.get("status"), str):
                     observation = {"status": "unknown", "checked_at": _timestamp(), "error": "invalid process probe result"}
+                observation = {**observation, "status": job_runtime.job_status(observation["status"])}
                 # Re-read while holding the task lock.  A concurrent archive or
                 # replacement wins over this stale observation.
                 with self.store.lock(task_id):
@@ -762,7 +803,7 @@ class WakeScheduler:
                     if current is None:
                         continue
                     current["probe"] = dict(observation)
-                    if observation.get("status") in {"running", "stopped"}:
+                    if observation.get("status") in {"running", "exited"}:
                         current["status"] = observation["status"]
                         if observation.get("checked_at") is not None:
                             current["checked_at"] = observation["checked_at"]
@@ -774,8 +815,7 @@ class WakeScheduler:
             if key not in live_keys:
                 schedule.pop(key, None)
 
-    @staticmethod
-    def _review_graph(tasks: list[dict[str, Any]]) -> tuple[set[str], list[dict[str, str]]]:
+    def _review_graph(self, tasks: list[dict[str, Any]], states: Mapping[str, Mapping[str, Any]]) -> tuple[set[str], list[dict[str, str]]]:
         by_id = {task.get("id"): task for task in tasks if isinstance(task.get("id"), str)}
         edges: dict[str, str] = {}
         diagnostics: list[dict[str, str]] = []
@@ -801,8 +841,34 @@ class WakeScheduler:
                 current = edges[current]
         if cycles:
             diagnostics.append({"kind": "review_cycle", "task": ",".join(sorted(cycles)), "message": "unarchived review links contain a cycle"})
-        suppressed = {source for reviewer, source in edges.items() if reviewer not in cycles and source not in cycles}
-        return suppressed, diagnostics
+        adjacent: dict[str, set[str]] = {task_id: set() for task_id in by_id}
+        for reviewer, source in edges.items():
+            adjacent[reviewer].add(source)
+            adjacent[source].add(reviewer)
+        blocked: set[str] = set()
+        visited: set[str] = set()
+        for root in adjacent:
+            if root in visited:
+                continue
+            component = {root}
+            frontier = [root]
+            while frontier:
+                current = frontier.pop()
+                for neighbor in adjacent[current] - component:
+                    component.add(neighbor)
+                    frontier.append(neighbor)
+            visited.update(component)
+            for task_id in component:
+                task = by_id[task_id]
+                agent = task.get("agent")
+                agent_status = states.get(agent, {}).get("status") if _valid_agent(agent) else None
+                jobs = self._unarchived_jobs(task)
+                if (_valid_agent(agent) and agent_status not in {"idle", "notLoaded"}) or any(
+                    not self._job_stopped(job) for job in jobs
+                ):
+                    blocked.update(component)
+                    break
+        return blocked, diagnostics
 
     def _agent_states(self, agents: set[str]) -> dict[str, dict[str, Any]]:
         if not agents:
@@ -822,6 +888,17 @@ class WakeScheduler:
     def _make_event(self, kind: str, recipient: str, **fields: Any) -> dict[str, Any]:
         payload = {"kind": kind, "recipient": recipient, **fields}
         return {"signature": _event_signature(payload), **payload}
+
+    def _executor_path(self, task: Mapping[str, Any]) -> str | None:
+        known = task.get("identity")
+        if not isinstance(known, Mapping) or known.get("tree_root") != self.manager:
+            return None
+        path = known.get("path")
+        if not isinstance(path, str) or not path.startswith("/root/") or any(
+            segment in ("", ".", "..") for segment in path.split("/")[1:]
+        ):
+            return None
+        return path
 
     @staticmethod
     def _executor_stopped_job_event(event: Mapping[str, Any]) -> bool:
@@ -899,18 +976,11 @@ class WakeScheduler:
     def _task_ready_event(self, task: Mapping[str, Any], task_id: str, title: str, executor: str) -> dict[str, Any] | None:
         if self.manager is None:
             return None
-        report = task.get("report") if isinstance(task.get("report"), Mapping) else {}
-        return self._make_event(
-            "task_ready",
-            self.manager,
-            task=task_id,
-            task_title=title,
-            executor=executor,
-            **({"executor_path": task["identity"]["path"]} if isinstance(task.get("identity"), Mapping)
-               and task["identity"].get("path") else {}),
-            task_status=task.get("status"),
-            report_revision=report.get("revision"),
-        )
+        identity = {"kind": "task_ready", "recipient": self.manager, "task": task_id,
+                    "executor": executor}
+        path = self._executor_path(task)
+        return {"signature": _event_signature(identity), **identity, "task_title": title,
+                **({"executor_path": path} if path else {})}
 
     def _native_v2_manager_escalations(
         self,
@@ -974,7 +1044,7 @@ class WakeScheduler:
     ) -> tuple[dict[str, dict[str, Any]], set[str], list[dict[str, str]]]:
         desired: dict[str, dict[str, Any]] = {}
         inconclusive: set[str] = set()
-        suppressed, diagnostics = self._review_graph(tasks)
+        suppressed, diagnostics = self._review_graph(tasks, states)
         for task in tasks:
             task_id, title = task.get("id"), task.get("title")
             if not isinstance(task_id, str) or not isinstance(title, str):
@@ -1001,8 +1071,7 @@ class WakeScheduler:
                         job=job_id,
                         note=note,
                         executor=agent,
-                        **({"executor_path": task["identity"]["path"]} if agent and
-                           isinstance(task.get("identity"), Mapping) and task["identity"].get("path") else {}),
+                        **({"executor_path": self._executor_path(task)} if agent and self._executor_path(task) else {}),
                     )
                     desired[event["signature"]] = event
                 continue
@@ -1017,7 +1086,7 @@ class WakeScheduler:
             if agent is None:
                 if self.manager is None:
                     diagnostics.append({"kind": "missing_executor", "task": task_id, "message": "task has no executor or Manager"})
-                else:
+                elif task_id not in suppressed:
                     event = self._make_event("task_unbound", self.manager, task=task_id, task_title=title)
                     desired[event["signature"]] = event
                 continue
@@ -1061,6 +1130,8 @@ class WakeScheduler:
         events = state.setdefault("events", {})
         counters = state.setdefault("counters", {})
         for signature in list(events):
+            if isinstance(events.get(signature), Mapping) and events[signature].get("kind") == "message":
+                continue
             if signature in inconclusive:
                 existing = events.get(signature)
                 if isinstance(existing, dict):
@@ -1085,6 +1156,8 @@ class WakeScheduler:
                 counters["queued"] = int(counters.get("queued", 0)) + 1
             else:
                 existing.update(dict(current))
+                if "executor_path" not in current:
+                    existing.pop("executor_path", None)
                 existing["last_observed_at"] = _timestamp()
                 existing["observed_count"] = int(existing.get("observed_count", 0)) + 1
                 existing.pop("last_condition_error", None)
@@ -1113,12 +1186,15 @@ class WakeScheduler:
 
     def _source_suppressed_now(self, task_id: str) -> bool:
         tasks = self._load_tasks()
-        suppressed, _ = self._review_graph(tasks)
+        agents = {task["agent"] for task in tasks if _valid_agent(task.get("agent"))}
+        suppressed, _ = self._review_graph(tasks, self._agent_states(agents))
         return task_id in suppressed
 
     def _event_is_current(self, event: Mapping[str, Any]) -> tuple[str, str | None]:
         """Classify an event without turning an unavailable read into resolution."""
 
+        if event.get("kind") == "message":
+            return (_EVENT_CURRENT, None) if event.get("recipient") == self.manager else (_EVENT_STALE, "Manager changed")
         task_id = event.get("task")
         if not isinstance(task_id, str):
             return _EVENT_STALE, "event has no valid TASK-ID"
@@ -1143,9 +1219,12 @@ class WakeScheduler:
                 not _valid_agent(task.get("agent"))
                 and not self._unarchived_jobs(task)
                 and self.manager == event.get("recipient")
-                and task.get("title") == event.get("task_title")
             ):
-                return _EVENT_CURRENT, None
+                try:
+                    if not self._source_suppressed_now(task_id):
+                        return _EVENT_CURRENT, None
+                except Exception as exc:
+                    return _EVENT_UNVERIFIABLE, f"cannot read review state for TASK-ID {task_id}: {exc}"
             return _EVENT_STALE, "unbound task condition changed"
         if kind == _MANAGER_NATIVE_FOLLOWUP:
             executor = event.get("executor")
@@ -1168,14 +1247,10 @@ class WakeScheduler:
             return _EVENT_STALE, "native-v2 Manager escalation source condition changed"
         if kind == "task_ready":
             executor = task.get("agent")
-            report = task.get("report") if isinstance(task.get("report"), Mapping) else {}
             if (
                 executor != event.get("executor")
                 or self.manager != event.get("recipient")
                 or self._unarchived_jobs(task)
-                or task.get("title") != event.get("task_title")
-                or task.get("status") != event.get("task_status")
-                or report.get("revision") != event.get("report_revision")
             ):
                 return _EVENT_STALE, "task-ready condition changed"
             try:
@@ -1203,29 +1278,25 @@ class WakeScheduler:
         lines: list[str] = []
         for event in events:
             if event.get("kind") == "job_stopped":
-                lines.append(
-                    f"Stopped registered job: JOB-ID {event['job']} ({event['note']}); "
-                    f"TASK-ID {event['task']}: {event['task_title']}."
-                )
+                if event.get("recipient") == event.get("executor"):
+                    lines.append(f"Job {event['job']} has exited. Check the result, continue the task, and archive the job.")
+                elif event.get("executor_path"):
+                    lines.append(f"{event['executor_path']}: job {event['job']} has exited. Use followup_task to ask the executor to check the result and archive the job.")
+                else:
+                    lines.append(f"Job {event['job']} for TASK-ID {event['task']} has exited. Assign an executor to check the result and archive the job.")
             elif event.get("kind") == "task_ready":
-                executor = (f"{event['executor_path']} (AGENT-ID {event['executor']})"
-                            if event.get("executor_path") else f"AGENT-ID {event['executor']}")
-                lines.append(
-                    f"Executor {executor} "
-                    f"has no unarchived jobs for TASK-ID {event['task']}: {event['task_title']}."
-                )
+                executor = event.get("executor_path") or f"TASK-ID {event['task']} (AGENT-ID {event['executor']})"
+                lines.append(f"{executor} needs follow-up. Check the report; continue the work, request review, or archive the task.")
             elif event.get("kind") == "task_unbound":
-                lines.append(f"TASK-ID {event['task']}: {event['task_title']} has no bound executor.")
+                lines.append(f"TASK-ID {event['task']} has no executor. Assign an executor or archive the task.")
             elif event.get("kind") == _MANAGER_NATIVE_FOLLOWUP:
-                executor = (f"{event['executor_path']} (AGENT-ID {event['executor']})"
-                            if event.get("executor_path") else f"AGENT-ID {event['executor']}")
-                lines.append(
-                    f"Direct MAM input to executor {executor} was explicitly rejected for native "
-                    f"multi-agent v2 while handling JOB-ID {event['job']} ({event['note']}); "
-                    f"TASK-ID {event['task']}: {event['task_title']}. Error: {event['error']} "
-                    "Manager action required: use parent-native collaboration.followup_task to notify the executor; "
-                    "MAM has stopped retrying this direct turn/start."
-                )
+                executor = event.get("executor_path") or f"TASK-ID {event['task']} (AGENT-ID {event['executor']})"
+                lines.append(f"{executor}: job {event['job']} has exited. Use followup_task to ask the executor to check the result and archive the job.")
+            elif event.get("kind") == "message":
+                sender = event.get("sender_path") if event.get("sender_tree") == event.get("recipient") else None
+                sender = sender or f"AGENT-ID {event['sender']}"
+                context = f" (TASK-ID {event['task']})" if event.get("task") and not sender.startswith("/root/") else ""
+                lines.append(f"From {sender}{context}: {event['message']}")
         if not lines:
             return ""
         return "[MAM Message]\n" + "\n".join(lines)
@@ -1395,63 +1466,47 @@ class WakeScheduler:
     def _eligible_recipient(status: Any) -> bool:
         return status in {"idle", "notLoaded"}
 
-    @contextlib.contextmanager
-    def _wait_delivery_guard(self, recipient: str):
-        """Hold one optional-wait registration lock through a delivery edge.
-
-        The optional ``mam wait`` path owns the registration format.  It and
-        the proactive daemon share the registration lock so a waiter cannot
-        appear between the final check and ``turn/start``.
-        """
-
-        try:
-            from . import cli
-            lock_name = cli.wait_lock(recipient)
-        except Exception as exc:
-            yield "unknown", f"cannot load optional wait state: {exc}"
-            return
-        with self.store.lock(lock_name):
-            try:
-                record, status = cli.active_wait(self.store, recipient)
-            except Exception as exc:
-                yield "unknown", f"cannot inspect optional wait state: {exc}"
-                return
-            if record is None:
-                yield None, None
-            elif status == "running":
-                yield "waiting", None
-            else:
-                yield "unknown", f"cannot verify optional wait identity: {status}"
-
-    @staticmethod
-    def _retain_for_wait(events: list[dict[str, Any]], wait_status: str, detail: str | None) -> None:
-        for event in events:
-            event["last_recipient_state"] = "waiting" if wait_status == "waiting" else "wait_unknown"
-            event["last_wait_checked_at"] = _timestamp()
-            if detail:
-                event["last_wait_error"] = detail
-            else:
-                event.pop("last_wait_error", None)
-
     def _reconcile_uncertain_boundary(
         self, events: list[dict[str, Any]], latest: Mapping[str, Any] | None
     ) -> list[dict[str, Any]]:
-        _, current_id, _ = self._turn_boundary(latest)
         retry: list[dict[str, Any]] = []
         for event in events:
             if event.get("delivery") != "uncertain":
                 retry.append(event)
                 continue
-            if not event.get("before_turn_observed") or event.get("before_turn_id") != current_id:
-                event.update({
-                    "delivery": "ambiguous",
-                    "next_attempt_at": None,
-                    "last_error": "turn history changed after an unacknowledged turn/start; manual reconciliation is required",
-                    "ambiguity_at": _timestamp(),
-                })
-                continue
-            retry.append(event)
+            event.update({
+                "delivery": "ambiguous",
+                "next_attempt_at": None,
+                "last_error": "turn/start acknowledgement was lost; delivery cannot be confirmed without risking a duplicate",
+                "ambiguity_at": _timestamp(),
+            })
         return retry
+
+    def _rearm_accepted(self, state: dict[str, Any], states: Mapping[str, Mapping[str, Any]]) -> None:
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for event in state.get("events", {}).values():
+            if not isinstance(event, dict) or event.get("delivery") != "accepted" or event.get("kind") == "message":
+                continue
+            recipient = event.get("recipient")
+            if _valid_agent(recipient) and self._eligible_recipient(states.get(recipient, {}).get("status")):
+                groups.setdefault(recipient, []).append(event)
+        for recipient, events in groups.items():
+            stream = None
+            try:
+                stream = self.stream_factory(self.socket_path)
+                latest = stream.latest_turn(recipient)
+            except Exception as exc:
+                for event in events:
+                    event["last_condition_error"] = f"cannot verify recipient turn completion: {exc}"
+                continue
+            finally:
+                if stream is not None:
+                    with contextlib.suppress(Exception):
+                        stream.close()
+            _, _, status = self._turn_boundary(latest)
+            if self._completed_turn(status):
+                for event in events:
+                    event.update({"delivery": "pending", "next_attempt_at": 0.0})
 
     def _deliver(self, state: dict[str, Any]) -> None:
         now = self.clock()
@@ -1484,14 +1539,14 @@ class WakeScheduler:
                     self._retain_unverifiable_event(event, detail)
             if not current:
                 continue
-            with self._wait_delivery_guard(recipient) as (wait_status, wait_error):
-                if wait_status is not None:
-                    self._retain_for_wait(current, wait_status, wait_error)
-                    continue
             recipient_state = self._agent_states({recipient}).get(recipient, {}).get("status")
-            if not self._eligible_recipient(recipient_state):
+            if recipient_state == "active":
+                current = [event for event in current if event.get("kind") == "message" and not event.get("defer")]
+            elif not self._eligible_recipient(recipient_state):
                 for event in current:
                     event["last_recipient_state"] = recipient_state or "unknown"
+                continue
+            if not current:
                 continue
             stream = None
             sent = False
@@ -1505,7 +1560,7 @@ class WakeScheduler:
                         continue
                     snapshot = stream.read(recipient)
                     resumed_state = _status_from_snapshot(snapshot, recipient)
-                if resumed_state != "idle":
+                if resumed_state not in {"idle", "active"}:
                     if resumed_state == "notLoaded":
                         self._preflight_failure(current, "recipient remains notLoaded after thread/resume recheck")
                         continue
@@ -1531,6 +1586,10 @@ class WakeScheduler:
                         event["delivery"] = "pending"
                         event["last_recipient_state"] = resumed_state or "unknown"
                     continue
+                if resumed_state == "active":
+                    current = [event for event in current if event.get("kind") == "message" and not event.get("defer")]
+                    if not current:
+                        continue
                 # Conditions can change after the first recheck or while the
                 # recipient is being resumed.  Do not start a stale turn.
                 rechecked: list[dict[str, Any]] = []
@@ -1561,33 +1620,54 @@ class WakeScheduler:
                         latest=latest,
                     )
                     continue
+                if before_turn_status == "inProgress":
+                    current = [event for event in current if event.get("kind") == "message" and not event.get("defer")]
+                    if not current:
+                        continue
+                elif resumed_state == "active" and not self._completed_turn(before_turn_status):
+                    self._preflight_failure(current, "active recipient has no verifiable current turn")
+                    continue
                 payload = self._payload(current)
                 if not payload:
+                    continue
+                channel = state.get("message_channel", "tool")
+                in_progress = before_turn_status == "inProgress"
+                if channel == "user" and in_progress and (
+                    not isinstance(before_turn_id, str) or
+                    (hasattr(stream, "start_turn") and not hasattr(stream, "steer_turn"))
+                ):
+                    self._preflight_failure(current, "active user-channel delivery requires a verified turn and turn/steer")
                     continue
                 # Persist the attempt and its exact before-turn boundary
                 # before the RPC.  A missing response can then be reconciled
                 # after a crash/restart without pretending exactly-once.
-                with self._wait_delivery_guard(recipient) as (wait_status, wait_error):
-                    if wait_status is not None:
-                        self._retain_for_wait(current, wait_status, wait_error)
-                        continue
-                    for event in current:
-                        event.update({
-                            "delivery": "attempting",
-                            "attempts": int(event.get("attempts", 0)) + 1,
-                            "last_attempt_at": _timestamp(),
-                            "before_turn_observed": True,
-                            "before_turn_id": before_turn_id,
-                            "before_turn_status": before_turn_status,
-                        })
-                    counters = state.setdefault("counters", {})
-                    counters["turn_start_attempts"] = int(counters.get("turn_start_attempts", 0)) + 1
-                    _save_state(self.store, state)
-                    sent = True
-                    if hasattr(stream, "start_turn"):
-                        stream.start_turn(recipient, payload)
+                for event in current:
+                    event.update({
+                        "delivery": "attempting",
+                        "attempts": int(event.get("attempts", 0)) + 1,
+                        "last_attempt_at": _timestamp(),
+                        "before_turn_observed": True,
+                        "before_turn_id": before_turn_id,
+                        "before_turn_status": before_turn_status,
+                    })
+                counters = state.setdefault("counters", {})
+                counters["turn_start_attempts"] = int(counters.get("turn_start_attempts", 0)) + 1
+                _save_state(self.store, state)
+                sent = True
+                if hasattr(stream, "start_turn"):
+                    if channel == "user" and in_progress:
+                        response = stream.steer_turn(recipient, before_turn_id, payload)
                     else:
-                        stream.request("turn/start", {"threadId": recipient, "input": [{"type": "text", "text": payload}]})
+                        response = stream.start_turn(recipient, payload, message_channel=channel)
+                elif channel == "user" and in_progress:
+                    response = stream.request("turn/steer", {"threadId": recipient, "expectedTurnId": before_turn_id,
+                                                              "input": [{"type": "text", "text": payload}]})
+                else:
+                    params = {"threadId": recipient, "input": [{"type": "text", "text": payload}]} if channel == "user" else {
+                        "threadId": recipient, "input": [],
+                        "toolOutput": {"name": "message", "namespace": "mam", "output": payload},
+                    }
+                    response = stream.request("turn/start", params)
             except Exception as exc:
                 if sent:
                     self._delivery_failure(current, exc)
@@ -1600,14 +1680,19 @@ class WakeScheduler:
                     self.compatibility_ready = False
                     self.next_compatibility_retry = self.clock() + COMPATIBILITY_RETRY_SECONDS
             else:
+                turn = response.get("turn") if isinstance(response, Mapping) else None
+                accepted_turn = turn.get("id") if isinstance(turn, Mapping) else before_turn_id
                 for event in current:
                     event.update({
                         "delivery": "accepted",
                         "accepted_at": _timestamp(),
+                        "accepted_turn_id": accepted_turn,
                         "acknowledgement": "turn/start RPC response",
                         "last_error": None,
                     })
                     event.pop("failure_kind", None)
+                    if event.get("kind") == "message":
+                        self._resolve_event(state, event["signature"], reason="message accepted")
                 counters = state.setdefault("counters", {})
                 counters["accepted"] = int(counters.get("accepted", 0)) + len(current)
             finally:
@@ -1691,6 +1776,7 @@ class WakeScheduler:
             self._reconcile_events(state, desired, inconclusive)
             self._recover_attempts_without_reply(state)
             self._reobserve_interrupted_events(state, states)
+            self._rearm_accepted(state, states)
             _save_state(self.store, state)
             self._deliver(state)
             state["heartbeat_at"] = _timestamp()

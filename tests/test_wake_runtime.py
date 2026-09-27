@@ -36,7 +36,7 @@ class Clock:
 
 
 class FakeStream:
-    def __init__(self, agent_statuses, calls, turns, resumed_statuses, resume_failures, *, failure=None, resumes=None):
+    def __init__(self, agent_statuses, calls, turns, resumed_statuses, resume_failures, *, failure=None, resumes=None, channels=None):
         self.agent_statuses = agent_statuses
         self.calls = calls
         self.turns = turns
@@ -44,6 +44,7 @@ class FakeStream:
         self.resume_failures = resume_failures
         self.failure = failure
         self.resumes = resumes
+        self.channels = channels
         self.closed = False
 
     def resume(self, agent):
@@ -59,7 +60,9 @@ class FakeStream:
     def latest_turn(self, agent):
         return self.turns.get(agent)
 
-    def start_turn(self, agent, text):
+    def start_turn(self, agent, text, *, message_channel="tool"):
+        if self.channels is not None:
+            self.channels.append((agent, message_channel))
         if self.failure is not None:
             failure, self.failure = self.failure, None
             if isinstance(failure, AcceptedThenLost):
@@ -69,7 +72,13 @@ class FakeStream:
             raise failure
         self.calls.append((agent, text))
         self.turns[agent] = {"id": f"accepted-{len(self.calls)}", "status": "inProgress"}
-        return {"turn": {"id": "started"}}
+        return {"turn": {"id": f"accepted-{len(self.calls)}", "status": "inProgress"}}
+
+    def steer_turn(self, agent, turn_id, text):
+        if self.channels is not None:
+            self.channels.append((agent, "user-steer"))
+        self.calls.append((agent, text))
+        return {"turnId": turn_id}
 
     def close(self):
         self.closed = True
@@ -116,7 +125,7 @@ finally:
         identity = state.get("identity")
         if not isinstance(pid, int) or not isinstance(identity, dict):
             break
-        if job_runtime.probe_process("local", pid, identity).get("status") == "stopped":
+        if job_runtime.probe_process("local", pid, identity).get("status") == "exited":
             break
         time.sleep(0.05)
     else:
@@ -142,6 +151,7 @@ class WakeRuntimeTests(unittest.TestCase):
         self.processes = {}
         self.process_calls = []
         self.starts = []
+        self.channels = []
         self.stream_connections = 0
         self.resumes = []
         self.turns = {}
@@ -215,6 +225,7 @@ class WakeRuntimeTests(unittest.TestCase):
             self.resume_failures,
             failure=failure,
             resumes=self.resumes,
+            channels=self.channels,
         )
 
     def scheduler(self, **kwargs):
@@ -233,6 +244,145 @@ class WakeRuntimeTests(unittest.TestCase):
 
     def state(self):
         return wake_runtime._load_state(self.store)
+
+    def message(self, value="check result", *, defer=False, task=None, tree=MANAGER):
+        return wake_runtime.enqueue_message(
+            self.store, sender=EXECUTOR, sender_path="/root/worker", sender_tree=tree,
+            message=value, defer=defer, task=task,
+        )
+
+    def test_timely_message_enters_active_turn_once_and_survives_restart(self):
+        self.statuses[MANAGER] = "active"
+        self.turns[MANAGER] = {"id": "manager-turn", "status": "inProgress"}
+        queued = self.message("inspect output")
+        self.assertEqual(queued["status"], "queued")
+        self.assertEqual(queued["service"], "disabled")
+
+        self.scheduler().run_once()
+        self.assertEqual(self.channels, [(MANAGER, "tool")])
+        self.assertIn("From /root/worker: inspect output", self.starts[0][1])
+        self.assertFalse(self.state()["events"])
+        self.scheduler().run_once()
+        self.assertEqual(len(self.starts), 1)
+
+    def test_deferred_message_waits_for_completed_manager_turn(self):
+        self.statuses[MANAGER] = "active"
+        self.turns[MANAGER] = {"id": "manager-turn", "status": "inProgress"}
+        self.message("background copy", defer=True)
+        self.scheduler().run_once()
+        self.assertEqual(self.starts, [])
+        self.statuses[MANAGER] = "idle"
+        self.scheduler().run_once()
+        self.assertEqual(self.starts, [], "stale idle metadata must not inject into an active turn")
+        self.turns[MANAGER] = {"id": "manager-turn", "status": "completed"}
+        self.scheduler().run_once()
+        self.assertEqual(self.channels, [(MANAGER, "tool")])
+        self.assertFalse(self.state()["events"])
+
+    def test_user_channel_steers_timely_message_and_idle_copy_uses_user_input(self):
+        wake_runtime.set_message_channel(self.config, "user")
+        self.assertEqual(self.state()["message_channel"], "user")
+        self.statuses[MANAGER] = "active"
+        self.turns[MANAGER] = {"id": "manager-turn", "status": "inProgress"}
+        self.message("urgent")
+        self.scheduler().run_once()
+        self.assertEqual(self.channels, [(MANAGER, "user-steer")])
+        self.message("copy", defer=True)
+        self.statuses[MANAGER] = "idle"
+        self.turns[MANAGER] = {"id": "manager-turn", "status": "completed"}
+        self.scheduler().run_once()
+        self.assertEqual(self.channels[-1], (MANAGER, "user"))
+
+    def test_tool_failure_remains_visible_without_user_fallback(self):
+        self.message("keep tool channel")
+        self.stream_failure = job_runtime.AppServerRpcError("tool output rejected")
+        self.scheduler().run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "rejected")
+        self.assertIn("tool output rejected", event["last_error"])
+        self.assertEqual(self.channels, [(MANAGER, "tool")])
+
+    def test_timely_message_response_loss_is_ambiguous_even_with_same_turn_id(self):
+        self.statuses[MANAGER] = "active"
+        self.turns[MANAGER] = {"id": "manager-turn", "status": "inProgress"}
+        self.message("may have arrived")
+        self.stream_failure = AcceptedThenLost(job_runtime.AppServerEventError("response lost"), turn_id="manager-turn")
+        self.scheduler().run_once()
+        self.assertEqual(len(self.starts), 1)
+        self.clock.advance(5)
+        self.scheduler().run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "ambiguous")
+        self.assertEqual(len(self.starts), 1)
+
+    def test_idle_manager_is_reminded_after_prior_turn_completes(self):
+        task = self.task(TASK_ONE, title="draft title")
+        task["identity"] = {"path": "/root/worker", "tree_root": MANAGER}
+        self.store.write(task)
+        self.scheduler().run_once()
+        self.assertIn("/root/worker needs follow-up", self.starts[0][1])
+        self.assertNotIn(TASK_ONE, self.starts[0][1])
+        task = self.store.read(TASK_ONE)
+        task["title"] = "edited title"
+        task["report"] = {"revision": "manager-republished"}
+        self.store.write(task)
+        self.scheduler().run_once()
+        self.assertEqual(len(self.starts), 1)
+        self.turns[MANAGER] = {"id": "accepted-1", "status": "completed"}
+        self.scheduler().run_once()
+        self.assertEqual(len(self.starts), 2)
+        self.assertEqual(self.starts[0][1], self.starts[1][1])
+
+    def test_old_tree_path_falls_back_to_task_and_agent_ids(self):
+        task = self.task(TASK_ONE)
+        task["identity"] = {"path": "/root/worker", "tree_root": EXECUTOR_TWO}
+        self.store.write(task)
+        self.scheduler().run_once()
+        payload = self.starts[0][1]
+        self.assertNotIn("/root/worker", payload)
+        self.assertIn(TASK_ONE, payload)
+        self.assertIn(EXECUTOR, payload)
+
+    def test_review_group_blocks_both_directions_and_ignores_archived_member(self):
+        self.task(TASK_ONE, agent=EXECUTOR)
+        self.task(TASK_TWO, agent=REVIEWER, review={"task": TASK_ONE})
+        self.task(TASK_THREE, agent=EXECUTOR_TWO, review={"task": TASK_ONE})
+        self.statuses[EXECUTOR] = "active"
+        self.scheduler().run_once()
+        self.assertEqual(self.starts, [])
+        self.statuses[EXECUTOR] = "idle"
+        self.statuses[REVIEWER] = "active"
+        self.scheduler().run_once()
+        self.assertEqual(self.starts, [])
+        archived = self.store.read(TASK_TWO)
+        archived["status"] = "archived"
+        self.store.write(archived)
+        self.scheduler().run_once()
+        self.assertEqual([agent for agent, _ in self.starts], [MANAGER])
+        self.assertIn(TASK_ONE, self.starts[0][1])
+        self.assertIn(TASK_THREE, self.starts[0][1])
+        self.assertNotIn(TASK_TWO, self.starts[0][1])
+
+    def test_running_review_job_blocks_group_but_exited_source_job_remains_visible(self):
+        self.task(TASK_ONE, jobs=[self.job("finished", status="stopped")])
+        self.task(TASK_TWO, agent=REVIEWER, review={"task": TASK_ONE}, jobs=[self.job("still-running")])
+        self.scheduler().run_once()
+        self.assertEqual([agent for agent, _ in self.starts], [EXECUTOR])
+        self.assertIn("Job finished has exited", self.starts[0][1])
+        self.assertNotIn(MANAGER, [agent for agent, _ in self.starts])
+
+    def test_pending_message_follows_manager_rebind(self):
+        replacement = "00000000-0000-4000-8000-000000000009"
+        self.message("handoff note", defer=True)
+        self.statuses[replacement] = "idle"
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": replacement}), \
+             mock.patch.object(identity, "read", return_value=identity.ThreadIdentity(replacement, "/root", replacement)), \
+             mock.patch.object(cli, "agent_observations", return_value={MANAGER: {"status": "idle"}}):
+            wake_runtime.rebind_manager(self.store, "new root")
+        self.scheduler().run_once()
+        self.assertEqual([agent for agent, _ in self.starts], [replacement])
+        self.assertIn("AGENT-ID", self.starts[0][1])
+        self.assertNotIn("/root/worker", self.starts[0][1])
 
     @staticmethod
     def _write_shadow_wake_runtime(mam_root, marker):
@@ -256,7 +406,7 @@ class WakeRuntimeTests(unittest.TestCase):
         by_recipient = {recipient: text for recipient, text in self.starts}
         self.assertIn(EXECUTOR, by_recipient)
         self.assertEqual(by_recipient[EXECUTOR].splitlines()[0], "[MAM Message]")
-        self.assertIn("JOB-ID stopped (formal eval)", by_recipient[EXECUTOR])
+        self.assertIn("Job stopped has exited", by_recipient[EXECUTOR])
         self.assertIn(MANAGER, by_recipient)
         self.assertEqual(by_recipient[MANAGER].splitlines()[0], "[MAM Message]")
         self.assertIn(f"AGENT-ID {REVIEWER}", by_recipient[MANAGER])
@@ -275,11 +425,11 @@ class WakeRuntimeTests(unittest.TestCase):
             payload,
             "\n".join([
                 "[MAM Message]",
-                f"Stopped registered job: JOB-ID job-one (first); TASK-ID {TASK_ONE}: first task.",
-                f"Stopped registered job: JOB-ID job-two (second); TASK-ID {TASK_TWO}: second task.",
-                f"Executor AGENT-ID {EXECUTOR_TWO} has no unarchived jobs for TASK-ID {TASK_TWO}: second task.",
-                f"Executor AGENT-ID {REVIEWER} has no unarchived jobs for TASK-ID {TASK_THREE}: third task.",
-                f"TASK-ID {TASK_THREE}: third task has no bound executor.",
+                "Job job-one has exited. Check the result, continue the task, and archive the job.",
+                "Job job-two has exited. Check the result, continue the task, and archive the job.",
+                f"TASK-ID {TASK_TWO} (AGENT-ID {EXECUTOR_TWO}) needs follow-up. Check the report; continue the work, request review, or archive the task.",
+                f"TASK-ID {TASK_THREE} (AGENT-ID {REVIEWER}) needs follow-up. Check the report; continue the work, request review, or archive the task.",
+                f"TASK-ID {TASK_THREE} has no executor. Assign an executor or archive the task.",
             ]),
         )
 
@@ -295,59 +445,6 @@ class WakeRuntimeTests(unittest.TestCase):
         scheduler.run_once()
         self.assertEqual(len(self.starts), 1)
         self.assertEqual(self.starts[0][0], EXECUTOR)
-
-    def test_active_optional_wait_holds_delivery_then_archived_task_prevents_redundant_wake(self):
-        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
-        observation = job_runtime.probe_process("local", os.getpid())
-        self.assertEqual(observation["status"], "running")
-        self.store.write_wait({
-            "agent": EXECUTOR,
-            "pid": os.getpid(),
-            "identity": observation["identity"],
-            "token": "optional-wait",
-            "kind": "unified",
-            "role": "executor",
-            "task": TASK_ONE,
-            "turn_id": "waiting-turn",
-            "timeout": 3600,
-            "started_at": "test",
-            "cancelled": None,
-        })
-        scheduler = self.scheduler()
-
-        scheduler.run_once()
-        event = next(iter(self.state()["events"].values()))
-        self.assertEqual(event["delivery"], "pending")
-        self.assertEqual(event["last_recipient_state"], "waiting")
-        self.assertEqual(self.starts, [])
-        self.assertEqual(self.stream_connections, 0)
-
-        self.store.remove_wait(EXECUTOR)
-        handled = self.store.read(TASK_ONE)
-        handled["status"] = "archived"
-        self.store.write(handled)
-        scheduler.run_once()
-        self.assertEqual(self.starts, [])
-        self.assertFalse(self.state()["events"])
-
-    def test_optional_wait_appearing_during_preflight_blocks_final_turn_start(self):
-        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
-        calls = []
-
-        def staged_wait_state(_store, agent):
-            self.assertEqual(agent, EXECUTOR)
-            calls.append(agent)
-            return (None, "empty") if len(calls) == 1 else ({"agent": agent}, "running")
-
-        with mock.patch.object(cli, "active_wait", side_effect=staged_wait_state):
-            self.scheduler().run_once()
-
-        event = next(iter(self.state()["events"].values()))
-        self.assertEqual(calls, [EXECUTOR, EXECUTOR])
-        self.assertEqual(event["delivery"], "pending")
-        self.assertEqual(event["last_recipient_state"], "waiting")
-        self.assertEqual(self.stream_connections, 1)
-        self.assertEqual(self.starts, [])
 
     def test_not_loaded_stopped_owner_is_targetedly_resumed_then_started(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
@@ -396,7 +493,7 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(self.starts[0][0], MANAGER)
         self.assertIn(f"TASK-ID {TASK_ONE}", self.starts[0][1])
 
-    def test_uncertain_delivery_survives_restart_and_retries_with_backoff(self):
+    def test_uncertain_delivery_survives_restart_without_blind_retry(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
         self.stream_failure = job_runtime.AppServerEventError("connection closed after request")
         self.scheduler().run_once()
@@ -406,8 +503,8 @@ class WakeRuntimeTests(unittest.TestCase):
         self.clock.advance(5)
         self.scheduler().run_once()  # a new scheduler object models a daemon restart
         event = next(iter(self.state()["events"].values()))
-        self.assertEqual(event["delivery"], "accepted")
-        self.assertEqual(len(self.starts), 1)
+        self.assertEqual(event["delivery"], "ambiguous")
+        self.assertEqual(len(self.starts), 0)
 
     def test_crash_after_persisted_attempt_recovers_as_uncertain_before_retry(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
@@ -422,7 +519,7 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(self.starts, [])
         self.clock.advance(5)
         self.scheduler().run_once()
-        self.assertEqual(next(iter(self.state()["events"].values()))["delivery"], "accepted")
+        self.assertEqual(next(iter(self.state()["events"].values()))["delivery"], "ambiguous")
 
     def test_accepted_turn_with_lost_reply_becomes_ambiguous_not_a_second_model_turn(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
@@ -449,7 +546,7 @@ class WakeRuntimeTests(unittest.TestCase):
         self.clock.advance(30)
         self.processes[51] = "stopped"
         scheduler.run_once()
-        self.assertEqual(self.store.read(TASK_ONE)["jobs"][0]["status"], "stopped")
+        self.assertEqual(self.store.read(TASK_ONE)["jobs"][0]["status"], "exited")
         self.assertEqual(self.starts[0][0], EXECUTOR)
 
     def test_no_repeated_turn_start_or_global_job_scan_for_unchanged_state(self):
@@ -519,9 +616,7 @@ class WakeRuntimeTests(unittest.TestCase):
 
         self.statuses[EXECUTOR] = "unknown"
         scheduler.run_once()
-        event = next(iter(self.state()["events"].values()))
-        self.assertEqual(event["delivery"], "accepted")
-        self.assertIn("source thread metadata", event["last_condition_error"])
+        self.assertFalse(self.state()["events"])
 
         self.statuses[EXECUTOR] = "idle"
         scheduler.run_once()
@@ -546,9 +641,7 @@ class WakeRuntimeTests(unittest.TestCase):
 
         scheduler = self.scheduler(agent_probe=staged_probe)
         scheduler.run_once()
-        event = next(iter(self.state()["events"].values()))
-        self.assertEqual(event["delivery"], "pending")
-        self.assertIn("temporary source query failure", event["last_condition_error"])
+        self.assertFalse(self.state()["events"])
         self.assertEqual(self.starts, [])
 
         self.statuses[MANAGER] = "idle"
@@ -648,10 +741,10 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
         payload = self.starts[0][1]
         self.assertIn(f"AGENT-ID {EXECUTOR}", payload)
-        self.assertIn("JOB-ID stopped", payload)
+        self.assertIn("job stopped has exited", payload)
         self.assertIn(TASK_ONE, payload)
-        self.assertIn(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION, payload)
-        self.assertIn("collaboration.followup_task", payload)
+        self.assertNotIn(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION, payload)
+        self.assertIn("followup_task", payload)
 
         self.scheduler().run_once()
         self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
@@ -722,26 +815,27 @@ class WakeRuntimeTests(unittest.TestCase):
         scheduler.run_once()
         self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
         first_payload = self.starts[0][1]
-        self.assertIn("JOB-ID one", first_payload)
-        self.assertIn("JOB-ID two", first_payload)
+        self.assertIn("job one has exited", first_payload)
+        self.assertIn("job two has exited", first_payload)
         scheduler.run_once()
         self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
 
-        # A later stopped job has its own source signature and therefore earns
-        # one new Manager escalation; the accepted older escalation remains
-        # deduplicated.
-        self.turns[MANAGER] = {"id": "manager-completed", "status": "completed"}
+        # Keep the Manager's first turn active while another job exits.
+        self.turns[MANAGER] = {"id": "manager-active", "status": "inProgress"}
         task = self.store.read(TASK_ONE)
         task["jobs"].append(self.job("three", status="stopped", note="later completed"))
         self.store.write(task)
+        self.statuses[MANAGER] = "active"
         self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
         scheduler.run_once()
         self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+        self.statuses[MANAGER] = "idle"
+        self.turns[MANAGER] = {"id": "manager-completed", "status": "completed"}
         scheduler.run_once()
         self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER, MANAGER])
-        self.assertIn("JOB-ID three", self.starts[-1][1])
+        self.assertIn("job three has exited", self.starts[-1][1])
 
-    def test_native_v2_escalation_waits_for_manager_unknown_paused_and_optional_wait(self):
+    def test_native_v2_escalation_waits_for_manager_unknown_and_paused(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
         self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
         scheduler = self.scheduler()
@@ -762,29 +856,7 @@ class WakeRuntimeTests(unittest.TestCase):
             "paused",
         )
 
-        observation = job_runtime.probe_process("local", os.getpid())
-        self.store.write_wait({
-            "agent": MANAGER,
-            "pid": os.getpid(),
-            "identity": observation["identity"],
-            "token": "manager-native-v2-wait",
-            "kind": "unified",
-            "role": "manager",
-            "task": None,
-            "turn_id": "manager-waiting-turn",
-            "timeout": 3600,
-            "started_at": "test",
-            "cancelled": None,
-        })
         self.statuses[MANAGER] = "idle"
-        scheduler.run_once()
-        self.assertEqual(self.starts, [])
-        self.assertEqual(
-            next(event for event in self.state()["events"].values() if event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP)["last_recipient_state"],
-            "waiting",
-        )
-
-        self.store.remove_wait(MANAGER)
         scheduler.run_once()
         self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
 
@@ -1034,83 +1106,6 @@ class WakeRuntimeTests(unittest.TestCase):
             for event in state["events"].values()
         ))
 
-    def test_rebind_and_wait_stop_manager_share_the_bindings_boundary_without_deadlock(self):
-        self.task(TASK_ONE)
-        old_wait = {
-            "agent": EXECUTOR,
-            "pid": 71,
-            "identity": {"host": "local", "boot_id": "boot", "start_ticks": 71},
-            "token": "old-wait", "kind": "unified", "role": "executor", "task": TASK_ONE,
-            "turn_id": "old-turn", "timeout": 3600, "started_at": "test", "cancelled": None,
-        }
-        manager_wait = {
-            "agent": MANAGER,
-            "pid": 72,
-            "identity": {"host": "local", "boot_id": "boot", "start_ticks": 72},
-            "token": "manager-wait", "kind": "unified", "role": "manager", "task": None,
-            "turn_id": "manager-turn", "timeout": 3600, "started_at": "test", "cancelled": None,
-        }
-        self.store.write_wait(old_wait)
-        self.store.write_wait(manager_wait)
-        selected = threading.Event()
-        release_selection = threading.Event()
-        stop_result, stop_errors, rebind_result, rebind_errors = [], [], [], []
-        original_target = cli.manager_wait_target
-
-        def fake_active_wait(store, agent):
-            record = store.read_wait(agent)
-            return (record, "running") if record else (None, "empty")
-
-        def gated_target(store):
-            selected.set()
-            if not release_selection.wait(5):
-                raise AssertionError("wait-stop selection was not released")
-            target = original_target(store)
-            self.assertEqual(target["agent"], MANAGER)
-            # The old executor's wait has just finished.  It was still bound
-            # for the selection, so it could not be mistaken for the Manager.
-            self.store.remove_wait(EXECUTOR)
-            return target
-
-        def run_wait_stop():
-            try:
-                stop_result.append(cli.wait_stop_manager(self.store))
-            except BaseException as exc:
-                stop_errors.append(exc)
-
-        def run_rebind():
-            args = types.SimpleNamespace(task=TASK_ONE, agent=EXECUTOR_TWO, note="wait completed before handoff")
-            states = {
-                EXECUTOR: {"status": "idle", "checked_at": "rebind", "error": None},
-                EXECUTOR_TWO: {"status": "idle", "checked_at": "rebind", "error": None},
-            }
-            try:
-                with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": MANAGER}, clear=False), \
-                     mock.patch.object(cli, "agent_observations", return_value=states):
-                    rebind_result.append(cli.rebind(self.store, args))
-            except BaseException as exc:
-                rebind_errors.append(exc)
-
-        with mock.patch.object(cli, "active_wait", side_effect=fake_active_wait), \
-             mock.patch.object(cli, "manager_wait_target", side_effect=gated_target):
-            stopper = threading.Thread(target=run_wait_stop)
-            stopper.start()
-            self.assertTrue(selected.wait(2))
-            handoff = threading.Thread(target=run_rebind)
-            handoff.start()
-            self.assertEqual(self.store.read(TASK_ONE)["agent"], EXECUTOR)
-            self.assertFalse(rebind_result, "rebind must wait for wait-stop's binding snapshot")
-            release_selection.set()
-            stopper.join(5)
-            handoff.join(5)
-
-        self.assertFalse(stopper.is_alive())
-        self.assertFalse(handoff.is_alive())
-        self.assertFalse(stop_errors)
-        self.assertFalse(rebind_errors)
-        self.assertEqual(stop_result, [{"status": "cancelled", "agent": MANAGER}])
-        self.assertEqual(rebind_result[0]["agent"], EXECUTOR_TWO)
-
     def test_review_cycle_and_unknown_executor_are_visible_without_turn_start(self):
         self.task(TASK_ONE, agent=EXECUTOR, review={"task": TASK_TWO, "commits": {}})
         self.task(TASK_TWO, agent=REVIEWER, review={"task": TASK_ONE, "commits": {}})
@@ -1204,7 +1199,7 @@ class WakeRuntimeTests(unittest.TestCase):
             while time.monotonic() < deadline:
                 state = wake_runtime._load_state(store)
                 observed = job_runtime.probe_process("local", state["pid"], state["identity"])
-                if observed["status"] == "stopped":
+                if observed["status"] == "exited":
                     break
                 time.sleep(0.05)
             else:

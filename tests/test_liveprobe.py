@@ -138,10 +138,10 @@ class FakeStream:
             "turn-manager-delivery",
             (
                 "[MAM Message]\n"
-                f"Executor AGENT-ID {THREAD_IDS['idle_executor']} has no unarchived jobs for "
-                f"TASK-ID {TASK_IDS['idle']}: MAM liveprobe no-job Manager delivery.\n"
-                f"Executor AGENT-ID {THREAD_IDS['archived_executor']} has no unarchived jobs for "
-                f"TASK-ID {TASK_IDS['archived']}: MAM liveprobe archived-job Manager delivery."
+                f"TASK-ID {TASK_IDS['idle']} (AGENT-ID {THREAD_IDS['idle_executor']}) needs follow-up. "
+                "Check the report; continue the work, request review, or archive the task.\n"
+                f"TASK-ID {TASK_IDS['archived']} (AGENT-ID {THREAD_IDS['archived_executor']}) needs follow-up. "
+                "Check the report; continue the work, request review, or archive the task."
             ),
         )
 
@@ -154,8 +154,7 @@ class FakeStream:
             "turn-job-delivery",
             (
                 "[MAM Message]\n"
-                f"Stopped registered job: JOB-ID {JOB_ID} (liveprobe-short-job-stop); "
-                f"TASK-ID {TASK_IDS['job']}: MAM liveprobe stopped-job delivery."
+                f"Job {JOB_ID} has exited. Check the result, continue the task, and archive the job."
             ),
         )
 
@@ -334,7 +333,7 @@ class LiveProbeTests(unittest.TestCase):
                 "manager_delivery": True,
                 "manager_is_fixture_only": True,
                 "turn_budget": True,
-                "quiet_window_no_duplicate_starts": True,
+                "service_stopped_after_delivery": True,
                 "idle_executors_received_no_turn": True,
             },
         )
@@ -350,7 +349,7 @@ class LiveProbeTests(unittest.TestCase):
             ],
         )
         self.assertEqual(self.state["job_adds"][0][0], TASK_IDS["job"])
-        self.assertEqual(self.state["job_adds"][0][2], "liveprobe-short-job-stop")
+        self.assertEqual(self.state["job_adds"][0][2], "liveprobe-short-job-exit")
         self.assertIn(self.state["stopped_pid"], self.state["released_processes"])
         self.assertEqual(self.state["runtime_config"].mam_root, root / "mam-state")
         self.assertEqual(self.state["manager"], THREAD_IDS["manager"])
@@ -396,7 +395,7 @@ class LiveProbeTests(unittest.TestCase):
         self.assertIn(("service-stop", THREAD_IDS["manager"]), self.state["timeline"])
         self.assertTrue(self.stream.closed)
         self.assertEqual(result["resources"]["threads"], THREAD_IDS)
-        self.assertEqual(result["resources"]["jobs"], {"stopped": JOB_ID, "archived_before_delivery": ARCHIVED_JOB_ID})
+        self.assertEqual(result["resources"]["jobs"], {"exited": JOB_ID, "archived_before_delivery": ARCHIVED_JOB_ID})
         self.assertEqual(
             result["turn_counts"]["before_job_stop"],
             {"manager": 2, "job_executor": 1, "idle_executor": 1, "archived_executor": 1},

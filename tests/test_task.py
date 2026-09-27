@@ -122,6 +122,48 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
         self.assertEqual(wake_runtime.recorded_manager(self.store), manager)
         return task, manager
 
+    def test_service_message_channel_set_is_persistent_and_visible(self):
+        with patch("sys.stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(cli.main(["service", "set", "message-channel", "user"], cwd=self.projects), 0)
+        self.assertEqual(json.loads(output.getvalue()), {"message_channel": "user"})
+        self.assertEqual(wake_runtime.service_status(self.config)["message_channel"], "user")
+        self.assertEqual(wake_runtime._load_state(self.store)["message_channel"], "user")
+        with patch("sys.stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(cli.main(["service", "set", "message-channel", "tool"], cwd=self.projects), 0)
+        self.assertEqual(json.loads(output.getvalue()), {"message_channel": "tool"})
+
+    def test_unbound_sender_can_queue_message_with_optional_task(self):
+        task, manager = self.task_with_manager()
+        sender = str(uuid.uuid4())
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": sender}), \
+             patch.object(identity, "read", return_value=identity.ThreadIdentity(sender, "/root/free", manager)):
+            with patch("sys.stdout", new_callable=io.StringIO) as output:
+                self.assertEqual(cli.main(["message", "send", "--message", "FYI"], cwd=self.projects), 0)
+            first = json.loads(output.getvalue())
+            with patch("sys.stdout", new_callable=io.StringIO) as output:
+                self.assertEqual(cli.main(["message", "send", "--message", "Follow-up", "--defer", "--task", task], cwd=self.projects), 0)
+            second = json.loads(output.getvalue())
+        events = wake_runtime._load_state(self.store)["events"]
+        self.assertIsNone(events[first["id"]]["task"])
+        self.assertEqual(events[second["id"]]["task"], task)
+        self.assertTrue(events[second["id"]]["defer"])
+        self.assertEqual(first["status"], "queued")
+        self.assertEqual(first["service"], "disabled")
+
+    def test_message_queue_reports_enabled_service_without_process_as_unavailable(self):
+        _, manager = self.task_with_manager()
+        sender = str(uuid.uuid4())
+        state = wake_runtime._load_state(self.store)
+        state["enabled"] = True
+        wake_runtime._save_state(self.store, state)
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": sender}), \
+             patch.object(identity, "read", return_value=identity.ThreadIdentity(sender, "/root/free", manager)):
+            with patch("sys.stdout", new_callable=io.StringIO) as output:
+                self.assertEqual(cli.main(["message", "send", "--message", "Check status"], cwd=self.projects), 0)
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["status"], "queued")
+        self.assertEqual(result["service"], "unavailable")
+
     def fixture_bind(self, task, agent):
         data = self.store.read(task)
         data["agent"] = agent
@@ -175,22 +217,6 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
         result = subprocess.run(mam_command("job", *args), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
-
-    def wait_call(self, *args, env=None, ok=True):
-        result = subprocess.run(mam_command("wait", *args), capture_output=True, text=True, env=env, cwd=self.projects)
-        self.assertEqual(result.returncode, 0 if ok else 2, result.stdout + result.stderr)
-        return json.loads(result.stdout if ok else result.stderr)
-
-    def wait_list_lines(self):
-        result = subprocess.run(mam_command("wait", "list"), capture_output=True, text=True, cwd=self.projects)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        return result.stdout.splitlines()
-
-    def wait_record(self, agent, pid, token, task=None):
-        return {"agent": agent, "pid": pid,
-                "identity": {"host": "local", "boot_id": "test-boot", "start_ticks": pid},
-                "token": token, "kind": "jobs", "task": task, "timeout": None,
-                "started_at": "test", "cancelled": None}
 
     def test_source_cli_launcher_needs_no_adjacent_mam_or_site_package(self):
         launcher = Path(self.temp.name) / "bare-python"
@@ -301,7 +327,7 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
             text = help_text(*command)
             self.assertIn("TASK-ID|AGENT-PATH", text, command)
             self.assertNotIn("TARGET", text, command)
-        self.assertIn("AGENT-ID|AGENT-PATH", help_text("wait", "stop"))
+        self.assertNotIn("wait", help_text())
         for command in (("task", "start"), ("task", "rebind")):
             self.assertIn("TASK-ID", help_text(*command))
             self.assertNotIn("TASK-ID|AGENT-PATH", help_text(*command))
@@ -533,7 +559,7 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
             result = cli.job_status(self.store, types.SimpleNamespace(job="second"))
         self.assertEqual(calls, [11])
         self.assertEqual(result["task"], task)
-        self.assertEqual(result["status"], "stopped")
+        self.assertEqual(result["status"], "exited")
         self.assertEqual(result["checked_at"], "checked")
         self.assertEqual(result["started_at"], "started-second")
         self.assertNotIn("identity", result)
@@ -549,7 +575,7 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
         self.assertEqual(calls, [11, 11])
         self.assertEqual(unknown["status"], "unknown")
         self.assertEqual(unknown["checked_at"], "unavailable")
-        self.assertEqual(unknown["last_known_status"], "stopped")
+        self.assertEqual(unknown["last_known_status"], "exited")
         self.assertEqual(unknown["last_known_checked_at"], "checked")
         self.assertEqual(unknown["error"], "offline")
 
@@ -768,31 +794,6 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
         self.assertTrue(result["unchanged"])
         self.assertEqual(path.read_bytes(), before)
         self.assertEqual(len(self.store.read(task)["handoffs"]), 1)
-
-    def test_rebind_rejects_active_optional_wait_even_with_idle_thread_metadata(self):
-        cases = (
-            ("old-executor", "running", "current executor has an active optional wait"),
-            ("old-executor", "unknown", "cannot verify current executor optional-wait identity"),
-            ("new-executor", "running", "replacement agent has an active optional wait"),
-        )
-        for waiter, wait_state, message in cases:
-            with self.subTest(waiter=waiter, wait_state=wait_state):
-                self.store.remove_wait("old-executor")
-                self.store.remove_wait("new-executor")
-                task = self.task()
-                args, states, manager = self.prepare_rebind(task)
-                self.store.write_wait(self.wait_record(waiter, 77, "agent-wait", task=task))
-                fake = types.SimpleNamespace(probe_process=lambda host, pid, identity, timeout=None: {
-                    "status": wait_state, "identity": identity, "checked_at": "test", "error": "identity query unavailable",
-                })
-                with patch.dict(os.environ, {"CODEX_THREAD_ID": manager}, clear=False), \
-                        patch.object(cli, "agent_observations", return_value=states), \
-                        patch.object(cli, "runtime", return_value=fake), \
-                        patch.object(identity, "read", side_effect=lambda agent: identity.ThreadIdentity(
-                            agent, "/root" if agent == manager else "/root/replacement", manager)):
-                    with self.assertRaisesRegex(cli.Error, message):
-                        cli.rebind(self.store, args)
-                self.assertEqual(self.store.read(task)["agent"], "old-executor")
 
     def test_partial_creation_retry_and_no_foreign_branch_adoption(self):
         source = self.source("robot-bridge")
@@ -1284,116 +1285,6 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.assertEqual(self.store.read(task)["status"], "archived")
 
 
-    def test_wait_list_and_manual_stop_preserve_the_wait_process(self):
-        observation = cli.runtime().probe_process("local", os.getpid())
-        self.assertEqual(observation["status"], "running")
-        record = {
-            "agent": "manager-agent",
-            "pid": os.getpid(),
-            "identity": observation["identity"],
-            "token": "manager-token",
-            "kind": "unified",
-            "role": "manager",
-            "task": None,
-            "turn_id": "turn-id",
-            "timeout": 3600,
-            "started_at": "test",
-            "cancelled": None,
-        }
-        self.store.write_wait(record)
-        rows = cli.wait_list(self.store, types.SimpleNamespace())
-        self.assertEqual(rows, [{"agent": "manager-agent", "task_title": "未绑定", "task": "未绑定",
-                                 "waiting": "unified manager", "started_at": "test"}])
-        stopped = cli.wait_stop(self.store, types.SimpleNamespace(agent="manager-agent", manager=None))
-        self.assertEqual(stopped, {"status": "cancelled", "agent": "manager-agent"})
-        self.assertEqual(self.store.read_wait("manager-agent")["cancelled"] is not None, True)
-        self.assertEqual(cli.runtime().probe_process("local", os.getpid(), observation["identity"])["status"], "running")
-
-    def test_wait_stop_manager_requires_unique_verifiable_unbound_waiter(self):
-        states = {1: "running", 2: "running", 3: "unknown", 4: "running", 5: "running", 6: "running"}
-        fake = types.SimpleNamespace(probe_process=lambda host, pid, identity, timeout=None:
-                                     {"status": states[pid], "identity": identity})
-        args = types.SimpleNamespace(agent=None, manager="manager")
-        with patch.object(cli, "runtime", return_value=fake):
-            with self.assertRaisesRegex(cli.Error, "no unbound active wait"):
-                cli.wait_stop(self.store, args)
-
-            self.store.write_wait(self.wait_record("first-manager", 1, "first"))
-            self.store.write_wait(self.wait_record("second-manager", 2, "second"))
-            with self.assertRaisesRegex(cli.Error, "multiple unbound active waits"):
-                cli.wait_stop(self.store, args)
-            self.store.remove_wait("first-manager")
-            self.store.remove_wait("second-manager")
-
-            bound_task = self.task()
-            self.fixture_bind(bound_task, "bound-executor")
-            self.store.write_wait(self.wait_record("bound-executor", 1, "bound"))
-            self.store.write_wait(self.wait_record("manager-agent", 2, "manager", task=bound_task))
-            self.assertEqual(cli.wait_stop(self.store, args), {"status": "cancelled", "agent": "manager-agent"})
-            self.assertIsNone(self.store.read_wait("bound-executor")["cancelled"])
-            self.store.remove_wait("bound-executor")
-            self.store.remove_wait("manager-agent")
-
-            self.store.write_wait(self.wait_record("unverified-manager", 3, "unknown"))
-            self.store.write_wait(self.wait_record("other-manager", 4, "other"))
-            with self.assertRaisesRegex(cli.Error, "cannot verify unbound manager wait identity"):
-                cli.wait_stop(self.store, args)
-            self.assertIsNone(self.store.read_wait("other-manager")["cancelled"])
-            self.store.remove_wait("unverified-manager")
-            self.store.remove_wait("other-manager")
-
-            selected = self.wait_record("racing-manager", 5, "old")
-            replacement = self.wait_record("racing-manager", 6, "new")
-            self.store.write_wait(selected)
-
-            def replace_selected(_store):
-                self.store.write_wait(replacement)
-                return selected
-
-            with patch.object(cli, "manager_wait_target", side_effect=replace_selected):
-                self.assertEqual(cli.wait_stop_manager(self.store), {"status": "not_waiting", "agent": "racing-manager"})
-            self.assertIsNone(self.store.read_wait("racing-manager")["cancelled"])
-
-            self.store.write_wait(selected)
-
-            def finish_selected(_store):
-                self.store.remove_wait("racing-manager")
-                return selected
-
-            with patch.object(cli, "manager_wait_target", side_effect=finish_selected):
-                self.assertEqual(cli.wait_stop_manager(self.store), {"status": "not_waiting", "agent": "racing-manager"})
-
-    def test_wait_stop_manager_isolated_by_project_configuration(self):
-        other_projects = Path(self.temp.name) / "Other Projects"
-        other_root = self.source("multi-agent-manager", other_projects)
-        other_store = cli.Store(self.configure(other_projects, other_root))
-        observation = cli.runtime().probe_process("local", os.getpid())
-        self.assertEqual(observation["status"], "running")
-        first = self.wait_record("first-manager", os.getpid(), "first")
-        first["identity"] = observation["identity"]
-        second = self.wait_record("second-manager", os.getpid(), "second")
-        second["identity"] = observation["identity"]
-        self.store.write_wait(first)
-        other_store.write_wait(second)
-
-        self.assertEqual(self.wait_call("stop", "manager"), {"status": "cancelled", "agent": "first-manager"})
-        self.assertTrue(self.store.read_wait("first-manager")["cancelled"])
-        self.assertIsNone(other_store.read_wait("second-manager")["cancelled"])
-
-    def test_two_manual_wait_records_are_independent(self):
-        observation = cli.runtime().probe_process("local", os.getpid())
-        for agent, token in (("waiter-left", "left"), ("waiter-right", "right")):
-            record = self.wait_record(agent, os.getpid(), token)
-            record.update({"kind": "unified", "role": "manager", "turn_id": f"{agent}-turn", "timeout": 3600})
-            record["identity"] = observation["identity"]
-            self.store.write_wait(record)
-        self.assertEqual(cli.wait_stop(self.store, types.SimpleNamespace(agent="waiter-left", manager=None)),
-                         {"status": "cancelled", "agent": "waiter-left"})
-        self.assertTrue(self.store.read_wait("waiter-left")["cancelled"])
-        self.assertIsNone(self.store.read_wait("waiter-right")["cancelled"])
-        self.assertEqual(cli.wait_stop(self.store, types.SimpleNamespace(agent="waiter-right", manager=None)),
-                         {"status": "cancelled", "agent": "waiter-right"})
-
     def test_attention_marks_stopped_job_with_unknown_agent(self):
         task = self.task()
         process = {"status": "running", "identity": {"boot_id": "boot", "start_ticks": 10},
@@ -1717,14 +1608,6 @@ base=$(git rev-parse --verify "$1^{commit}")
                 patch.object(cli, "agent_observations", return_value={old: {"status": "active"}}):
             with self.assertRaisesRegex(RuntimeError, "current Manager is active"):
                 wake_runtime.rebind_manager(self.store, "handoff")
-        waiting = self.wait_record(old, 20, "manager-wait")
-        self.store.write_wait(waiting)
-        with patch.dict(os.environ, {"CODEX_THREAD_ID": new}), \
-                patch.object(identity, "read", return_value=identity.ThreadIdentity(new, "/root", new)), \
-                patch.object(cli, "active_wait", return_value=(waiting, "running")):
-            with self.assertRaisesRegex(RuntimeError, "active optional wait"):
-                wake_runtime.rebind_manager(self.store, "handoff")
-        self.store.remove_wait(old)
         with patch.dict(os.environ, {"CODEX_THREAD_ID": new}), \
                 patch.object(identity, "read", return_value=identity.ThreadIdentity(new, "/root", new)), \
                 patch.object(cli, "agent_observations", return_value={old: {"status": "unknown"}}):
@@ -1758,23 +1641,6 @@ base=$(git rev-parse --verify "$1^{commit}")
         with self.assertRaisesRegex(cli.Error, "conflicting .task path"):
             cli.workspace_add(self.store, types.SimpleNamespace(task=task, repo="multi-agent-manager",
                                                            base=self.git(self.root, "rev-parse", "main")))
-
-    def test_wait_stop_accepts_path_only_in_callers_tree(self):
-        task = self.task()
-        root, agent = str(uuid.uuid4()), str(uuid.uuid4())
-        data = self.store.read(task)
-        data["agent"] = agent
-        data["identity"] = {"path": "/root/worker", "tree_root": root}
-        self.store.write(data)
-        record = self.wait_record(agent, 10, "waiting", task=task)
-        self.store.write_wait(record)
-        with patch.dict(os.environ, {"CODEX_THREAD_ID": root}), \
-                patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(root, "/root", root)), \
-                patch.object(cli, "active_wait", return_value=(record, "running")):
-            result = cli.wait_stop(self.store, types.SimpleNamespace(agent="/root/worker", manager=None))
-        self.assertEqual(result["status"], "cancelled")
-        self.assertEqual(result["agent"], agent)
-
 
     def test_rebind_rejects_another_native_root_as_executor(self):
         task = self.task()
@@ -1855,134 +1721,6 @@ base=$(git rev-parse --verify "$1^{commit}")
         data = self.store.read(task)
         self.assertEqual(data["report"]["commits"]["multi-agent-manager"], self.git(worktree, "rev-parse", "HEAD"))
         self.assertEqual(data["status"], "pending")
-
-    def race_wait_handoff(self, wait_first, wait, handoff, gate_owner, gate_method, gate_match):
-        entered, release, attempted = threading.Event(), threading.Event(), threading.Event()
-        results = {}
-        original = getattr(gate_owner, gate_method)
-
-        def gated(*args, **kwargs):
-            if gate_match(*args, **kwargs):
-                entered.set()
-                if not release.wait(5):
-                    raise AssertionError("handoff race gate timed out")
-            return original(*args, **kwargs)
-
-        def run(name, action, signal):
-            if signal:
-                attempted.set()
-            try:
-                results[name] = action()
-            except Exception as exc:
-                results[name] = exc
-
-        first = ("wait", wait) if wait_first else ("handoff", handoff)
-        second = ("handoff", handoff) if wait_first else ("wait", wait)
-        with patch.object(gate_owner, gate_method, side_effect=gated):
-            one = threading.Thread(target=run, args=(*first, False))
-            two = threading.Thread(target=run, args=(*second, True))
-            one.start()
-            try:
-                self.assertTrue(entered.wait(5), "first operation never reached registration edge")
-                two.start()
-                self.assertTrue(attempted.wait(5), "second operation never started")
-            finally:
-                release.set()
-                one.join(5)
-                if two.ident is not None:
-                    two.join(5)
-        self.assertFalse(one.is_alive())
-        self.assertFalse(two.is_alive())
-        return results
-
-    def test_executor_wait_and_start_handoff_serialize_in_both_orders(self):
-        task = self.task()
-        old, new, root = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
-        data = self.store.read(task)
-        data["agent"] = old
-        self.store.write(data)
-
-        def wait():
-            return cli.begin_wait(self.store, old, "executor", task, "old-turn")
-
-        def handoff():
-            with patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(new, "/root/new", root)), \
-                    patch.object(cli, "agent_observations", return_value={old: {"status": "idle"}}):
-                return cli.start(self.store, types.SimpleNamespace(task=task))
-
-        first = self.race_wait_handoff(True, wait, handoff, self.store, "write_wait",
-                                       lambda record: record.get("agent") == old)
-        self.assertIsInstance(first["wait"], dict)
-        self.assertRegex(str(first["handoff"]), "active optional wait")
-        self.assertEqual(self.store.read(task)["agent"], old)
-        cli.finish_wait(self.store, first["wait"])
-
-        second = self.race_wait_handoff(False, wait, handoff, self.store, "write",
-                                        lambda data: data.get("agent") == new)
-        self.assertIsInstance(second["handoff"], dict)
-        self.assertRegex(str(second["wait"]), "no longer matches the current task binding")
-        self.assertIsNone(self.store.read_wait(old))
-        current = cli.begin_wait(self.store, new, "executor", task, "new-turn")
-        cli.finish_wait(self.store, current)
-
-    def test_manager_wait_and_takeover_serialize_in_both_orders(self):
-        _, old = self.task_with_manager()
-        new = str(uuid.uuid4())
-
-        def wait():
-            return cli.begin_wait(self.store, old, "manager", None, "old-turn")
-
-        def takeover():
-            with patch.dict(os.environ, {"CODEX_THREAD_ID": new}), \
-                    patch.object(identity, "read", return_value=identity.ThreadIdentity(new, "/root", new)), \
-                    patch.object(cli, "agent_observations", return_value={old: {"status": "idle"}}):
-                return wake_runtime.rebind_manager(self.store, "handoff")
-
-        first = self.race_wait_handoff(True, wait, takeover, self.store, "write_wait",
-                                       lambda record: record.get("agent") == old)
-        self.assertIsInstance(first["wait"], dict)
-        self.assertRegex(str(first["handoff"]), "active optional wait")
-        self.assertEqual(wake_runtime.recorded_manager(self.store), old)
-        cli.finish_wait(self.store, first["wait"])
-
-        second = self.race_wait_handoff(False, wait, takeover, wake_runtime, "_write_json",
-                                        lambda path, value: Path(path).name == "manager.json" and value.get("manager") == new)
-        self.assertIsInstance(second["handoff"], dict)
-        self.assertRegex(str(second["wait"]), "no longer matches the current Manager identity")
-        self.assertIsNone(self.store.read_wait(old))
-        current = cli.begin_wait(self.store, new, "manager", None, "new-turn")
-        cli.finish_wait(self.store, current)
-
-    def test_wait_registration_keeps_unrecorded_manager_and_new_token(self):
-        initial = cli.begin_wait(self.store, "unrecorded-manager", "manager", None, "initial-turn")
-        cli.finish_wait(self.store, initial)
-        _, manager = self.task_with_manager()
-        first = cli.begin_wait(self.store, manager, "manager", None, "first-turn")
-        cli.finish_wait(self.store, first)
-        second = cli.begin_wait(self.store, manager, "manager", None, "second-turn")
-        cli.finish_wait(self.store, first)
-        self.assertEqual(self.store.read_wait(manager)["token"], second["token"])
-        cli.finish_wait(self.store, second)
-        self.assertIsNone(self.store.read_wait(manager))
-
-    def test_unrecorded_manager_wait_requires_no_active_executor_binding(self):
-        task = self.task()
-        wake_runtime._service_path(self.store, "manager.json").unlink(missing_ok=True)
-        executor = str(uuid.uuid4())
-        data = self.store.read(task)
-        data["agent"] = executor
-        self.store.write(data)
-
-        with self.assertRaisesRegex(cli.Error, "requires a recorded Manager"):
-            cli.begin_wait(self.store, "unbound-caller", "manager", None, "turn")
-        self.assertIsNone(self.store.read_wait("unbound-caller"))
-        legitimate = cli.begin_wait(self.store, executor, "executor", task, "turn")
-        cli.finish_wait(self.store, legitimate)
-
-        data["status"] = "archived"
-        self.store.write(data)
-        compatible = cli.begin_wait(self.store, "unbound-caller", "manager", None, "later-turn")
-        cli.finish_wait(self.store, compatible)
 
     def test_project_hook_context_and_template_repo_dispatch(self):
         state = self.projects / "state"
