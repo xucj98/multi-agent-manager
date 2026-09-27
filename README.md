@@ -119,7 +119,7 @@ mam job archive JOB-ID --note NOTE
 - HOST 可以使用 ssh 别名或 username@hostname。
 - list 省略 `--task` 时显示所有任务中未归档的 job；已绑定执行者登记 job 时可省略任务参数。
 
-job 状态包括 `running`、`stopped`、`unknown`、`archived`；unknown 表示暂时无法确认。进程停止后，Manager 收到转发通知时，通知对应执行者检查结果、按项目要求更新文档或实验记录，再归档该 job。原生转发方式见[自动唤醒](#自动唤醒)。
+job 状态包括 `running`、`exited`、`unknown`、`archived`；exited 表示进程已退出，unknown 表示暂时无法确认。进程退出后，Manager 收到转发通知时，通知对应执行者检查结果、按项目要求更新文档或实验记录，再归档该 job。原生转发方式见[自动唤醒](#自动唤醒)。
 
 一个任务可以多次启动、处理和归档 job；全部 job 已归档、任务成果验收完成后，才进行一次最终 task 归档。`mam job archive` 只结束 MAM 跟踪并保留记录，不停止进程；也可用于明确不再跟踪的运行中进程。
 
@@ -129,21 +129,30 @@ job 状态包括 `running`、`stopped`、`unknown`、`archived`；unknown 表示
 
 当前可执行的工作处理完后，正常结束 turn。已登记的长进程可以继续运行，MAM 会在需要处理后续工作时唤醒负责人，无需调用等待命令或定时查询状态。
 
-- 有未归档的 stopped job：由执行者按任务要求处理并归档。
-- 只有 running job：MAM 继续监控，执行者可以结束 turn。
-- 没有 job 或所有 job 都已归档，且执行者已结束 turn：由 Manager 检查成果，决定归档、委派 review 或追加要求。源任务已交给未归档的 review 任务时，等待 reviewer 的结果。
+- 有未归档的 exited job：由执行者按任务要求处理并归档。
+- 原任务与关联的未归档 review 中，任一执行者 active 或有 running job：等待执行推进。
+- 原任务与关联 review 都空闲：提醒 Manager 检查报告，安排继续执行、review 或归档。Manager 再次空闲时，仍需处理的待办会继续提醒。
 
-负责人正在工作时，MAM 保留待办，避免打断当前 turn。服务的启动、停止和故障处理见[安装说明](docs/install.md)，查看当前服务状态使用：
+自动提醒在负责人空闲时合并投递。服务的启动、停止和故障处理见[安装说明](docs/install.md)，查看当前服务状态使用：
 
 ```text
 mam service status
 ```
 
-原生 subagent 无法直接唤醒时，MAM 通知 Manager 转发。Manager 核对 job 尚未处理后，通过原生 follow-up 将 TASK-ID、JOB-ID 和用途发给当前执行者，要求检查结果、按最新 task.md 继续工作并在收尾后归档 job。进程停止不代表任务成功，也不是要求 Manager 立即归档任务。状态说明及拟议消息格式见 [mam service](docs/commands/service.md)。
+原生 subagent 无法直接唤醒时，MAM 通知 Manager 转发。Manager 按通知中的执行者路径调用 `followup_task`，要求检查指定 job 的结果、按最新 task.md 继续工作并归档 job。通知通过 TASK-ID 定位时，先查看任务并确认执行者；需要换人则按任务接续流程处理。消息格式见 [mam service](docs/commands/service.md#消息与状态输出)。
 
 新 Manager 接管本实例时，在旧 Manager 已结束 turn 和 wait 后调用 `mam service rebind-manager --note NOTE`。任务和工作目录保留，后续 Manager 通知发给接管者；Codex 原生父子关系不变，旧树执行者仍需通过 TASK-ID 定位，或交给新 subagent 接手。
 
-另计划提供执行者主动发消息的接口：默认发送给当前实例的 Manager，自动识别发送者，TASK-ID 可选，并能唤醒 idle Manager；接口待实现。
+### 向 Manager 发消息
+
+需要 Manager 反馈时，使用及时消息；可以等当前工作结束后处理的信息加 `--defer`：
+
+```text
+mam message send --message TEXT [--task TASK-ID|AGENT-PATH]
+mam message send --message TEXT --defer [--task TASK-ID|AGENT-PATH]
+```
+
+及时消息进入 Manager 当前 turn，抄送消息等待其空闲；两类消息在 Manager idle 时都会唤醒。MAM 自动识别发送者并关联其任务，未绑定 task 也可发送。详见 [mam message](docs/commands/message.md)。
 
 ## 可选等待
 
@@ -164,4 +173,4 @@ MAM 自身的开发 worktree、环境、验证和合并步骤见[MAM 开发指�
 
 ## MAM 接口说明
 
-各命令的参数、返回内容和使用约束见 [mam task](docs/commands/task.md)、[mam job](docs/commands/job.md)、[mam wait](docs/commands/wait.md)、[mam service](docs/commands/service.md)、[mam workspace](docs/commands/workspace.md)。各页的“待开发”部分为拟议接口，后续任务见 [roadmap](docs/roadmap.md)。
+各命令的参数、返回内容和使用约束见 [mam task](docs/commands/task.md)、[mam job](docs/commands/job.md)、[mam message](docs/commands/message.md)、[mam wait](docs/commands/wait.md)、[mam service](docs/commands/service.md)、[mam workspace](docs/commands/workspace.md)。各页的“待开发”部分为拟议接口，后续任务见 [roadmap](docs/roadmap.md)。

@@ -9,6 +9,7 @@
 | `mam service start [--manager AGENT-ID]` | Manager、安装者 | 启动或复用当前实例的服务，返回 JSON 状态；可显式指定首次绑定的 Manager。 |
 | `mam service stop` | Manager、安装者 | 停止当前实例的服务；job 继续运行，任务和 workspace 保留。 |
 | `mam service status` | 所有人 | 返回服务是否运行、健康状态、Manager、待办和错误信息。 |
+| `mam service set message-channel tool\|user` | Manager、安装者 | 设置本实例的消息渠道，立即生效并保存。 |
 | `mam service rebind-manager --note NOTE` | 新 Manager | 从 CODEX_THREAD_ID 确认原生根线程身份，接管本实例 Manager 并记录交接理由。 |
 
 新实例尚未绑定 Manager 时显示 awaiting_manager。Manager 首次 create 任务时可自动登记；已有任务但无法确认 Manager 时，使用 start 的 `--manager` 参数。当前 start 不能替换已绑定的 Manager。
@@ -19,14 +20,15 @@
 
 | 情况 | 处理 |
 | --- | --- |
-| 有未归档的 stopped job | 通知执行者检查结果并归档 job |
-| job 仍在运行 | 继续监控 |
-| 执行者已结束 turn，且无未归档 job | 通知 Manager 检查交付、安排 review 或归档 |
-| 源任务有未归档的 review | 等待 reviewer；源任务的 stopped job 仍通知执行者 |
+| 有未归档的 exited job | 通知执行者检查结果并归档 job |
+| 原任务与关联的未归档 review 中，有 active agent 或 running job | 等待执行推进 |
+| 原任务与关联 review 都空闲 | 通知 Manager 检查报告、继续派工、review 或归档 |
 
-负责人正在工作或使用 wait 时，服务保留待办；用户暂停或中断的 turn 不会被自动恢复。状态无法确认时保留诊断，待确认后处理。
+自动提醒在负责人空闲时投递。每次按当前任务、job 和 review 状态判断并合批；Manager 再次空闲时，尚待处理的事项继续提醒。原任务与 review 双向关联，同一 review 可以接续多轮返工。exited job 始终保留收尾待办。
 
-通知以 `[MAM Message]` 开头，包含相关任务、job 或执行者标识及用途。收到通知后，负责人按任务要求处理；进程停止或执行者结束 turn 都不表示任务成功。
+负责人使用 wait 时由等待接口返回待办。用户暂停或中断的 turn 等待用户恢复；状态无法确认时保留诊断，待确认后处理。
+
+通知以 `[MAM Message]` 开头，给出相关任务或执行者、job 及下一步动作。
 
 ## 状态与故障处理
 
@@ -42,27 +44,29 @@
 
 某些 subagent 不接受直接唤醒时，服务会通知 Manager 协调。Manager 先查看执行者状态和 report，确认尚未处理后，通过原生 follow-up 通知执行者收尾。服务状态中的 blocked 待办会保留，直到对应工作被处理。
 
-## 待开发
+## 消息渠道
 
-### 执行者主动发消息
+```text
+mam service set message-channel tool
+mam service set message-channel user
+```
 
-提供消息发送接口，正文必填，收件人默认当前实例的 Manager。MAM 自动识别发送者及其协作路径；TASK-ID 可选，未绑定任务的 subagent 也可请求裁决或报告问题。具体命令名和参数待定。
+默认 `tool`，以工具输出投递；`user` 以可见的用户消息投递，便于验收。设置作用于本实例全部 MAM 消息，运行中的服务无需重启，重启后继续沿用。`mam service status` 的 `message_channel` 显示当前选择。
 
-Manager idle 时投递并唤醒；正在工作时保留待办，继续遵守用户暂停或中断的保护。消息展示发送者和正文，有关联任务时再附任务信息。
+执行者主动发送及时信息或抄送信息使用 [mam message](message.md)。
 
-### 消息与状态输出
+## 消息与状态输出
 
-区分“请验收任务”和“请转发 job 停止消息”，优先展示可用的执行者协作路径、相关任务或 job 及下一步动作；避免已处理交付或 Manager 自己整理报告后再次触发无事可做的唤醒。
-
-原生 subagent 无法直接接收时，保留 Manager 转发路径，不维护 Codex fork。拟议消息如下（尚未实现）：
+通知优先使用当前 Manager 可用的执行者路径；其他任务用 TASK-ID 定位。Manager 转发 job 消息示例：
 
 ```text
 [MAM Message]
-需要 Manager 转发：登记的进程已停止，执行者无法直接唤醒。
-TASK-ID: ...（任务标题）
-JOB-ID: ...（进程用途）
-执行者: /root/worker
-请先确认该 job 尚未收尾，再通过原生 follow-up 通知当前执行者：
-检查进程结果，按最新 task.md 继续任务，处理后归档该 job。
-进程停止不表示成功；本消息不要求归档任务。
+/root/worker: job JOB-ID has exited. Use followup_task to ask the executor to check the result and archive the job.
+```
+
+执行者结束当前工作后的通知示例：
+
+```text
+[MAM Message]
+/root/worker needs follow-up. Check the report; continue the work, request review, or archive the task.
 ```
