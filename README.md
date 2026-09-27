@@ -4,9 +4,9 @@
 
 MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job` 和可选的 `mam wait`，并自动唤醒需要处理后续工作的负责人。本集群的信息查看[本地说明](.local/README.md)，所有 `mam` 命令以及 agent 均在本机运行。
 
-使用细节可用 `mam --help` 查询，语法中的大写词需要替换为实际值，方括号表示可选参数。
+使用细节可用 `mam --help` 查询，语法中的大写词需要替换为实际值，`[]` 表示可选，`|` 表示任选其一。
 
-MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 是 Codex 线程 ID。`TARGET` 可用 TASK-ID，或绑定后当前原生协作树内的完整执行者路径，如 `/root/worker`；已绑定执行者的日常操作可省略 TARGET。
+MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 是 Codex 线程 ID。`AGENT-PATH` 是当前原生协作树内的完整执行者路径，如 `/root/worker`，绑定后可用于定位任务。Manager 显式指定任务；已绑定执行者的日常操作可省略任务参数。
 
 MAM 使用共享根目录 `MAM_ROOT`：Manager 编辑其中的 `task.md`，执行者编辑自己的 `report.md`。任务和报告通过 `mam task publish` 发布，并使用 `mam task show` 查看，未发布的修改是草稿。
 
@@ -47,14 +47,14 @@ Manager 无关联任务的临时文件统一放在 `PROJECT_ROOT/workspace/tmp/`
 Manager 创建任务、填写并发布要求，再通过 Codex 原生工具创建 subagent，提供 TASK-ID 并要求其阅读 AGENTS.md 和已发布任务。执行者自行登记；完成后由 Manager 验收、安排 review 或归档。
 
 ```text
-mam task create --title TITLE [--review TARGET]
-mam task publish TASK-ID --file task
-mam task archive TARGET --note NOTE
+mam task create --title TITLE [--review TASK-ID|AGENT-PATH]
+mam task publish TASK-ID|AGENT-PATH --file task
+mam task archive TASK-ID|AGENT-PATH --note NOTE
 ```
 
 - `create` 返回 TASK-ID；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求，再用该 TASK-ID 首次发布，无需先绑定 subagent。
 - 途中追加要求时，先更新并发布 task.md，再通知执行者读取。执行者和 reviewer 始终以最新已发布要求为准；report 无需绑定要求版本。
-- Review 任务用 `--review TARGET` 指定源任务，结合最新 task.md、report.md 和交付代码独立验收。
+- Review 任务用 `--review TASK-ID|AGENT-PATH` 指定源任务，结合最新 task.md、report.md 和交付代码独立验收。
 - 返工时通知原执行者调用 `mam task start` 后继续；需要换人时，先确认旧执行者已结束 turn 和 wait，再让新执行者 `mam task start TASK-ID` 接手。原 workspace、分支、环境和 job 保留，无需再次创建。
 - 交付后的验收、留存和归档按[任务收尾](#任务收尾)完成。
 
@@ -63,8 +63,8 @@ mam task archive TARGET --note NOTE
 ```text
 mam task list
 mam job list
-mam task status [TARGET]
-mam task show [TARGET]
+mam task status [TASK-ID|AGENT-PATH]
+mam task show [TASK-ID|AGENT-PATH]
 ```
 
 `mam task status` 显示已保存的 job 观测，不会实时探测。Manager 可用 `/root/worker` 定位当前协作树内的执行者；其他树或归档任务用 TASK-ID。
@@ -97,7 +97,7 @@ mam task publish --file report
 1. 执行者整理代码和产物，同步相关文档；需保留的文件按上述规则转存，临时检查文件留在任务 tmp。报告说明结果、验证方法、未解决问题和产物位置，让接手者不依赖原对话也能理解。
 2. 执行者检查已停止 job 的结果，完成项目侧收尾后归档 job。仍需监控的进程保留登记，任务暂不归档。
 3. 执行者提交交付代码，发布附件和最终 report；Manager 按最新 task.md 验收，需要时独立 review，并对 review 结论作出裁决。返工继续原任务。
-4. Manager 确认代码已合入主分支，必要报告和附件已发布，然后调用 `mam task archive TARGET --note NOTE`；明确舍弃时使用 `--discard-code` 或 `--discard-drafts` 并在 note 说明理由。归档检查留存，再清理 tmp、worktree、独立环境、任务分支及 `.task` 链接，保留中央任务记录和共享链接目标。
+4. Manager 确认代码已合入主分支，必要报告和附件已发布，然后调用 `mam task archive TASK-ID|AGENT-PATH --note NOTE`；明确舍弃时使用 `--discard-code` 或 `--discard-drafts` 并在 note 说明理由。归档检查留存，再清理 tmp、worktree、独立环境、任务分支及 `.task` 链接，保留中央任务记录和共享链接目标。
 5. Manager 核对归档结果，确认任务已归档、工作目录和分支已清理。失败时按提示处理后重试；阶段结束时也检查自己的 workspace/tmp，将必要内容转存后清理其余文件。
 
 MAM 提供通用的留存检查和清理工具；数据、checkpoint 等产物保留多久、放在哪里，由各项目规定。接口和拒绝归档的条件见 [mam task](docs/commands/task.md#附件与归档)。
@@ -107,18 +107,18 @@ MAM 提供通用的留存检查和清理工具；数据、checkpoint 等产物�
 预计运行超过 30 分钟的程序（如正式数据生成、训练、评估、传输拷贝）需要登记；短 smoke 不需要。登记、查询和收尾使用：
 
 ```text
-mam job add [TARGET] --note NOTE --host HOST --pid PID
-mam job list [--task TARGET]
+mam job add [TASK-ID|AGENT-PATH] --note NOTE --host HOST --pid PID
+mam job list [--task TASK-ID|AGENT-PATH]
 mam job status JOB-ID
 mam job archive JOB-ID --note NOTE
 ```
 
 - HOST 可以使用 ssh 别名或 username@hostname。
-- list 不提供 TARGET 时显示所有任务中未归档的 job；已绑定执行者登记 job 时可省略 TARGET。
+- list 省略 `--task` 时显示所有任务中未归档的 job；已绑定执行者登记 job 时可省略任务参数。
 
 job 状态包括 `running`、`stopped`、`unknown`、`archived`；unknown 表示暂时无法确认。进程停止后，由执行者检查结果、完成收尾，再归档 job。`mam job archive` 可归档任意已登记 job，只结束 MAM 对它的跟踪并保留记录，不停止进程。`mam task archive` 要求其所有 job 已归档。
 
-拟议接口为 `mam job submit [TARGET] --command COMMAND`，一次完成登记与启动；已绑定执行者可省略 TARGET，Manager 可用协作路径定位任务。详见 [mam job](docs/commands/job.md#待开发)。
+拟议接口为 `mam job submit [TASK-ID|AGENT-PATH] --command COMMAND`，一次完成登记与启动；已绑定执行者可省略任务参数，Manager 可用协作路径定位任务。详见 [mam job](docs/commands/job.md#待开发)。
 
 ## 自动唤醒
 
@@ -148,7 +148,7 @@ mam service status
 mam wait
 mam wait list
 mam wait stop manager
-mam wait stop --agent AGENT-ID|PATH
+mam wait stop --agent AGENT-ID|AGENT-PATH
 ```
 
 等待返回时会说明原因及相关 job 或任务。用户的 steer 或 Manager 发来的消息可以解除对应等待，也可通过 `wait stop` 手动解除；这些操作不停止 job。收到返回结果后，按其中的待办继续工作。

@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `mam wait` | Manager、执行者 | 根据 CODEX_THREAD_ID 识别调用者及所属任务；有待办立即返回，否则最多等待一小时。 |
 | `mam wait list` | 所有人 | 列出当前实例的等待者、绑定任务、等待内容和开始时间。 |
-| `mam wait stop --agent AGENT-ID\|PATH` | Manager、执行者 | 按线程 ID 或当前原生协作树内的完整路径解除指定执行者的等待；不停止 job、不归档任务。 |
+| `mam wait stop --agent AGENT-ID\|AGENT-PATH` | Manager、执行者 | 按线程 ID 或当前原生协作树内的完整路径解除指定执行者的等待；不停止 job、不归档任务。 |
 | `mam wait stop manager` | Manager、执行者 | 解除 Manager 的等待；无法唯一确认等待者时返回错误。 |
 
 执行者等待自己的 job；Manager 等待任务执行者的交接和 job 待办。只有运行中的 job 时继续等待；已停止的 job 优先返回，活动 review 不会掩盖它。

@@ -1,12 +1,12 @@
 # mam task
 
-`mam task` 创建任务、登记执行者、发布要求和成果、查询及归档。`TARGET` 可用 TASK-ID 或当前调用者所属原生协作树内的完整路径，如 `/root/worker`。已绑定执行者的 show、status、publish 可省略 TARGET；Manager 显式指定。未绑定或已归档任务仍可用 TASK-ID。路径身份无法确认或不唯一时返回错误，不跨树猜测。
+`mam task` 创建任务、登记执行者、发布要求和成果、查询及归档。任务可用 TASK-ID 或 AGENT-PATH 定位；AGENT-PATH 是当前原生协作树内的完整执行者路径，如 `/root/worker`。Manager 显式指定任务；已绑定执行者可按下表省略任务参数。首次发布、未绑定或已归档任务使用 TASK-ID。路径身份无法确认或不唯一时返回错误，不跨树猜测。
 
 ## 创建与开始
 
 | 接口 | 操作 |
 | --- | --- |
-| `mam task create --title TITLE [--review TARGET]` | 创建 TASK-ID、task.md/report.md 草稿、files/ 和 workspace，状态为 working；review 引用源任务当前已发布的要求、报告与代码交付记录。 |
+| `mam task create --title TITLE [--review TASK-ID\|AGENT-PATH]` | 创建 TASK-ID、task.md/report.md 草稿、files/ 和 workspace，状态为 working；review 引用源任务当前已发布的要求、报告与代码交付记录。 |
 | `mam task start [TASK-ID]` | 执行者从 CODEX_THREAD_ID 登记原生路径与树根，进入 working；首次登记和换人时指定 TASK-ID，已绑定执行者返工可省略。重复调用幂等。 |
 | `mam task list [--archived\|--all]` | 默认列出未归档任务，选项查看归档或全部；表格包含任务、状态、TASK-ID、执行者路径或旧记录的 AGENT-ID、线程状态，空列表仍有表头。 |
 
@@ -16,9 +16,10 @@ Manager 用原生工具创建或通知 subagent。换人前让旧执行者结束
 
 | 接口 | 操作 |
 | --- | --- |
-| `mam task show [TARGET] [--file task\|report] [--json]` | 读取 MAM_BRANCH 当前最新已发布文档，默认 task；不读取草稿，--json 同时返回正文和发布信息。 |
-| `mam task publish [TARGET] --file task\|report\|files` | 单独发布指定草稿，返回发布 commit。 |
-| `mam task status [TARGET]` | 返回任务、执行者路径与树根、仓库交付、发布记录、草稿提示和保存的 job 观测；不探测 job。 |
+| `mam task show [TASK-ID\|AGENT-PATH] [--file task\|report] [--json]` | 读取 MAM_BRANCH 当前最新已发布文档，默认 task；不读取草稿，--json 同时返回正文和发布信息。 |
+| `mam task publish TASK-ID\|AGENT-PATH --file task` | Manager 发布任务要求，必须显式指定任务，返回发布 commit。 |
+| `mam task publish [TASK-ID\|AGENT-PATH] --file report\|files` | 执行者单独发布简报或附件，可省略任务参数，返回发布 commit。 |
+| `mam task status [TASK-ID\|AGENT-PATH]` | 返回任务、执行者路径与树根、仓库交付、发布记录、草稿提示和保存的 job 观测；不探测 job。 |
 
 Manager 编辑 task.md；执行者经 workspace 的 `.task/report.md` 和 `.task/files/` 编辑简报、附件。report 草稿用于记录当前进展，更新草稿不改变状态；完成交付后再发布。发布 task 或 report 只提交对应文件。
 
@@ -30,7 +31,7 @@ Manager 编辑 task.md；执行者经 workspace 的 `.task/report.md` 和 `.task
 
 | 接口 | 操作 |
 | --- | --- |
-| `mam task archive TARGET --note NOTE [--discard-drafts] [--discard-code]` | 完整预检后清理本任务资源，保留中央任务记录和发布历史。 |
+| `mam task archive TASK-ID\|AGENT-PATH --note NOTE [--discard-drafts] [--discard-code]` | Manager 显式指定任务，完整预检后清理资源，保留中央任务记录和发布历史。 |
 
 归档要求所有 job 已归档、仓库 worktree 无未提交或未知内容、任务/报告/附件无未发布草稿，且交付代码已包含在各源仓库的主分支中（优先检查 main/master，否则检查主 checkout 当前分支）。仅在 `--note` 说明舍弃理由时，才使用 `--discard-drafts` 忽略草稿或 `--discard-code` 舍弃未合入提交。报告中的 commit hash 本身不是 Git 对象的永久留存。取消无交付的空任务可直接归档。
 

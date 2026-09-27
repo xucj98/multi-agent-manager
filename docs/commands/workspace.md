@@ -6,11 +6,11 @@
 
 | 接口 | 使用者 | 具体操作 |
 | --- | --- | --- |
-| `mam workspace add [TARGET] --repo REPO --base COMMIT` | 执行者 | 从 PROJECT_ROOT/REPO 的指定 commit 创建任务 worktree 和环境，登记并返回路径、分支、base commit 和创建状态。 |
+| `mam workspace add [TASK-ID\|AGENT-PATH] --repo REPO --base COMMIT` | 执行者 | 从 PROJECT_ROOT/REPO 的指定 commit 创建任务 worktree 和环境，登记并返回路径、分支、base commit 和创建状态。 |
 
 `REPO` 是 PROJECT_ROOT 下的仓库目录名；源目录必须是该仓库的主 checkout，并有非软链接的 `.local/create_worktree.sh`。`COMMIT` 可以是可解析为 commit 的分支、标签或提交号，具体由任务要求指定。
 
-`TARGET` 可用 TASK-ID 或当前原生协作树内的完整执行者路径；已绑定执行者可省略。创建后的路径为 `PROJECT_ROOT/workspace/TASK-ID/REPO`，分支为 `task/TASK-ID`。同一任务在不同仓库使用相同分支名。workspace 根目录同时建立 `.task` 软链接，指向 `MAM_ROOT/.tasks/TASK-ID`；已有任务正常接续时补齐缺失链接，冲突路径不会被覆盖。
+任务可用 TASK-ID 或当前原生协作树内的完整执行者路径 AGENT-PATH 定位；已绑定执行者可省略任务参数。创建后的路径为 `PROJECT_ROOT/workspace/TASK-ID/REPO`，分支为 `task/TASK-ID`。同一任务在不同仓库使用相同分支名。workspace 根目录同时建立 `.task` 软链接，指向 `MAM_ROOT/.tasks/TASK-ID`；已有任务正常接续时补齐缺失链接，冲突路径不会被覆盖。
 
 ## 环境与后续使用
 
