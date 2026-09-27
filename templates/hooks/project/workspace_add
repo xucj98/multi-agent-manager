@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+"""Example project dispatcher for the required workspace_add event."""
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+
+payload = sys.stdin.buffer.read()
+context = json.loads(payload)
+name = context["repo"]
+record = next(item for item in context["repos"] if item["name"] == name)
+source = Path(record["source"])
+entry = source / ".local" / "hooks" / "workspace_add"
+if entry.is_symlink() or not entry.is_file() or not os.access(entry, os.X_OK):
+    sys.exit(f"repo workspace_add hook must be an executable regular file: {entry}")
+sys.exit(subprocess.run([str(entry)], input=payload, cwd=source).returncode)

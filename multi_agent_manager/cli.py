@@ -4,14 +4,16 @@ from __future__ import annotations
 import argparse
 import contextlib
 import datetime as dt
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import fcntl
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -128,6 +130,7 @@ class ProjectConfig:
     mam_root: Path
     project_root: Path
     branch: str
+    hook_timeouts: dict[str, float] = field(default_factory=dict)
 
 
 def environment_file(cwd=None):
@@ -168,7 +171,15 @@ def project_config(cwd=None):
         raise Error(f"MAM_BRANCH is not a valid local branch name: {branch}")
     if not branch_exists(mam_root, branch):
         raise Error(f"MAM_BRANCH is not an existing local branch: {branch}")
-    return ProjectConfig(mam_root=mam_root, project_root=project_root, branch=branch)
+    timeouts = data.get("HOOK_TIMEOUTS", {})
+    if not isinstance(timeouts, dict):
+        raise Error("HOOK_TIMEOUTS must be an object")
+    for event, seconds in timeouts.items():
+        if event not in ("workspace_add", "before_task_archive"):
+            raise Error(f"unknown HOOK_TIMEOUTS event: {event}")
+        if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds <= 0:
+            raise Error(f"HOOK_TIMEOUTS.{event} must be a positive finite number of seconds")
+    return ProjectConfig(mam_root=mam_root, project_root=project_root, branch=branch, hook_timeouts=timeouts)
 
 
 def wait_key(agent):
@@ -359,11 +370,59 @@ def repo_context(store, data, name, record):
     return source, path, branch
 
 
-def workspace_entry(source):
-    entry = safe_path(source / ".local" / "create_worktree.sh")
-    if not entry.is_file():
-        raise Error(f"source repository has no .local/create_worktree.sh: {source}")
-    return entry
+def hook_context(store, data, event, *, repo=None, options=None):
+    delivery = (data.get("report") or {}).get("commits") or {}
+    repos = []
+    for name, record in data["repos"].items():
+        repos.append({"name": name, **{key: record.get(key) for key in
+                      ("source", "path", "branch", "base", "state", "removed", "branch_removed")},
+                      "commit": delivery.get(name)})
+    return {"schema_version": 1, "event": event, "project_root": str(store.project_root),
+            "mam_root": str(store.root),
+            "task": {"id": data["id"], "title": data["title"], "status": data["status"],
+                     "workspace": data["workspace"], "task_dir": str(store.logs / data["id"])},
+            "repos": repos, "repo": repo,
+            "jobs": [{**job_summary(job), **{key: job.get(key) for key in ("host", "pid", "started_at")}}
+                     for job in data["jobs"]],
+            "options": options or {"note": None, "discard_code": False, "discard_drafts": False}}
+
+
+def project_hook(store, data, event, *, required=False, repo=None, options=None):
+    if os.environ.get("MAM_HOOK_ACTIVE"):
+        raise Error("MAM hook cannot invoke workspace add or task archive recursively")
+    entry = store.root / ".local" / "hooks" / event
+    if not entry.exists() and not entry.is_symlink():
+        if required:
+            raise Error(f"required project hook is missing: {entry}")
+        return
+    safe_path(entry)
+    if not entry.is_file() or not os.access(entry, os.X_OK):
+        raise Error(f"project hook must be an executable regular file: {entry}")
+    timeout = store.config.hook_timeouts.get(event, {"workspace_add": 1800, "before_task_archive": 60}[event])
+    payload = json.dumps(hook_context(store, data, event, repo=repo, options=options)).encode()
+    env = {**os.environ, "MAM_HOOK_ACTIVE": event}
+    with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+        try:
+            process = subprocess.Popen([str(entry)], cwd=store.root, stdin=subprocess.PIPE,
+                                       stdout=stdout, stderr=stderr, env=env, start_new_session=True)
+            try:
+                process.communicate(payload, timeout=timeout)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.communicate()
+                raise Error(f"project hook {event} timed out after {timeout:g} seconds")
+        except OSError as exc:
+            raise Error(f"project hook {event} could not start: {exc}") from exc
+        if process.returncode:
+            stderr.seek(0, os.SEEK_END)
+            stderr.seek(max(0, stderr.tell() - 3000))
+            stdout.seek(0, os.SEEK_END)
+            stdout.seek(max(0, stdout.tell() - 3000))
+            detail = (stderr.read() or stdout.read()).decode(errors="replace").strip()
+            raise Error(f"project hook {event} exited {process.returncode}: {detail[:3000]}")
 
 
 def live(store, data, name, record):
@@ -614,6 +673,8 @@ def rebind(store, args):
 
 
 def workspace_add(store, args):
+    if os.environ.get("MAM_HOOK_ACTIVE"):
+        raise Error("MAM hook cannot invoke workspace add recursively")
     name = repository_name(args.repo)
     with store.lock(args.task):
         data = store.read(args.task, writable=True)
@@ -621,7 +682,6 @@ def workspace_add(store, args):
         source = safe_path(store.project_root / name)
         if primary(source) != source:
             raise Error(f"source is not a primary checkout: {source}")
-        entry = workspace_entry(source)
         base = head(source, args.base)
         branch = f"task/{args.task}"
         path = safe_path(Path(data["workspace"]) / name)
@@ -646,9 +706,7 @@ def workspace_add(store, args):
         safe_path(data["workspace"]).mkdir(parents=True, exist_ok=True)
         store.write(data)
         try:
-            result = run(["bash", entry, base, branch, data["workspace"]], check=False)
-            if result.returncode:
-                raise Error((os.fsdecode(result.stderr + result.stdout).strip() or "environment entry failed")[-3000:])
+            project_hook(store, data, "workspace_add", required=True, repo=name)
             live(store, data, name, record)
             record["state"], record["error"] = "ready", None
         except (OSError, Error) as exc:
@@ -1487,131 +1545,90 @@ def print_published(document):
     sys.stdout.write(document["content"])
 
 
-def ignored_link(repo, name):
-    path = repo
-    for part in Path(name.rstrip("/")).parts:
-        path /= part
-        if path.is_symlink():
-            return True
-    return False
-
-
-def controlled_local_readme(repo):
-    local = repo / ".local"
-    readme = local / "README.md"
-    if local.is_symlink() or not local.is_dir() or not readme.is_symlink():
-        return False
-    try:
-        entries = list(local.iterdir())
-        expected = primary(repo) / ".local" / "README.md"
-        return entries == [readme] and os.readlink(readme) == str(expected)
-    except OSError:
-        return False
-
-
-def dirty(repo):
-    output = git(repo, "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--ignore-submodules=none", "--ignored=matching").stdout
-    ignored, problems = [], []
-    for item in output.split(b"\0"):
-        if not item:
+def archive_preflight(store, data, args):
+    workspace = safe_path(data["workspace"])
+    if workspace.exists() and not workspace.is_dir():
+        raise Error(f"archive refused; workspace is not a directory: {workspace}")
+    blocked = [job["id"] for job in data["jobs"] if job["status"] != "archived"]
+    if blocked:
+        raise Error("archive refused; unarchived registered jobs: " + ", ".join(blocked))
+    link = workspace / ".task"
+    if link.is_symlink():
+        if os.readlink(link) != str(store.logs / args.task):
+            raise Error(f"archive refused; conflicting .task link: {link}")
+    elif link.exists():
+        raise Error(f"archive refused; conflicting .task path: {link}")
+    docs = {kind: optional_doc(store, args.task, kind) for kind in ("task", "report")}
+    drafts = [kind for kind, doc in docs.items() if store.doc(args.task, kind).exists() and
+              (doc is None or store.doc(args.task, kind).read_bytes() != doc["content"].encode())]
+    files = files_snapshot(store, args.task)
+    committed = published_files(store, args.task)
+    if "report" in drafts and not store.doc(args.task, "report").read_bytes():
+        drafts.remove("report")
+    if ("task" in drafts and docs["task"] is None and
+            store.doc(args.task, "task").read_text() == f"# {data['title']}\n" and
+            data.get("report") is None and not files and not committed):
+        drafts.remove("task")
+    if draft_file_blobs(store, files) != committed:
+        drafts.append("files")
+    if drafts and not getattr(args, "discard_drafts", False):
+        raise Error("archive refused; unpublished drafts: " + ", ".join(drafts) + "; use --discard-drafts with --note")
+    unmerged = []
+    for name, record in data["repos"].items():
+        source, path, branch = repo_context(store, data, name, record)
+        if record["branch_removed"]:
+            if branch_exists(source, branch):
+                raise Error(f"removed task branch reappeared: {branch}")
             continue
-        code, name = item[:2], os.fsdecode(item[3:])
-        if code == b"!!" and (name.rstrip("/").split("/", 1)[0] == ".venv" or ignored_link(repo, name)
-                              or (name.rstrip("/") in (".local", ".local/README.md")
-                                  and controlled_local_readme(repo))):
-            ignored.append(name)
-        else:
-            problems.append(f"{os.fsdecode(code)} {name}")
-    if problems:
-        raise Error(f"archive refused; modified, untracked or unknown ignored contents in {repo}: " + "; ".join(problems))
-    return ignored
-
-
-def outer_check(workspace, records):
-    if not workspace.exists():
-        return
-    known = {Path(record["path"]).name for record in records.values() if not record["removed"]}
-    known.update({"tmp", ".task"})
-    unknown = [str(path) for path in workspace.iterdir() if path.name not in known]
-    if unknown:
-        raise Error("archive refused; unregistered workspace entries: " + ", ".join(unknown))
+        retained_by = retention_branch(source)
+        commits = set()
+        if branch_exists(source, branch):
+            commits.add(head(source, branch))
+        report = data.get("report") or {}
+        delivery = report.get("commits") if isinstance(report, dict) else None
+        if isinstance(delivery, dict) and name in delivery:
+            try:
+                commits.add(head(source, delivery[name]))
+            except Error:
+                unmerged.append(name)
+        if commits and (retained_by is None or any(
+            git(source, "merge-base", "--is-ancestor", commit, retained_by, check=False).returncode
+            for commit in commits
+        )):
+            unmerged.append(name)
+    if unmerged and not getattr(args, "discard_code", False):
+        raise Error("archive refused; delivery is not retained in the source main branch: " + ", ".join(unmerged) +
+                    "; use --discard-code with --note")
+    if (getattr(args, "discard_drafts", False) or getattr(args, "discard_code", False)) and not args.note.strip():
+        raise Error("archive discard requires a non-empty --note")
+    for name, record in data["repos"].items():  # preflight every repo before removing any
+        source, path, branch = repo_context(store, data, name, record)
+        if path.exists():
+            if record["removed"]:
+                raise Error(f"removed worktree path reappeared: {path}")
+            live(store, data, name, record)
+        elif record["state"] == "ready" and not record["removed"] and data.get("archive") is None:
+            raise Error(f"registered worktree unexpectedly missing: {path}")
+        registrations = git(source, "worktree", "list", "--porcelain").stdout.decode().split("\n\n")
+        for entry in registrations:
+            if f"branch refs/heads/{branch}" in entry.splitlines() and f"worktree {path}" not in entry.splitlines():
+                raise Error(f"task branch is checked out elsewhere: {branch}")
+    return workspace
 
 
 def archive(store, args):
+    if os.environ.get("MAM_HOOK_ACTIVE"):
+        raise Error("MAM hook cannot invoke task archive recursively")
     with store.lock(args.task):
         data = store.read(args.task)
         if data["status"] == "archived":
             return data["archive"]
-        blocked = [job["id"] for job in data["jobs"] if job["status"] != "archived"]
-        if blocked:
-            raise Error("archive refused; unarchived registered jobs: " + ", ".join(blocked))
-        workspace = safe_path(data["workspace"])
-        outer_check(workspace, data["repos"])
-        link = workspace / ".task"
-        if link.is_symlink():
-            if os.readlink(link) != str(store.logs / args.task):
-                raise Error(f"archive refused; conflicting .task link: {link}")
-        elif link.exists():
-            raise Error(f"archive refused; conflicting .task path: {link}")
-        tmp = workspace / "tmp"
-        if tmp.is_symlink() or (tmp.exists() and not tmp.is_dir()):
-            raise Error(f"archive refused; invalid tmp directory: {tmp}")
-        docs = {kind: optional_doc(store, args.task, kind) for kind in ("task", "report")}
-        drafts = [kind for kind, doc in docs.items() if store.doc(args.task, kind).exists() and
-                  (doc is None or store.doc(args.task, kind).read_bytes() != doc["content"].encode())]
-        files = files_snapshot(store, args.task)
-        committed = published_files(store, args.task)
-        if "report" in drafts and not store.doc(args.task, "report").read_bytes():
-            drafts.remove("report")
-        if ("task" in drafts and docs["task"] is None and
-                store.doc(args.task, "task").read_text() == f"# {data['title']}\n" and
-                data.get("report") is None and not files and not committed):
-            drafts.remove("task")
-        if draft_file_blobs(store, files) != committed:
-            drafts.append("files")
-        if drafts and not getattr(args, "discard_drafts", False):
-            raise Error("archive refused; unpublished drafts: " + ", ".join(drafts) + "; use --discard-drafts with --note")
-        unmerged = []
-        for name, record in data["repos"].items():
-            source, path, branch = repo_context(store, data, name, record)
-            if record["branch_removed"]:
-                if branch_exists(source, branch):
-                    raise Error(f"removed task branch reappeared: {branch}")
-                continue
-            retained_by = retention_branch(source)
-            commits = set()
-            if branch_exists(source, branch):
-                commits.add(head(source, branch))
-            report = data.get("report") or {}
-            delivery = report.get("commits") if isinstance(report, dict) else None
-            if isinstance(delivery, dict) and name in delivery:
-                try:
-                    commits.add(head(source, delivery[name]))
-                except Error:
-                    unmerged.append(name)
-            if commits and (retained_by is None or any(
-                git(source, "merge-base", "--is-ancestor", commit, retained_by, check=False).returncode
-                for commit in commits
-            )):
-                unmerged.append(name)
-        if unmerged and not getattr(args, "discard_code", False):
-            raise Error("archive refused; delivery is not retained in the source main branch: " + ", ".join(unmerged) +
-                        "; use --discard-code with --note")
-        if (getattr(args, "discard_drafts", False) or getattr(args, "discard_code", False)) and not args.note.strip():
-            raise Error("archive discard requires a non-empty --note")
-        for name, record in data["repos"].items():  # preflight every repo before removing any
-            source, path, branch = repo_context(store, data, name, record)
-            if path.exists():
-                if record["removed"]:
-                    raise Error(f"removed worktree path reappeared: {path}")
-                live(store, data, name, record)
-                dirty(path)
-            elif record["state"] == "ready" and not record["removed"] and data.get("archive") is None:
-                raise Error(f"registered worktree unexpectedly missing: {path}")
-            registrations = git(source, "worktree", "list", "--porcelain").stdout.decode().split("\n\n")
-            for entry in registrations:
-                if f"branch refs/heads/{branch}" in entry.splitlines() and f"worktree {path}" not in entry.splitlines():
-                    raise Error(f"task branch is checked out elsewhere: {branch}")
+        archive_preflight(store, data, args)
+        project_hook(store, data, "before_task_archive", options={
+            "note": args.note, "discard_code": bool(getattr(args, "discard_code", False)),
+            "discard_drafts": bool(getattr(args, "discard_drafts", False))})
+        data = store.read(args.task)
+        workspace = archive_preflight(store, data, args)
         result = data["archive"] or {"note": args.note, "removed": [], "at": None}
         if data["archive"] is None:
             result["discard_drafts"] = bool(getattr(args, "discard_drafts", False))
@@ -1626,20 +1643,12 @@ def archive(store, args):
             result["discard_code"] = result.get("discard_code", False) or bool(getattr(args, "discard_code", False))
         data["archive"] = result
         try:
-            if tmp.exists():
-                shutil.rmtree(tmp)
-                result["removed"].append({"tmp": str(tmp)})
             for name, record in data["repos"].items():
                 source, path, branch = repo_context(store, data, name, record)
                 if not record["removed"]:
                     if path.exists():
                         live(store, data, name, record)
-                        ignored = dirty(path)
-                        removal = git(source, "worktree", "remove", str(path), check=False)
-                        if removal.returncode and ignored:
-                            live(store, data, name, record)
-                            dirty(path)
-                            removal = git(source, "worktree", "remove", "--force", str(path), check=False)
+                        removal = git(source, "worktree", "remove", "--force", str(path), check=False)
                         if removal.returncode:
                             raise Error(os.fsdecode(removal.stderr).strip())
                         result["removed"].append({"worktree": str(path)})
@@ -1651,12 +1660,8 @@ def archive(store, args):
                         result["removed"].append({"repo": name, "branch": branch})
                     record["branch_removed"] = True
                     store.write(data)
-            if link.is_symlink():
-                link.unlink()
-                result["removed"].append({"task_link": str(link)})
-            outer_check(workspace, data["repos"])
             if workspace.exists():
-                workspace.rmdir()
+                shutil.rmtree(workspace)
                 result["removed"].append({"workspace": str(workspace)})
             data["status"], data["error"] = "archived", None
             result["at"] = now()
@@ -1758,7 +1763,7 @@ def parser():
     p.add_argument("--note", required=True, metavar="NOTE", help="reason for Manager handoff")
     p.set_defaults(func=service_rebind_manager)
     w = command(commands, "workspace", "manage repository worktrees and their environments").add_subparsers(required=True)
-    p = command(w, "add", "create a repository worktree using its local environment entry")
+    p = command(w, "add", "create a repository worktree using the project workspace_add hook")
     p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="TASK-ID or native collaboration path; defaults to caller task")
     p.add_argument("--repo", required=True, metavar="REPO", help="single source repository directory below PROJECT_ROOT")
     p.add_argument("--base", required=True, metavar="COMMIT", help="base commit for the task branch")
@@ -1769,6 +1774,8 @@ def parser():
 def main(argv=None, *, cwd=None):
     args = parser().parse_args(argv)
     try:
+        if os.environ.get("MAM_HOOK_ACTIVE") and args.func not in {show, status, task_list, service_status}:
+            raise Error("MAM hook cannot invoke a command that may modify task state")
         store = Store(project_config(cwd))
         if args.func in {show, publish, report, status, workspace_add, job_add, archive}:
             args.task = task_target(store, args.task)

@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""Add repository-specific retention checks here; this example has no side effects."""
+import json
+import sys
+
+
+context = json.load(sys.stdin)
+assert context["event"] == "before_task_archive"
+assert context["repo"] is not None
