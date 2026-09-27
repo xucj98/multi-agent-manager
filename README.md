@@ -59,7 +59,7 @@ mam task archive TASK-ID|AGENT-PATH --note NOTE [--force]
 - `create` 返回 TASK-ID；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求。
 - 途中追加要求时，先更新并发布 task.md，再通知执行者读取。执行者和 reviewer 始终以最新已发布要求为准；report 无需绑定要求版本。
 - Review 任务用 `--review TASK-ID|AGENT-PATH` 指定源任务，结合最新 task.md、report.md 和交付代码独立验收。
-- 返工时通知原执行者调用 `mam task start` 后继续；需要换人时，先确认旧执行者已结束 turn 和 wait，再让新执行者 `mam task start TASK-ID` 接手。原 workspace、分支、环境和 job 保留，无需再次创建。
+- 返工时通知原执行者调用 `mam task start` 后继续；需要换人时，先确认旧执行者已结束 turn，再让新执行者 `mam task start TASK-ID` 接手。原 workspace、分支、环境和 job 保留，无需再次创建。
 - 交付后的验收、留存和归档按[任务收尾](#任务收尾)完成。
 
 查看已有任务、进程及一个任务的详情：
@@ -141,7 +141,7 @@ mam service status
 
 原生 subagent 无法直接唤醒时，MAM 通知 Manager 转发。Manager 按通知中的执行者路径调用 `followup_task`，要求检查指定 job 的结果、按最新 task.md 继续工作并归档 job。通知通过 TASK-ID 定位时，先查看任务并确认执行者；需要换人则按任务接续流程处理。消息格式见 [mam service](docs/commands/service.md#消息与状态输出)。
 
-新 Manager 接管本实例时，在旧 Manager 已结束 turn 和 wait 后调用 `mam service rebind-manager --note NOTE`。任务和工作目录保留，后续 Manager 通知发给接管者；Codex 原生父子关系不变，旧树执行者仍需通过 TASK-ID 定位，或交给新 subagent 接手。
+新 Manager 接管本实例时，在旧 Manager 已结束 turn 后调用 `mam service rebind-manager --note NOTE`。任务和工作目录保留，后续 Manager 通知发给接管者；Codex 原生父子关系不变，旧树执行者仍需通过 TASK-ID 定位，或交给新 subagent 接手。
 
 ### 向 Manager 发消息
 
@@ -154,23 +154,10 @@ mam message send --message TEXT --defer [--task TASK-ID|AGENT-PATH]
 
 及时消息进入 Manager 当前 turn，抄送消息等待其空闲；两类消息在 Manager idle 时都会唤醒。MAM 自动识别发送者并关联其任务，未绑定 task 也可发送。详见 [mam message](docs/commands/message.md)。
 
-## 可选等待
-
-需要在当前 turn 等待执行者或 job 时，运行 `mam wait`。MAM 自动识别调用者和待处理事项，最多等待一小时；有待办时直接返回。默认仍按[自动唤醒](#自动唤醒)结束 turn，由 MAM 后续唤醒。
-
-```text
-mam wait
-mam wait list
-mam wait stop manager
-mam wait stop --agent AGENT-ID|AGENT-PATH
-```
-
-等待返回时会说明原因及相关 job 或任务。用户的 steer 或 Manager 发来的消息可以解除对应等待，也可通过 `wait stop` 手动解除；这些操作不停止 job。收到返回结果后，按其中的待办继续工作。
-
 ## MAM 开发指南
 
 MAM 自身的开发 worktree、环境、验证和合并步骤见[MAM 开发指南](docs/development.md)。
 
 ## MAM 接口说明
 
-各命令的参数、返回内容和使用约束见 [mam task](docs/commands/task.md)、[mam job](docs/commands/job.md)、[mam message](docs/commands/message.md)、[mam wait](docs/commands/wait.md)、[mam service](docs/commands/service.md)、[mam workspace](docs/commands/workspace.md)。各页的“待开发”部分为拟议接口，后续任务见 [roadmap](docs/roadmap.md)。
+各命令的参数、返回内容和使用约束见 [mam task](docs/commands/task.md)、[mam job](docs/commands/job.md)、[mam message](docs/commands/message.md)、[mam service](docs/commands/service.md)、[mam workspace](docs/commands/workspace.md)。各页的“待开发”部分为拟议接口，后续任务见 [roadmap](docs/roadmap.md)。
