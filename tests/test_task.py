@@ -97,6 +97,13 @@ printf env > "$target/.venv/marker"
     def task(self):
         return self.call("create", "--title", "test task")["id"]
 
+    def task_with_manager(self):
+        manager = str(uuid.uuid4())
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": manager}):
+            task = self.task()
+        self.assertEqual(wake_runtime.recorded_manager(self.store), manager)
+        return task, manager
+
     def fixture_bind(self, task, agent):
         data = self.store.read(task)
         data["agent"] = agent
@@ -1404,8 +1411,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.assertEqual(len(self.store.read(task)["handoffs"]), 1)
 
     def test_manager_takeover_retires_old_delivery_and_preserves_bindings(self):
-        task = self.task()
-        old = wake_runtime.recorded_manager(self.store)
+        task, old = self.task_with_manager()
         new = str(uuid.uuid4())
         self.fixture_bind(task, str(uuid.uuid4()))
         state = wake_runtime._load_state(self.store)
@@ -1629,8 +1635,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         cli.finish_wait(self.store, current)
 
     def test_manager_wait_and_takeover_serialize_in_both_orders(self):
-        self.task()
-        old = wake_runtime.recorded_manager(self.store)
+        _, old = self.task_with_manager()
         new = str(uuid.uuid4())
 
         def wait():
@@ -1660,8 +1665,7 @@ base=$(git rev-parse --verify "$1^{commit}")
     def test_wait_registration_keeps_unrecorded_manager_and_new_token(self):
         initial = cli.begin_wait(self.store, "unrecorded-manager", "manager", None, "initial-turn")
         cli.finish_wait(self.store, initial)
-        task = self.task()
-        manager = wake_runtime.recorded_manager(self.store)
+        _, manager = self.task_with_manager()
         first = cli.begin_wait(self.store, manager, "manager", None, "first-turn")
         cli.finish_wait(self.store, first)
         second = cli.begin_wait(self.store, manager, "manager", None, "second-turn")
@@ -1672,7 +1676,7 @@ base=$(git rev-parse --verify "$1^{commit}")
 
     def test_unrecorded_manager_wait_requires_no_active_executor_binding(self):
         task = self.task()
-        wake_runtime._service_path(self.store, "manager.json").unlink()
+        wake_runtime._service_path(self.store, "manager.json").unlink(missing_ok=True)
         executor = str(uuid.uuid4())
         data = self.store.read(task)
         data["agent"] = executor
