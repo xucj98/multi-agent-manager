@@ -271,8 +271,17 @@ def published(store, task, kind):
     result = git(store.root, "show", f"{commit}:{path}", check=False)
     if result.returncode:
         raise Error(f"no published {kind} for TASK-ID {task} at {commit}")
-    return {"revision": value(store.root, "log", "-1", "--format=%H", commit, "--", path),
-            "content": result.stdout.decode(), "blob": value(store.root, "rev-parse", f"{commit}:{path}")}
+    blob = value(store.root, "rev-parse", f"{commit}:{path}")
+    revision = value(store.root, "log", "-1", "--format=%H", commit, "--", path)
+    if kind == "report":
+        recorded = store.read(task).get("report")
+        candidate = recorded.get("revision") if isinstance(recorded, dict) else None
+        if (isinstance(candidate, str) and re.fullmatch(r"[0-9a-f]{40,64}", candidate)
+                and git(store.root, "merge-base", "--is-ancestor", candidate, commit, check=False).returncode == 0
+                and git(store.root, "merge-base", "--is-ancestor", revision, candidate, check=False).returncode == 0
+                and value(store.root, "rev-parse", f"{candidate}:{path}") == blob):
+            revision = candidate
+    return {"revision": revision, "content": result.stdout.decode(), "blob": blob}
 
 
 def optional_doc(store, task, kind):
@@ -699,70 +708,66 @@ def draft_file_blobs(store, files):
             for path, (mode, content) in files.items()}
 
 
-def publish_files(store, task):
-    current = published_files(store, task)
-    draft = files_snapshot(store, task)
-    blobs = draft_file_blobs(store, draft)
-    if current == blobs:
-        revision = value(store.root, "log", "-1", "--format=%H", store.branch, "--", f".tasks/{task}/files")
-        return {"id": task, "file": "files", "revision": revision or head(store.root, store.branch), "unchanged": True}
-    parent = head(store.root, store.branch)
-    for _, content in draft.values():
-        git(store.root, "hash-object", "-w", "--stdin", input=content)
-    with tempfile.TemporaryDirectory(prefix="task-files-publish-") as temporary:
-        env = {**os.environ, "GIT_INDEX_FILE": str(Path(temporary) / "index")}
-        git(store.root, "read-tree", parent, env=env)
-        for path in current.keys() - blobs.keys():
-            git(store.root, "update-index", "--force-remove", "--", path, env=env)
-        for path, (mode, blob) in blobs.items():
-            git(store.root, "update-index", "--add", "--cacheinfo", mode, blob, path, env=env)
-        tree = git(store.root, "write-tree", env=env).stdout.decode().strip()
-        commit = git(store.root, "commit-tree", tree, "-p", parent, "-m", f"Publish {task} files").stdout.decode().strip()
-        git(store.root, "update-ref", f"refs/heads/{store.branch}", commit, parent)
-    for path in current.keys() - blobs.keys():
+def sync_files_index(store, task, files):
+    prefix = f".tasks/{identifier(task)}/files/"
+    output = git(store.root, "ls-files", "--cached", "-z", "--", prefix).stdout
+    staged = {os.fsdecode(path) for path in output.split(b"\0") if path}
+    for path in staged - files.keys():
         git(store.root, "update-index", "--force-remove", "--", path)
-    for path, (mode, blob) in blobs.items():
+    for path, (mode, blob) in files.items():
         git(store.root, "update-index", "--add", "--cacheinfo", mode, blob, path)
-    return {"id": task, "file": "files", "revision": commit,
-            "added": sorted(blobs.keys() - current.keys()),
-            "updated": sorted(path for path in blobs.keys() & current.keys() if blobs[path] != current[path]),
-            "deleted": sorted(current.keys() - blobs.keys())}
 
 
 def publish_draft(store, args, kind):
     with store.lock(args.task), store.lock("publish"):
         publish_branch(store)
         data = store.read(args.task, writable=True)
-        if kind == "files":
-            return publish_files(store, args.task)
         draft = store.doc(args.task, kind)
         if not draft.is_file():
             raise Error(f"missing draft: {draft}")
         content = draft.read_bytes()
         report = None
+        current_files, file_draft, file_blobs = {}, {}, {}
         if kind == "report":
             delivery = {}
             for name, record in data["repos"].items():
-                if record["state"] != "ready" or record["removed"]:
+                if record["removed"]:
+                    previous = data.get("report") or {}
+                    saved = previous.get("commits", {}).get(name)
+                    if not saved:
+                        raise Error(f"cannot publish delivery from incomplete worktree: {name}")
+                    delivery[name] = saved
+                    continue
+                if record["state"] != "ready":
                     raise Error(f"cannot publish delivery from incomplete worktree: {name}")
                 _, path, _ = live(store, data, name, record)
                 delivery[name] = head(path)
             report = {"commits": delivery}
+            file_draft = files_snapshot(store, args.task)
+            current_files = published_files(store, args.task)
+            file_blobs = draft_file_blobs(store, file_draft)
         path = f".tasks/{args.task}/{kind}.md"
         existing = optional_doc(store, args.task, kind)
-        if existing and existing["content"].encode() == content:
+        if existing and existing["content"].encode() == content and current_files == file_blobs:
             git(store.root, "update-index", "--add", "--cacheinfo", "100644", existing["blob"], path)
             if report is not None:
+                sync_files_index(store, args.task, file_blobs)
                 data["report"] = {**report, "revision": existing["revision"]}
                 data["status"] = "pending"
                 store.write(data)
             return {"id": args.task, "file": kind, "revision": existing["revision"], "unchanged": True}
         parent = head(store.root, store.branch)
+        for _, attachment in file_draft.values():
+            git(store.root, "hash-object", "-w", "--stdin", input=attachment)
         with tempfile.TemporaryDirectory(prefix="task-publish-") as temporary:
             env = {**os.environ, "GIT_INDEX_FILE": str(Path(temporary) / "index")}
             git(store.root, "read-tree", parent, env=env)
             blob = git(store.root, "hash-object", "-w", "--stdin", input=content).stdout.decode().strip()
             git(store.root, "update-index", "--add", "--cacheinfo", "100644", blob, path, env=env)
+            for file_path in current_files.keys() - file_blobs.keys():
+                git(store.root, "update-index", "--force-remove", "--", file_path, env=env)
+            for file_path, (mode, file_blob) in file_blobs.items():
+                git(store.root, "update-index", "--add", "--cacheinfo", mode, file_blob, file_path, env=env)
             tree = git(store.root, "write-tree", env=env).stdout.decode().strip()
             commit = git(store.root, "commit-tree", tree, "-p", parent, "-m", f"Publish {args.task} {kind}").stdout.decode().strip()
             git(store.root, "update-ref", f"refs/heads/{store.branch}", commit, parent)
@@ -773,7 +778,15 @@ def publish_draft(store, args, kind):
         # Update only this entry; Git locks the shared index and keeps other entries.
         # Use the published blob so an edit made during publication stays a draft.
         git(store.root, "update-index", "--add", "--cacheinfo", "100644", blob, path)
-    return {"id": args.task, "file": kind, "revision": commit, "report": report}
+        if report is not None:
+            sync_files_index(store, args.task, file_blobs)
+    result = {"id": args.task, "file": kind, "revision": commit, "report": report}
+    if kind == "report":
+        result.update(added=sorted(file_blobs.keys() - current_files.keys()),
+                      updated=sorted(path for path in file_blobs.keys() & current_files.keys()
+                                     if file_blobs[path] != current_files[path]),
+                      deleted=sorted(current_files.keys() - file_blobs.keys()))
+    return result
 
 
 def publish(store, args):
@@ -782,10 +795,6 @@ def publish(store, args):
 
 def report(store, args):
     return publish_draft(store, args, "report")
-
-
-def attach(store, args):
-    return publish_draft(store, args, "files")
 
 
 def runtime():
@@ -1692,12 +1701,9 @@ def parser():
     p = command(sub, "publish", "publish task requirements")
     p.add_argument("task", metavar="TASK-ID|AGENT-PATH", help="task whose requirements to publish")
     p.set_defaults(func=publish)
-    p = command(sub, "report", "publish a delivery report and record worktree commits")
+    p = command(sub, "report", "publish a delivery report and attachments; record worktree commits")
     p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="defaults to the calling executor's task")
     p.set_defaults(func=report)
-    p = command(sub, "attach", "publish attachments from .task/files/")
-    p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="defaults to the calling executor's task")
-    p.set_defaults(func=attach)
     p = command(sub, "list", "list registered task records")
     group = p.add_mutually_exclusive_group()
     group.add_argument("--archived", action="store_true", help="show only archived tasks")
@@ -1764,7 +1770,7 @@ def main(argv=None, *, cwd=None):
     args = parser().parse_args(argv)
     try:
         store = Store(project_config(cwd))
-        if args.func in {show, publish, report, attach, status, workspace_add, job_add, archive}:
+        if args.func in {show, publish, report, status, workspace_add, job_add, archive}:
             args.task = task_target(store, args.task)
         elif args.func == job_list and args.task:
             args.task = task_target(store, args.task)

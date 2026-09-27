@@ -113,7 +113,7 @@ printf env > "$target/.venv/marker"
         return self.call("add", task, "--repo", repo, "--base", self.git(self.projects / repo, "rev-parse", "main"), command="workspace", ok=ok)
 
     def publish(self, task, kind="task"):
-        return self.call({"task": "publish", "report": "report", "files": "attach"}[kind], task)["revision"]
+        return self.call({"task": "publish", "report": "report"}[kind], task)["revision"]
 
     def report(self, task):
         self.store.doc(task, "report").write_text("Completed the task; tests passed.\n")
@@ -256,9 +256,7 @@ printf env > "$target/.venv/marker"
         self.store.doc(task, "report").write_text("Done.\n")
         with patch.dict(os.environ, {"CODEX_THREAD_ID": agent}):
             report = self.call("report")
-            files = self.call("attach")
         self.assertEqual(report["id"], task)
-        self.assertEqual(files["id"], task)
         self.assertEqual(self.store.read(task)["status"], "pending")
 
     def test_target_help_and_required_option_values(self):
@@ -270,12 +268,12 @@ printf env > "$target/.venv/marker"
         self.assertIn("TASK-ID|AGENT-PATH", publish_help)
         self.assertNotIn("[TASK-ID|AGENT-PATH]", publish_help)
         self.assertNotIn("--file", publish_help)
-        for command in ("report", "attach"):
+        for command in ("report",):
             help_output = help_text("task", command)
             self.assertIn("[TASK-ID|AGENT-PATH]", help_output)
             self.assertNotIn("--file", help_output)
         for command in (("task", "create"), ("task", "bind"), ("task", "show"),
-                        ("task", "publish"), ("task", "report"), ("task", "attach"),
+                        ("task", "publish"), ("task", "report"),
                         ("task", "status"), ("task", "archive"),
                         ("job", "add"), ("job", "list"), ("workspace", "add")):
             text = help_text(*command)
@@ -293,6 +291,18 @@ printf env > "$target/.venv/marker"
             result = subprocess.run(mam_command(*command), cwd=self.projects, capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0, command)
         self.assertEqual(self.store.read(task)["status"], "working")
+
+    def test_attach_command_is_removed(self):
+        task = self.task()
+        before = self.store.read(task)
+        head = self.git(self.root, "rev-parse", "main")
+        result = subprocess.run(mam_command("task", "attach", task), cwd=self.projects,
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("invalid choice", result.stderr)
+        self.assertNotIn("task attach", self.task_command_output("--help"))
+        self.assertEqual(self.git(self.root, "rev-parse", "main"), head)
+        self.assertEqual(self.store.read(task), before)
 
     def test_legacy_publish_file_option_is_rejected_without_side_effects(self):
         task = self.task()
@@ -1382,36 +1392,121 @@ base=$(git rev-parse --verify "$1^{commit}")
             self.assertEqual(saved["jobs"][1]["status"], "running")
 
     def test_files_publication_is_isolated_and_tracks_add_update_delete(self):
-        task = self.task()
+        task, other = self.task(), self.task()
         files = self.store.logs / task / "files"
         self.assertEqual((Path(self.store.read(task)["workspace"]) / ".task").resolve(), files.parent)
         self.publish(task)
         (self.root / "code.py").write_text("staged = True\n")
         self.git(self.root, "add", "code.py")
         staged = self.git(self.root, "ls-files", "--stage", "code.py")
+        self.store.doc(other, "task").write_text("unpublished other task\n")
         (files / "note.txt").write_text("first\n")
         (files / "nested").mkdir()
         (files / "nested" / "trace.json").write_text('{"ok": true}\n')
-        first = self.call("attach", task)
+        self.store.doc(task, "report").write_text("Evidence included.\n")
+        first = self.call("report", task)
         self.assertEqual(len(first["added"]), 2)
-        self.assertEqual(self.store.read(task)["status"], "working")
+        self.assertEqual(self.git(self.root, "show", f"{first['revision']}:.tasks/{task}/report.md"),
+                         "Evidence included.")
+        changed_paths = self.git(self.root, "diff-tree", "--no-commit-id", "--name-only", "-r",
+                                 first["revision"]).splitlines()
+        self.assertEqual(set(changed_paths), {
+            f".tasks/{task}/report.md", f".tasks/{task}/files/note.txt",
+            f".tasks/{task}/files/nested/trace.json"})
+        self.assertEqual(self.store.read(task)["status"], "pending")
         self.assertEqual(self.git(self.root, "ls-files", "--stage", "code.py"), staged)
+        self.assertEqual(self.store.doc(other, "task").read_text(), "unpublished other task\n")
         self.assertEqual(self.git(self.root, "show", f"main:.tasks/{task}/files/note.txt"), "first")
         (files / "note.txt").write_text("second\n")
         (files / "nested" / "trace.json").unlink()
         self.assertTrue(self.call("status", task)["drafts"]["files"])
         self.assertEqual(self.git(self.root, "show", f"main:.tasks/{task}/files/note.txt"), "first")
-        second = self.call("attach", task)
+        second = self.call("report", task)
         self.assertNotEqual(first["revision"], second["revision"])
         self.assertEqual(len(second["updated"]), 1)
         self.assertEqual(len(second["deleted"]), 1)
         before_unchanged = self.git(self.root, "rev-parse", "main")
-        self.assertTrue(self.call("attach", task)["unchanged"])
+        self.assertTrue(self.call("report", task)["unchanged"])
         self.assertEqual(self.git(self.root, "rev-parse", "main"), before_unchanged)
-        self.assertEqual(self.store.read(task)["status"], "working")
+        self.assertEqual(self.store.read(task)["status"], "pending")
         self.assertEqual(self.git(self.root, "ls-files", "--stage", "code.py"), staged)
         (files / "escape").symlink_to(self.root / "code.py")
-        self.call("attach", task, ok=False)
+        self.store.doc(task, "report").write_text("Changed report should stay a draft.\n")
+        before_state = self.store.read(task)
+        before_index = self.git(self.root, "ls-files", "--stage", "--", f".tasks/{task}", "code.py")
+        self.call("report", task, ok=False)
+        self.assertEqual(self.git(self.root, "rev-parse", "main"), before_unchanged)
+        self.assertEqual(self.git(self.root, "ls-files", "--stage", "--", f".tasks/{task}", "code.py"),
+                         before_index)
+        self.assertEqual(self.store.read(task), before_state)
+        self.assertEqual(self.call("show", task, "--file", "report", "--json")["content"],
+                         "Evidence included.\n")
+
+    def test_files_only_report_revision_supports_review_and_legacy_record(self):
+        task = self.task()
+        self.publish(task)
+        original = self.report(task)
+        files = self.store.logs / task / "files"
+        (files / "evidence.txt").write_text("first\n")
+        result = self.call("report", task)
+        self.assertNotEqual(result["revision"], original)
+        self.assertEqual(self.call("show", task, "--file", "report", "--json")["revision"],
+                         result["revision"])
+        self.assertEqual(self.call("status", task)["publications"]["report"], result["revision"])
+        review = self.call("create", "--title", "review new files", "--review", task)
+        self.assertEqual(review["review"]["task"], task)
+        self.assertIn("Completed the task", self.store.doc(review["id"], "task").read_text())
+        data = self.store.read(task)
+        data["report"]["revision"] = original
+        self.store.write(data)
+        self.assertEqual(self.call("show", task, "--file", "report", "--json")["revision"], original)
+        self.call("create", "--title", "review legacy record", "--review", task)
+
+    def test_unchanged_report_repairs_only_its_files_index(self):
+        task, other = self.task(), self.task()
+        self.publish(task)
+        files = self.store.logs / task / "files"
+        retained = files / "retained.txt"
+        retained.write_text("published\n")
+        revision = self.report(task)
+        self.git(self.root, "update-index", "--force-remove", "--", f".tasks/{task}/files/retained.txt")
+        extra = files / "extra.txt"
+        extra.write_text("staged only\n")
+        self.git(self.root, "add", "--", str(extra))
+        extra.unlink()
+        other_path = self.store.doc(other, "task")
+        other_path.write_text("staged other draft\n")
+        self.git(self.root, "add", "--", str(other_path))
+        other_index = self.git(self.root, "ls-files", "--stage", "--", f".tasks/{other}/task.md")
+        result = self.call("report", task)
+        self.assertTrue(result["unchanged"])
+        self.assertEqual(result["revision"], revision)
+        self.assertEqual(self.git(self.root, "ls-files", "--stage", "--", f".tasks/{other}/task.md"),
+                         other_index)
+        self.assertEqual(self.git(self.root, "diff", "--cached", "--", f".tasks/{task}/files"), "")
+        self.assertEqual(self.git(self.root, "ls-files", "--", f".tasks/{task}/files/extra.txt"), "")
+        self.assertEqual(self.git(self.root, "show", f":.tasks/{task}/files/retained.txt"), "published")
+
+    def test_report_keeps_new_attachment_edit_as_draft(self):
+        task = self.task()
+        self.publish(task)
+        self.report(task)
+        attachment = self.store.logs / task / "files" / "trace.txt"
+        attachment.write_text("published\n")
+        original_git = cli.git
+
+        def edit_during_commit(repo, *args, **kwargs):
+            if args[0] == "commit-tree":
+                attachment.write_text("later draft\n")
+            return original_git(repo, *args, **kwargs)
+
+        with patch.object(cli, "git", side_effect=edit_during_commit):
+            result = cli.report(self.store, types.SimpleNamespace(task=task))
+        path = f".tasks/{task}/files/trace.txt"
+        self.assertEqual(self.git(self.root, "show", f"{result['revision']}:{path}"), "published")
+        self.assertEqual(self.git(self.root, "show", f":{path}"), "published")
+        self.assertEqual(attachment.read_text(), "later draft\n")
+        self.assertTrue(self.call("status", task)["drafts"]["files"])
 
     def test_archive_preflight_preserves_code_then_cleans_tmp_and_link(self):
         task = self.task()
@@ -1590,18 +1685,18 @@ base=$(git rev-parse --verify "$1^{commit}")
         attachment = self.store.logs / task / "files" / "run.sh"
         attachment.write_text("#!/bin/sh\nexit 0\n")
         attachment.chmod(0o755)
-        self.call("attach", task)
+        self.call("report", task)
         path = f".tasks/{task}/files/run.sh"
         self.assertTrue(self.git(self.root, "ls-tree", "main", "--", path).startswith("100755 blob "))
         self.assertNotIn("files", self.call("status", task).get("drafts", {}))
-        self.assertTrue(self.call("attach", task)["unchanged"])
+        self.assertTrue(self.call("report", task)["unchanged"])
         attachment.chmod(0o644)
         self.assertTrue(self.call("status", task)["drafts"]["files"])
-        changed = self.call("attach", task)
+        changed = self.call("report", task)
         self.assertEqual(changed["updated"], [path])
         self.assertTrue(self.git(self.root, "ls-tree", "main", "--", path).startswith("100644 blob "))
         attachment.chmod(0o755)
-        self.call("attach", task)
+        self.call("report", task)
         self.call("archive", task, "--note", "published executable retained")
 
     def test_archive_retry_rechecks_new_drafts_and_unmerged_head(self):
@@ -1624,7 +1719,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         attachment.write_text("new evidence\n")
         refused = self.call("archive", task, "--note", "retry", ok=False)
         self.assertIn("unpublished drafts", refused["error"])
-        self.call("attach", task)
+        self.call("report", task)
         old_head = self.git(second_tree, "rev-parse", "HEAD")
         self.git(second, "update-ref", "refs/heads/main", old_head)
         self.git(second_tree, "commit", "--allow-empty", "-m", "new delivery")
