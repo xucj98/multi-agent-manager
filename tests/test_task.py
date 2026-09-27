@@ -87,6 +87,24 @@ printf env > "$target/.venv/marker"
             "PROJECT_ROOT": str(project),
             "MAM_BRANCH": branch,
         }))
+        hooks = mam_root / ".local" / "hooks"
+        hooks.mkdir(parents=True, exist_ok=True)
+        entry = hooks / "workspace_add"
+        entry.write_text("""#!/usr/bin/env python3
+import json
+from pathlib import Path
+import subprocess
+import sys
+context = json.load(sys.stdin)
+record = next(repo for repo in context['repos'] if repo['name'] == context['repo'])
+source = Path(record['source'])
+legacy = source / '.local/create_worktree.sh'
+if not legacy.is_file() or legacy.is_symlink():
+    sys.exit(f'source repository has no .local/create_worktree.sh: {source}')
+sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
+                         context['task']['workspace']], cwd=source).returncode)
+""")
+        entry.chmod(0o755)
         return cli.project_config(location)
 
     def call(self, *args, command="task", ok=True):
@@ -785,7 +803,7 @@ printf env > "$target/.venv/marker"
         missing_task = self.task()
         missing_result = self.add(missing_task, "no-entry-repository", ok=False)
         self.assertIn("has no .local/create_worktree.sh", missing_result["error"])
-        self.assertFalse(self.store.read(missing_task)["repos"])
+        self.assertEqual(self.store.read(missing_task)["repos"]["no-entry-repository"]["state"], "failed")
 
         linked_entry = self.source("linked-entry-repository")
         entry = linked_entry / ".local" / "create_worktree.sh"
@@ -793,8 +811,8 @@ printf env > "$target/.venv/marker"
         entry.symlink_to(linked_entry / "code.py")
         linked_task = self.task()
         linked_result = self.add(linked_task, "linked-entry-repository", ok=False)
-        self.assertIn("symlinked path is not allowed", linked_result["error"])
-        self.assertFalse(self.store.read(linked_task)["repos"])
+        self.assertIn("has no .local/create_worktree.sh", linked_result["error"])
+        self.assertEqual(self.store.read(linked_task)["repos"]["linked-entry-repository"]["state"], "failed")
 
         self.call("archive", task, "--note", "custom repository cleanup")
         self.assertFalse(Path(record["path"]).exists())
@@ -903,12 +921,8 @@ base=$(git rev-parse --verify "$1^{commit}")
                                capture_output=True, text=True)
         self.assertEqual(retry.returncode, 0, retry.stdout + retry.stderr)
         self.assertEqual(linked_readme.read_text(), "Keep this conflicting file.\n")
-        self.call("archive", task, "--note", "conflicting local README remains protected", ok=False)
-        self.assertTrue(path.exists())
-
-        linked_readme.unlink()
-        linked_readme.symlink_to(source_readme)
         self.call("archive", task, "--note", "stdlib smoke finished")
+        self.assertEqual(source_readme.read_text(), "Primary local instructions.\n")
         self.assertFalse(path.parent.exists())
 
     def test_real_environment_uses_source_checkout_name(self):
@@ -1875,6 +1889,251 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.store.write(data)
         compatible = cli.begin_wait(self.store, "unbound-caller", "manager", None, "later-turn")
         cli.finish_wait(self.store, compatible)
+
+    def test_project_hook_context_and_template_repo_dispatch(self):
+        state = self.projects / "state"
+        self.git(self.root, "worktree", "add", "-b", "project/state", str(state), "main")
+        self.config = self.configure(self.projects, state, "project/state")
+        self.store = cli.Store(self.config)
+        source = self.source("hooked-repo")
+        project_entry = state / ".local/hooks/workspace_add"
+        shutil.copyfile(ROOT / "templates/hooks/project/workspace_add", project_entry)
+        project_entry.chmod(0o755)
+        repo_hooks = source / ".local/hooks"
+        repo_hooks.mkdir()
+        repo_entry = repo_hooks / "workspace_add"
+        shutil.copyfile(ROOT / "templates/hooks/repo/workspace_add", repo_entry)
+        repo_entry.chmod(0o755)
+        legacy = source / ".local/create_worktree.sh"
+        with legacy.open("a") as handle:
+            handle.write('printf x >> "$source_root/.local/calls"\n')
+        task = self.task()
+        first = self.add(task, "hooked-repo")
+        self.assertEqual(first["state"], "ready")
+        self.assertEqual(self.add(task, "hooked-repo"), first)
+        self.assertEqual((source / ".local/calls").read_text(), "x")
+        self.call("archive", task, "--note", "template dispatch complete")
+
+    def test_project_hook_entry_context_and_failure_retry(self):
+        source = self.source("context-repo")
+        task = self.task()
+        entry = self.root / ".local/hooks/workspace_add"
+        entry.unlink()
+        missing = self.add(task, "context-repo", ok=False)
+        self.assertIn("required project hook is missing", missing["error"])
+        self.assertEqual(self.store.read(task)["repos"]["context-repo"]["state"], "failed")
+        entry.write_text("#!/bin/sh\nexit 2\n")
+        invalid = self.add(task, "context-repo", ok=False)
+        self.assertIn("executable regular file", invalid["error"])
+        entry.chmod(0o755)
+        capture = self.projects / "hook-context.json"
+        entry.write_text("""#!/usr/bin/env python3
+import json
+from pathlib import Path
+import subprocess
+import sys
+context = json.load(sys.stdin)
+Path(%r).write_text(json.dumps({'cwd': str(Path.cwd()), 'context': context}))
+record = next(item for item in context['repos'] if item['name'] == context['repo'])
+subprocess.run(['bash', str(Path(record['source']) / '.local/create_worktree.sh'),
+                record['base'], record['branch'], context['task']['workspace']], check=True)
+print('hook stdout')
+print('hook stderr', file=sys.stderr)
+""" % str(capture))
+        ready = self.add(task, "context-repo")
+        context = json.loads(capture.read_text())
+        self.assertEqual(context["cwd"], str(self.root))
+        payload = context["context"]
+        self.assertEqual((payload["schema_version"], payload["event"], payload["repo"]),
+                         (1, "workspace_add", "context-repo"))
+        self.assertEqual(payload["project_root"], str(self.projects))
+        self.assertEqual(payload["mam_root"], str(self.root))
+        self.assertEqual(payload["task"]["task_dir"], str(self.store.logs / task))
+        self.assertEqual(payload["repos"][0]["path"], ready["path"])
+        self.assertEqual(payload["repos"][0]["state"], "failed")
+        self.assertIsNone(payload["repos"][0]["commit"])
+        self.assertEqual(payload["jobs"], [])
+
+    def test_archive_hook_rejection_retry_and_whole_workspace(self):
+        task = self.task()
+        path = Path(self.add(task)["path"])
+        workspace = path.parent
+        self.publish(task)
+        self.report(task)
+        shared = self.projects / "shared"
+        shared.mkdir()
+        (shared / "keep").write_text("keep")
+        (path / "shared-link").symlink_to(shared, target_is_directory=True)
+        (path / "code.py").write_text("dirty = True\n")
+        (path / "untracked.txt").write_text("untracked")
+        (path / "checkpoint").mkdir()
+        (path / "checkpoint" / "model").write_text("ignored")
+        (workspace / "unknown").mkdir()
+        (workspace / "unknown" / "file").write_text("extra")
+        (workspace / "tmp").symlink_to(shared, target_is_directory=True)
+        entry = self.root / ".local/hooks/before_task_archive"
+        entry.write_text("#!/bin/sh\necho archive blocked >&2\nexit 9\n")
+        entry.chmod(0o755)
+        refused = self.call("archive", task, "--note", "hold", ok=False)
+        self.assertIn("archive blocked", refused["error"])
+        self.assertTrue(path.exists())
+        self.assertTrue(cli.branch_exists(self.root, f"task/{task}"))
+        capture = self.projects / "archive-context.json"
+        entry.write_text("""#!/usr/bin/env python3
+import json
+from pathlib import Path
+import sys
+context = json.load(sys.stdin)
+Path(%r).write_text(json.dumps({'cwd': str(Path.cwd()), 'context': context}))
+""" % str(capture))
+        result = self.call("archive", task, "--note", "cleanup")
+        self.assertFalse(workspace.exists())
+        self.assertEqual((shared / "keep").read_text(), "keep")
+        self.assertFalse(cli.branch_exists(self.root, f"task/{task}"))
+        payload = json.loads(capture.read_text())
+        self.assertEqual(payload["cwd"], str(self.root))
+        self.assertEqual(payload["context"]["event"], "before_task_archive")
+        self.assertIsNone(payload["context"]["repo"])
+        self.assertEqual(payload["context"]["options"]["note"], "cleanup")
+        capture.unlink()
+        self.call("archive", task, "--note", "already archived")
+        self.assertFalse(capture.exists())
+        self.assertIsNotNone(result["at"])
+
+    def test_hook_timeout_kills_child_process_and_rejects_reentry(self):
+        task = self.task()
+        config_path = self.projects / ".mam/env.json"
+        config = json.loads(config_path.read_text())
+        config["HOOK_TIMEOUTS"] = {"workspace_add": 0.2}
+        config_path.write_text(json.dumps(config))
+        entry = self.root / ".local/hooks/workspace_add"
+        marker = self.projects / "late-child"
+        entry.write_text(f"#!/bin/sh\n(sleep 0.5; touch {shlex.quote(str(marker))}) &\nsleep 5\n")
+        entry.chmod(0o755)
+        refused = self.add(task, ok=False)
+        self.assertIn("timed out", refused["error"])
+        time.sleep(0.7)
+        self.assertFalse(marker.exists())
+        entry.write_text(f"#!/bin/sh\n{shlex.quote(sys.executable)} -B -c 'import sys; sys.path.insert(0, sys.argv.pop(1)); from multi_agent_manager.cli import main; raise SystemExit(main())' {shlex.quote(str(ROOT))} task report {task}\n")
+        refused = self.add(task, ok=False)
+        self.assertIn("cannot invoke a command that may modify task state", refused["error"])
+        self.assertEqual(self.store.read(task)["repos"]["multi-agent-manager"]["state"], "failed")
+
+    def test_archive_template_forwards_repo_context_and_invalid_optional_hook(self):
+        state = self.projects / "state"
+        self.git(self.root, "worktree", "add", "-b", "project/state", str(state), "main")
+        self.config = self.configure(self.projects, state, "project/state")
+        self.store = cli.Store(self.config)
+        source = self.source("archive-repo")
+        project_entry = state / ".local/hooks/before_task_archive"
+        shutil.copyfile(ROOT / "templates/hooks/project/before_task_archive", project_entry)
+        project_entry.chmod(0o755)
+        repo_hooks = source / ".local/hooks"
+        repo_hooks.mkdir()
+        repo_entry = repo_hooks / "before_task_archive"
+        capture = self.projects / "repo-archive-context.json"
+        repo_entry.write_text("""#!/usr/bin/env python3
+import json
+from pathlib import Path
+import sys
+context = json.load(sys.stdin)
+Path(%r).write_text(json.dumps({'cwd': str(Path.cwd()), 'context': context}))
+sys.exit(4)
+""" % str(capture))
+        repo_entry.chmod(0o755)
+        task = self.task()
+        path = Path(self.add(task, "archive-repo")["path"])
+        self.publish(task)
+        self.report(task)
+        denied = self.call("archive", task, "--note", "gate", ok=False)
+        self.assertIn("exited 4", denied["error"])
+        self.assertTrue(path.exists())
+        received = json.loads(capture.read_text())
+        self.assertEqual(received["cwd"], str(source))
+        self.assertEqual(received["context"]["repo"], "archive-repo")
+        self.assertEqual(received["context"]["repos"][0]["state"], "ready")
+        repo_entry.chmod(0o644)
+        denied = self.call("archive", task, "--note", "bad hook", ok=False)
+        self.assertIn("executable regular file", denied["error"])
+        self.assertTrue(path.exists())
+        repo_entry.unlink()
+        self.call("archive", task, "--note", "optional repo hook absent")
+        self.assertFalse(path.parent.exists())
+
+    def test_project_archive_bad_entry_and_hook_config_validation(self):
+        task = self.task()
+        entry = self.root / ".local/hooks/before_task_archive"
+        entry.symlink_to(self.root / "missing-hook")
+        denied = self.call("archive", task, "--note", "bad link", ok=False)
+        self.assertIn("symlinked path is not allowed", denied["error"])
+        self.assertTrue(Path(self.store.read(task)["workspace"]).exists())
+        entry.unlink()
+        entry.write_text("#!/bin/sh\nexit 0\n")
+        denied = self.call("archive", task, "--note", "bad mode", ok=False)
+        self.assertIn("executable regular file", denied["error"])
+        entry.unlink()
+        config_path = self.projects / ".mam/env.json"
+        config = json.loads(config_path.read_text())
+        for invalid in (0, -1, True, "60", float("inf")):
+            config["HOOK_TIMEOUTS"] = {"before_task_archive": invalid}
+            config_path.write_text(json.dumps(config))
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(cli.Error, "positive finite"):
+                cli.project_config(self.projects)
+
+    def test_archive_hook_runs_after_guards_and_rechecks_publication(self):
+        task = self.task()
+        path = Path(self.add(task)["path"])
+        entry = self.root / ".local/hooks/before_task_archive"
+        marker = self.projects / "archive-hook-called"
+        entry.write_text(f"#!/bin/sh\ntouch {shlex.quote(str(marker))}\n")
+        entry.chmod(0o755)
+        data = self.store.read(task)
+        data["jobs"].append({"id": "pending-job", "status": "running", "note": "test"})
+        self.store.write(data)
+        denied = self.call("archive", task, "--note", "job pending", ok=False)
+        self.assertIn("unarchived registered jobs", denied["error"])
+        self.assertFalse(marker.exists())
+        data["jobs"][0]["status"] = "archived"
+        self.store.write(data)
+        self.publish(task)
+        self.report(task)
+        self.store.doc(task, "task").write_text("unpublished change")
+        denied = self.call("archive", task, "--note", "draft pending", ok=False)
+        self.assertIn("unpublished drafts", denied["error"])
+        self.assertFalse(marker.exists())
+        self.store.doc(task, "task").write_text("# test task\n")
+        entry.write_text("""#!/usr/bin/env python3
+import json
+from pathlib import Path
+import sys
+context = json.load(sys.stdin)
+Path(context['task']['task_dir'], 'task.md').write_text('changed during hook')
+""")
+        denied = self.call("archive", task, "--note", "hook changed task", ok=False)
+        self.assertIn("unpublished drafts", denied["error"])
+        self.assertTrue(path.exists())
+        self.assertTrue(cli.branch_exists(self.root, f"task/{task}"))
+
+    def test_archive_hook_reruns_after_partial_git_cleanup(self):
+        second = self.source("second-repo")
+        task = self.task()
+        first_path = Path(self.add(task)["path"])
+        second_path = Path(self.add(task, "second-repo")["path"])
+        entry = self.root / ".local/hooks/before_task_archive"
+        calls = self.projects / "archive-hook-calls"
+        entry.write_text(f"#!/bin/sh\nprintf x >> {shlex.quote(str(calls))}\n")
+        entry.chmod(0o755)
+        self.git(second, "worktree", "lock", str(second_path))
+        denied = self.call("archive", task, "--note", "first pass", ok=False)
+        self.assertIn("archive incomplete", denied["error"])
+        self.assertEqual(calls.read_text(), "x")
+        self.assertFalse(first_path.exists())
+        self.assertTrue(second_path.exists())
+        (second_path.parent / "unknown").write_text("discard on retry")
+        self.git(second, "worktree", "unlock", str(second_path))
+        self.call("archive", task, "--note", "second pass")
+        self.assertEqual(calls.read_text(), "xx")
+        self.assertFalse(second_path.parent.exists())
 
 
 if __name__ == "__main__":
