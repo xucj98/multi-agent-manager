@@ -137,6 +137,10 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
         self.store.doc(task, "report").write_text("Completed the task; tests passed.\n")
         return self.publish(task, "report")
 
+    def clean_task(self, task):
+        self.git(self.store.root, "add", "--", f".tasks/{task}")
+        self.git(self.store.root, "commit", "-m", f"Record {task}", "--only", "--", f".tasks/{task}")
+
     def prepare_rebind(self, task, current="old-executor", replacement="new-executor", manager="manager-agent"):
         data = self.store.read(task)
         data["agent"] = current
@@ -588,6 +592,36 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
             "source_task": task, "commits": {"multi-agent-manager": delivery}})
         self.call("create", "--title", "bad review", "--review", self.task(), ok=False)
 
+    def test_report_publishes_without_usable_worktree_and_forgets_old_head(self):
+        task = self.task()
+        worktree = Path(self.add(task)["path"])
+        self.publish(task)
+        self.report(task)
+        self.assertIn("multi-agent-manager", self.store.read(task)["report"]["commits"])
+        self.git(self.root, "worktree", "remove", str(worktree))
+        attachment = self.store.logs / task / "files" / "result.txt"
+        attachment.write_text("available evidence\n")
+        self.store.doc(task, "report").write_text("Report is independent of checkout.\n")
+        result = self.call("report", task)
+        self.assertEqual(result["report"]["commits"], {})
+        self.assertEqual(self.store.read(task)["report"]["commits"], {})
+        self.assertEqual(self.store.read(task)["status"], "pending")
+        self.assertEqual(self.git(self.root, "show", f"{result['revision']}:.tasks/{task}/files/result.txt"),
+                         "available evidence")
+
+        failed = self.task()
+        (self.root / ".local/fail-before").touch()
+        self.add(failed, ok=False)
+        (self.root / ".local/fail-before").unlink()
+        self.store.doc(failed, "report").write_text("Worktree creation failed.\n")
+        self.assertEqual(self.call("report", failed)["report"]["commits"], {})
+
+        unreadable = self.task()
+        broken_path = Path(self.add(unreadable)["path"])
+        (broken_path / ".git").write_text("invalid worktree metadata\n")
+        self.store.doc(unreadable, "report").write_text("Git metadata is unreadable.\n")
+        self.assertEqual(self.call("report", unreadable)["report"]["commits"], {})
+
     def test_legacy_revision_metadata_is_ignored_when_querying_records(self):
         task = self.task()
         task_publication = self.publish(task)
@@ -608,6 +642,7 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
 
     def test_bind_and_empty_archive_have_no_accept_gate(self):
         first, second = self.task(), self.task()
+        self.clean_task(first)
         agent = "00000000-0000-4000-8000-000000000011"
         native = identity.ThreadIdentity(agent, "/root/agent-1", "00000000-0000-4000-8000-000000000010")
         with patch.object(cli, "caller_identity", return_value=native):
@@ -814,11 +849,12 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
         self.assertIn("has no .local/create_worktree.sh", linked_result["error"])
         self.assertEqual(self.store.read(linked_task)["repos"]["linked-entry-repository"]["state"], "failed")
 
+        self.clean_task(task)
         self.call("archive", task, "--note", "custom repository cleanup")
         self.assertFalse(Path(record["path"]).exists())
         self.assertFalse(cli.branch_exists(source, f"task/{task}"))
 
-    def test_archive_protects_code_and_shared_entities(self):
+    def test_archive_force_removes_dirty_workspace_and_preserves_symlink_targets(self):
         self.source("robot-bridge")
         task = self.task()
         first, second = Path(self.add(task)["path"]), Path(self.add(task, "robot-bridge")["path"])
@@ -833,18 +869,15 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
         self.assertNotEqual(self.git(first, "rev-parse", "HEAD"), self.git(self.root, "rev-parse", "main"))
         (second / "code.py").write_text("keep modifications\n")
         (second / "useful.py").write_text("keep untracked\n")
-        self.call("archive", task, "--note", "done", ok=False)
-        self.assertTrue(first.exists(), "preflight must protect the earlier clean repository")
-        self.git(second, "restore", "code.py")
-        (second / "useful.py").unlink()
+        self.clean_task(task)
         for path in (first / "checkpoint", first / "temp", first.parent / "temp"):
             path.mkdir()
             (path / "keep").write_text("keep")
-            self.call("archive", task, "--note", "done", ok=False)
-            self.assertTrue((path / "keep").exists())
-            (path / "keep").unlink()
-            path.rmdir()
-        self.call("archive", task, "--note", "done", "--discard-code")
+        refused = self.call("archive", task, "--note", "done", ok=False)
+        self.assertIn("archive incomplete", refused["error"])
+        self.assertFalse(first.exists())
+        self.assertTrue(second.exists())
+        self.call("archive", task, "--note", "done", "--force")
         self.assertFalse(first.parent.exists())
         self.assertTrue((shared / "keep").exists())
         self.assertFalse(cli.branch_exists(self.root, f"task/{task}"))
@@ -855,6 +888,7 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
         self.source("robot-bridge")
         task = self.task()
         first, second = Path(self.add(task)["path"]), Path(self.add(task, "robot-bridge")["path"])
+        self.clean_task(task)
         self.git(self.projects / "robot-bridge", "worktree", "lock", str(second))
         self.call("archive", task, "--note", "done", ok=False)
         self.assertFalse(first.exists())
@@ -892,11 +926,13 @@ base=$(git rev-parse --verify "$1^{commit}")
 """)
         linked = self.projects / "production state"
         self.git(self.root, "worktree", "add", "-b", "project/state-vla", str(linked), "main")
-        self.configure(self.projects, linked, "project/state-vla")
+        self.config = self.configure(self.projects, linked, "project/state-vla")
+        self.store = cli.Store(self.config)
 
         missing = self.task()
         missing_path = Path(self.add(missing)["path"])
         self.assertFalse((missing_path / ".local").exists())
+        self.clean_task(missing)
         self.call("archive", missing, "--note", "missing local README is allowed")
 
         source_readme = self.root / ".local/README.md"
@@ -921,6 +957,7 @@ base=$(git rev-parse --verify "$1^{commit}")
                                capture_output=True, text=True)
         self.assertEqual(retry.returncode, 0, retry.stdout + retry.stderr)
         self.assertEqual(linked_readme.read_text(), "Keep this conflicting file.\n")
+        self.clean_task(task)
         self.call("archive", task, "--note", "stdlib smoke finished")
         self.assertEqual(source_readme.read_text(), "Primary local instructions.\n")
         self.assertFalse(path.parent.exists())
@@ -944,6 +981,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.assertEqual(path, self.projects / "workspace" / task / "mam-dev")
         self.assertTrue((path / ".venv/bin/mam").is_file())
         self.assertEqual(cli.Store(cli.project_config(path)).root, self.root)
+        self.clean_task(task)
         self.call("archive", task, "--note", "renamed source smoke finished")
         self.assertFalse(path.parent.exists())
 
@@ -973,7 +1011,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         help_text = subprocess.check_output([command, "--help"], cwd="/tmp", text=True)
         self.assertNotIn("--root", help_text)
         archive_help = subprocess.check_output([command, "task", "archive", "--help"], cwd="/tmp", text=True)
-        self.assertIn("remove owned worktrees and task branches", " ".join(archive_help.split()))
+        self.assertIn("delete the entire task workspace", " ".join(archive_help.split()))
         rows = subprocess.check_output([command, "task", "list"], cwd=self.projects, text=True)
         self.assertEqual(rows.splitlines(), ["标题\t任务状态\tTASK-ID\t执行者\tagent状态"])
         installed = subprocess.check_output([str(python), "-I", "-c",
@@ -1115,6 +1153,7 @@ base=$(git rev-parse --verify "$1^{commit}")
 
     def test_archived_records_keep_historical_paths(self):
         task = self.task()
+        self.clean_task(task)
         self.call("archive", task, "--note", "historical task")
         data = self.store.read(task)
         data["repos"]["agent-workflow"] = {"source": str(self.projects / "agent-workflow"),
@@ -1140,16 +1179,19 @@ base=$(git rev-parse --verify "$1^{commit}")
             self.assertEqual(old.returncode, 2, old.stdout + old.stderr)
         self.assertEqual(self.job_command_output("list").splitlines(), ["描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID\t执行者"])
 
-    def test_tampered_paths_and_symlink_workspace_rejected(self):
+    def test_symlink_workspace_is_unlinked_and_tampered_registration_rejected(self):
         task = self.task()
+        self.clean_task(task)
         data = self.store.read(task)
         workspace = Path(data["workspace"])
         (workspace / ".task").unlink()
         workspace.rmdir()
         workspace.symlink_to(self.root, target_is_directory=True)
-        self.call("archive", task, "--note", "unsafe", ok=False)
-        workspace.unlink()
-        workspace.mkdir()
+        self.call("archive", task, "--note", "remove link")
+        self.assertFalse(workspace.exists())
+        self.assertTrue((self.root / "code.py").exists())
+        task = self.task()
+        data = self.store.read(task)
         data["workspace"] = str(self.root)
         self.store.write(data)
         self.call("archive", task, "--note", "unsafe", ok=False)
@@ -1189,6 +1231,7 @@ base=$(git rev-parse --verify "$1^{commit}")
             archived = self.call("status", job["id"], command="job")
             self.assertEqual(archived["status"], "archived")
             self.assertEqual(archived["archive"]["note"], "tracking complete")
+            self.clean_task(task)
             cli.archive(self.store, types.SimpleNamespace(task=task, note="smoke complete"))
             self.assertEqual(self.store.read(task)["status"], "archived")
             self.assertIsNone(child.poll())
@@ -1236,6 +1279,7 @@ base=$(git rev-parse --verify "$1^{commit}")
                 cli.archive(self.store, types.SimpleNamespace(task=task, note="blocked"))
             self.assertEqual(self.store.read(task)["status"], "working")
             cli.job_archive(self.store, types.SimpleNamespace(job="unarchived-job", note="results copied"))
+            self.clean_task(task)
             cli.archive(self.store, types.SimpleNamespace(task=task, note="complete"))
         self.assertEqual(self.store.read(task)["status"], "archived")
 
@@ -1522,7 +1566,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.assertEqual(attachment.read_text(), "later draft\n")
         self.assertTrue(self.call("status", task)["drafts"]["files"])
 
-    def test_archive_preflight_preserves_code_then_cleans_tmp_and_link(self):
+    def test_archive_requires_clean_task_directory_then_cleans_tmp_and_link(self):
         task = self.task()
         worktree = Path(self.add(task)["path"])
         workspace = worktree.parent
@@ -1537,17 +1581,74 @@ base=$(git rev-parse --verify "$1^{commit}")
         (manager_tmp / "notes").write_text("preserve")
         self.call("archive", task, "--note", "done", ok=False)
         self.assertTrue(worktree.exists())
-        self.call("archive", task, "--note", "discard draft", "--discard-drafts", ok=False)
-        self.assertTrue(worktree.exists())
-        result = self.call("archive", task, "--note", "discard unmerged test commit and draft",
-                           "--discard-drafts", "--discard-code")
-        self.assertTrue(result["discard_code"])
+        self.clean_task(task)
+        refused = self.call("archive", task, "--note", "default branch removal", ok=False)
+        self.assertIn("archive incomplete", refused["error"])
+        self.assertFalse(worktree.exists())
+        self.call("archive", task, "--note", "explicit force", "--force")
         self.assertFalse(workspace.exists())
         self.assertEqual((manager_tmp / "notes").read_text(), "preserve")
         self.assertTrue((self.store.logs / task / "report.md").exists())
         self.assertTrue((self.store.logs / task / "files" / "draft.txt").exists())
 
-    def test_archive_requires_main_branch_even_if_primary_checkout_is_on_feature(self):
+    def test_archive_checks_all_task_paths_but_ignores_other_tasks(self):
+        task = self.task()
+        workspace = Path(self.store.read(task)["workspace"])
+        self.clean_task(task)
+        other = self.task()
+        self.store.doc(other, "task").write_text("other task draft\n")
+        path = self.store.logs / task / "extra.txt"
+        path.write_text("untracked\n")
+        self.assertIn("uncommitted Git changes", self.call("archive", task, "--note", "check", "--force", ok=False)["error"])
+        self.assertTrue(workspace.exists())
+        self.git(self.root, "add", "--", str(path))
+        self.assertIn("uncommitted Git changes", self.call("archive", task, "--note", "check", ok=False)["error"])
+        self.git(self.root, "reset", "--", str(path))
+        path.unlink()
+        task_doc = self.store.doc(task, "task")
+        task_doc.write_text("modified\n")
+        self.assertIn("uncommitted Git changes", self.call("archive", task, "--note", "check", ok=False)["error"])
+        self.git(self.root, "restore", "--", str(task_doc))
+        self.git(self.root, "rm", "--", str(task_doc))
+        self.assertIn("uncommitted Git changes", self.call("archive", task, "--note", "check", ok=False)["error"])
+        self.git(self.root, "restore", "--staged", "--worktree", "--", str(task_doc))
+        self.call("archive", task, "--note", "other task is unrelated")
+        self.assertFalse(workspace.exists())
+
+    def test_archive_missing_or_failed_worktree_does_not_block_cleanup(self):
+        task = self.task()
+        worktree = Path(self.add(task)["path"])
+        self.git(self.root, "worktree", "remove", str(worktree))
+        worktree.mkdir()
+        (worktree / "partial.txt").write_text("partial\n")
+        self.clean_task(task)
+        self.call("archive", task, "--note", "partial path")
+        self.assertFalse(worktree.parent.exists())
+
+        failed = self.task()
+        (self.root / ".local/fail-before").touch()
+        self.add(failed, ok=False)
+        (self.root / ".local/fail-before").unlink()
+        self.clean_task(failed)
+        self.call("archive", failed, "--note", "creation failed")
+
+    def test_archive_force_does_not_override_job_or_hook(self):
+        task = self.task()
+        self.clean_task(task)
+        data = self.store.read(task)
+        data["jobs"] = [{"id": "unfinished", "status": "running"}]
+        self.store.write(data)
+        self.assertIn("unarchived registered jobs", self.call("archive", task, "--note", "check", "--force", ok=False)["error"])
+        data["jobs"][0]["status"] = "archived"
+        self.store.write(data)
+        hook = self.root / ".local/hooks/before_task_archive"
+        hook.write_text("#!/bin/sh\nexit 3\n")
+        hook.chmod(0o755)
+        self.assertIn("exited 3", self.call("archive", task, "--note", "check", "--force", ok=False)["error"])
+        hook.unlink()
+        self.call("archive", task, "--note", "finished", "--force")
+
+    def test_archive_has_no_main_branch_precheck(self):
         task = self.task()
         source = self.source("delivery-repo")
         worktree = Path(self.add(task, "delivery-repo")["path"])
@@ -1556,11 +1657,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.report(task)
         self.git(source, "branch", "feature-retains-delivery", self.git(worktree, "rev-parse", "HEAD"))
         self.git(source, "switch", "feature-retains-delivery")
-        self.call("archive", task, "--note", "not on main", ok=False)
-        self.assertTrue(worktree.exists())
-        self.git(source, "switch", "main")
-        self.git(source, "update-ref", "refs/heads/main", self.git(worktree, "rev-parse", "HEAD"))
-        self.call("archive", task, "--note", "merged on main")
+        self.call("archive", task, "--note", "retained on feature")
         self.assertFalse(worktree.parent.exists())
 
     def test_start_rework_republish_and_tree_scoped_target(self):
@@ -1713,7 +1810,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.call("report", task)
         self.call("archive", task, "--note", "published executable retained")
 
-    def test_archive_retry_rechecks_new_drafts_and_unmerged_head(self):
+    def test_archive_retry_rechecks_task_directory_and_force_branch_removal(self):
         task = self.task()
         second = self.source("second-repo")
         first_tree = Path(self.add(task)["path"])
@@ -1723,7 +1820,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.git(second_tree, "commit", "--allow-empty", "-m", "second delivery")
         self.report(task)
         self.git(second, "worktree", "lock", str(second_tree))
-        failed = self.call("archive", task, "--note", "discard initial commits", "--discard-code", ok=False)
+        failed = self.call("archive", task, "--note", "first pass", "--force", ok=False)
         self.assertIn("archive incomplete", failed["error"])
         self.assertFalse(first_tree.exists())
         self.assertTrue(second_tree.exists())
@@ -1732,19 +1829,16 @@ base=$(git rev-parse --verify "$1^{commit}")
         attachment = self.store.logs / task / "files" / "new.txt"
         attachment.write_text("new evidence\n")
         refused = self.call("archive", task, "--note", "retry", ok=False)
-        self.assertIn("unpublished drafts", refused["error"])
+        self.assertIn("uncommitted Git changes", refused["error"])
         self.call("report", task)
-        old_head = self.git(second_tree, "rev-parse", "HEAD")
-        self.git(second, "update-ref", "refs/heads/main", old_head)
         self.git(second_tree, "commit", "--allow-empty", "-m", "new delivery")
         refused = self.call("archive", task, "--note", "retry", ok=False)
-        self.assertIn("delivery is not retained", refused["error"])
-        self.assertIn("second-repo", refused["error"])
-        self.assertTrue(second_tree.exists())
-        self.call("archive", task, "--note", "discard newly made commit", "--discard-code")
+        self.assertIn("archive incomplete", refused["error"])
+        self.assertFalse(second_tree.exists())
+        self.call("archive", task, "--note", "force unmerged branch", "--force")
         archived = self.store.read(task)
         self.assertEqual(archived["status"], "archived")
-        self.assertEqual(archived["archive"]["discard_confirmations"][-1]["note"], "discard newly made commit")
+        self.assertNotIn("discard_confirmations", archived["archive"])
 
     def test_unchanged_report_republishes_new_delivery_head(self):
         task = self.task()
@@ -1912,6 +2006,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.assertEqual(first["state"], "ready")
         self.assertEqual(self.add(task, "hooked-repo"), first)
         self.assertEqual((source / ".local/calls").read_text(), "x")
+        self.clean_task(task)
         self.call("archive", task, "--note", "template dispatch complete")
 
     def test_project_hook_entry_context_and_failure_retry(self):
@@ -1986,7 +2081,7 @@ import sys
 context = json.load(sys.stdin)
 Path(%r).write_text(json.dumps({'cwd': str(Path.cwd()), 'context': context}))
 """ % str(capture))
-        result = self.call("archive", task, "--note", "cleanup")
+        result = self.call("archive", task, "--note", "cleanup", "--force")
         self.assertFalse(workspace.exists())
         self.assertEqual((shared / "keep").read_text(), "keep")
         self.assertFalse(cli.branch_exists(self.root, f"task/{task}"))
@@ -1995,6 +2090,7 @@ Path(%r).write_text(json.dumps({'cwd': str(Path.cwd()), 'context': context}))
         self.assertEqual(payload["context"]["event"], "before_task_archive")
         self.assertIsNone(payload["context"]["repo"])
         self.assertEqual(payload["context"]["options"]["note"], "cleanup")
+        self.assertTrue(payload["context"]["options"]["force"])
         capture.unlink()
         self.call("archive", task, "--note", "already archived")
         self.assertFalse(capture.exists())
@@ -2062,6 +2158,7 @@ sys.exit(4)
 
     def test_project_archive_bad_entry_and_hook_config_validation(self):
         task = self.task()
+        self.clean_task(task)
         entry = self.root / ".local/hooks/before_task_archive"
         entry.symlink_to(self.root / "missing-hook")
         denied = self.call("archive", task, "--note", "bad link", ok=False)
@@ -2080,7 +2177,7 @@ sys.exit(4)
             with self.subTest(invalid=invalid), self.assertRaisesRegex(cli.Error, "positive finite"):
                 cli.project_config(self.projects)
 
-    def test_archive_hook_runs_after_guards_and_rechecks_publication(self):
+    def test_archive_hook_runs_after_guards_and_rechecks_git_status(self):
         task = self.task()
         path = Path(self.add(task)["path"])
         entry = self.root / ".local/hooks/before_task_archive"
@@ -2099,7 +2196,7 @@ sys.exit(4)
         self.report(task)
         self.store.doc(task, "task").write_text("unpublished change")
         denied = self.call("archive", task, "--note", "draft pending", ok=False)
-        self.assertIn("unpublished drafts", denied["error"])
+        self.assertIn("uncommitted Git changes", denied["error"])
         self.assertFalse(marker.exists())
         self.store.doc(task, "task").write_text("# test task\n")
         entry.write_text("""#!/usr/bin/env python3
@@ -2110,7 +2207,7 @@ context = json.load(sys.stdin)
 Path(context['task']['task_dir'], 'task.md').write_text('changed during hook')
 """)
         denied = self.call("archive", task, "--note", "hook changed task", ok=False)
-        self.assertIn("unpublished drafts", denied["error"])
+        self.assertIn("uncommitted Git changes", denied["error"])
         self.assertTrue(path.exists())
         self.assertTrue(cli.branch_exists(self.root, f"task/{task}"))
 
@@ -2123,6 +2220,7 @@ Path(context['task']['task_dir'], 'task.md').write_text('changed during hook')
         calls = self.projects / "archive-hook-calls"
         entry.write_text(f"#!/bin/sh\nprintf x >> {shlex.quote(str(calls))}\n")
         entry.chmod(0o755)
+        self.clean_task(task)
         self.git(second, "worktree", "lock", str(second_path))
         denied = self.call("archive", task, "--note", "first pass", ok=False)
         self.assertIn("archive incomplete", denied["error"])

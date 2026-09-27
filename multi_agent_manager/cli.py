@@ -1,4 +1,4 @@
-"""Local task records, Git publication and conservative workspace archival."""
+"""Local task records, Git publication and workspace archival."""
 from __future__ import annotations
 
 import argparse
@@ -114,15 +114,6 @@ def head(repo, ref="HEAD"):
 
 def branch_exists(repo, branch):
     return git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}", check=False).returncode == 0
-
-
-def retention_branch(repo):
-    for branch in ("main", "master"):
-        if branch_exists(repo, branch):
-            return branch
-    current = git(repo, "symbolic-ref", "--quiet", "--short", "HEAD", check=False)
-    branch = current.stdout.decode().strip() if current.returncode == 0 else ""
-    return branch if branch and not branch.startswith("task/") and branch_exists(repo, branch) else None
 
 
 @dataclass(frozen=True)
@@ -384,7 +375,7 @@ def hook_context(store, data, event, *, repo=None, options=None):
             "repos": repos, "repo": repo,
             "jobs": [{**job_summary(job), **{key: job.get(key) for key in ("host", "pid", "started_at")}}
                      for job in data["jobs"]],
-            "options": options or {"note": None, "discard_code": False, "discard_drafts": False}}
+            "options": options or {"note": None, "force": False}}
 
 
 def project_hook(store, data, event, *, required=False, repo=None, options=None):
@@ -789,17 +780,12 @@ def publish_draft(store, args, kind):
         if kind == "report":
             delivery = {}
             for name, record in data["repos"].items():
-                if record["removed"]:
-                    previous = data.get("report") or {}
-                    saved = previous.get("commits", {}).get(name)
-                    if not saved:
-                        raise Error(f"cannot publish delivery from incomplete worktree: {name}")
-                    delivery[name] = saved
+                try:
+                    _, path, _ = repo_context(store, data, name, record)
+                    if primary(path) == Path(record["source"]) and value(path, "rev-parse", "--show-toplevel") == str(path):
+                        delivery[name] = head(path)
+                except (Error, OSError):
                     continue
-                if record["state"] != "ready":
-                    raise Error(f"cannot publish delivery from incomplete worktree: {name}")
-                _, path, _ = live(store, data, name, record)
-                delivery[name] = head(path)
             report = {"commits": delivery}
             file_draft = files_snapshot(store, args.task)
             current_files = published_files(store, args.task)
@@ -1545,75 +1531,34 @@ def print_published(document):
     sys.stdout.write(document["content"])
 
 
-def archive_preflight(store, data, args):
-    workspace = safe_path(data["workspace"])
-    if workspace.exists() and not workspace.is_dir():
-        raise Error(f"archive refused; workspace is not a directory: {workspace}")
+def archive_preflight(store, data):
     blocked = [job["id"] for job in data["jobs"] if job["status"] != "archived"]
     if blocked:
         raise Error("archive refused; unarchived registered jobs: " + ", ".join(blocked))
-    link = workspace / ".task"
-    if link.is_symlink():
-        if os.readlink(link) != str(store.logs / args.task):
-            raise Error(f"archive refused; conflicting .task link: {link}")
-    elif link.exists():
-        raise Error(f"archive refused; conflicting .task path: {link}")
-    docs = {kind: optional_doc(store, args.task, kind) for kind in ("task", "report")}
-    drafts = [kind for kind, doc in docs.items() if store.doc(args.task, kind).exists() and
-              (doc is None or store.doc(args.task, kind).read_bytes() != doc["content"].encode())]
-    files = files_snapshot(store, args.task)
-    committed = published_files(store, args.task)
-    if "report" in drafts and not store.doc(args.task, "report").read_bytes():
-        drafts.remove("report")
-    if ("task" in drafts and docs["task"] is None and
-            store.doc(args.task, "task").read_text() == f"# {data['title']}\n" and
-            data.get("report") is None and not files and not committed):
-        drafts.remove("task")
-    if draft_file_blobs(store, files) != committed:
-        drafts.append("files")
-    if drafts and not getattr(args, "discard_drafts", False):
-        raise Error("archive refused; unpublished drafts: " + ", ".join(drafts) + "; use --discard-drafts with --note")
-    unmerged = []
-    for name, record in data["repos"].items():
-        source, path, branch = repo_context(store, data, name, record)
-        if record["branch_removed"]:
-            if branch_exists(source, branch):
-                raise Error(f"removed task branch reappeared: {branch}")
-            continue
-        retained_by = retention_branch(source)
-        commits = set()
-        if branch_exists(source, branch):
-            commits.add(head(source, branch))
-        report = data.get("report") or {}
-        delivery = report.get("commits") if isinstance(report, dict) else None
-        if isinstance(delivery, dict) and name in delivery:
-            try:
-                commits.add(head(source, delivery[name]))
-            except Error:
-                unmerged.append(name)
-        if commits and (retained_by is None or any(
-            git(source, "merge-base", "--is-ancestor", commit, retained_by, check=False).returncode
-            for commit in commits
-        )):
-            unmerged.append(name)
-    if unmerged and not getattr(args, "discard_code", False):
-        raise Error("archive refused; delivery is not retained in the source main branch: " + ", ".join(unmerged) +
-                    "; use --discard-code with --note")
-    if (getattr(args, "discard_drafts", False) or getattr(args, "discard_code", False)) and not args.note.strip():
-        raise Error("archive discard requires a non-empty --note")
-    for name, record in data["repos"].items():  # preflight every repo before removing any
-        source, path, branch = repo_context(store, data, name, record)
-        if path.exists():
-            if record["removed"]:
-                raise Error(f"removed worktree path reappeared: {path}")
-            live(store, data, name, record)
-        elif record["state"] == "ready" and not record["removed"] and data.get("archive") is None:
-            raise Error(f"registered worktree unexpectedly missing: {path}")
-        registrations = git(source, "worktree", "list", "--porcelain").stdout.decode().split("\n\n")
-        for entry in registrations:
-            if f"branch refs/heads/{branch}" in entry.splitlines() and f"worktree {path}" not in entry.splitlines():
-                raise Error(f"task branch is checked out elsewhere: {branch}")
-    return workspace
+    relative = f".tasks/{identifier(data['id'])}"
+    if git(store.root, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", relative).stdout:
+        raise Error(f"archive refused; task directory has uncommitted Git changes: {relative}")
+
+
+def archive_repo_context(store, data, name, record):
+    name = repository_name(name)
+    source = safe_path(store.project_root / name)
+    path = Path(data["workspace"]) / name
+    branch = f"task/{identifier(data['id'])}"
+    if record["source"] != str(source) or record["path"] != str(path) or record["branch"] != branch:
+        raise Error(f"registration has inconsistent repo/path/branch: {name}")
+    if primary(source) != source:
+        raise Error(f"source is not a primary checkout: {source}")
+    return source, path, branch
+
+
+def remove_task_worktree(source, path, *, force):
+    registrations = git(source, "worktree", "list", "--porcelain").stdout.decode().splitlines()
+    if f"worktree {path}" not in registrations:
+        return False
+    args = ("worktree", "remove", "--force", str(path)) if force else ("worktree", "remove", str(path))
+    git(source, *args)
+    return True
 
 
 def archive(store, args):
@@ -1623,44 +1568,32 @@ def archive(store, args):
         data = store.read(args.task)
         if data["status"] == "archived":
             return data["archive"]
-        archive_preflight(store, data, args)
-        project_hook(store, data, "before_task_archive", options={
-            "note": args.note, "discard_code": bool(getattr(args, "discard_code", False)),
-            "discard_drafts": bool(getattr(args, "discard_drafts", False))})
+        archive_preflight(store, data)
+        force = bool(getattr(args, "force", False))
+        project_hook(store, data, "before_task_archive", options={"note": args.note, "force": force})
         data = store.read(args.task)
-        workspace = archive_preflight(store, data, args)
+        archive_preflight(store, data)
+        workspace = Path(data["workspace"])
         result = data["archive"] or {"note": args.note, "removed": [], "at": None}
-        if data["archive"] is None:
-            result["discard_drafts"] = bool(getattr(args, "discard_drafts", False))
-            result["discard_code"] = bool(getattr(args, "discard_code", False))
-        elif getattr(args, "discard_drafts", False) or getattr(args, "discard_code", False):
-            result.setdefault("discard_confirmations", []).append({
-                "note": args.note, "at": now(),
-                "drafts": bool(getattr(args, "discard_drafts", False)),
-                "code": bool(getattr(args, "discard_code", False)),
-            })
-            result["discard_drafts"] = result.get("discard_drafts", False) or bool(getattr(args, "discard_drafts", False))
-            result["discard_code"] = result.get("discard_code", False) or bool(getattr(args, "discard_code", False))
         data["archive"] = result
         try:
             for name, record in data["repos"].items():
-                source, path, branch = repo_context(store, data, name, record)
-                if not record["removed"]:
-                    if path.exists():
-                        live(store, data, name, record)
-                        removal = git(source, "worktree", "remove", "--force", str(path), check=False)
-                        if removal.returncode:
-                            raise Error(os.fsdecode(removal.stderr).strip())
+                source, path, branch = archive_repo_context(store, data, name, record)
+                if not record["removed"] or path.exists() or path.is_symlink():
+                    if remove_task_worktree(source, path, force=force):
                         result["removed"].append({"worktree": str(path)})
                     record["removed"] = True
                     store.write(data)
+                if branch_exists(source, branch):
+                    git(source, "branch", "-D" if force else "-d", "--", branch)
+                    result["removed"].append({"repo": name, "branch": branch})
                 if not record["branch_removed"]:
-                    if branch_exists(source, branch):
-                        git(source, "branch", "-D", "--", branch)
-                        result["removed"].append({"repo": name, "branch": branch})
                     record["branch_removed"] = True
                     store.write(data)
-            if workspace.exists():
+            if workspace.is_symlink() or (workspace.exists() and not workspace.is_dir()):
+                workspace.unlink()
+                result["removed"].append({"workspace": str(workspace)})
+            elif workspace.exists():
                 shutil.rmtree(workspace)
                 result["removed"].append({"workspace": str(workspace)})
             data["status"], data["error"] = "archived", None
@@ -1706,7 +1639,7 @@ def parser():
     p = command(sub, "publish", "publish task requirements")
     p.add_argument("task", metavar="TASK-ID|AGENT-PATH", help="task whose requirements to publish")
     p.set_defaults(func=publish)
-    p = command(sub, "report", "publish a delivery report and attachments; record worktree commits")
+    p = command(sub, "report", "publish report and attachments; collect available worktree commits")
     p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="defaults to the calling executor's task")
     p.set_defaults(func=report)
     p = command(sub, "list", "list registered task records")
@@ -1717,11 +1650,10 @@ def parser():
     p = command(sub, "status", "show concise task, repo and cached job status")
     p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="TASK-ID or native collaboration path; defaults to caller task")
     p.set_defaults(func=status)
-    p = command(sub, "archive", "remove owned worktrees and task branches after all jobs are archived; retain task records")
+    p = command(sub, "archive", "delete the entire task workspace, registered worktrees and task branches; Manager owns deliverables and branch policy")
     p.add_argument("task", metavar="TASK-ID|AGENT-PATH", help="registered TASK-ID or native collaboration path")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
-    p.add_argument("--discard-drafts", action="store_true", help="acknowledge unpublished task, report or files drafts")
-    p.add_argument("--discard-code", action="store_true", help="acknowledge unmerged delivery commits")
+    p.add_argument("--force", action="store_true", help="use git worktree remove --force and git branch -D; does not bypass archive checks")
     p.set_defaults(func=archive)
     jobs = command(commands, "job", "register, query and archive process records").add_subparsers(required=True)
     p = command(jobs, "add", "register a running process with its startup identity")
