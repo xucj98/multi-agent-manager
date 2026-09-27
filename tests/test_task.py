@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import types
 import unittest
@@ -1557,6 +1558,117 @@ base=$(git rev-parse --verify "$1^{commit}")
         data = self.store.read(task)
         self.assertEqual(data["report"]["commits"]["multi-agent-manager"], self.git(worktree, "rev-parse", "HEAD"))
         self.assertEqual(data["status"], "pending")
+
+    def race_wait_handoff(self, wait_first, wait, handoff, gate_owner, gate_method, gate_match):
+        entered, release, attempted = threading.Event(), threading.Event(), threading.Event()
+        results = {}
+        original = getattr(gate_owner, gate_method)
+
+        def gated(*args, **kwargs):
+            if gate_match(*args, **kwargs):
+                entered.set()
+                if not release.wait(5):
+                    raise AssertionError("handoff race gate timed out")
+            return original(*args, **kwargs)
+
+        def run(name, action, signal):
+            if signal:
+                attempted.set()
+            try:
+                results[name] = action()
+            except Exception as exc:
+                results[name] = exc
+
+        first = ("wait", wait) if wait_first else ("handoff", handoff)
+        second = ("handoff", handoff) if wait_first else ("wait", wait)
+        with patch.object(gate_owner, gate_method, side_effect=gated):
+            one = threading.Thread(target=run, args=(*first, False))
+            two = threading.Thread(target=run, args=(*second, True))
+            one.start()
+            try:
+                self.assertTrue(entered.wait(5), "first operation never reached registration edge")
+                two.start()
+                self.assertTrue(attempted.wait(5), "second operation never started")
+            finally:
+                release.set()
+                one.join(5)
+                if two.ident is not None:
+                    two.join(5)
+        self.assertFalse(one.is_alive())
+        self.assertFalse(two.is_alive())
+        return results
+
+    def test_executor_wait_and_start_handoff_serialize_in_both_orders(self):
+        task = self.task()
+        old, new, root = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
+        data = self.store.read(task)
+        data["agent"] = old
+        self.store.write(data)
+
+        def wait():
+            return cli.begin_wait(self.store, old, "executor", task, "old-turn")
+
+        def handoff():
+            with patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(new, "/root/new", root)), \
+                    patch.object(cli, "agent_observations", return_value={old: {"status": "idle"}}):
+                return cli.start(self.store, types.SimpleNamespace(task=task))
+
+        first = self.race_wait_handoff(True, wait, handoff, self.store, "write_wait",
+                                       lambda record: record.get("agent") == old)
+        self.assertIsInstance(first["wait"], dict)
+        self.assertRegex(str(first["handoff"]), "active optional wait")
+        self.assertEqual(self.store.read(task)["agent"], old)
+        cli.finish_wait(self.store, first["wait"])
+
+        second = self.race_wait_handoff(False, wait, handoff, self.store, "write",
+                                        lambda data: data.get("agent") == new)
+        self.assertIsInstance(second["handoff"], dict)
+        self.assertRegex(str(second["wait"]), "no longer matches the current task binding")
+        self.assertIsNone(self.store.read_wait(old))
+        current = cli.begin_wait(self.store, new, "executor", task, "new-turn")
+        cli.finish_wait(self.store, current)
+
+    def test_manager_wait_and_takeover_serialize_in_both_orders(self):
+        self.task()
+        old = wake_runtime.recorded_manager(self.store)
+        new = str(uuid.uuid4())
+
+        def wait():
+            return cli.begin_wait(self.store, old, "manager", None, "old-turn")
+
+        def takeover():
+            with patch.dict(os.environ, {"CODEX_THREAD_ID": new}), \
+                    patch.object(identity, "read", return_value=identity.ThreadIdentity(new, "/root", new)), \
+                    patch.object(cli, "agent_observations", return_value={old: {"status": "idle"}}):
+                return wake_runtime.rebind_manager(self.store, "handoff")
+
+        first = self.race_wait_handoff(True, wait, takeover, self.store, "write_wait",
+                                       lambda record: record.get("agent") == old)
+        self.assertIsInstance(first["wait"], dict)
+        self.assertRegex(str(first["handoff"]), "active optional wait")
+        self.assertEqual(wake_runtime.recorded_manager(self.store), old)
+        cli.finish_wait(self.store, first["wait"])
+
+        second = self.race_wait_handoff(False, wait, takeover, wake_runtime, "_write_json",
+                                        lambda path, value: Path(path).name == "manager.json" and value.get("manager") == new)
+        self.assertIsInstance(second["handoff"], dict)
+        self.assertRegex(str(second["wait"]), "no longer matches the current Manager identity")
+        self.assertIsNone(self.store.read_wait(old))
+        current = cli.begin_wait(self.store, new, "manager", None, "new-turn")
+        cli.finish_wait(self.store, current)
+
+    def test_wait_registration_keeps_unrecorded_manager_and_new_token(self):
+        initial = cli.begin_wait(self.store, "unrecorded-manager", "manager", None, "initial-turn")
+        cli.finish_wait(self.store, initial)
+        task = self.task()
+        manager = wake_runtime.recorded_manager(self.store)
+        first = cli.begin_wait(self.store, manager, "manager", None, "first-turn")
+        cli.finish_wait(self.store, first)
+        second = cli.begin_wait(self.store, manager, "manager", None, "second-turn")
+        cli.finish_wait(self.store, first)
+        self.assertEqual(self.store.read_wait(manager)["token"], second["token"])
+        cli.finish_wait(self.store, second)
+        self.assertIsNone(self.store.read_wait(manager))
 
 
 if __name__ == "__main__":

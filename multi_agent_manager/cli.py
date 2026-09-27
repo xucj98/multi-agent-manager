@@ -1233,7 +1233,18 @@ def begin_wait(store, agent, role, task, turn_id):
     record = {"agent": agent, "pid": os.getpid(), "identity": observation["identity"], "token": str(uuid.uuid4()),
               "kind": "unified", "role": role, "task": task, "turn_id": turn_id, "timeout": 3600,
               "started_at": now(), "cancelled": None}
-    with store.lock(wait_lock(agent)):
+    with store.lock("bindings"), store.lock(wait_lock(agent)):
+        bound = [data for data in store.all() if data.get("status") != "archived" and data.get("agent") == agent]
+        if role == "executor":
+            if len(bound) != 1 or bound[0]["id"] != task:
+                raise Error("executor wait no longer matches the current task binding")
+        elif role == "manager":
+            from . import wake_runtime
+            manager = wake_runtime.recorded_manager(store)
+            if bound or (manager is not None and manager != agent):
+                raise Error("manager wait no longer matches the current Manager identity")
+        else:
+            raise Error(f"invalid wait role: {role}")
         existing, state = active_wait(store, agent)
         if existing:
             if state == "unknown":
