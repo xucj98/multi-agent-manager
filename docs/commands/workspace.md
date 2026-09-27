@@ -8,13 +8,13 @@
 | --- | --- | --- |
 | `mam workspace add [TASK-ID\|AGENT-PATH] --repo REPO --base COMMIT` | 执行者 | 从 PROJECT_ROOT/REPO 的指定 commit 创建任务 worktree 和环境，登记并返回路径、分支、base commit 和创建状态。 |
 
-`REPO` 是 PROJECT_ROOT 下的仓库目录名；源目录必须是该仓库的主 checkout，并有非软链接的 `.local/create_worktree.sh`。`COMMIT` 可以是可解析为 commit 的分支、标签或提交号，具体由任务要求指定。
+`REPO` 是 PROJECT_ROOT 下的仓库目录名；源目录必须是该仓库的主 checkout，并已配置[创建 hook](../install.md#项目-hooks)。`COMMIT` 可以是可解析为 commit 的分支、标签或提交号，具体由任务要求指定。
 
 任务可用 TASK-ID 或当前原生协作树内的完整执行者路径 AGENT-PATH 定位；已绑定执行者可省略任务参数。创建后的路径为 `PROJECT_ROOT/workspace/TASK-ID/REPO`，分支为 `task/TASK-ID`。同一任务在不同仓库使用相同分支名。workspace 根目录同时建立 `.task` 软链接，指向 `MAM_ROOT/.tasks/TASK-ID`；已有任务正常接续时补齐缺失链接，冲突路径不会被覆盖。
 
 ## 环境与后续使用
 
-MAM 调用仓库的 `.local/create_worktree.sh`，依次传入 base commit、任务分支名和 workspace 根目录。脚本负责创建 worktree、安装环境及建立共享软链接；这些规则由各仓库决定。开发 MAM 时，每个 worktree 使用独立的 `.venv`。
+MAM 调用项目的创建 hook，项目入口负责创建工作区或转发到 repo hook。环境和共享软链接由项目配置决定。
 
 同一任务、仓库和 base 重复调用时复用已登记的 worktree；创建失败会保留记录及错误，处理后可重试。通过 `mam task status TASK-ID` 查看已登记的仓库。执行者交接后继续使用原 workspace、worktree、环境和分支；目录名与分支名始终使用 TASK-ID，不随执行者或 Manager 更换而改变。
 

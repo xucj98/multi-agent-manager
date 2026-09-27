@@ -6,14 +6,14 @@
 
 修改文档时，应该明确阅读对象和使用场景，并尽量保持简洁，只提供必要的信息。
 1. AGENTS.md, README.md 是给 manager 和 subagent 日常使用的高频入口。
-2. install.md 用于首次使用需要安装 mam 的场景，不应该包含如何开发 mam 的内容。 `.local/create_worktree.sh` 是用作开发的，使用者不需要准备。
+2. install.md 面向安装与配置者，说明安装、实例配置和项目 hooks；不包含 MAM 源码开发流程。
 3. development.md 是给 mam 的开发者用的。
 4. 上述几个文档都随 MAM 上传 git，MAM 可以被部署到各个集群，因此其中不应该有本地环境特定的说明。本地环境说明保留在 `.local/README.md` 中不上传 git。
 5. roadmap 只列后续任务和要做什么。接口说明按顶层命令拆分，只写用途、参数、返回内容和使用约束；内部实现和测试过程留在代码与测试中。
 
 ## Python 与 editable 安装
 
-首次开发 MAM 需要先准备 `.local/create_worktree.sh` 并验证可用性，已有 `.local/create_worktree.sh` 可跳过此条。MAM 的 `pyproject.toml` 要求 Python >=3.10，应选择可用的解释器；`scripts/local_create_worktree.sh` 只是没有站点默认值的复制模板。
+先按[创建 hook 配置](install.md#项目-hooks)准备 MAM 仓库的环境入口；已配置时无需重复准备。MAM 的 `pyproject.toml` 要求 Python >=3.10，应选择可用的解释器；`scripts/local_create_worktree.sh` 是 MAM 开发环境的复制模板，不含站点默认值。
 
 创建 MAM worktree 时，入口会建立 `.venv`，并执行：
 

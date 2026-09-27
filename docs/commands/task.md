@@ -33,6 +33,14 @@ Manager 编辑 task.md；执行者经 workspace 的 `.task/report.md` 和 `.task
 | --- | --- |
 | `mam task archive TASK-ID\|AGENT-PATH --note NOTE [--discard-drafts] [--discard-code]` | Manager 显式指定任务，完整预检后清理资源，保留中央任务记录和发布历史。 |
 
-归档要求所有 job 已归档、仓库 worktree 无未提交或未知内容、任务/报告/附件无未发布草稿，且交付代码已包含在各源仓库的主分支中（优先检查 main/master，否则检查主 checkout 当前分支）。仅在 `--note` 说明舍弃理由时，才使用 `--discard-drafts` 忽略草稿或 `--discard-code` 舍弃未合入提交。报告中的 commit hash 本身不是 Git 对象的永久留存。取消无交付的空任务可直接归档。
+归档要求所有 job 已归档、任务/报告/附件无未发布草稿，且交付代码已包含在各源仓库的主分支中（优先检查 main/master，否则检查主 checkout 当前分支）。仅在 `--note` 说明舍弃理由时，才使用 `--discard-drafts` 忽略草稿或 `--discard-code` 舍弃未合入提交。报告中的 commit hash 本身不是 Git 对象的永久留存。取消无交付的空任务可直接归档。
 
-预检通过后，MAM 清理本任务 tmp、worktree、独立环境、分支、`.task` 链接和 workspace；不跟随共享链接，也不删除中央 `.tasks/TASK-ID` 或 Manager 的 `workspace/tmp`。清理中途失败会保留进度；重试时重新检查仍存在的草稿和交付分支，新增内容需要重新发布或在本次命令中明确舍弃。归档任务仍可用 TASK-ID 查询历史记录。
+MAM 检查通过后执行已配置的项目[归档前 hook](../install.md#项目-hooks)；hook 拒绝时不开始删除。通过后，MAM 删除登记的 worktree、任务分支和整个 workspace，包括独立环境、tmp、ignored、未跟踪文件和未提交修改。使用者负责提前保存成果；软链接只删除链接本身，中央 `.tasks/TASK-ID` 和 Manager 的 `workspace/tmp` 保留。
+
+清理中途失败会保留进度；重试时重新核对已发布文档、代码留存和资源归属，并重新执行 hook。归档任务仍可用 TASK-ID 查询历史记录。
+
+## 待开发
+
+按项目指定主分支或保留的 tag/branch 检查交付留存，并记录代码去向。当前仅支持上述主分支检查和明确舍弃，不支持用其他 tag/branch 通过留存检查；不能将 `--discard-code` 当作保留代码的接口。具体配置方式待定。
+
+环境创建失败或任务取消时，也应允许提交诊断报告和附件，明确哪些仓库没有代码交付。

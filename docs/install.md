@@ -58,3 +58,56 @@ mam wait stop --agent AGENT-ID
 ```
 
 `mam wait` 最多等待一小时；已有待办会立即返回。用户 steer 或 Manager 消息可以解除 wait，`wait stop` 也可手动解除，但这些操作不会停止 job。
+
+## 项目 hooks
+
+hooks 由项目安装与配置者准备。MAM 统一调用项目入口，项目入口决定是否及如何调用 repo hook；MAM 不再自动调用第二层。项目规则写在 `.local/README.md` 或各仓库的 README.md、AGENTS.md。
+
+```text
+MAM_ROOT/.local/hooks/                 # MAM 调用的项目入口
+  workspace_add
+  before_task_archive
+PROJECT_ROOT/REPO/.local/hooks/        # 项目入口可调用的仓库入口
+  workspace_add
+  before_task_archive
+```
+
+入口是带 shebang 的可执行普通文件，可以使用 Bash、Python 等语言。MAM 从 `MAM_ROOT` 执行项目 hook，向 stdin 写入一个 JSON 对象；项目 hook 可完成整个操作，也可按项目规则调用 repo hook。
+
+### 触发时机
+
+| 项目入口 | 时机与职责 | 缺失时 |
+| --- | --- | --- |
+| `workspace_add` | 登记本次创建后执行；创建指定 worktree，按需安装环境、建立共享软链接。返回成功后 MAM 核对所属仓库、路径和分支。 | 拒绝创建 |
+| `before_task_archive` | MAM 自身检查通过后、删除任何资源之前，检查项目收尾条件。 | 直接继续归档 |
+
+已有 ready worktree 的重复 add 不执行 hook；创建失败后修复并以相同 base 重试，会再次执行。归档前检查应可重复执行，每次归档重试均重新检查；已归档任务不再执行。归档 hook 只检查，实验记录更新、成果转存和远端清理由项目流程提前完成。
+
+### 输入与返回
+
+两个入口使用相同的 JSON 结构，路径均为绝对路径：
+
+| 字段 | 内容 |
+| --- | --- |
+| `schema_version`、`event` | 协议版本 `1`；事件为入口名称 |
+| `project_root`、`mam_root` | 当前实例的根目录 |
+| `task` | `id`、`title`、`status`、`workspace`、中央任务目录 `task_dir` |
+| `repos` | 登记仓库数组：`name`、`source`、`path`、`branch`、`base`、`state`、`removed`、`branch_removed`、交付 `commit`；无交付时 commit 为 null |
+| `repo` | 创建时为本次仓库名；归档时为 null |
+| `jobs` | 已保存的 job 摘要；不隐式探测进程 |
+| `options` | 本次 `note`、`discard_code`、`discard_drafts`；不适用时为空值或 false |
+
+退出码 0 表示成功；非 0、启动失败或超时使本次操作失败，MAM 返回入口和错误摘要。输出只作诊断，不作为 MAM 状态。归档 hook 拒绝时 MAM 不开始删除；创建失败可能留下部分 worktree，修复后重试。hook 内不要调用修改 MAM 状态的命令。
+
+可在 `.mam/env.json` 增加 `HOOK_TIMEOUTS`，按入口名设置正数秒数；默认 `workspace_add` 为 1800 秒，`before_task_archive` 为 60 秒。hook 应同步完成，不启动脱离进程组的后台进程；时限覆盖项目到 repo 的整个调用链，超时终止 hook 所在进程组。
+
+### 部署模板
+
+[参考模板](../templates/hooks/)只展示调用和转发，不包含项目的实验验收规则：
+
+- `project/workspace_add`：调用本次源库的同名 repo hook，并将 cwd 切到源库。
+- `repo/workspace_add`：将 JSON 转成现有 `.local/create_worktree.sh` 的 `BASE_COMMIT BRANCH WORKSPACE_ROOT` 三参数，复用已有环境脚本。
+- `project/before_task_archive`：预留项目检查位置，再逐库调用已配置的同名 repo hook，任一拒绝即停止。转发时将 `repo` 设为该仓库名，cwd 为源库。
+- `repo/before_task_archive`：预留单库检查位置，默认通过；按项目需要补充。
+
+部署时将所需模板复制到上述 `.local/hooks/` 并赋予执行权限。创建模板只是一个分派方式；项目可以在项目入口直接创建纯文档 worktree，也可以调用仓库内随 Git 管理的安装脚本。MAM 不自动安装模板，也不回退旧入口；迁移时先配置项目和 repo 入口，旧环境脚本可由适配模板继续调用。

@@ -2,7 +2,7 @@
 
 ## 核心原则
 
-MAM 是 multi-agent 项目管理工具。使用细节可查阅 `mam --help` 或[接口文档](docs/commands/)，语法中的大写词需要替换为实际值，`[]` 表示可选，`|` 表示任选其一。项目具体信息查看[项目说明](.local/README.md)。
+MAM 是 multi-agent 项目管理工具。使用细节可查阅 `mam --help` 或[接口文档](docs/commands/)，语法中的大写词需要替换为实际值，`[]` 表示可选，`|` 表示任选其一。本文说明 MAM 通用流程；项目的文档、实验记录、产物留存和代码合并要求写在[项目说明](.local/README.md)或各 REPO 的 README.md、AGENTS.md。
 
 项目的目录结构如下：
 
@@ -44,7 +44,7 @@ Manager 无关联任务的临时文件统一放在 `PROJECT_ROOT/workspace/tmp/`
 
 ## 安装
 
-安装与更新见[安装说明](docs/install.md)。
+安装、更新及项目 hooks 配置见[安装说明](docs/install.md)。
 
 ## 任务管理
 
@@ -56,7 +56,7 @@ mam task publish TASK-ID|AGENT-PATH
 mam task archive TASK-ID|AGENT-PATH --note NOTE
 ```
 
-- `create` 返回 TASK-ID；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求，首次发布任务使用 TASK-ID。
+- `create` 返回 TASK-ID；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求。
 - 途中追加要求时，先更新并发布 task.md，再通知执行者读取。执行者和 reviewer 始终以最新已发布要求为准；report 无需绑定要求版本。
 - Review 任务用 `--review TASK-ID|AGENT-PATH` 指定源任务，结合最新 task.md、report.md 和交付代码独立验收。
 - 返工时通知原执行者调用 `mam task start` 后继续；需要换人时，先确认旧执行者已结束 turn 和 wait，再让新执行者 `mam task start TASK-ID` 接手。原 workspace、分支、环境和 job 保留，无需再次创建。
@@ -97,13 +97,13 @@ report 在同一次提交中发布报告及 `.task/files/` 的新增、修改和
 
 ### 任务收尾
 
-1. 执行者整理代码和产物，同步相关文档；需保留的文件按上述规则转存，临时检查文件留在任务 tmp。报告说明结果、验证方法、未解决问题和产物位置，让接手者不依赖原对话也能理解。
-2. 执行者检查已停止 job 的结果，完成项目侧收尾后归档 job。仍需监控的进程保留登记，任务暂不归档。
-3. 执行者提交交付代码，发布附件和最终 report；Manager 按最新 task.md 验收，需要时独立 review，并对 review 结论作出裁决。返工继续原任务。
-4. Manager 确认代码已合入主分支，必要报告和附件已发布，然后调用 `mam task archive TASK-ID|AGENT-PATH --note NOTE`；明确舍弃时使用 `--discard-code` 或 `--discard-drafts` 并在 note 说明理由。归档检查留存，再清理 tmp、worktree、独立环境、任务分支及 `.task` 链接，保留中央任务记录和共享链接目标。
+1. 执行者整理代码和产物，同步相关文档；需保留的文件按[文件留存原则](#文件留存原则)、具体项目和代码库要求处理。报告说明结果、验证方法、未解决问题和产物位置，让接手者不依赖原对话也能理解。
+2. 确认全部 job 已归档。job 的逐次收尾见[进程管理](#进程管理)，不能留到 task 归档时一并处理。
+3. 执行者 `git commit` 提交代码，发布附件和最终 report；Manager 按最新 task.md 验收，需要时独立 review，并对 review 结论作出裁决。返工继续原任务。
+4. Manager 按项目规则确认代码去向，并确认 `.tasks/TASK-ID/` 下的任务要求、报告和附件均已发布，再调用 `mam task archive TASK-ID|AGENT-PATH --note NOTE`；明确舍弃时使用 `--discard-code` 或 `--discard-drafts` 并在 note 说明理由。归档删除任务分支及整个 workspace，包括 ignored 文件和未提交修改；须提前保存成果，中央任务记录和软链接目标保留。
 5. Manager 核对归档结果，确认任务已归档、工作目录和分支已清理。失败时按提示处理后重试；阶段结束时也检查自己的 workspace/tmp，将必要内容转存后清理其余文件。
 
-MAM 提供通用的留存检查和清理工具；数据、checkpoint 等产物保留多久、放在哪里，由各项目规定。接口和拒绝归档的条件见 [mam task](docs/commands/task.md#附件与归档)。
+交付代码可以合入项目指定的主分支、明确舍弃，或按项目规则用 tag/branch 留存；主分支不必叫 main。当前归档的支持范围与限制见 [mam task](docs/commands/task.md#附件与归档)。
 
 ## 进程管理
 
@@ -119,7 +119,9 @@ mam job archive JOB-ID --note NOTE
 - HOST 可以使用 ssh 别名或 username@hostname。
 - list 省略 `--task` 时显示所有任务中未归档的 job；已绑定执行者登记 job 时可省略任务参数。
 
-job 状态包括 `running`、`stopped`、`unknown`、`archived`；unknown 表示暂时无法确认。进程停止后，由执行者检查结果、完成收尾，再归档 job。`mam job archive` 可归档任意已登记 job，只结束 MAM 对它的跟踪并保留记录，不停止进程。`mam task archive` 要求其所有 job 已归档。
+job 状态包括 `running`、`stopped`、`unknown`、`archived`；unknown 表示暂时无法确认。进程停止后，Manager 收到转发通知时，通知对应执行者检查结果、按项目要求更新文档或实验记录，再归档该 job。原生转发方式见[自动唤醒](#自动唤醒)。
+
+一个任务可以多次启动、处理和归档 job；全部 job 已归档、任务成果验收完成后，才进行一次最终 task 归档。`mam job archive` 只结束 MAM 跟踪并保留记录，不停止进程；也可用于明确不再跟踪的运行中进程。
 
 拟议接口为 `mam job submit [TASK-ID|AGENT-PATH] --command COMMAND`，一次完成登记与启动；已绑定执行者可省略任务参数，Manager 可用协作路径定位任务。详见 [mam job](docs/commands/job.md#待开发)。
 
