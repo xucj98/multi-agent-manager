@@ -43,4 +43,31 @@ mam workspace add TASK-ID --repo mam-dev --base main
 .venv/bin/python -B -m unittest discover -s tests -v
 ```
 
-提交任务分支并发布 report 后，由 Manager 验收，必要时安排独立 review，并对其结论作出裁决。验收后的改动合入 `main`；生产实例升级另行安排，不随合并自动更新已安装版本或正在运行的服务。归档前确认交付已合入 `main` 或明确可以舍弃，必要报告和附件已留存；安装与项目配置仍见[安装说明](install.md)。
+提交任务分支并发布 report 后，由 Manager 验收，必要时安排独立 review，并对其结论作出裁决。验收后的改动合入 `main`；实例升级另行安排，不随合并自动更新已安装版本或正在运行的服务。任务相关的一次性验证记录放 `PROJECT_ROOT/workspace/TASK-ID/tmp`；Manager 无关联任务的文件放 `PROJECT_ROOT/workspace/tmp` 并按工作分目录，阶段收尾清理。自动化测试内部自行创建并清理的临时目录不受此约定限制。
+
+## 单实例固定版本试用
+
+Manager 完成 review 和合并后，确定验收 commit `COMMIT`，在当前项目的 `PROJECT_ROOT/.mam/runtime/COMMIT` 创建非 editable 的独立安装。以下路径只服务该项目；不更改 pipx、系统 mam 或全局 shell 配置：
+
+```bash
+RUNTIME="$PROJECT_ROOT/.mam/runtime"
+mkdir -p "$RUNTIME/$COMMIT/src"
+git -C "$PROJECT_ROOT/mam-dev" archive "$COMMIT" | tar -xf - -C "$RUNTIME/$COMMIT/src"
+python3 -m venv "$RUNTIME/$COMMIT/venv"
+"$RUNTIME/$COMMIT/venv/bin/pip" install --no-deps "$RUNTIME/$COMMIT/src"
+"$RUNTIME/$COMMIT/venv/bin/mam" --help
+```
+
+安装完成后先用该绝对路径在隔离测试实例验证。记录当前 `runtime/current` 目标以及本实例服务状态，停止本实例服务，原子更新 `runtime/current` 指向 `COMMIT` 目录，再从项目根目录以新入口启动服务并检查 `mam service status`。需要验证 daemon 确实运行所选版本时，检查其 PID 命令行中的 Python 和包路径是否来自 `runtime/COMMIT/venv`。服务只处理当前 `.mam/env.json` 指定的实例。
+
+```bash
+OLD_MAM=/root/.local/bin/mam  # 首次试用；后续升级时改为旧 runtime 的绝对入口
+"$OLD_MAM" service stop
+ln -s "$RUNTIME/$COMMIT" "$RUNTIME/.next"
+mv -Tf "$RUNTIME/.next" "$RUNTIME/current"
+export PATH="$RUNTIME/current/venv/bin:$PATH"
+"$RUNTIME/current/venv/bin/mam" service start
+"$RUNTIME/current/venv/bin/mam" service status
+```
+
+`PATH` 只影响设置它的 shell 及子进程；在同一 shell 切换到其他目录仍使用该版本。已运行的 agent 需在自己的 shell 前置同一路径，或使用新入口绝对路径。回退时只停止本实例服务，将 `current` 指回事先记录的旧版本目录，再用旧版本绝对路径启动并检查服务；首次试用若之前使用系统 pipx 版，则用 `/root/.local/bin/mam` 停止和重启旧服务。原有任务、job 和 workspace 保留。提交留存和归档仍按 [task](commands/task.md#附件与归档) 处理。

@@ -12,9 +12,10 @@ import tempfile
 import time
 import types
 import unittest
+import uuid
 from unittest.mock import patch
 
-from multi_agent_manager import cli, wake_runtime
+from multi_agent_manager import cli, identity, wake_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 _CLI_BOOTSTRAP = (
@@ -95,6 +96,11 @@ printf env > "$target/.venv/marker"
     def task(self):
         return self.call("create", "--title", "test task")["id"]
 
+    def fixture_bind(self, task, agent):
+        data = self.store.read(task)
+        data["agent"] = agent
+        self.store.write(data)
+
     def add(self, task, repo="multi-agent-manager", ok=True):
         return self.call("add", task, "--repo", repo, "--base", self.git(self.projects / repo, "rev-parse", "main"), command="workspace", ok=ok)
 
@@ -120,7 +126,9 @@ printf env > "$target/.venv/marker"
 
     def rebind_direct(self, args, states, manager):
         with patch.dict(os.environ, {"CODEX_THREAD_ID": manager}, clear=False), \
-                patch.object(cli, "agent_observations", return_value=states):
+                patch.object(cli, "agent_observations", return_value=states), \
+                patch.object(identity, "read", side_effect=lambda agent: identity.ThreadIdentity(
+                    agent, "/root" if agent == manager else "/root/replacement", manager)):
             return cli.rebind(self.store, args)
 
     def task_output(self, *args):
@@ -181,7 +189,7 @@ printf env > "$target/.venv/marker"
             text=True,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(result.stdout.splitlines(), ["标题\t任务状态\tTASK-ID\tAGENT-ID\tagent状态"])
+        self.assertEqual(result.stdout.splitlines(), ["标题\t任务状态\tTASK-ID\t执行者\tagent状态"])
         self.assertFalse(marker.exists())
 
 
@@ -270,7 +278,7 @@ printf env > "$target/.venv/marker"
                 self.assertEqual(self.git(self.root, "diff", "--cached", "--", relative), "")
 
     def test_task_list_text_has_header_and_status_keeps_records(self):
-        header = "标题\t任务状态\tTASK-ID\tAGENT-ID\tagent状态"
+        header = "标题\t任务状态\tTASK-ID\t执行者\tagent状态"
         self.assertEqual(self.task_command_output("list").splitlines(), [header])
         rejected = subprocess.run(mam_command("task", "list", "--json"), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(rejected.returncode, 2)
@@ -278,7 +286,7 @@ printf env > "$target/.venv/marker"
         self.assertEqual(self.task_command_output("list").splitlines()[1].split("\t"),
                          ["中文 标题 with whitespace", "working", unbound, "未绑定", "未绑定"])
         bound = self.task()
-        self.call("bind", bound, "--agent", "bound-agent")
+        self.fixture_bind(bound, "bound-agent")
         calls = []
         fake = types.SimpleNamespace(probe_agents=lambda ids: calls.append(ids) or {})
         with patch.object(cli, "runtime", return_value=fake):
@@ -338,8 +346,8 @@ printf env > "$target/.venv/marker"
                     "checked_at": "saved", "probe": {"status": status, "checked_at": "saved", "error": None}, "archive": None}
 
         active, archived = self.task(), self.task()
-        self.call("bind", active, "--agent", "active-agent")
-        self.call("bind", archived, "--agent", "archived-agent")
+        self.fixture_bind(active, "active-agent")
+        self.fixture_bind(archived, "archived-agent")
         active_data = self.store.read(active)
         active_data["jobs"] = [job("becomes-running", 10, "stopped"), job("becomes-stopped", 11, "running"),
                                job("already-archived", 12, "archived")]
@@ -477,10 +485,15 @@ printf env > "$target/.venv/marker"
 
     def test_bind_and_empty_archive_have_no_accept_gate(self):
         first, second = self.task(), self.task()
-        self.call("bind", first, "--agent", "agent-1")
-        self.call("bind", second, "--agent", "agent-1", ok=False)
+        agent = "00000000-0000-4000-8000-000000000011"
+        native = identity.ThreadIdentity(agent, "/root/agent-1", "00000000-0000-4000-8000-000000000010")
+        with patch.object(cli, "caller_identity", return_value=native):
+            cli.start(self.store, types.SimpleNamespace(task=first))
+            with self.assertRaisesRegex(cli.Error, "already bound to another task"):
+                cli.start(self.store, types.SimpleNamespace(task=second))
         self.call("archive", first, "--note", "cancelled before implementation")
-        self.call("bind", second, "--agent", "agent-1")
+        with patch.object(cli, "caller_identity", return_value=native):
+            cli.start(self.store, types.SimpleNamespace(task=second))
         self.assertEqual(len(self.task_command_output("list", "--archived").splitlines()), 2)
         self.assertTrue(self.store.doc(first, "task").exists())
         self.assertEqual(self.call("status", first)["status"], "archived")
@@ -616,7 +629,8 @@ printf env > "$target/.venv/marker"
                 })
                 with patch.dict(os.environ, {"CODEX_THREAD_ID": manager}, clear=False), \
                         patch.object(cli, "agent_observations", return_value=states), \
-                        patch.object(cli, "runtime", return_value=fake):
+                        patch.object(cli, "runtime", return_value=fake), \
+                        patch.object(identity, "read", return_value=identity.ThreadIdentity(manager, "/root", manager)):
                     with self.assertRaisesRegex(cli.Error, message):
                         cli.rebind(self.store, args)
                 self.assertEqual(self.store.read(task)["agent"], "old-executor")
@@ -706,7 +720,7 @@ printf env > "$target/.venv/marker"
             self.assertTrue((path / "keep").exists())
             (path / "keep").unlink()
             path.rmdir()
-        self.call("archive", task, "--note", "done")
+        self.call("archive", task, "--note", "done", "--discard-code")
         self.assertFalse(first.parent.exists())
         self.assertTrue((shared / "keep").exists())
         self.assertFalse(cli.branch_exists(self.root, f"task/{task}"))
@@ -841,7 +855,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         archive_help = subprocess.check_output([command, "task", "archive", "--help"], cwd="/tmp", text=True)
         self.assertIn("remove owned worktrees and task branches", " ".join(archive_help.split()))
         rows = subprocess.check_output([command, "task", "list"], cwd=self.projects, text=True)
-        self.assertEqual(rows.splitlines(), ["标题\t任务状态\tTASK-ID\tAGENT-ID\tagent状态"])
+        self.assertEqual(rows.splitlines(), ["标题\t任务状态\tTASK-ID\t执行者\tagent状态"])
         installed = subprocess.check_output([str(python), "-I", "-c",
             "import multi_agent_manager; print(multi_agent_manager.__file__)"], cwd="/tmp", text=True)
         self.assertTrue(Path(installed.strip()).is_relative_to(environment))
@@ -1004,12 +1018,13 @@ base=$(git rev-parse --verify "$1^{commit}")
             self.assertIn(description, help_result.stdout)
             old = subprocess.run(mam_command("task", command, "--help"), capture_output=True, text=True)
             self.assertEqual(old.returncode, 2, old.stdout + old.stderr)
-        self.assertEqual(self.job_command_output("list").splitlines(), ["描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID"])
+        self.assertEqual(self.job_command_output("list").splitlines(), ["描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID\t执行者"])
 
     def test_tampered_paths_and_symlink_workspace_rejected(self):
         task = self.task()
         data = self.store.read(task)
         workspace = Path(data["workspace"])
+        (workspace / ".task").unlink()
         workspace.rmdir()
         workspace.symlink_to(self.root, target_is_directory=True)
         self.call("archive", task, "--note", "unsafe", ok=False)
@@ -1038,8 +1053,8 @@ base=$(git rev-parse --verify "$1^{commit}")
             self.assertNotIn("probe", detail)
             self.assertTrue(detail["started_at"].endswith("Z"))
             rows = self.job_command_output("list", "--task", task, "--status", "running").splitlines()
-            self.assertEqual(rows[0], "描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID")
-            self.assertEqual(rows[1].split("\t"), ["owned smoke", "running", detail["started_at"], job["id"], "test task", task])
+            self.assertEqual(rows[0], "描述\tjob状态\t开始时间\tJOB-ID\t任务描述\tTASK-ID\t执行者")
+            self.assertEqual(rows[1].split("\t"), ["owned smoke", "running", detail["started_at"], job["id"], "test task", task, "未绑定"])
             before = self.store.read(task)["jobs"][0]
             saved = cli.job_archive(self.store, types.SimpleNamespace(job=job["id"], note="tracking complete"))
             self.assertEqual(saved["status"], "archived")
@@ -1147,7 +1162,7 @@ base=$(git rev-parse --verify "$1^{commit}")
             self.store.remove_wait("second-manager")
 
             bound_task = self.task()
-            self.call("bind", bound_task, "--agent", "bound-executor")
+            self.fixture_bind(bound_task, "bound-executor")
             self.store.write_wait(self.wait_record("bound-executor", 1, "bound"))
             self.store.write_wait(self.wait_record("manager-agent", 2, "manager", task=bound_task))
             self.assertEqual(cli.wait_stop(self.store, args), {"status": "cancelled", "agent": "manager-agent"})
@@ -1232,13 +1247,13 @@ base=$(git rev-parse --verify "$1^{commit}")
                     self.assertEqual(cli.main(["job", "list", "--attention"], cwd=self.projects), 0)
                 rows = output.getvalue().splitlines()
                 self.assertEqual(len(rows), 2)
-                self.assertEqual(len(rows[1].split("\t")), 6)
+                self.assertEqual(len(rows[1].split("\t")), 7)
                 self.assertEqual(rows[1].split("\t")[1], "unknown/待核实")
                 self.assertEqual(rows[1].split("\t")[3], job["id"])
 
     def test_job_identity_attention_and_history(self):
         task = self.task()
-        self.call("bind", task, "--agent", "agent-1")
+        self.fixture_bind(task, "agent-1")
         process = {"status": "running", "identity": {"boot_id": "boot", "start_ticks": 10}, "checked_at": "first", "error": None}
         agent = {"status": "idle", "checked_at": "first", "error": None}
         fake = types.SimpleNamespace(probe_process=lambda *a: dict(process), probe_agents=lambda ids: {key: dict(agent) for key in ids})
@@ -1269,6 +1284,191 @@ base=$(git rev-parse --verify "$1^{commit}")
             cli.refresh_jobs(saved)
             self.assertEqual(saved["jobs"][0]["status"], "archived")
             self.assertEqual(saved["jobs"][1]["status"], "running")
+
+    def test_files_publication_is_isolated_and_tracks_add_update_delete(self):
+        task = self.task()
+        files = self.store.logs / task / "files"
+        self.assertEqual((Path(self.store.read(task)["workspace"]) / ".task").resolve(), files.parent)
+        self.publish(task)
+        (self.root / "code.py").write_text("staged = True\n")
+        self.git(self.root, "add", "code.py")
+        staged = self.git(self.root, "ls-files", "--stage", "code.py")
+        (files / "note.txt").write_text("first\n")
+        (files / "nested").mkdir()
+        (files / "nested" / "trace.json").write_text('{"ok": true}\n')
+        first = self.call("publish", task, "--file", "files")
+        self.assertEqual(len(first["added"]), 2)
+        self.assertEqual(self.git(self.root, "ls-files", "--stage", "code.py"), staged)
+        self.assertEqual(self.git(self.root, "show", f"main:.tasks/{task}/files/note.txt"), "first")
+        (files / "note.txt").write_text("second\n")
+        (files / "nested" / "trace.json").unlink()
+        self.assertTrue(self.call("status", task)["drafts"]["files"])
+        self.assertEqual(self.git(self.root, "show", f"main:.tasks/{task}/files/note.txt"), "first")
+        second = self.call("publish", task, "--file", "files")
+        self.assertNotEqual(first["revision"], second["revision"])
+        self.assertEqual(len(second["updated"]), 1)
+        self.assertEqual(len(second["deleted"]), 1)
+        self.assertTrue(self.call("publish", task, "--file", "files")["unchanged"])
+        self.assertEqual(self.git(self.root, "ls-files", "--stage", "code.py"), staged)
+        (files / "escape").symlink_to(self.root / "code.py")
+        self.call("publish", task, "--file", "files", ok=False)
+
+    def test_archive_preflight_preserves_code_then_cleans_tmp_and_link(self):
+        task = self.task()
+        worktree = Path(self.add(task)["path"])
+        workspace = worktree.parent
+        self.publish(task)
+        self.git(worktree, "commit", "--allow-empty", "-m", "delivery")
+        self.report(task)
+        (self.store.logs / task / "files" / "draft.txt").write_text("draft")
+        (workspace / "tmp").mkdir()
+        (workspace / "tmp" / "scratch").write_text("ephemeral")
+        manager_tmp = self.projects / "workspace" / "tmp" / "review"
+        manager_tmp.mkdir(parents=True)
+        (manager_tmp / "notes").write_text("preserve")
+        self.call("archive", task, "--note", "done", ok=False)
+        self.assertTrue(worktree.exists())
+        self.call("archive", task, "--note", "discard draft", "--discard-drafts", ok=False)
+        self.assertTrue(worktree.exists())
+        result = self.call("archive", task, "--note", "discard unmerged test commit and draft",
+                           "--discard-drafts", "--discard-code")
+        self.assertTrue(result["discard_code"])
+        self.assertFalse(workspace.exists())
+        self.assertEqual((manager_tmp / "notes").read_text(), "preserve")
+        self.assertTrue((self.store.logs / task / "report.md").exists())
+        self.assertTrue((self.store.logs / task / "files" / "draft.txt").exists())
+
+    def test_archive_requires_main_branch_even_if_primary_checkout_is_on_feature(self):
+        task = self.task()
+        source = self.source("delivery-repo")
+        worktree = Path(self.add(task, "delivery-repo")["path"])
+        self.publish(task)
+        self.git(worktree, "commit", "--allow-empty", "-m", "delivery")
+        self.report(task)
+        self.git(source, "branch", "feature-retains-delivery", self.git(worktree, "rev-parse", "HEAD"))
+        self.git(source, "switch", "feature-retains-delivery")
+        self.call("archive", task, "--note", "not on main", ok=False)
+        self.assertTrue(worktree.exists())
+        self.git(source, "switch", "main")
+        self.git(source, "update-ref", "refs/heads/main", self.git(worktree, "rev-parse", "HEAD"))
+        self.call("archive", task, "--note", "merged on main")
+        self.assertFalse(worktree.parent.exists())
+
+    def test_start_rework_republish_and_tree_scoped_target(self):
+        first, second = self.task(), self.task()
+        self.publish(first)
+        root_a, root_b = str(uuid.uuid4()), str(uuid.uuid4())
+        agent_a, agent_b = str(uuid.uuid4()), str(uuid.uuid4())
+        a = identity.ThreadIdentity(agent_a, "/root/worker", root_a)
+        b = identity.ThreadIdentity(agent_b, "/root/worker", root_b)
+        with patch.object(cli, "caller_identity", return_value=a), patch.dict(os.environ, {"CODEX_THREAD_ID": agent_a}):
+            self.assertFalse(cli.start(self.store, types.SimpleNamespace(task=first))["unchanged"])
+            self.assertTrue(cli.start(self.store, types.SimpleNamespace(task=None))["unchanged"])
+            self.assertEqual(cli.task_target(self.store, "/root/worker"), first)
+            with self.assertRaisesRegex(cli.Error, "already bound"):
+                cli.start(self.store, types.SimpleNamespace(task=second))
+        self.report(first)
+        self.assertEqual(self.store.read(first)["status"], "pending")
+        with patch.object(cli, "caller_identity", return_value=a), patch.dict(os.environ, {"CODEX_THREAD_ID": agent_a}):
+            cli.start(self.store, types.SimpleNamespace(task=None))
+        self.assertEqual(self.store.read(first)["status"], "working")
+        self.assertTrue(self.call("publish", first, "--file", "report")["unchanged"])
+        self.assertEqual(self.store.read(first)["status"], "pending")
+        with patch.object(cli, "caller_identity", return_value=b), patch.dict(os.environ, {"CODEX_THREAD_ID": agent_b}):
+            cli.start(self.store, types.SimpleNamespace(task=second))
+            self.assertEqual(cli.task_target(self.store, "/root/worker"), second)
+        with patch.object(cli, "caller_identity", return_value=a), patch.dict(os.environ, {"CODEX_THREAD_ID": agent_a}):
+            self.assertEqual(cli.task_target(self.store, "/root/worker"), first)
+
+    def test_start_handoff_requires_old_executor_quiescent(self):
+        task = self.task()
+        old, new, root = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
+        for agent in (old, new):
+            native = identity.ThreadIdentity(agent, f"/root/{agent[:4]}", root)
+            with patch.object(cli, "caller_identity", return_value=native), \
+                    patch.object(cli, "agent_observations", return_value={old: {"status": "active"}}):
+                if agent == old:
+                    cli.start(self.store, types.SimpleNamespace(task=task))
+                else:
+                    with self.assertRaisesRegex(cli.Error, "current executor is active"):
+                        cli.start(self.store, types.SimpleNamespace(task=task))
+        with patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(new, "/root/new", root)), \
+                patch.object(cli, "agent_observations", return_value={old: {"status": "idle"}}):
+            cli.start(self.store, types.SimpleNamespace(task=task))
+        self.assertEqual(self.store.read(task)["agent"], new)
+        self.assertEqual(len(self.store.read(task)["handoffs"]), 1)
+
+    def test_manager_takeover_retires_old_delivery_and_preserves_bindings(self):
+        task = self.task()
+        old = wake_runtime.recorded_manager(self.store)
+        new = str(uuid.uuid4())
+        self.fixture_bind(task, str(uuid.uuid4()))
+        state = wake_runtime._load_state(self.store)
+        state["events"]["old-event"] = {"signature": "old-event", "recipient": old, "task": task,
+                                        "delivery": "pending", "kind": "task_ready"}
+        wake_runtime._save_state(self.store, state)
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": new}), \
+                patch.object(identity, "read", return_value=identity.ThreadIdentity(new, "/root", new)), \
+                patch.object(cli, "agent_observations", return_value={old: {"status": "active"}}):
+            with self.assertRaisesRegex(RuntimeError, "current Manager is active"):
+                wake_runtime.rebind_manager(self.store, "handoff")
+        waiting = self.wait_record(old, 20, "manager-wait")
+        self.store.write_wait(waiting)
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": new}), \
+                patch.object(identity, "read", return_value=identity.ThreadIdentity(new, "/root", new)), \
+                patch.object(cli, "active_wait", return_value=(waiting, "running")):
+            with self.assertRaisesRegex(RuntimeError, "active optional wait"):
+                wake_runtime.rebind_manager(self.store, "handoff")
+        self.store.remove_wait(old)
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": new}), \
+                patch.object(identity, "read", return_value=identity.ThreadIdentity(new, "/root", new)), \
+                patch.object(cli, "agent_observations", return_value={old: {"status": "unknown"}}):
+            with self.assertRaisesRegex(RuntimeError, "cannot verify current Manager state"):
+                wake_runtime.rebind_manager(self.store, "handoff")
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": new}), \
+                patch.object(identity, "read", return_value=identity.ThreadIdentity(new, "/root", new)), \
+                patch.object(cli, "agent_observations", return_value={old: {"status": "idle"}}):
+            self.assertFalse(wake_runtime.rebind_manager(self.store, "handoff")["unchanged"])
+            self.assertTrue(wake_runtime.rebind_manager(self.store, "retry")["unchanged"])
+        self.assertEqual(wake_runtime.recorded_manager(self.store), new)
+        self.assertEqual(self.store.read(task)["agent"] != new, True)
+        current = wake_runtime._load_state(self.store)
+        self.assertNotIn("old-event", current["events"])
+        self.assertEqual(current["manager"], new)
+        self.assertEqual(current["history"][-1]["resolution"], "Manager identity changed")
+        scheduler = wake_runtime.WakeScheduler(self.store)
+        scheduler.manager = new
+        desired, _, _ = scheduler._desired_events([self.store.read(task)],
+                                                   {self.store.read(task)["agent"]: {"status": "idle"}})
+        self.assertEqual({event["recipient"] for event in desired.values()}, {new})
+
+    def test_legacy_task_link_is_repaired_without_overwriting_conflict(self):
+        task = self.task()
+        link = Path(self.store.read(task)["workspace"]) / ".task"
+        link.unlink()
+        self.add(task)
+        self.assertEqual(link.resolve(), self.store.logs / task)
+        link.unlink()
+        link.mkdir()
+        with self.assertRaisesRegex(cli.Error, "conflicting .task path"):
+            cli.workspace_add(self.store, types.SimpleNamespace(task=task, repo="multi-agent-manager",
+                                                           base=self.git(self.root, "rev-parse", "main")))
+
+    def test_wait_stop_accepts_path_only_in_callers_tree(self):
+        task = self.task()
+        root, agent = str(uuid.uuid4()), str(uuid.uuid4())
+        data = self.store.read(task)
+        data["agent"] = agent
+        data["identity"] = {"path": "/root/worker", "tree_root": root}
+        self.store.write(data)
+        record = self.wait_record(agent, 10, "waiting", task=task)
+        self.store.write_wait(record)
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": root}), \
+                patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(root, "/root", root)), \
+                patch.object(cli, "active_wait", return_value=(record, "running")):
+            result = cli.wait_stop(self.store, types.SimpleNamespace(agent="/root/worker", manager=None))
+        self.assertEqual(result["status"], "cancelled")
+        self.assertEqual(result["agent"], agent)
 
 
 if __name__ == "__main__":

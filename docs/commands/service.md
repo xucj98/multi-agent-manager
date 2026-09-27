@@ -9,8 +9,11 @@
 | `mam service start [--manager AGENT-ID]` | Manager、安装者 | 启动或复用当前实例的服务，返回 JSON 状态；可显式指定首次绑定的 Manager。 |
 | `mam service stop` | Manager、安装者 | 停止当前实例的服务；job 继续运行，任务和 workspace 保留。 |
 | `mam service status` | 所有人 | 返回服务是否运行、健康状态、Manager、待办和错误信息。 |
+| `mam service rebind-manager --note NOTE` | 新 Manager | 从 CODEX_THREAD_ID 确认原生根线程身份，接管本实例 Manager 并记录交接理由。 |
 
 新实例尚未绑定 Manager 时显示 awaiting_manager。Manager 首次 create 或 bind 任务后可自动登记；已有任务但无法确认 Manager 时，使用 start 的 `--manager` 参数。当前 start 不能替换已绑定的 Manager。
+
+接管前旧 Manager 必须已结束 turn 和可选 wait，且状态可确认；新 Manager 正在调用命令不构成阻碍。已绑定的执行者不能成为 Manager。重复接管同一身份无副作用。任务、执行者、job、workspace 和服务记录保留；面向旧 Manager 的未投递待办失效，后续由服务重新路由到新 Manager。原生父子关系不变，旧树的协作路径仍按旧树解释。
 
 ## 何时通知
 
@@ -40,12 +43,6 @@
 某些 subagent 不接受直接唤醒时，服务会通知 Manager 协调。Manager 先查看执行者状态和 report，确认尚未处理后，通过原生 follow-up 通知执行者收尾。服务状态中的 blocked 待办会保留，直到对应工作被处理。
 
 ## 待开发
-
-### Manager 接管
-
-候选接口为 `mam service rebind-manager --note NOTE`，由新 Manager 调用，从 CODEX_THREAD_ID 自动取得身份。保留任务、执行者、job、workspace 和待办，并记录交接理由。
-
-接管不改变 Codex 原生父子关系，也不把旧协作树的路径解释成新树中的同名执行者。需要换人时，由新 Manager 创建 subagent，再由执行者 `mam task start TASK-ID` 接续原任务。
 
 ### 执行者主动发消息
 

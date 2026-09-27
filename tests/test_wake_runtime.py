@@ -12,7 +12,7 @@ import unittest
 from unittest import mock
 
 from multi_agent_manager import job_runtime, wake_runtime
-from multi_agent_manager import cli
+from multi_agent_manager import cli, identity
 
 
 MANAGER = "00000000-0000-4000-8000-000000000001"
@@ -149,6 +149,10 @@ class WakeRuntimeTests(unittest.TestCase):
         self.resume_failures = {}
         self.stream_failure = None
         wake_runtime._record_manager(self.store, MANAGER, source="test")
+        identity_patch = mock.patch.object(identity, "read", side_effect=lambda agent: identity.ThreadIdentity(
+            agent, "/root" if agent == MANAGER else "/root/worker", MANAGER))
+        identity_patch.start()
+        self.addCleanup(identity_patch.stop)
 
     def tearDown(self):
         self.temporary.cleanup()
