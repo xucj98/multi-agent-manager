@@ -729,18 +729,18 @@ def publish_files(store, task):
             "deleted": sorted(current.keys() - blobs.keys())}
 
 
-def publish(store, args):
+def publish_draft(store, args, kind):
     with store.lock(args.task), store.lock("publish"):
         publish_branch(store)
         data = store.read(args.task, writable=True)
-        if args.file == "files":
+        if kind == "files":
             return publish_files(store, args.task)
-        draft = store.doc(args.task, args.file)
+        draft = store.doc(args.task, kind)
         if not draft.is_file():
             raise Error(f"missing draft: {draft}")
         content = draft.read_bytes()
         report = None
-        if args.file == "report":
+        if kind == "report":
             delivery = {}
             for name, record in data["repos"].items():
                 if record["state"] != "ready" or record["removed"]:
@@ -748,15 +748,15 @@ def publish(store, args):
                 _, path, _ = live(store, data, name, record)
                 delivery[name] = head(path)
             report = {"commits": delivery}
-        path = f".tasks/{args.task}/{args.file}.md"
-        existing = optional_doc(store, args.task, args.file)
+        path = f".tasks/{args.task}/{kind}.md"
+        existing = optional_doc(store, args.task, kind)
         if existing and existing["content"].encode() == content:
             git(store.root, "update-index", "--add", "--cacheinfo", "100644", existing["blob"], path)
             if report is not None:
                 data["report"] = {**report, "revision": existing["revision"]}
                 data["status"] = "pending"
                 store.write(data)
-            return {"id": args.task, "file": args.file, "revision": existing["revision"], "unchanged": True}
+            return {"id": args.task, "file": kind, "revision": existing["revision"], "unchanged": True}
         parent = head(store.root, store.branch)
         with tempfile.TemporaryDirectory(prefix="task-publish-") as temporary:
             env = {**os.environ, "GIT_INDEX_FILE": str(Path(temporary) / "index")}
@@ -764,7 +764,7 @@ def publish(store, args):
             blob = git(store.root, "hash-object", "-w", "--stdin", input=content).stdout.decode().strip()
             git(store.root, "update-index", "--add", "--cacheinfo", "100644", blob, path, env=env)
             tree = git(store.root, "write-tree", env=env).stdout.decode().strip()
-            commit = git(store.root, "commit-tree", tree, "-p", parent, "-m", f"Publish {args.task} {args.file}").stdout.decode().strip()
+            commit = git(store.root, "commit-tree", tree, "-p", parent, "-m", f"Publish {args.task} {kind}").stdout.decode().strip()
             git(store.root, "update-ref", f"refs/heads/{store.branch}", commit, parent)
         if report is not None:
             data["report"] = {**report, "revision": commit}
@@ -773,7 +773,19 @@ def publish(store, args):
         # Update only this entry; Git locks the shared index and keeps other entries.
         # Use the published blob so an edit made during publication stays a draft.
         git(store.root, "update-index", "--add", "--cacheinfo", "100644", blob, path)
-    return {"id": args.task, "file": args.file, "revision": commit, "report": report}
+    return {"id": args.task, "file": kind, "revision": commit, "report": report}
+
+
+def publish(store, args):
+    return publish_draft(store, args, "task")
+
+
+def report(store, args):
+    return publish_draft(store, args, "report")
+
+
+def attach(store, args):
+    return publish_draft(store, args, "files")
 
 
 def runtime():
@@ -1658,10 +1670,10 @@ def parser():
     sub = task.add_subparsers(dest="command", required=True)
     p = command(sub, "create", "register a TASK-ID, drafts and empty workspace")
     p.add_argument("--title", required=True, metavar="TITLE", help="short task title")
-    p.add_argument("--review", metavar="TASK-ID", help="source TASK-ID; read its latest published task/report and delivery commits")
+    p.add_argument("--review", metavar="TASK-ID|AGENT-PATH", help="source task; read its latest published task/report and delivery commits")
     p.set_defaults(func=create)
     p = command(sub, "bind", "bind one execution agent")
-    p.add_argument("task", metavar="TARGET", help="registered TASK-ID or native collaboration path")
+    p.add_argument("task", metavar="TASK-ID|AGENT-PATH", help="registered TASK-ID or native collaboration path")
     p.add_argument("--agent", required=True, metavar="AGENT-ID", help="execution AGENT-ID; one active task per agent")
     p.set_defaults(func=bind)
     p = command(sub, "start", "register or resume the calling executor")
@@ -1673,37 +1685,42 @@ def parser():
     p.add_argument("--note", required=True, metavar="NOTE", help="short Manager handoff reason")
     p.set_defaults(func=rebind)
     p = command(sub, "show", "read a published document")
-    p.add_argument("task", nargs="?", metavar="TARGET", help="TASK-ID or native collaboration path; defaults to caller task")
+    p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="TASK-ID or native collaboration path; defaults to caller task")
     p.add_argument("--file", choices=("task", "report"), default="task", metavar="FILE", help="published document: task or report (default: task)")
     p.add_argument("--json", action="store_true", help="emit the published document as JSON")
     p.set_defaults(func=show, renderer="published")
-    p = command(sub, "publish", "publish one draft to the configured branch using an isolated index")
-    p.add_argument("task", nargs="?", metavar="TARGET", help="TASK-ID or native collaboration path; defaults to caller task")
-    p.add_argument("--file", choices=("task", "report", "files"), required=True, metavar="FILE", help="draft to publish")
+    p = command(sub, "publish", "publish task requirements")
+    p.add_argument("task", metavar="TASK-ID|AGENT-PATH", help="task whose requirements to publish")
     p.set_defaults(func=publish)
+    p = command(sub, "report", "publish a delivery report and record worktree commits")
+    p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="defaults to the calling executor's task")
+    p.set_defaults(func=report)
+    p = command(sub, "attach", "publish attachments from .task/files/")
+    p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="defaults to the calling executor's task")
+    p.set_defaults(func=attach)
     p = command(sub, "list", "list registered task records")
     group = p.add_mutually_exclusive_group()
     group.add_argument("--archived", action="store_true", help="show only archived tasks")
     group.add_argument("--all", action="store_true", help="include archived tasks")
     p.set_defaults(func=task_list, renderer="task_list")
     p = command(sub, "status", "show concise task, repo and cached job status")
-    p.add_argument("task", nargs="?", metavar="TARGET", help="TASK-ID or native collaboration path; defaults to caller task")
+    p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="TASK-ID or native collaboration path; defaults to caller task")
     p.set_defaults(func=status)
     p = command(sub, "archive", "remove owned worktrees and task branches after all jobs are archived; retain task records")
-    p.add_argument("task", metavar="TARGET", help="registered TASK-ID or native collaboration path")
+    p.add_argument("task", metavar="TASK-ID|AGENT-PATH", help="registered TASK-ID or native collaboration path")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
     p.add_argument("--discard-drafts", action="store_true", help="acknowledge unpublished task, report or files drafts")
     p.add_argument("--discard-code", action="store_true", help="acknowledge unmerged delivery commits")
     p.set_defaults(func=archive)
     jobs = command(commands, "job", "register, query and archive process records").add_subparsers(required=True)
     p = command(jobs, "add", "register a running process with its startup identity")
-    p.add_argument("task", nargs="?", metavar="TARGET", help="TASK-ID or native collaboration path; defaults to caller task")
+    p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="TASK-ID or native collaboration path; defaults to caller task")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
     p.add_argument("--host", required=True, metavar="HOST", help="host running the process")
     p.add_argument("--pid", type=int, required=True, metavar="PID", help="running process ID")
     p.set_defaults(func=job_add)
     p = command(jobs, "list", "query process and agent states; never wake agents")
-    p.add_argument("--task", metavar="TARGET", help="filter jobs by TASK-ID or native collaboration path")
+    p.add_argument("--task", metavar="TASK-ID|AGENT-PATH", help="filter jobs by TASK-ID or native collaboration path")
     p.add_argument("--status", choices=("running", "stopped", "archived", "all"), metavar="STATUS", help="filter jobs; default excludes archived records")
     p.add_argument("--attention", action="store_true", help="show stopped jobs with inactive agents; list unknowns separately")
     p.set_defaults(func=job_list, renderer="job_list")
@@ -1721,7 +1738,7 @@ def parser():
     p.set_defaults(func=wait_list, renderer="wait_list")
     p = command(waits, "stop", "wake one waiter without changing its monitored jobs")
     p.add_argument("manager", nargs="?", choices=("manager",), help="stop the unique unbound manager wait")
-    p.add_argument("--agent", metavar="AGENT-ID", help="waiter AGENT-ID")
+    p.add_argument("--agent", metavar="AGENT-ID|AGENT-PATH", help="waiter AGENT-ID or native collaboration path")
     p.set_defaults(func=wait_stop)
     service = command(commands, "service", "manage the project-local proactive wakeup scheduler").add_subparsers(required=True)
     p = command(service, "start", "start the detached project-local scheduler")
@@ -1736,7 +1753,7 @@ def parser():
     p.set_defaults(func=service_rebind_manager)
     w = command(commands, "workspace", "manage repository worktrees and their environments").add_subparsers(required=True)
     p = command(w, "add", "create a repository worktree using its local environment entry")
-    p.add_argument("task", nargs="?", metavar="TARGET", help="TASK-ID or native collaboration path; defaults to caller task")
+    p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="TASK-ID or native collaboration path; defaults to caller task")
     p.add_argument("--repo", required=True, metavar="REPO", help="single source repository directory below PROJECT_ROOT")
     p.add_argument("--base", required=True, metavar="COMMIT", help="base commit for the task branch")
     p.set_defaults(func=workspace_add)
@@ -1747,7 +1764,7 @@ def main(argv=None, *, cwd=None):
     args = parser().parse_args(argv)
     try:
         store = Store(project_config(cwd))
-        if args.func in {show, publish, status, workspace_add, job_add, archive}:
+        if args.func in {show, publish, report, attach, status, workspace_add, job_add, archive}:
             args.task = task_target(store, args.task)
         elif args.func == job_list and args.task:
             args.task = task_target(store, args.task)

@@ -113,7 +113,7 @@ printf env > "$target/.venv/marker"
         return self.call("add", task, "--repo", repo, "--base", self.git(self.projects / repo, "rev-parse", "main"), command="workspace", ok=ok)
 
     def publish(self, task, kind="task"):
-        return self.call("publish", task, "--file", kind)["revision"]
+        return self.call({"task": "publish", "report": "report", "files": "attach"}[kind], task)["revision"]
 
     def report(self, task):
         self.store.doc(task, "report").write_text("Completed the task; tests passed.\n")
@@ -208,7 +208,7 @@ printf env > "$target/.venv/marker"
         (self.root / "code.py").write_text("unstaged = True\n")
         index = self.git(self.root, "ls-files", "--stage", "--", "code.py", ".gitignore")
         draft_bytes = self.store.doc(draft, "task").read_bytes()
-        commands = [mam_command("task", "publish", task, "--file", "task") for task in (first, second)]
+        commands = [mam_command("task", "publish", task) for task in (first, second)]
         processes = [subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.projects) for command in commands]
         for process in processes:
             stdout, stderr = process.communicate(timeout=20)
@@ -227,6 +227,90 @@ printf env > "$target/.venv/marker"
         for task in (first, second):
             self.assertIn("test task", self.git(self.root, "show", f"main:.tasks/{task}/task.md"))
         self.assertEqual(self.git(self.root, "show", "main:code.py"), "staged = True")
+
+    def test_publish_task_requires_explicit_target_even_for_bound_executor(self):
+        task = self.task()
+        initial_head = self.git(self.root, "rev-parse", "main")
+        before = self.store.read(task)
+        missing = subprocess.run(mam_command("task", "publish"), cwd=self.projects, capture_output=True, text=True)
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn("TASK-ID|AGENT-PATH", missing.stderr)
+        self.assertEqual(self.git(self.root, "rev-parse", "main"), initial_head)
+        self.assertEqual(self.store.read(task), before)
+
+        agent = str(uuid.uuid4())
+        self.fixture_bind(task, agent)
+        before = self.store.read(task)
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": agent}):
+            missing = subprocess.run(mam_command("task", "publish"), cwd=self.projects, capture_output=True, text=True)
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertIn("TASK-ID|AGENT-PATH", missing.stderr)
+            self.assertEqual(self.git(self.root, "rev-parse", "main"), initial_head)
+            self.assertEqual(self.store.read(task), before)
+
+        publication = self.call("publish", task)
+        self.assertEqual(publication["id"], task)
+        self.assertNotEqual(publication["revision"], initial_head)
+        self.assertEqual(self.git(self.root, "show", f"main:.tasks/{task}/task.md"), "# test task")
+
+        self.store.doc(task, "report").write_text("Done.\n")
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": agent}):
+            report = self.call("report")
+            files = self.call("attach")
+        self.assertEqual(report["id"], task)
+        self.assertEqual(files["id"], task)
+        self.assertEqual(self.store.read(task)["status"], "pending")
+
+    def test_target_help_and_required_option_values(self):
+        def help_text(*args):
+            return subprocess.check_output(mam_command(*args, "--help"), cwd=self.projects, text=True)
+
+        publish_help = help_text("task", "publish")
+        self.assertIn("mam task publish", publish_help)
+        self.assertIn("TASK-ID|AGENT-PATH", publish_help)
+        self.assertNotIn("[TASK-ID|AGENT-PATH]", publish_help)
+        self.assertNotIn("--file", publish_help)
+        for command in ("report", "attach"):
+            help_output = help_text("task", command)
+            self.assertIn("[TASK-ID|AGENT-PATH]", help_output)
+            self.assertNotIn("--file", help_output)
+        for command in (("task", "create"), ("task", "bind"), ("task", "show"),
+                        ("task", "publish"), ("task", "report"), ("task", "attach"),
+                        ("task", "status"), ("task", "archive"),
+                        ("job", "add"), ("job", "list"), ("workspace", "add")):
+            text = help_text(*command)
+            self.assertIn("TASK-ID|AGENT-PATH", text, command)
+            self.assertNotIn("TARGET", text, command)
+        self.assertIn("AGENT-ID|AGENT-PATH", help_text("wait", "stop"))
+        for command in (("task", "start"), ("task", "rebind")):
+            self.assertIn("TASK-ID", help_text(*command))
+            self.assertNotIn("TASK-ID|AGENT-PATH", help_text(*command))
+
+        task = self.task()
+        for command in (("task", "archive", "--note", "done"),
+                        ("task", "create", "--title", "review", "--review"),
+                        ("job", "list", "--task")):
+            result = subprocess.run(mam_command(*command), cwd=self.projects, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0, command)
+        self.assertEqual(self.store.read(task)["status"], "working")
+
+    def test_legacy_publish_file_option_is_rejected_without_side_effects(self):
+        task = self.task()
+        before = self.store.read(task)
+        head = self.git(self.root, "rev-parse", "main")
+        for kind in ("task", "report", "files"):
+            with self.subTest(kind=kind):
+                result = subprocess.run(mam_command("task", "publish", task, "--file", kind),
+                                        cwd=self.projects, capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("unrecognized arguments", result.stderr)
+                self.assertEqual(self.git(self.root, "rev-parse", "main"), head)
+                self.assertEqual(self.store.read(task), before)
+        self.publish(task)
+        self.store.doc(task, "report").write_text("Done.\n")
+        self.call("report", task)
+        self.assertEqual(self.call("show", task, "--file", "task", "--json")["content"], "# test task\n")
+        self.assertEqual(self.call("show", task, "--file", "report", "--json")["content"], "Done.\n")
 
     def test_publish_unchanged_repairs_only_its_index_entry(self):
         task, other = self.task(), self.task()
@@ -249,7 +333,7 @@ printf env > "$target/.venv/marker"
                         blob = self.git(self.root, "rev-parse", "HEAD:code.py")
                         self.git(self.root, "update-index", "--add", "--cacheinfo", "100644", blob, path)
                     before = self.git(self.root, "rev-parse", "main")
-                    result = self.call("publish", task, "--file", kind)
+                    result = self.call({"task": "publish", "report": "report"}[kind], task)
                     self.assertTrue(result["unchanged"])
                     self.assertEqual(result["revision"], publication)
                     self.assertEqual(self.git(self.root, "rev-parse", "main"), before)
@@ -278,7 +362,7 @@ printf env > "$target/.venv/marker"
                         path.write_text(content + "Later draft.\n")
                     return original_git(repo, *args, **kwargs)
                 with patch.object(cli, "git", side_effect=edit_during_commit):
-                    cli.publish(self.store, types.SimpleNamespace(task=task, file=kind))
+                    {"task": cli.publish, "report": cli.report}[kind](self.store, types.SimpleNamespace(task=task))
                 relative = f".tasks/{task}/{kind}.md"
                 self.assertEqual(self.git(self.root, "show", f":{relative}"), content.strip())
                 self.assertEqual(self.git(self.root, "show", f"main:{relative}"), content.strip())
@@ -456,7 +540,7 @@ printf env > "$target/.venv/marker"
         self.git(worktree, "add", "code.py")
         self.git(worktree, "commit", "-m", "record delivery")
         delivery = self.git(worktree, "rev-parse", "HEAD")
-        reused = self.call("publish", task, "--file", "report")
+        reused = self.call("report", task)
         self.assertTrue(reused["unchanged"])
         self.assertEqual(reused["revision"], report_publication)
         self.assertEqual(self.store.read(task)["report"]["commits"]["multi-agent-manager"], delivery)
@@ -971,7 +1055,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.assertFalse((self.root / ".local" / "tasks" / f"{task}.json").exists())
         main_before = self.git(self.root, "rev-parse", "main")
         state_before = self.git(self.root, "rev-parse", "project/state-vla")
-        published = subprocess.run(mam_command("task", "publish", task, "--file", "task"), cwd=self.projects,
+        published = subprocess.run(mam_command("task", "publish", task), cwd=self.projects,
                                    capture_output=True, text=True)
         self.assertEqual(published.returncode, 0, published.stdout + published.stderr)
         self.assertEqual(self.git(self.root, "rev-parse", "main"), main_before)
@@ -997,7 +1081,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         main_before = self.git(self.root, "rev-parse", "main")
         branch_before = self.git(self.root, "rev-parse", "project/state-vla")
 
-        rejected = subprocess.run(mam_command("task", "publish", task, "--file", "task"), cwd=self.projects,
+        rejected = subprocess.run(mam_command("task", "publish", task), cwd=self.projects,
                                   capture_output=True, text=True)
         self.assertEqual(rejected.returncode, 2)
         self.assertIn("must be checked out on MAM_BRANCH", rejected.stderr)
@@ -1308,22 +1392,26 @@ base=$(git rev-parse --verify "$1^{commit}")
         (files / "note.txt").write_text("first\n")
         (files / "nested").mkdir()
         (files / "nested" / "trace.json").write_text('{"ok": true}\n')
-        first = self.call("publish", task, "--file", "files")
+        first = self.call("attach", task)
         self.assertEqual(len(first["added"]), 2)
+        self.assertEqual(self.store.read(task)["status"], "working")
         self.assertEqual(self.git(self.root, "ls-files", "--stage", "code.py"), staged)
         self.assertEqual(self.git(self.root, "show", f"main:.tasks/{task}/files/note.txt"), "first")
         (files / "note.txt").write_text("second\n")
         (files / "nested" / "trace.json").unlink()
         self.assertTrue(self.call("status", task)["drafts"]["files"])
         self.assertEqual(self.git(self.root, "show", f"main:.tasks/{task}/files/note.txt"), "first")
-        second = self.call("publish", task, "--file", "files")
+        second = self.call("attach", task)
         self.assertNotEqual(first["revision"], second["revision"])
         self.assertEqual(len(second["updated"]), 1)
         self.assertEqual(len(second["deleted"]), 1)
-        self.assertTrue(self.call("publish", task, "--file", "files")["unchanged"])
+        before_unchanged = self.git(self.root, "rev-parse", "main")
+        self.assertTrue(self.call("attach", task)["unchanged"])
+        self.assertEqual(self.git(self.root, "rev-parse", "main"), before_unchanged)
+        self.assertEqual(self.store.read(task)["status"], "working")
         self.assertEqual(self.git(self.root, "ls-files", "--stage", "code.py"), staged)
         (files / "escape").symlink_to(self.root / "code.py")
-        self.call("publish", task, "--file", "files", ok=False)
+        self.call("attach", task, ok=False)
 
     def test_archive_preflight_preserves_code_then_cleans_tmp_and_link(self):
         task = self.task()
@@ -1384,7 +1472,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         with patch.object(cli, "caller_identity", return_value=a), patch.dict(os.environ, {"CODEX_THREAD_ID": agent_a}):
             cli.start(self.store, types.SimpleNamespace(task=None))
         self.assertEqual(self.store.read(first)["status"], "working")
-        self.assertTrue(self.call("publish", first, "--file", "report")["unchanged"])
+        self.assertTrue(self.call("report", first)["unchanged"])
         self.assertEqual(self.store.read(first)["status"], "pending")
         with patch.object(cli, "caller_identity", return_value=b), patch.dict(os.environ, {"CODEX_THREAD_ID": agent_b}):
             cli.start(self.store, types.SimpleNamespace(task=second))
@@ -1502,18 +1590,18 @@ base=$(git rev-parse --verify "$1^{commit}")
         attachment = self.store.logs / task / "files" / "run.sh"
         attachment.write_text("#!/bin/sh\nexit 0\n")
         attachment.chmod(0o755)
-        self.call("publish", task, "--file", "files")
+        self.call("attach", task)
         path = f".tasks/{task}/files/run.sh"
         self.assertTrue(self.git(self.root, "ls-tree", "main", "--", path).startswith("100755 blob "))
         self.assertNotIn("files", self.call("status", task).get("drafts", {}))
-        self.assertTrue(self.call("publish", task, "--file", "files")["unchanged"])
+        self.assertTrue(self.call("attach", task)["unchanged"])
         attachment.chmod(0o644)
         self.assertTrue(self.call("status", task)["drafts"]["files"])
-        changed = self.call("publish", task, "--file", "files")
+        changed = self.call("attach", task)
         self.assertEqual(changed["updated"], [path])
         self.assertTrue(self.git(self.root, "ls-tree", "main", "--", path).startswith("100644 blob "))
         attachment.chmod(0o755)
-        self.call("publish", task, "--file", "files")
+        self.call("attach", task)
         self.call("archive", task, "--note", "published executable retained")
 
     def test_archive_retry_rechecks_new_drafts_and_unmerged_head(self):
@@ -1536,7 +1624,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         attachment.write_text("new evidence\n")
         refused = self.call("archive", task, "--note", "retry", ok=False)
         self.assertIn("unpublished drafts", refused["error"])
-        self.call("publish", task, "--file", "files")
+        self.call("attach", task)
         old_head = self.git(second_tree, "rev-parse", "HEAD")
         self.git(second, "update-ref", "refs/heads/main", old_head)
         self.git(second_tree, "commit", "--allow-empty", "-m", "new delivery")
@@ -1558,7 +1646,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         data = self.store.read(task)
         data["status"] = "working"
         self.store.write(data)
-        result = self.call("publish", task, "--file", "report")
+        result = self.call("report", task)
         self.assertTrue(result["unchanged"])
         self.assertEqual(result["revision"], revision)
         data = self.store.read(task)
