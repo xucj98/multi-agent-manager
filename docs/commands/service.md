@@ -14,7 +14,7 @@
 
 新实例尚未绑定 Manager 时显示 awaiting_manager。Manager 首次 create 任务时可自动登记；已有任务但无法确认 Manager 时，使用 start 的 `--manager` 参数。当前 start 不能替换已绑定的 Manager。
 
-接管前旧 Manager 必须已结束 turn 和可选 wait，且状态可确认；新 Manager 正在调用命令不构成阻碍。已绑定的执行者不能成为 Manager。重复接管同一身份无副作用。任务、执行者、job、workspace 和服务记录保留；面向旧 Manager 的未投递待办失效，后续由服务重新路由到新 Manager。原生父子关系不变，旧树的协作路径仍按旧树解释。
+接管前旧 Manager 必须已结束 turn，且状态可确认；新 Manager 正在调用命令不构成阻碍。已绑定的执行者不能成为 Manager。重复接管同一身份无副作用。任务、执行者、job、workspace 和服务记录保留；后续通知和未投递的主动消息发给新 Manager。原生父子关系不变，旧树的协作路径仍按旧树解释。
 
 ## 何时通知
 
@@ -26,7 +26,7 @@
 
 自动提醒在负责人空闲时投递。每次按当前任务、job 和 review 状态判断并合批；Manager 再次空闲时，尚待处理的事项继续提醒。原任务与 review 双向关联，同一 review 可以接续多轮返工。exited job 始终保留收尾待办。
 
-负责人使用 wait 时由等待接口返回待办。用户暂停或中断的 turn 等待用户恢复；状态无法确认时保留诊断，待确认后处理。
+用户暂停或中断的 turn 等待用户恢复；状态无法确认时保留诊断，待确认后处理。
 
 通知以 `[MAM Message]` 开头，给出相关任务或执行者、job 及下一步动作。
 

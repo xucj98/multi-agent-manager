@@ -13,6 +13,6 @@
 
 已绑定任务时自动关联；`--task` 可显式指定当前实例的任务，未绑定任务也可发送。消息包含发送者和正文，接收后由 Manager 决定后续动作。
 
-命令不等待 Manager 回复。及时消息会解除 Manager 当前的 `mam wait`，以便其处理消息。未投递消息保留到后续处理，服务重启后继续；Manager 接管后发给当前 Manager。暂停或中断的 turn 等待用户恢复，投递问题可查 `mam service status`。
+命令不等待 Manager 回复。未投递消息保留到后续处理，服务重启后继续；Manager 接管后发给当前 Manager。暂停或中断的 turn 等待用户恢复，投递问题可查 `mam service status`。
 
 消息默认以工具输出送达；需要在客户端查看消息时，用 `mam service set message-channel user` 切换。详见[服务配置](service.md#消息渠道)。
