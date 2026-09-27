@@ -8,11 +8,11 @@ job 是任务下登记的长进程，每条记录有独立 JOB-ID。预计超过
 | --- | --- | --- |
 | `mam job add [TASK-ID\|AGENT-PATH] --note NOTE --host HOST --pid PID` | 执行者 | 将已启动的进程登记到任务，记录用途、主机、PID 和启动身份，返回 JOB-ID。 |
 | `mam job list [--task TASK-ID\|AGENT-PATH] [--status STATUS]` | 所有人 | 查询并列出 job；默认显示未归档项。表格包含描述、状态、开始时间、JOB-ID、任务描述、TASK-ID 和执行者路径（旧记录回退为 AGENT-ID）。 |
-| `mam job list --attention` | Manager | 筛选已停止、未归档且执行者已空闲的 job，同时列出需要核实的项目。 |
+| `mam job list --attention` | Manager | 筛选已退出、未归档且执行者已空闲的 job，同时列出需要核实的项目。 |
 | `mam job status JOB-ID` | 所有人 | 刷新指定 job，返回精简 JSON，包含任务、执行者、主机、PID、开始时间、进程状态和检查时间。 |
 | `mam job archive JOB-ID --note NOTE` | 执行者 | 记录处理结论或成果位置，结束跟踪，保留最后观测及历史记录；不停止进程。 |
 
-`HOST` 可用 `local`、SSH 别名或 `username@hostname`；远端查询需要 SSH 可达。`STATUS` 可为 `running`、`stopped`、`archived` 或 `all`。
+`HOST` 可用 `local`、SSH 别名或 `username@hostname`；远端查询需要 SSH 可达。`STATUS` 可为 `running`、`exited`、`archived` 或 `all`。
 任务可用 TASK-ID 或当前原生协作树内的完整执行者路径 AGENT-PATH 定位；已绑定执行者使用 add 时可省略任务参数。历史任务仍用 TASK-ID。
 
 ## 状态与收尾
@@ -20,13 +20,13 @@ job 是任务下登记的长进程，每条记录有独立 JOB-ID。预计超过
 | 状态 | 含义 |
 | --- | --- |
 | `running` | 已确认登记的进程仍在运行 |
-| `stopped` | 已确认进程停止，等待执行者处理 |
+| `exited` | 已确认进程退出，等待执行者处理 |
 | `unknown` | 本次无法确认，返回原因及已有的最后观测 |
 | `archived` | 已结束 MAM 跟踪，保留记录 |
 
-MAM 只观察进程是否停止，项目结果由执行者判断。正常结束、OOM 或其他退出原因都不改变 stopped 的含义。
+进程退出后的项目结果由执行者判断。
 
-进程停止后，执行者检查结果、按项目要求更新文档或实验记录，再归档 job；Manager 收到转发通知时，通知对应执行者处理。一个任务可多次归档 job，最终 task 归档前必须全部归档。
+进程退出后，执行者检查结果、按项目要求更新文档或实验记录，再归档 job；Manager 收到转发通知时，通知对应执行者处理。一个任务可多次归档 job，最终 task 归档前必须全部归档。
 
 archive 也可用于不再需要跟踪的运行中进程，不会查询或终止它。已归档 job 不再探测或唤醒。
 

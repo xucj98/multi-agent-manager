@@ -46,7 +46,9 @@ mam service start --manager AGENT-ID
 mam service stop
 ```
 
-新项目没有 Manager 绑定时，service 会处于 `awaiting_manager`，首次由 Manager 执行 `mam task create` 或 `mam task bind` 后才开始投递。已有任务却无法确定 Manager 时，显式运行 `mam service start --manager AGENT-ID`。
+MAM 消息默认通过工具输出投递。需要在客户端看到消息时，运行 `mam service set message-channel user`；用 `mam service set message-channel tool` 恢复默认渠道。设置按实例保存并立即生效，详见[服务配置](commands/service.md#消息渠道)。
+
+新项目没有 Manager 绑定时，service 会处于 `awaiting_manager`，首次由 Manager 执行 `mam task create` 后才开始投递。已有任务却无法确定 Manager 时，显式运行 `mam service start --manager AGENT-ID`。
 
 默认工作流是在当前工作完成后结束 turn，由 proactive service 后续投递待办。需要在当前 turn 内等待时，可使用：
 
