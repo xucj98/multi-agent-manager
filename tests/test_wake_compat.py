@@ -165,7 +165,15 @@ class WakeCompatibilityTests(unittest.TestCase):
         )
         self.assertEqual(
             requests[3]["params"],
-            {"threadId": thread_ids[0], "input": [{"type": "text", "text": "MAM compatibility probe; unknown thread only."}]},
+            {
+                "threadId": thread_ids[0],
+                "input": [],
+                "toolOutput": {
+                    "name": "message",
+                    "namespace": "mam",
+                    "output": "MAM compatibility probe; unknown thread only.",
+                },
+            },
         )
         self.assertNotIn("model", requests[3]["params"])
         self.assertNotIn("effort", requests[3]["params"])

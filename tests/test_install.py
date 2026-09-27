@@ -442,7 +442,7 @@ run_live_delivery_probe() {
             "                while time.monotonic() < deadline:\n"
             "                    state = wake_runtime._load_state(store)\n"
             "                    observed = job_runtime.probe_process('local', state['pid'], state['identity'])\n"
-            "                    if observed['status'] == 'stopped':\n"
+            "                    if observed['status'] == 'exited':\n"
             "                        break\n"
             "                    time.sleep(0.05)\n"
             "                else:\n"
