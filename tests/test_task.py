@@ -1670,6 +1670,25 @@ base=$(git rev-parse --verify "$1^{commit}")
         cli.finish_wait(self.store, second)
         self.assertIsNone(self.store.read_wait(manager))
 
+    def test_unrecorded_manager_wait_requires_no_active_executor_binding(self):
+        task = self.task()
+        wake_runtime._service_path(self.store, "manager.json").unlink()
+        executor = str(uuid.uuid4())
+        data = self.store.read(task)
+        data["agent"] = executor
+        self.store.write(data)
+
+        with self.assertRaisesRegex(cli.Error, "requires a recorded Manager"):
+            cli.begin_wait(self.store, "unbound-caller", "manager", None, "turn")
+        self.assertIsNone(self.store.read_wait("unbound-caller"))
+        legitimate = cli.begin_wait(self.store, executor, "executor", task, "turn")
+        cli.finish_wait(self.store, legitimate)
+
+        data["status"] = "archived"
+        self.store.write(data)
+        compatible = cli.begin_wait(self.store, "unbound-caller", "manager", None, "later-turn")
+        cli.finish_wait(self.store, compatible)
+
 
 if __name__ == "__main__":
     unittest.main()
