@@ -2,20 +2,15 @@
 
 ## 核心原则
 
-MAM 用于协助管理本集群的 agents，提供 `mam task`、`mam workspace`、`mam job` 和可选的 `mam wait`，并自动唤醒需要处理后续工作的负责人。本集群的信息查看[本地说明](.local/README.md)，所有 `mam` 命令以及 agent 均在本机运行。
+MAM 是 multi-agent 项目管理工具。使用细节可查阅 `mam --help` 或[接口文档](docs/commands/)，语法中的大写词需要替换为实际值，`[]` 表示可选，`|` 表示任选其一。项目具体信息查看[项目说明](.local/README.md)。
 
-使用细节可用 `mam --help` 查询，语法中的大写词需要替换为实际值，`[]` 表示可选，`|` 表示任选其一。
-
-MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 是 Codex 线程 ID。`AGENT-PATH` 是当前原生协作树内的完整执行者路径，如 `/root/worker`，绑定后可用于定位任务。Manager 显式指定任务；已绑定执行者的日常操作可省略任务参数。
-
-MAM 使用共享根目录 `MAM_ROOT`：Manager 编辑其中的 `task.md`，执行者编辑自己的 `report.md`。任务要求通过 `mam task publish` 发布，报告通过 `mam task report` 提交，使用 `mam task show` 查看；未发布的修改是草稿。
-
-每个未归档任务最多绑定一个执行者，每个执行者同时只绑定一个未归档任务。每个任务有独立的 workspace `PROJECT_ROOT/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。交接给新执行者时，沿用原目录、分支、环境和 job。**原则上每个 subagent 都只能读写自己的 workspace**。`mam` 需在 `PROJECT_ROOT` 或其各级子目录中使用。
+项目的目录结构如下：
 
 ```text
 PROJECT_ROOT/
-  .mam/env.json               # 项目配置
+  .mam/env.json               # MAM 配置，每个 MAM 实例唯一
   MAM_ROOT/                   # MAM 根目录
+    .local/                   # 该项目的具体信息说明及 MAM service 持久化目录
     .tasks/TASK-ID/task.md    # Manager 编辑任务要求
     .tasks/TASK-ID/report.md  # 执行者编辑结果简报
     .tasks/TASK-ID/files      # 其他有必要保留的一次性文件
@@ -26,11 +21,20 @@ PROJECT_ROOT/
     tmp/                      # 本任务临时文件，归档时自动清理
 ```
 
+MAM 创建任务时生成 `TASK-ID`，同时用作任务标识、命名 workspace 和 git branch；`JOB-ID` 标识登记的进程；`AGENT-ID` 是 Codex 线程 ID。`AGENT-PATH` 是 Codex 原生协作树内的执行者路径，如 `/root/worker`。
+
+MAM 使用共享根目录 `MAM_ROOT`：Manager 编辑其中的 `task.md`，执行者编辑自己的 `report.md`。任务要求通过 `mam task publish` 发布，报告通过 `mam task report` 提交，使用 `mam task show` 查看；未发布的修改是草稿。
+
+每个未归档任务和 subagent 一一绑定。每个任务有独立的 workspace `PROJECT_ROOT/workspace/TASK-ID`，下面可以建立独立的 worktree，并使用独立的 git branch `task/TASK-ID`。**原则上每个 subagent 都只能读写自己的 workspace**。
+
+MAM 使用 `.mam/env.json` 区分不同的项目实例，因此 `mam` 命令需在 `PROJECT_ROOT` 或其各级子目录中使用。
+
 Manager 主要负责任务的推进，进行排期，派遣 subagent 工作，验收，裁决。细节工作交给 subagent 进行，manager 主要通过 report 或者协作工具了解进展。subagent 工作可能出错，manager 可以根据需要派发 reviewer，并对最终结果进行裁定。涉及项目的核心工作，如后续计划安排，roadmap 调整，编写 README.md, AGENTS.md 这类工作由 manager 自己完成。Manager可以直接修改 PROJECT_ROOT/REPO，无需创建 task，worktree。
 
 ### 文件留存原则
 
 为了保证项目的长期可维护性，需要严格控制留存的内容。项目文件根据用途分成4类：
+
 1. 后续会**重复使用**的代码、配置、分析工具。进入各个 `REPO`，随 git 提交。
 2. 一次性，但有必要保留以解释本次结论的分析代码或附件。进入 `.tasks/TASK-ID/files/`，随 `mam task report` 一起提交。
 3. 正式数据、checkpoint、评测原始结果。放在 `REPO` 约定的稳定产物目录，不进入 git。
@@ -44,7 +48,7 @@ Manager 无关联任务的临时文件统一放在 `PROJECT_ROOT/workspace/tmp/`
 
 ## 任务管理
 
-Manager 创建任务、填写并发布要求，再通过 Codex 原生工具创建 subagent，提供 TASK-ID 并要求其阅读 AGENTS.md 和已发布任务。执行者自行登记；完成后由 Manager 验收、安排 review 或归档。
+Manager 先创建任务、填写并发布要求，再通过 Codex 原生工具创建 subagent，提供 TASK-ID 并要求其阅读 AGENTS.md 和已发布任务。执行者自行登记；完成后由 Manager 验收、安排 review 或归档。
 
 ```text
 mam task create --title TITLE [--review TASK-ID|AGENT-PATH]
@@ -52,7 +56,7 @@ mam task publish TASK-ID|AGENT-PATH
 mam task archive TASK-ID|AGENT-PATH --note NOTE
 ```
 
-- `create` 返回 TASK-ID；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求，再用该 TASK-ID 首次发布，无需先绑定 subagent。
+- `create` 返回 TASK-ID；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求，首次发布任务使用 TASK-ID。
 - 途中追加要求时，先更新并发布 task.md，再通知执行者读取。执行者和 reviewer 始终以最新已发布要求为准；report 无需绑定要求版本。
 - Review 任务用 `--review TASK-ID|AGENT-PATH` 指定源任务，结合最新 task.md、report.md 和交付代码独立验收。
 - 返工时通知原执行者调用 `mam task start` 后继续；需要换人时，先确认旧执行者已结束 turn 和 wait，再让新执行者 `mam task start TASK-ID` 接手。原 workspace、分支、环境和 job 保留，无需再次创建。
@@ -67,29 +71,29 @@ mam task status [TASK-ID|AGENT-PATH]
 mam task show [TASK-ID|AGENT-PATH]
 ```
 
-`mam task status` 显示已保存的 job 观测，不会实时探测。Manager 可用 `/root/worker` 定位当前协作树内的执行者；其他树或归档任务用 TASK-ID。
+`mam task status` 显示已保存的 job 观测，不会实时探测。
 
 ## 执行与交付
 
-启动 prompt 会提供 TASK-ID。首次执行或接手时调用 start，再读取已发布要求，为每个需要修改或独立 review 的仓库创建 worktree：
+Subagent 首次执行任务时调用 `mam task start` 登记，再读取已发布要求，为每个需要修改或独立 review 的仓库创建 worktree：
 
 ```text
 mam task start TASK-ID
-mam task show
+mam task show [TASK-ID|AGENT-PATH]
 mam workspace add --repo REPO --base COMMIT
 ```
 
-MAM 从 CODEX_THREAD_ID 自动确认执行者身份与协作路径。已绑定执行者返工时调用 `mam task start`，任务进入 working；发布 report 后进入 pending，归档后为 archived。普通问答无需 start。该命令不创建 agent，也不更换任务目录或分支。
+Subagent 查看自己任务时可不提供 `TASK-ID|AGENT-PATH`，MAM 从 `CODEX_THREAD_ID` 自动确认身份。返工时也要调用 `mam task start`，任务进入 working；发布 report 后进入 pending，归档后为 archived。普通问答无需 start。
 
-完成一个阶段、遇到阻塞或准备交接时，更新 `.task/report.md` 草稿，简洁记录当前进展、验证结果、阻塞和下一步，不记操作流水账。Manager 可读取中央草稿了解进度；`mam task show --file report` 仍只返回已发布交付。草稿更新不改变状态，最终交付时再发布，不另建 progress.md。
+subagent 执行任务过程中应及时更新任务进度。直接修改 `workspace/TASK-ID/.task/report.md` 草稿，简洁记录当前进展，中间结果无需发布。Manager 可读取草稿了解进度；`mam task show --file report` 只返回已发布。
 
-完成后按[文件留存原则](#文件留存原则)整理成果，并提交 worktree 中的交付代码。通过 workspace 根目录的 `.task/report.md` 写简报，说明完成项、交付 commit、验证结果和成果位置；需要保留的一次性附件放 `.task/files/`。发布前将进度草稿整理为交付简报，再提交报告和附件：
+完成后按[文件留存原则](#文件留存原则)整理成果，并在各 worktree 中用 `git commit` 提交代码。编辑 `workspace/TASK-ID/.task/report.md`，说明完成项、交付 commit、验证结果和成果位置；需要保留的一次性附件放 `.task/files/`。发布前将进度草稿整理为交付简报，再提交报告和附件：
 
 ```text
 mam task report
 ```
 
-report 在同一次提交中发布报告及 `.task/files/` 的新增、修改和删除，没有附件也可提交。执行者无需在共享管理仓库手工 git add/commit。读取要求仍用 `mam task show`，不能以 `.task/task.md` 中的未发布草稿代替。
+report 在同一次提交中发布报告及 `.task/files/` 的新增、修改和删除，没有附件也可提交。
 
 ### 任务收尾
 
