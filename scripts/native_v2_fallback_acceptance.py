@@ -460,6 +460,36 @@ def _assert_escalation(source: Mapping[str, Any], escalation: Mapping[str, Any])
         raise FixtureError("Manager escalation has the wrong fallback action")
 
 
+def _assert_manager_delivery(
+    escalation: Mapping[str, Any], baseline: Mapping[str, Any], turn_start_attempts: int,
+    attestation: str, *, task: str, job: str,
+) -> str:
+    if escalation.get("delivery") != "accepted":
+        raise FixtureError("idle root has no accepted fallback escalation")
+    delivered_attempts = _integer(escalation.get("attempts"), field="escalation attempts")
+    if delivered_attempts < 1:
+        raise FixtureError("accepted fallback escalation has no delivery attempt")
+    if not isinstance(escalation.get("accepted_at"), str) or not escalation["accepted_at"]:
+        raise FixtureError("accepted fallback escalation has no acknowledgement timestamp")
+    expected_turn_starts = _integer(baseline.get("turn_start_attempts"), field="baseline turn-start attempts") + delivered_attempts
+    if turn_start_attempts != expected_turn_starts:
+        raise FixtureError("fixture Manager turn/start count does not match accepted reminder attempts")
+    attestation = attestation.strip()
+    locator = escalation.get("executor_path") or f"TASK-ID {task}"
+    if (
+        "[MAM Message]" not in attestation
+        or locator not in attestation
+        or job not in attestation
+        or "followup_task" not in attestation
+        or "archive the job" not in attestation
+        or EXACT_REJECTION in attestation
+    ):
+        raise FixtureError(
+            "--manager-attestation must record the concise [MAM Message] with the executor, job, and followup_task action"
+        )
+    return attestation
+
+
 def _assert_no_extra_manager_event(events: list[dict[str, Any]], task: str, manager: str, escalation: Mapping[str, Any]) -> None:
     manager_events = [event for event in events if event.get("task") == task and event.get("recipient") == manager]
     if len(manager_events) != 1 or manager_events[0].get("signature") != escalation.get("signature"):
@@ -474,6 +504,10 @@ def _fixture_job(task_record: Mapping[str, Any], job: str) -> dict[str, Any]:
     return _one([dict(item) for item in matching], label="fixture job")
 
 
+def _job_exited(value: Any) -> bool:
+    return isinstance(value, str) and value in {"exited", "stopped"}
+
+
 def _running_fixture_context(
     root: Path, task: str, job: str, manager: str, child: str
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -481,8 +515,8 @@ def _running_fixture_context(
     if task_record.get("agent") != child:
         raise FixtureError("fixture task is not bound to the declared native child")
     fixture_job = _fixture_job(task_record, job)
-    if fixture_job.get("status") != "stopped":
-        raise FixtureError("fixture job is not recorded as stopped before fallback verification")
+    if not _job_exited(fixture_job.get("status")):
+        raise FixtureError("fixture job is not recorded as exited before fallback verification")
     state = _service_state(root)
     if state.get("manager") != manager or state.get("mode") != "active" or state.get("enabled") is not True:
         raise FixtureError("fixture service is not running for the declared Manager")
@@ -846,7 +880,7 @@ def command_plan(_args: argparse.Namespace) -> int:
                 "Read docs/native-v2-fallback-acceptance.zh-CN.md before prepare.",
                 "Use prepare only with a new absolute fixture root and CREATE_NATIVE_V2_FIXTURE.",
                 "Keep the root Manager active through blocked and restarted checkpoints.",
-                "Only after the root receives the one idle-time fallback may it use parent-native followup_task.",
+                "After the root receives an idle-time fallback, use parent-native followup_task before archiving the job.",
             )
         )
     )
@@ -1003,8 +1037,8 @@ def command_record_stopped(args: argparse.Namespace) -> int:
     if task_record.get("agent") != child:
         raise FixtureError("fixture task is not bound to the declared native child")
     fixture_job = _fixture_job(task_record, args.job)
-    if fixture_job.get("status") != "stopped":
-        raise FixtureError("fixture job is not recorded as stopped before restart verification")
+    if not _job_exited(fixture_job.get("status")):
+        raise FixtureError("fixture job is not recorded as exited before restart verification")
     state = _service_state(root)
     if state.get("manager") != manager or state.get("mode") != "disabled" or state.get("enabled") is not False:
         raise FixtureError("fixture service state is not disabled after the requested stop")
@@ -1238,24 +1272,10 @@ def command_assert(args: argparse.Namespace) -> int:
         )
         _assert_source_checkpoint_snapshot(source, baseline)
         _assert_escalation_identity_snapshot(escalation, baseline)
-        if escalation.get("delivery") != "accepted" or _integer(escalation.get("attempts"), field="escalation attempts") != 1:
-            raise FixtureError("idle root did not receive exactly one accepted fallback escalation")
-        if not isinstance(escalation.get("accepted_at"), str) or not escalation["accepted_at"]:
-            raise FixtureError("accepted fallback escalation has no acknowledgement timestamp")
-        expected_turn_starts = _integer(baseline.get("turn_start_attempts"), field="baseline turn-start attempts") + 1
-        if payload["turn_start_attempts"] != expected_turn_starts:
-            raise FixtureError("fixture did not have exactly one additional Manager turn/start after root became idle")
-        attestation = (args.manager_attestation or "").strip()
-        if (
-            "[MAM Message]" not in attestation
-            or args.task not in attestation
-            or args.job not in attestation
-            or EXACT_REJECTION not in attestation
-        ):
-            raise FixtureError(
-                "--manager-attestation must record the received [MAM Message] with this TASK-ID, JOB-ID, and exact rejection"
-            )
-        payload["manager_attestation"] = attestation
+        payload["manager_attestation"] = _assert_manager_delivery(
+            escalation, baseline, payload["turn_start_attempts"], args.manager_attestation or "",
+            task=args.task, job=args.job,
+        )
     else:
         raise FixtureError(f"unsupported running-service assertion phase: {phase}")
     _write_receipt(root, args.receipt, payload)
@@ -1280,7 +1300,7 @@ def command_assert_archived(args: argparse.Namespace) -> int:
         manager=manager,
         child=child,
         escalation_delivery="accepted",
-        escalation_attempts=1,
+        escalation_attempts=_integer(baseline.get("escalation_attempts"), field="baseline escalation attempts"),
     )
     child_archive_receipt = _load_fixture_receipt(
         root,
@@ -1315,7 +1335,12 @@ def command_assert_archived(args: argparse.Namespace) -> int:
     _assert_source_event(source, task=args.task, job=args.job, child=child)
     _assert_escalation_event(escalation, task=args.task, job=args.job, manager=manager, child=child)
     _assert_escalation(source, escalation)
-    _assert_checkpoint_event_snapshot(source, escalation, baseline)
+    _assert_source_checkpoint_snapshot(source, baseline)
+    _assert_escalation_identity_snapshot(escalation, baseline)
+    if _integer(baseline.get("escalation_attempts"), field="baseline escalation attempts") < 1:
+        raise FixtureError("delivered baseline has no Manager reminder attempt")
+    if _integer(escalation.get("attempts"), field="archived escalation attempts") < baseline["escalation_attempts"]:
+        raise FixtureError("archived escalation lost a prior reminder attempt")
     if (
         source.get("resolution") != "condition changed or resolved"
         or escalation.get("resolution") != "condition changed or resolved"
@@ -1360,8 +1385,8 @@ def command_cleanup(args: argparse.Namespace) -> int:
     if task_record.get("status") != "archived" or fixture_job.get("status") != "archived":
         raise FixtureError("cleanup requires the fixture task and fixture job to be archived")
     probe = fixture_job.get("probe")
-    if not isinstance(probe, Mapping) or probe.get("status") != "stopped":
-        raise FixtureError("cleanup requires a previously observed stopped fixture process")
+    if not isinstance(probe, Mapping) or not _job_exited(probe.get("status")):
+        raise FixtureError("cleanup requires a previously observed exited fixture process")
     state = _service_state(root)
     if state.get("enabled") is not False or state.get("mode") != "disabled":
         raise FixtureError("cleanup requires the fixture scheduler to be stopped")

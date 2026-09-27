@@ -267,6 +267,22 @@ def capture_manager_for_task(store: Store, *, excluded_agent: str | None = None)
     return _record_manager(store, caller, source="unbound Manager task create/bind")
 
 
+def _route_messages(state: dict[str, Any], manager: str) -> None:
+    for event in state.get("events", {}).values():
+        if not isinstance(event, dict) or event.get("kind") != "message" or event.get("recipient") == manager:
+            continue
+        event["recipient"] = manager
+        if event.get("delivery") not in {"pending", "rejected", "blocked"}:
+            continue
+        event["delivery"] = "pending"
+        event["next_attempt_at"] = 0.0
+        event.pop("block_kind", None)
+        event.pop("last_error", None)
+        for key in tuple(event):
+            if key.startswith("interruption_"):
+                event.pop(key, None)
+
+
 def rebind_manager(store: Store, note: str) -> dict[str, Any]:
     """Transfer a project Manager after proving the old owner has stopped."""
     from . import cli, identity
@@ -296,12 +312,10 @@ def rebind_manager(store: Store, note: str) -> dict[str, Any]:
         record["handoffs"].append({"from_agent": old, "to_agent": caller.agent, "at": _timestamp(), "note": note})
         state = _load_state(store)
         _write_json(_service_path(store, "manager.json"), record)
+        _route_messages(state, caller.agent)
         if old is not None:
             for signature, event in list(state.get("events", {}).items()):
                 if isinstance(event, Mapping) and event.get("recipient") == old:
-                    if event.get("kind") == "message":
-                        event["recipient"] = caller.agent
-                        continue
                     scheduler_event = state["events"].pop(signature)
                     state.setdefault("history", []).append({**scheduler_event, "resolved_at": _timestamp(),
                                                                "resolution": "Manager identity changed"})
@@ -1316,6 +1330,10 @@ class WakeScheduler:
     def _completed_turn(status: str | None) -> bool:
         return isinstance(status, str) and status.lower() == "completed"
 
+    @staticmethod
+    def _terminal_turn(status: str | None) -> bool:
+        return isinstance(status, str) and status.lower() in {"completed", "failed"}
+
     def _block_for_interruption(
         self,
         events: list[dict[str, Any]],
@@ -1504,7 +1522,7 @@ class WakeScheduler:
                     with contextlib.suppress(Exception):
                         stream.close()
             _, _, status = self._turn_boundary(latest)
-            if self._completed_turn(status):
+            if self._terminal_turn(status):
                 for event in events:
                     event.update({"delivery": "pending", "next_attempt_at": 0.0})
 
@@ -1624,7 +1642,7 @@ class WakeScheduler:
                     current = [event for event in current if event.get("kind") == "message" and not event.get("defer")]
                     if not current:
                         continue
-                elif resumed_state == "active" and not self._completed_turn(before_turn_status):
+                elif resumed_state == "active" and not self._terminal_turn(before_turn_status):
                     self._preflight_failure(current, "active recipient has no verifiable current turn")
                     continue
                 payload = self._payload(current)
@@ -1749,6 +1767,7 @@ class WakeScheduler:
                 _save_state(self.store, state)
                 return state
             state["mode"] = "active"
+            _route_messages(state, manager)
             if not self._ensure_compatibility(state):
                 _save_state(self.store, state)
                 return state

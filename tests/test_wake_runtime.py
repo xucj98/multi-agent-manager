@@ -265,6 +265,76 @@ class WakeRuntimeTests(unittest.TestCase):
         self.scheduler().run_once()
         self.assertEqual(len(self.starts), 1)
 
+    def test_rebind_clears_old_manager_interruption_for_queued_message(self):
+        self.turns[MANAGER] = {"id": "old-interrupted", "status": "interrupted"}
+        queued = self.message("urgent after takeover")
+        self.scheduler().run_once()
+        event = self.state()["events"][queued["id"]]
+        self.assertEqual((event["delivery"], event["block_kind"]), ("blocked", "interrupted_turn"))
+
+        replacement = "00000000-0000-4000-8000-000000000009"
+        self.statuses[replacement] = "active"
+        self.turns[replacement] = {"id": "replacement-active", "status": "inProgress"}
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": replacement}), \
+             mock.patch.object(identity, "read", return_value=identity.ThreadIdentity(replacement, "/root", replacement)), \
+             mock.patch.object(cli, "agent_observations", return_value={MANAGER: {"status": "idle"}}):
+            wake_runtime.rebind_manager(self.store, "old Manager finished")
+        event = self.state()["events"][queued["id"]]
+        self.assertEqual(event["recipient"], replacement)
+        self.assertEqual(event["delivery"], "pending")
+        self.assertNotIn("block_kind", event)
+        self.assertNotIn("interruption_turn_id", event)
+        self.scheduler().run_once()
+        self.assertEqual(len(self.starts), 1)
+        self.assertEqual(self.starts[0][0], replacement)
+        self.assertIn("urgent after takeover", self.starts[0][1])
+
+    def test_rebind_preserves_ambiguous_message_delivery(self):
+        first = self.message("maybe delivered")
+        second = self.message("response lost")
+        state = self.state()
+        state["events"][first["id"]].update({"delivery": "ambiguous", "next_attempt_at": None})
+        state["events"][second["id"]].update({"delivery": "uncertain", "next_attempt_at": 0.0})
+        wake_runtime._save_state(self.store, state)
+        replacement = "00000000-0000-4000-8000-000000000009"
+        self.statuses[replacement] = "idle"
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": replacement}), \
+             mock.patch.object(identity, "read", return_value=identity.ThreadIdentity(replacement, "/root", replacement)), \
+             mock.patch.object(cli, "agent_observations", return_value={MANAGER: {"status": "idle"}}):
+            wake_runtime.rebind_manager(self.store, "old Manager finished")
+        self.scheduler().run_once()
+        events = self.state()["events"]
+        self.assertEqual(events[first["id"]]["delivery"], "ambiguous")
+        self.assertEqual(events[second["id"]]["delivery"], "ambiguous")
+        self.assertEqual(self.starts, [])
+
+    def test_partial_manager_rebind_routes_queued_message_without_resending_ambiguous_one(self):
+        pending = self.message("survive partial takeover", defer=True)
+        uncertain = self.message("may have arrived")
+        state = self.state()
+        state["events"][uncertain["id"]].update({"delivery": "ambiguous", "next_attempt_at": None,
+                                                  "last_error": "turn/start acknowledgement was lost"})
+        wake_runtime._save_state(self.store, state)
+        replacement = "00000000-0000-4000-8000-000000000009"
+        self.statuses[replacement] = "idle"
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": replacement}), \
+             mock.patch.object(identity, "read", return_value=identity.ThreadIdentity(replacement, "/root", replacement)), \
+             mock.patch.object(cli, "agent_observations", return_value={MANAGER: {"status": "idle"}}), \
+             mock.patch.object(wake_runtime, "_save_state", side_effect=OSError("injected state write failure")):
+            with self.assertRaisesRegex(OSError, "injected state write failure"):
+                wake_runtime.rebind_manager(self.store, "old Manager finished")
+        self.assertEqual(wake_runtime.recorded_manager(self.store), replacement)
+        self.assertEqual(self.state()["events"][pending["id"]]["recipient"], MANAGER)
+        self.scheduler().run_once()
+        current = self.state()
+        self.assertEqual(len(self.starts), 1)
+        self.assertEqual(self.starts[0][0], replacement)
+        self.assertIn("survive partial takeover", self.starts[0][1])
+        self.assertNotIn(pending["id"], current["events"])
+        self.assertEqual(current["events"][uncertain["id"]]["recipient"], replacement)
+        self.assertEqual(current["events"][uncertain["id"]]["delivery"], "ambiguous")
+        self.assertIn("acknowledgement was lost", current["events"][uncertain["id"]]["last_error"])
+
     def test_deferred_message_waits_for_completed_manager_turn(self):
         self.statuses[MANAGER] = "active"
         self.turns[MANAGER] = {"id": "manager-turn", "status": "inProgress"}
@@ -332,6 +402,16 @@ class WakeRuntimeTests(unittest.TestCase):
         self.scheduler().run_once()
         self.assertEqual(len(self.starts), 2)
         self.assertEqual(self.starts[0][1], self.starts[1][1])
+
+    def test_failed_manager_turn_rearms_current_task_reminder_when_idle(self):
+        self.task(TASK_ONE)
+        self.scheduler().run_once()
+        self.assertEqual(len(self.starts), 1)
+        self.turns[MANAGER] = {"id": "accepted-1", "status": "failed"}
+        self.scheduler().run_once()
+        self.assertEqual(len(self.starts), 2)
+        self.scheduler().run_once()
+        self.assertEqual(len(self.starts), 2, "new in-progress turn must not be reinjected")
 
     def test_old_tree_path_falls_back_to_task_and_agent_ids(self):
         task = self.task(TASK_ONE)
