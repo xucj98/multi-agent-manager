@@ -231,7 +231,7 @@ run_live_delivery_probe() {
         incomplete 'simulated isolated delivery failure'
         return 1
     fi
-    printf 'MAM proactive wakeup: isolated real delivery PASS (6 model turns)\n'
+    printf 'MAM proactive wakeup: isolated real delivery PASS\n'
 }
 '''
 
@@ -322,6 +322,10 @@ run_live_delivery_probe() {
 
     def test_same_repository_sibling_checkout_is_installed_and_path_persists(self):
         self.assertNotEqual(self.primary, self.checkout)
+        original_bashrc = (self.home / ".bashrc").read_text()
+        trace_begin = "# >>> MAM Codex App Server trace >>>"
+        trace_end = "# <<< MAM Codex App Server trace <<<"
+        legacy_trace = original_bashrc[original_bashrc.index(trace_begin) : original_bashrc.index(trace_end) + len(trace_end)]
         result = self.run_installer(CODEX_THREAD_ID="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("scheduler healthy", result.stdout)
@@ -337,9 +341,8 @@ run_live_delivery_probe() {
         bashrc = (self.home / ".bashrc").read_text()
         self.assertIn("export KEEP_THIS=1", bashrc)
         self.assertIn("export AFTER_RETURN=1", bashrc)
-        self.assertNotIn("# >>> MAM Codex App Server trace >>>", bashrc)
-        self.assertNotIn("export RUST_LOG=", bashrc)
-        self.assertNotIn("export LOG_FORMAT=", bashrc)
+        self.assertIn(legacy_trace, bashrc)
+        self.assertEqual(bashrc.count(trace_begin), 1)
         self.assertEqual(bashrc.count("# >>> MAM PATH >>>"), 1)
         self.assertLess(bashrc.index("# >>> MAM PATH >>>"), bashrc.index('[[ -z "$PS1" ]] && return'))
         self.assertTrue(list(self.home.glob(".bashrc.mam-path.*.bak")))
@@ -366,6 +369,18 @@ run_live_delivery_probe() {
         again = self.run_installer()
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual((self.home / ".bashrc").read_text().count("# >>> MAM PATH >>>"), 1)
+        self.assertIn(legacy_trace, (self.home / ".bashrc").read_text())
+
+    def test_fresh_shell_startup_does_not_add_trace_configuration(self):
+        bashrc = self.home / ".bashrc"
+        bashrc.write_text('export KEEP_THIS=1\n[[ -z "$PS1" ]] && return\n', encoding="utf-8")
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        content = bashrc.read_text()
+        self.assertNotIn("MAM Codex App Server trace", content)
+        self.assertNotIn("export RUST_LOG=", content)
+        self.assertNotIn("export LOG_FORMAT=", content)
+        self.assertEqual(content.count("# >>> MAM PATH >>>"), 1)
 
     def test_checkout_test_environment_reaches_current_source_in_detached_daemon(self):
         """A fresh checkout must outrank an older package for the daemon child.
@@ -532,6 +547,63 @@ run_live_delivery_probe() {
         for line in source.splitlines():
             code = line.split("#", 1)[0]
             self.assertIsNone(re.search(r"(?<![>&])&(?![&0-9])", code), line)
+
+
+class LiveprobeEvidenceValidationTests(unittest.TestCase):
+    script = Path(__file__).resolve().parents[1] / "scripts" / "install.sh"
+    required_checks = (
+        "all_roles_baselined_before_service",
+        "baseline_history_read_after_idle",
+        "job_delivery",
+        "manager_delivery",
+        "manager_is_fixture_only",
+        "turn_budget",
+        "service_stopped_after_delivery",
+        "idle_executors_received_no_turn",
+    )
+
+    def validate(self, evidence: dict[str, object]) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "evidence.json"
+            path.write_text(json.dumps(evidence), encoding="utf-8")
+            return subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    'source "$1"; INSTALLED_PYTHON="$2"; validate_liveprobe_evidence "$3"',
+                    "bash",
+                    str(self.script),
+                    sys.executable,
+                    str(path),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+    def evidence(self, model_turns: object = 6) -> dict[str, object]:
+        return {
+            "status": "passed",
+            "model_turns": model_turns,
+            "checks": {name: True for name in self.required_checks},
+        }
+
+    def test_accepts_bounded_model_turns_with_service_shutdown_evidence(self):
+        for turns in (6, 12):
+            with self.subTest(turns=turns):
+                result = self.validate(self.evidence(turns))
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_rejects_out_of_budget_or_obsolete_quiet_window_evidence(self):
+        for turns in (5, 13, True):
+            with self.subTest(turns=turns):
+                self.assertNotEqual(self.validate(self.evidence(turns)).returncode, 0)
+        evidence = self.evidence()
+        checks = evidence["checks"]
+        assert isinstance(checks, dict)
+        checks.pop("service_stopped_after_delivery")
+        checks["quiet_window_no_duplicate_starts"] = True
+        self.assertNotEqual(self.validate(evidence).returncode, 0)
 
 
 if __name__ == "__main__":

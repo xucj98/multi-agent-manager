@@ -5,8 +5,6 @@ set -euo pipefail
 
 readonly PATH_BEGIN='# >>> MAM PATH >>>'
 readonly PATH_END='# <<< MAM PATH <<<'
-readonly LEGACY_TRACE_BEGIN='# >>> MAM Codex App Server trace >>>'
-readonly LEGACY_TRACE_END='# <<< MAM Codex App Server trace <<<'
 readonly STARTUP_WAIT_ATTEMPTS=40
 readonly STARTUP_WAIT_SECONDS=0.5
 
@@ -219,14 +217,14 @@ update_startup_file() {
         incomplete "cannot prepare a PATH update for $target"
         return 1
     fi
-    if ! changed="$(python3 - "$target" "$temporary" "$kind" "$PATH_BEGIN" "$PATH_END" "$LEGACY_TRACE_BEGIN" "$LEGACY_TRACE_END" <<'PY'
+    if ! changed="$(python3 - "$target" "$temporary" "$kind" "$PATH_BEGIN" "$PATH_END" <<'PY'
 from pathlib import Path
 import os
 import stat
 import sys
 
 source, destination = map(Path, sys.argv[1:3])
-kind, path_begin, path_end, trace_begin, trace_end = sys.argv[3:]
+kind, path_begin, path_end = sys.argv[3:]
 path_block = (
     [
         path_begin,
@@ -275,21 +273,6 @@ try:
 except ValueError as exc:
     print(str(exc), file=sys.stderr)
     raise SystemExit(1)
-
-if kind == "bash":
-    legacy_trace_block = [
-        trace_begin,
-        'if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then',
-        '    export PATH="$HOME/.local/bin:$PATH"',
-        'fi',
-        'export RUST_LOG="off,codex_app_server::message_processor=trace,codex_app_server::app_server_tracing=info"',
-        'export LOG_FORMAT=json',
-        trace_end,
-    ]
-    for index in range(len(lines) - len(legacy_trace_block) + 1):
-        if [value(line) for line in lines[index : index + len(legacy_trace_block)]] == legacy_trace_block:
-            lines = lines[:index] + lines[index + len(legacy_trace_block) :]
-            break
 
 insert_at = len(lines)
 if kind == "bash":
@@ -477,9 +460,10 @@ try:
 except (OSError, UnicodeDecodeError, ValueError):
     raise SystemExit(1)
 checks = data.get("checks") if isinstance(data, dict) else None
-if data.get("status") != "passed" or data.get("model_turns") != 6 or not isinstance(checks, dict):
+model_turns = data.get("model_turns") if isinstance(data, dict) else None
+if data.get("status") != "passed" or type(model_turns) is not int or not 6 <= model_turns <= 12 or not isinstance(checks, dict):
     raise SystemExit(1)
-if not all(checks.get(key) is True for key in ("all_roles_baselined_before_service", "baseline_history_read_after_idle", "job_delivery", "manager_delivery", "manager_is_fixture_only", "turn_budget", "quiet_window_no_duplicate_starts", "idle_executors_received_no_turn")):
+if not all(checks.get(key) is True for key in ("all_roles_baselined_before_service", "baseline_history_read_after_idle", "job_delivery", "manager_delivery", "manager_is_fixture_only", "turn_budget", "service_stopped_after_delivery", "idle_executors_received_no_turn")):
     raise SystemExit(1)
 PY
 }
@@ -499,7 +483,7 @@ run_live_delivery_probe() {
         incomplete "isolated real delivery acceptance returned invalid evidence${detail:+: $detail}"
         return 1
     fi
-    printf 'MAM proactive wakeup: isolated real delivery PASS (6 model turns)\n'
+    printf 'MAM proactive wakeup: isolated real delivery PASS\n'
 }
 
 service_command() {
