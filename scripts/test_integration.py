@@ -85,6 +85,42 @@ def pipx_install(source: Path, env: dict[str, str], log: Path) -> Path:
     return launcher
 
 
+def controlled_job(instance: Path, metadata: dict[str, Any], log: Path) -> tuple[subprocess.Popen[bytes], str]:
+    """Start and register one owned process using the old installed writer."""
+
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"])
+    fixture = metadata["fixture"]
+    result = run(
+        [metadata["mam"], "job", "add", fixture["task"], "--note", "release integration controlled job",
+         "--host", "local", "--pid", str(process.pid)],
+        cwd=instance,
+        env={**os.environ, "CODEX_THREAD_ID": fixture["worker"]},
+        log=log,
+    )
+    if result.returncode:
+        process.terminate()
+        raise IntegrationError(f"could not register controlled job in {instance}: {result.stderr[-1000:]}")
+    try:
+        value = json.loads(result.stdout)
+        return process, value["id"]
+    except (json.JSONDecodeError, KeyError) as exc:
+        process.terminate()
+        raise IntegrationError(f"old job writer returned invalid JSON in {instance}") from exc
+
+
+def verify_job(launcher: Path, instance: Path, job_id: str, log: Path) -> dict[str, Any]:
+    result = run([str(launcher), "job", "status", job_id], cwd=instance, log=log)
+    if result.returncode:
+        raise IntegrationError(f"registered job was lost after upgrade in {instance}")
+    try:
+        value = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise IntegrationError(f"job status returned invalid JSON in {instance}") from exc
+    if value.get("status") not in {"running", "exited", "unknown"}:
+        raise IntegrationError(f"job status is malformed in {instance}")
+    return value
+
+
 def install_candidate(instances: list[tuple[Path, dict[str, Any]]], archive: Path, install_root: Path, log: Path) -> Path:
     env = {**os.environ, "MAM_INSTALL_ARCHIVE": str(archive.resolve()), "PIPX_HOME": str(install_root / "pipx"),
            "PIPX_BIN_DIR": str(install_root / "bin"), "HOME": str(install_root / "home")}
@@ -144,6 +180,7 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
     log = results / "integration.log"
     outcome: dict[str, Any] = {"root": str(root), "from": from_version, "to": to_version, "scenarios": []}
     owned: list[Path] = []
+    processes: list[subprocess.Popen[bytes]] = []
     try:
         if (from_version, to_version) != ("0.1.0", "0.2.0"):
             raise IntegrationError("only the complete 0.1.0 -> 0.2.0 chain is supported")
@@ -158,6 +195,16 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
             owned.append(path)
             instances.append((path, metadata))
         outcome["scenarios"].append({"name": "create-old-instances", "status": "passed"})
+        jobs: list[tuple[Path, dict[str, Any], subprocess.Popen[bytes], str]] = []
+        for instance, metadata in instances:
+            process, job_id = controlled_job(instance, metadata, log)
+            processes.append(process)
+            jobs.append((instance, metadata, process, job_id))
+        # The second process exits while the service is considered stopped;
+        # the first remains alive across package installation and upgrade.
+        jobs[1][2].terminate()
+        jobs[1][2].wait(timeout=5)
+        outcome["scenarios"].append({"name": "controlled-jobs-and-daemon-stop", "status": "passed", "codex": "simulated"})
         archive, commit = build_archive(root, log)
         outcome["candidate"] = {"archive": str(archive), "commit": commit}
         install_root = root / "mam-test-install"
@@ -168,6 +215,8 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
             upgrade(instance, launcher, log)
             verify_task(instance, launcher, metadata["fixture"], log)
             outcome["scenarios"].append({"name": f"upgrade:{instance.name}", "status": "passed"})
+        job_states = [verify_job(launcher, instance, job_id, log) for instance, _, _, job_id in jobs]
+        outcome["job_states"] = job_states
         new_instance = root / "mam-test-new"
         outcome["new_instance"] = create_instance(to_version, new_instance, log)
         owned.append(new_instance)
@@ -176,6 +225,13 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
         outcome["error"] = str(exc)
         outcome["scenarios"].append({"name": "integration", "status": "failed", "error": str(exc)})
     finally:
+        for process in processes:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    process.kill()
         if not keep:
             for path in owned:
                 if path.exists():
