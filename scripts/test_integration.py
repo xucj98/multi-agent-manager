@@ -168,7 +168,7 @@ def verify_task(instance: Path, launcher: Path, fixture: dict[str, Any], log: Pa
         raise IntegrationError(f"task status returned an unexpected task in {instance}")
 
 
-def upgrade(instance: Path, launcher: Path, log: Path) -> None:
+def upgrade(instance: Path, launcher: Path, log: Path) -> dict[str, Any]:
     result = run([str(launcher), "service", "upgrade"], cwd=instance, log=log)
     if result.returncode:
         raise IntegrationError(f"service upgrade failed for {instance}: {result.stderr[-1500:]}")
@@ -178,6 +178,7 @@ def upgrade(instance: Path, launcher: Path, log: Path) -> None:
         raise IntegrationError(f"service upgrade returned invalid JSON in {instance}") from exc
     if not isinstance(output, dict):
         raise IntegrationError(f"service upgrade returned an unexpected result in {instance}")
+    return output
 
 
 def integration(root: Path, from_version: str, to_version: str, keep: bool) -> tuple[int, dict[str, Any]]:
@@ -219,10 +220,20 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
         owned.append(install_root)
         launcher = install_candidate(instances, archive, install_root, log)
         outcome["scenarios"].append({"name": "pipx-install-and-update", "status": "passed", "launcher": str(launcher)})
+        upgrade_results: list[dict[str, Any]] = []
         for instance, metadata in instances:
-            upgrade(instance, launcher, log)
+            result = upgrade(instance, launcher, log)
+            upgrade_results.append(result)
             verify_task(instance, launcher, metadata["fixture"], log)
             outcome["scenarios"].append({"name": f"upgrade:{instance.name}", "status": "passed"})
+            backup = result.get("backup")
+            if not isinstance(backup, str) or not Path(backup).is_dir():
+                raise IntegrationError(f"upgrade did not retain a .local backup for {instance}")
+            repeat = upgrade(instance, launcher, log)
+            if repeat.get("status") != "up-to-date":
+                raise IntegrationError(f"repeated upgrade was not idempotent for {instance}")
+        outcome["upgrade_results"] = upgrade_results
+        outcome["scenarios"].append({"name": "repeat-upgrade-and-backup", "status": "passed"})
         job_states = [verify_job(launcher, instance, job_id, log) for instance, _, _, job_id in jobs]
         outcome["job_states"] = job_states
         new_instance = root / "mam-test-new"
