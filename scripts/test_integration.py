@@ -32,8 +32,8 @@ def run(argv: list[str], *, cwd: Path | None = None, env: dict[str, str] | None 
     return result
 
 
-def create_instance(version: str, path: Path, log: Path) -> dict[str, Any]:
-    result = run([sys.executable, str(root_dir() / "scripts" / "create_mam_test.py"), "--version", version, "--root", str(path)], log=log)
+def create_instance(version: str, path: Path, log: Path, *, seed: str = "HEAD") -> dict[str, Any]:
+    result = run([sys.executable, str(root_dir() / "scripts" / "create_mam_test.py"), "--version", version, "--root", str(path), "--seed", seed], log=log)
     if result.returncode:
         raise IntegrationError(f"create {path} failed: {result.stderr[-1000:]}")
     try:
@@ -149,9 +149,13 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
         if (from_version, to_version) != ("0.1.0", "0.2.0"):
             raise IntegrationError("only the complete 0.1.0 -> 0.2.0 chain is supported")
         instances: list[tuple[Path, dict[str, Any]]] = []
-        for name in ("mam-test", "mam-test-2"):
+        for index, name in enumerate(("mam-test", "mam-test-2")):
             path = root / name
-            metadata = create_instance(from_version, path, log)
+            # The first instance starts from the last pre-release commit.  It
+            # has the origin configured but no target object, so upgrade must
+            # fetch the release commit through the normal Git path.
+            seed = "9cf9ff9139a269ff49280d43c3b3510e4056df04" if index == 0 else "HEAD"
+            metadata = create_instance(from_version, path, log, seed=seed)
             owned.append(path)
             instances.append((path, metadata))
         outcome["scenarios"].append({"name": "create-old-instances", "status": "passed"})

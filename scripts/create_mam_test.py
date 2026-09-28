@@ -119,7 +119,7 @@ def _venv_and_launcher(destination: Path, package_parent: Path) -> Path:
     return launcher
 
 
-def _write_project(project: Path, mam_root: Path, branch: str, seed_repo: Path) -> None:
+def _write_project(project: Path, mam_root: Path, branch: str, seed_repo: Path, seed: str = "HEAD") -> None:
     project.mkdir(parents=True, exist_ok=False)
     mam_root.mkdir(parents=True)
     run(["git", "init", "-q", str(mam_root)])
@@ -127,7 +127,7 @@ def _write_project(project: Path, mam_root: Path, branch: str, seed_repo: Path) 
     # fixture data is old, while the repository history already contains the
     # release commit that ``service upgrade`` is expected to merge.
     run(["git", "-C", str(mam_root), "remote", "add", "origin", str(seed_repo)])
-    run(["git", "-C", str(mam_root), "fetch", "-q", "origin", "HEAD"])
+    run(["git", "-C", str(mam_root), "fetch", "-q", "origin", seed])
     run(["git", "-C", str(mam_root), "switch", "-q", "-c", branch, "FETCH_HEAD"])
     git(mam_root, "config", "user.name", "MAM release integration")
     git(mam_root, "config", "user.email", "mam-integration@example.invalid")
@@ -185,7 +185,7 @@ def _run_fixture(repo: Path, version: str, root: Path, mam_root: Path, package_p
     return value
 
 
-def create(version: str, root: Path) -> dict:
+def create(version: str, root: Path, *, seed: str = "HEAD") -> dict:
     if version not in SUPPORTED:
         raise CreateError(f"unsupported test version: {version}; choose one of {', '.join(sorted(SUPPORTED))}")
     root = root.expanduser().resolve()
@@ -198,7 +198,7 @@ def create(version: str, root: Path) -> dict:
     # Check prerequisites before allocating the caller's requested root.
     if version == "0.1.0":
         _old_snapshot(repo)
-    _write_project(root, mam_root, branch, repo)
+    _write_project(root, mam_root, branch, repo, seed)
     version_dir = root / ".versions" / version
     package_parent, source_commit = _package_for_version(repo, version, version_dir)
     launcher = _venv_and_launcher(version_dir, package_parent)
@@ -220,9 +220,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True, help="data/program version, for example 0.1.0")
     parser.add_argument("--root", required=True, type=Path, help="new test PROJECT_ROOT")
+    parser.add_argument("--seed", default="HEAD", help="candidate repository commit used as the MAM_ROOT base")
     args = parser.parse_args(argv)
     try:
-        print(json.dumps(create(args.version, args.root), ensure_ascii=False, indent=2, sort_keys=True))
+        print(json.dumps(create(args.version, args.root, seed=args.seed), ensure_ascii=False, indent=2, sort_keys=True))
     except (CreateError, OSError, subprocess.CalledProcessError) as exc:
         print(f"create_mam_test: {exc}", file=sys.stderr)
         return 1
