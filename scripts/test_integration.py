@@ -70,7 +70,7 @@ def old_source(install_root: Path) -> Path:
         shutil.copy2(item, package / item.name)
     (source / "pyproject.toml").write_text(
         "[build-system]\nrequires=['flit_core>=3.11,<5']\nbuild-backend='flit_core.buildapi'\n"
-        "[project]\nname='multi-agent-manager'\nversion='0.1.0'\nrequires-python='>=3.10'\n"
+        "[project]\nname='multi-agent-manager'\nversion='0.1.0'\ndescription='archived MAM fixture'\nrequires-python='>=3.10'\n"
         "[project.scripts]\nmam='multi_agent_manager.cli:main'\n", encoding="utf-8")
     return source
 
