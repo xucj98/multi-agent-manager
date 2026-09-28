@@ -6,9 +6,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from multi_agent_manager import job_runtime
-from scripts.integration_runtime import RuntimeHarness
+from scripts.integration_runtime import RuntimeHarness, RuntimeIntegrationError
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -134,6 +135,41 @@ class IntegrationRuntimeTests(unittest.TestCase):
                 self.assertEqual(harness.endpoint.errors, [])
             finally:
                 harness.close()
+
+    def test_close_does_not_mask_a_live_owned_pid_and_can_retry(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="mam-integration-cleanup-") as temporary:
+            instance = Path(temporary) / "instance"
+            instance.mkdir()
+            metadata = {"mam_root": str(instance / "multi-agent-manager"), "fixture": {
+                "manager": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "worker": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                "task": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            }}
+            harness = RuntimeHarness(instance, metadata, Path(temporary) / "cleanup.log")
+            identity = {"host": "local", "boot_id": "fixture", "start_ticks": 123}
+            harness._owned[123] = {"launcher": "/tmp/owned-mam", "identity": identity}
+            try:
+                with mock.patch.object(harness, "_service_state", return_value={"pid": 123, "identity": identity}), \
+                     mock.patch.object(harness, "_run", return_value={"status": "disabled"}), \
+                     mock.patch.object(harness, "_force_stop", return_value=False):
+                    with self.assertRaises(RuntimeIntegrationError):
+                        harness.close()
+                self.assertFalse(harness._closed)
+                self.assertFalse(harness.last_cleanup["ok"])
+                self.assertFalse(harness.last_cleanup["daemons"][0]["stopped"])
+
+                with mock.patch.object(harness, "_service_state", return_value={"pid": 123, "identity": identity}), \
+                     mock.patch.object(harness, "_run", return_value={"status": "disabled"}), \
+                     mock.patch.object(harness, "_force_stop", return_value=True):
+                    retry = harness.close()
+                self.assertTrue(retry["ok"])
+                self.assertTrue(retry["daemons"][0]["stopped"])
+                self.assertTrue(harness._closed)
+                self.assertTrue(harness.close()["ok"])
+            finally:
+                if not harness._closed:
+                    with mock.patch.object(harness, "_force_stop", return_value=True):
+                        harness.close()
 
 
 if __name__ == "__main__":

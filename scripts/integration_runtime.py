@@ -297,6 +297,8 @@ class RuntimeHarness:
         self._owned: dict[int, dict[str, Any]] = {}
         self._launchers: list[Path] = []
         self._closed = False
+        self._endpoint_closed = False
+        self.last_cleanup: dict[str, Any] | None = None
 
     @property
     def notifications(self) -> list[dict[str, Any]]:
@@ -459,22 +461,39 @@ class RuntimeHarness:
 
     def close(self) -> dict[str, Any]:
         if self._closed:
-            return {"daemons": [], "endpoint": "closed"}
+            return {"ok": True, "daemons": [], "endpoint": "closed"}
         cleanup: list[dict[str, Any]] = []
         for pid, info in list(self._owned.items()):
-            stopped = False
+            stop_result = None
             try:
-                result = self._run(Path(info["launcher"]), ["service", "stop"])
-                stopped = True
+                state = self._service_state()
             except (RuntimeIntegrationError, OSError):
-                result = None
-            stopped = self._force_stop(pid, info.get("identity")) or stopped
-            cleanup.append({"pid": pid, "stopped": stopped, "stop_result": result})
-        self.endpoint.close()
+                state = None
+            current = isinstance(state, Mapping) and state.get("pid") == pid and state.get("identity") == info.get("identity")
+            if current:
+                try:
+                    stop_result = self._run(Path(info["launcher"]), ["service", "stop"])
+                except (RuntimeIntegrationError, OSError) as exc:
+                    stop_result = {"error": str(exc)}
+            # A successful service command is only a request.  The owned
+            # process identity is the source of truth for cleanup success.
+            stopped = self._force_stop(pid, info.get("identity"))
+            cleanup.append({"pid": pid, "stopped": stopped, "stop_result": stop_result})
+        if not self._endpoint_closed:
+            self.endpoint.close()
+            self._endpoint_closed = True
+        result = {
+            "ok": all(item["stopped"] for item in cleanup),
+            "daemons": cleanup,
+            "endpoint": "closed",
+            "requests": len(self.requests),
+            "notifications": len(self.notifications),
+        }
+        self.last_cleanup = result
+        if not result["ok"]:
+            raise RuntimeIntegrationError(f"failed to clean up controlled daemons: {result}")
         self._closed = True
-        if not all(item["stopped"] for item in cleanup):
-            raise RuntimeIntegrationError(f"failed to clean up controlled daemons: {cleanup}")
-        return {"daemons": cleanup, "endpoint": "closed", "requests": len(self.requests), "notifications": len(self.notifications)}
+        return result
 
 
 __all__ = ["ControlledCodexEndpoint", "RuntimeHarness", "RuntimeIntegrationError"]
