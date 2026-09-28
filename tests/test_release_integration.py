@@ -55,6 +55,8 @@ class ReleaseFixtureTests(unittest.TestCase):
             self.assertFalse((root / "mam-test").exists())
 
     def test_published_missing_tag_does_not_allocate_resources(self):
+        if subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-dir"], check=False, capture_output=True).returncode:
+            self.skipTest("published-ref preflight requires the source checkout Git repository")
         with tempfile.TemporaryDirectory(prefix="mam release missing tag ") as temporary:
             root = Path(temporary) / "run"
             result = subprocess.run(
