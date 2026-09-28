@@ -52,20 +52,22 @@ def create_instance(version: str, path: Path, log: Path, *, seed: str = "HEAD") 
     return value
 
 
-def build_archive(output_root: Path, log: Path, expected_version: str) -> tuple[Path, str]:
+def build_archive(output_root: Path, log: Path, expected_version: str, *, published: bool = False) -> tuple[Path, str]:
     checkout = root_dir()
-    rev = run(["git", "-C", str(checkout), "rev-parse", "HEAD"], log=log)
+    ref = f"refs/tags/v{expected_version}" if published else "HEAD"
+    rev = run(["git", "-C", str(checkout), "rev-parse", ref], log=log)
     if rev.returncode:
-        raise IntegrationError("candidate checkout is not a Git repository")
-    release = checkout / "multi_agent_manager" / "release.py"
-    project = checkout / "pyproject.toml"
-    if not release.is_file() or f'RELEASE_VERSION = "{expected_version}"' not in release.read_text(encoding="utf-8"):
-        raise IntegrationError(f"candidate checkout does not provide published release metadata for {expected_version}")
-    if f'version = "{expected_version}"' not in project.read_text(encoding="utf-8"):
-        raise IntegrationError(f"candidate project metadata does not select published version {expected_version}")
+        source = f"tag v{expected_version}" if published else "candidate checkout"
+        raise IntegrationError(f"{source} is not available in the local repository")
+    metadata = run(["git", "-C", str(checkout), "show", f"{rev.stdout.strip()}:multi_agent_manager/release.py"], log=log)
+    project = run(["git", "-C", str(checkout), "show", f"{rev.stdout.strip()}:pyproject.toml"], log=log)
+    if metadata.returncode or f'RELEASE_VERSION = "{expected_version}"' not in metadata.stdout:
+        raise IntegrationError(f"published source does not provide release metadata for {expected_version}")
+    if project.returncode or f'version = "{expected_version}"' not in project.stdout:
+        raise IntegrationError(f"published source metadata does not select version {expected_version}")
     archive = output_root / "mam-test-install" / "candidate.tar.gz"
     archive.parent.mkdir(parents=True, exist_ok=True)
-    result = run(["git", "-C", str(checkout), "archive", "--format=tar.gz", f"--output={archive}", "HEAD"], log=log)
+    result = run(["git", "-C", str(checkout), "archive", "--format=tar.gz", f"--output={archive}", ref], log=log)
     if result.returncode:
         raise IntegrationError(f"candidate archive failed: {result.stderr[-1000:]}")
     return archive, rev.stdout.strip()
@@ -119,6 +121,11 @@ def git_output(repo: Path, *args: str) -> str:
     if result.returncode:
         raise IntegrationError(f"git {' '.join(args)} failed in {repo}: {result.stderr[-800:]}")
     return result.stdout.strip()
+
+
+def git_refs(repo: Path) -> dict[str, str]:
+    output = git_output(repo, "for-each-ref", "--format=%(refname) %(objectname)")
+    return {line.split(" ", 1)[0]: line.split(" ", 1)[1] for line in output.splitlines() if " " in line}
 
 
 def target_exists(repo: Path, target: str) -> bool:
@@ -193,8 +200,14 @@ def verify_instance_data(
     events = state.get("events")
     if not isinstance(history, list) or not any(item.get("message") == "retained fixture message" for item in history if isinstance(item, dict)):
         raise IntegrationError(f"message delivery history was lost in {instance}")
-    if not isinstance(events, dict) or not any(item.get("message") == "retained fixture message" for item in events.values() if isinstance(item, dict)):
-        raise IntegrationError(f"pending message event was lost in {instance}")
+    event_message = isinstance(events, dict) and any(
+        item.get("message") == "retained fixture message" for item in events.values() if isinstance(item, dict)
+    )
+    history_message = next(
+        (item for item in history if isinstance(item, dict) and item.get("message") == "retained fixture message"), None
+    )
+    if history_message is None or (not event_message and history_message.get("delivery") != "accepted"):
+        raise IntegrationError(f"message event/history was lost in {instance}")
     backup = upgrade_result.get("backup")
     if not isinstance(backup, str) or not Path(backup).is_dir():
         raise IntegrationError(f"upgrade backup is missing in {instance}: {backup}")
@@ -213,7 +226,8 @@ def verify_instance_data(
         "workspace": str(workspace),
         "manager": manager,
         "history_entries": len(history),
-        "event_entries": len(events),
+        "event_entries": len(events) if isinstance(events, dict) else 0,
+        "message_delivery": "pending" if event_message else history_message.get("delivery"),
         "backup": backup,
         "service_status": status_value,
     }
@@ -301,10 +315,17 @@ def migration_retry(launcher: Path, instance: Path, install_root: Path, log: Pat
     return value
 
 
-def verify_source_isolation(instances: list[tuple[Path, dict[str, Any]]], candidate_commit: str) -> dict[str, Any]:
+def verify_source_isolation(
+    instances: list[tuple[Path, dict[str, Any]]],
+    candidate_commit: str,
+    baseline_refs: dict[str, dict[str, str]],
+    source_refs: dict[str, str],
+) -> dict[str, Any]:
     source = root_dir()
     if git_output(source, "rev-parse", "HEAD") != candidate_commit:
         raise IntegrationError("candidate checkout HEAD changed during integration")
+    if git_refs(source) != source_refs:
+        raise IntegrationError("candidate checkout refs changed during integration")
     if run(["git", "-C", str(source), "status", "--porcelain"]).stdout.strip():
         raise IntegrationError("candidate checkout gained working-tree changes during integration")
     origins: dict[str, str] = {}
@@ -314,7 +335,19 @@ def verify_source_isolation(instances: list[tuple[Path, dict[str, Any]]], candid
         if origin.returncode:
             raise IntegrationError(f"upgraded instance lost its isolated origin: {instance}")
         origins[instance.name] = origin.stdout.strip()
-    return {"candidate_head": candidate_commit, "origins": origins, "task_roots": [str(path) for path, _ in instances]}
+        current = git_refs(root)
+        before = baseline_refs[instance.name]
+        allowed = {"refs/heads/project/mam-test"}
+        if {key: value for key, value in current.items() if key not in allowed} != {
+            key: value for key, value in before.items() if key not in allowed
+        }:
+            raise IntegrationError(f"non-MAM refs changed in isolated instance {instance}")
+    return {
+        "candidate_head": candidate_commit,
+        "origins": origins,
+        "task_roots": [str(path) for path, _ in instances],
+        "baseline_refs": baseline_refs,
+    }
 
 
 def pipx_install(source: Path, env: dict[str, str], log: Path) -> Path:
@@ -427,6 +460,24 @@ def install_candidate(
     return launcher, {"status": "passed", "kind": "real-codex-delivery"}
 
 
+def verify_installed_candidate(install_root: Path, expected_version: str, expected_commit: str, log: Path) -> dict[str, str]:
+    interpreters = sorted((install_root / "pipx" / "venvs").glob("*/bin/python"))
+    if len(interpreters) != 1:
+        raise IntegrationError(f"installed candidate interpreter is ambiguous: {interpreters}")
+    code = (
+        "from multi_agent_manager import release\n"
+        "print(release.RELEASE_VERSION)\n"
+        "print(release.RELEASE_COMMIT)\n"
+    )
+    result = run([str(interpreters[0]), "-c", code], log=log)
+    if result.returncode:
+        raise IntegrationError(f"installed candidate metadata query failed: {result.stderr[-800:]}")
+    values = result.stdout.strip().splitlines()
+    if values != [expected_version, expected_commit]:
+        raise IntegrationError(f"installed candidate metadata mismatch: {values!r}")
+    return {"version": values[0], "commit": values[1], "python": str(interpreters[0])}
+
+
 def verify_task(instance: Path, launcher: Path, fixture: dict[str, Any], log: Path) -> None:
     task = fixture.get("task")
     if not task:
@@ -455,7 +506,14 @@ def upgrade(instance: Path, launcher: Path, log: Path) -> dict[str, Any]:
     return output
 
 
-def integration(root: Path, from_version: str, to_version: str, keep: bool) -> tuple[int, dict[str, Any]]:
+def integration(
+    root: Path,
+    from_version: str,
+    to_version: str,
+    keep: bool,
+    *,
+    published: bool = False,
+) -> tuple[int, dict[str, Any]]:
     root = root.expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
     results = root / "integration-results"
@@ -512,7 +570,9 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
             "codex": "simulated",
             "old_daemons": old_daemons,
         })
-        archive, commit = build_archive(root, log, to_version)
+        baseline_refs = {instance.name: git_refs(Path(metadata["mam_root"])) for instance, metadata in instances}
+        source_refs = git_refs(root_dir())
+        archive, commit = build_archive(root, log, to_version, published=published)
         outcome["candidate"] = {"archive": str(archive), "commit": commit}
         if target_exists(Path(instances[0][1]["mam_root"]), commit):
             raise IntegrationError("old instance unexpectedly already contains the candidate commit")
@@ -521,6 +581,7 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
         owned.append(install_root)
         launcher, real_delivery = install_candidate(instances, archive, install_root, log)
         outcome["real_delivery"] = real_delivery
+        outcome["installed_metadata"] = verify_installed_candidate(install_root, to_version, commit, log)
         outcome["scenarios"].append({
             "name": "pipx-install-and-update",
             "status": "passed",
@@ -548,6 +609,10 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
             evidence = verify_instance_data(instance, metadata, launcher, result, commit, log)
             outcome.setdefault("instance_evidence", {})[instance.name] = evidence
             outcome["scenarios"].append({"name": f"upgrade:{instance.name}", "status": "passed", "data": evidence})
+            if instance == instances[0][0]:
+                other_root = Path(instances[1][1]["mam_root"])
+                if git_refs(other_root) != baseline_refs[instances[1][0].name]:
+                    raise IntegrationError("upgrading the first instance changed the second instance refs")
             repeat = upgrade(instance, launcher, log)
             if repeat.get("status") != "up-to-date":
                 raise IntegrationError(f"repeated upgrade was not idempotent for {instance}")
@@ -595,7 +660,7 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
         outcome["new_instance"] = create_instance(to_version, new_instance, log)
         owned.append(new_instance)
         outcome["scenarios"].append({"name": "first-use-new-instance", "status": "passed"})
-        outcome["source_isolation"] = verify_source_isolation(instances, commit)
+        outcome["source_isolation"] = verify_source_isolation(instances, commit, baseline_refs, source_refs)
         outcome["scenarios"].append({"name": "candidate-and-instance-isolation", "status": "passed"})
     except (IntegrationError, OSError, subprocess.SubprocessError, tarfile.TarError) as exc:
         outcome["error"] = str(exc)
@@ -613,6 +678,13 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
                 if path.exists():
                     shutil.rmtree(path)
         (results / "result.json").write_text(json.dumps(outcome, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if "error" not in outcome and outcome.get("real_delivery", {}).get("status") != "passed":
+        outcome["error"] = "real Codex delivery acceptance did not pass"
+    if outcome.get("cleanup_errors"):
+        outcome.setdefault("error", "integration cleanup failed")
+    # Rewrite after the final gate/cleanup status is known; result.json must
+    # agree with the process exit code even when controlled migration passed.
+    (results / "result.json").write_text(json.dumps(outcome, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return (0 if "error" not in outcome else 1), outcome
 
 
@@ -620,10 +692,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path("../tmp"))
     parser.add_argument("--from", dest="from_version", default="0.1.0")
-    parser.add_argument("--to", dest="to_version", default="0.2.0")
+    parser.add_argument("--to", dest="to_version", default=None, help="published target version; omit to test current checkout")
     parser.add_argument("--keep", action="store_true", help="retain created instances for diagnosis")
     args = parser.parse_args(argv)
-    code, outcome = integration(args.root, args.from_version, args.to_version, args.keep)
+    explicit_target = args.to_version is not None
+    target_version = args.to_version or "0.2.0"
+    code, outcome = integration(args.root, args.from_version, target_version, args.keep, published=explicit_target)
     print(json.dumps(outcome, indent=2, ensure_ascii=False, sort_keys=True))
     return code
 
