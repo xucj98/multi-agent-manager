@@ -510,7 +510,7 @@ resolve_installed_python() {
 
 validate_installed_metadata() {
     local metadata
-    if ! metadata="$($INSTALLED_PYTHON - "$REQUESTED_VERSION" <<'PY'
+    if ! metadata="$(cd -- "$INSTALL_TMP" && "$INSTALLED_PYTHON" - "$REQUESTED_VERSION" <<'PY'
 import re
 import sys
 from multi_agent_manager import release
