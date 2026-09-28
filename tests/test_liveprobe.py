@@ -273,9 +273,15 @@ class LiveProbeTests(unittest.TestCase):
         self.state["tasks_created"].append(role)
         return {"id": TASK_IDS[role]}
 
-    def _bind(self, _store, args):
-        self.state["binds"].append((args.task, args.agent))
-        return {"task": args.task, "agent": args.agent}
+    def _start(self, _store, args):
+        # The production probe invokes task start as the executor thread.  The
+        # test records the thread identity from the surrounding environment in
+        # the same way the CLI does.
+        import os
+
+        agent = os.environ.get("CODEX_THREAD_ID")
+        self.state["binds"].append((args.task, agent))
+        return {"task": args.task, "agent": agent}
 
     def _job_add(self, _store, args):
         job_id = next(self.job_roles)
@@ -299,7 +305,7 @@ class LiveProbeTests(unittest.TestCase):
 
     def _run_fixture(self, root, **kwargs):
         with mock.patch.object(liveprobe.cli, "create", side_effect=self._create), mock.patch.object(
-            liveprobe.cli, "bind", side_effect=self._bind
+            liveprobe.cli, "start", side_effect=self._start
         ), mock.patch.object(liveprobe.cli, "job_add", side_effect=self._job_add), mock.patch.object(
             liveprobe.cli, "job_archive", side_effect=self._job_archive
         ), mock.patch.object(liveprobe.cli, "archive", side_effect=self._archive):
