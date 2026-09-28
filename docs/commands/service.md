@@ -21,7 +21,7 @@
 在 agent 暂停工作、现有 MAM 命令结束且 daemon 已停止后执行 `mam service upgrade`。命令根据当前目录对应的 `.mam/env.json` 升级一个实例：
 
 1. 备份 `MAM_ROOT/.local/`。
-2. 将已安装 `mam` 对应的发布 tag 或 commit 合并到 `MAM_BRANCH`。
+2. 将已安装 `mam` 对应的发布 tag 或 commit 合并到 `MAM_BRANCH`；本地缺少该版本时，从 `MAM_ROOT` 已配置的 `origin` 获取。
 3. 按版本顺序执行数据迁移，输出升级结果、备份位置和各版升级适配说明的位置。
 
 新版程序保留自 0.1.0 起的完整迁移链，从实例记录的版本依次迁移到目标版本。每步迁移成功后再记录版本；中断或失败后可重试。测试在 [install.sh](install.md#安装与测试) 中完成，实例升级直接执行合并与迁移。
