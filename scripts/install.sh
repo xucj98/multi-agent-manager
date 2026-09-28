@@ -228,6 +228,9 @@ run_tests() {
         # environment.  Nested installer fixtures must exercise their own
         # checkout path instead of accidentally selecting the same archive.
         unset MAM_INSTALL_ARCHIVE
+        # Keep the fixture's pipx assertions independent of the isolated
+        # destination used by the outer release install.
+        unset PIPX_HOME PIPX_BIN_DIR
         "$SOURCE_PYTHON" -B -m unittest discover -s tests -v
     ); then
         incomplete 'checkout tests failed; pipx and the existing scheduler were left untouched'
