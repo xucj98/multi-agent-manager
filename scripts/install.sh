@@ -18,6 +18,8 @@ LOCAL_BIN=''
 MAM_BIN=''
 SOURCE_PYTHON=''
 INSTALLED_PYTHON=''
+INSTALLED_VERSION=''
+INSTALLED_COMMIT=''
 INSTALL_TMP=''
 COMPATIBILITY_JSON=''
 SERVICE_ERROR=''
@@ -204,6 +206,75 @@ choose_source_python() {
     fi
     if ! "$SOURCE_PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
         incomplete 'MAM requires Python 3.10 or newer'
+        return 1
+    fi
+}
+
+validate_release_metadata() {
+    local release_file="$CHECKOUT_ROOT/multi_agent_manager/release.py"
+    if [[ ! -f "$release_file" ]]; then
+        incomplete 'release archive has no multi_agent_manager/release.py metadata'
+        return 1
+    fi
+    if ! "$SOURCE_PYTHON" - "$release_file" "$REQUESTED_VERSION" "$CHECKOUT_ROOT" <<'PY'
+import ast
+from pathlib import Path
+import re
+import sys
+
+release_file = Path(sys.argv[1])
+requested = sys.argv[2]
+checkout = Path(sys.argv[3])
+project_file = checkout / "pyproject.toml"
+if not project_file.is_file():
+    raise SystemExit(1)
+project_version = None
+try:
+    import tomllib
+except ModuleNotFoundError:
+    tomllib = None
+if tomllib is not None:
+    try:
+        document = tomllib.loads(project_file.read_text(encoding="utf-8"))
+        project = document.get("project")
+        project_version = project.get("version") if isinstance(project, dict) else None
+    except (OSError, UnicodeDecodeError, ValueError):
+        project_version = None
+else:
+    try:
+        section = None
+        for raw_line in project_file.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if line.startswith("[") and line.endswith("]"):
+                section = line[1:-1]
+            elif section == "project" and line.startswith("version") and "=" in line:
+                project_version = ast.literal_eval(line.split("=", 1)[1].strip())
+                break
+    except (OSError, UnicodeDecodeError, ValueError, SyntaxError):
+        project_version = None
+if project_version != requested:
+    raise SystemExit(1)
+tree = ast.parse(release_file.read_text(encoding="utf-8"), filename=str(release_file))
+values = {}
+for node in tree.body:
+    if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+        try:
+            values[node.targets[0].id] = ast.literal_eval(node.value)
+        except (ValueError, TypeError):
+            pass
+version = values.get("RELEASE_VERSION")
+tag = values.get("RELEASE_TAG")
+commit = values.get("RELEASE_COMMIT")
+if version != requested or tag != f"v{requested}" or not isinstance(commit, str):
+    raise SystemExit(1)
+if re.fullmatch(r"[0-9a-f]{40}", commit):
+    raise SystemExit(0)
+# Published archives must contain a substituted full commit; the checkout's
+# ``$Format:%H$`` token is never accepted after extraction.
+raise SystemExit(1)
+PY
+    then
+        incomplete "release metadata does not match requested version $REQUESTED_VERSION"
         return 1
     fi
 }
@@ -435,6 +506,34 @@ resolve_installed_python() {
         incomplete 'pipx did not provide the MAM virtual-environment interpreter'
         return 1
     fi
+}
+
+validate_installed_metadata() {
+    local metadata
+    if ! metadata="$(cd -- "$INSTALL_TMP" && "$INSTALLED_PYTHON" - "$REQUESTED_VERSION" <<'PY'
+import re
+import sys
+from multi_agent_manager import release
+
+requested = sys.argv[1]
+version = getattr(release, "RELEASE_VERSION", None)
+tag = getattr(release, "RELEASE_TAG", None)
+commit = getattr(release, "RELEASE_COMMIT", None)
+if version != requested or tag != f"v{requested}" or not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+    raise SystemExit(1)
+print(version)
+print(commit)
+PY
+)"; then
+        incomplete "installed package metadata does not match release $REQUESTED_VERSION"
+        return 1
+    fi
+    if [[ "$(wc -l <<<"$metadata")" -ne 2 ]]; then
+        incomplete 'installed package returned incomplete release metadata'
+        return 1
+    fi
+    INSTALLED_VERSION="$(sed -n '1p' <<<"$metadata")"
+    INSTALLED_COMMIT="$(sed -n '2p' <<<"$metadata")"
 }
 
 validate_explicit_manager() {
@@ -685,77 +784,35 @@ main() {
     parse_args "$@" || return 1
     local local_checkout=''
     if [[ -z "$REQUESTED_VERSION" && -z "$INSTALL_ARCHIVE" ]]; then
-        local_checkout="$(repository_root 2>/dev/null || true)"
-        if [[ ! -f "$local_checkout/pyproject.toml" || ! -d "$local_checkout/tests" ]]; then
-            # A curl | bash invocation has no checkout to inspect.  The
-            # current release is the latest formal release until a newer tag
-            # is published; callers can pin it explicitly with --version.
-            REQUESTED_VERSION='0.2.0'
-        fi
+        # Every invocation, including one launched from a checkout, resolves
+        # a release archive so local and formal installs exercise one path.
+        REQUESTED_VERSION='0.2.0'
     fi
-    if [[ -n "$REQUESTED_VERSION" ]] || [[ -n "$INSTALL_ARCHIVE" ]]; then
-        MODERN_INSTALL=1
-        if [[ -z "$REQUESTED_VERSION" ]]; then
-            REQUESTED_VERSION='0.2.0'
-        fi
-        if ! version_is_valid "$REQUESTED_VERSION"; then
-            incomplete "invalid release version: $REQUESTED_VERSION"
-            return 1
-        fi
-        create_install_tmp
-        prepare_release_source
-    else
-        CHECKOUT_ROOT="$local_checkout" || {
-            incomplete 'cannot resolve the MAM checkout containing this installer'
-            return 1
-        }
-        if [[ ! -f "$CHECKOUT_ROOT/pyproject.toml" || ! -d "$CHECKOUT_ROOT/tests" ]]; then
-            incomplete 'scripts/install.sh must be run from a multi-agent-manager checkout; pass --version for a release install'
-            return 1
-        fi
+    MODERN_INSTALL=1
+    if [[ -z "$REQUESTED_VERSION" ]]; then
+        REQUESTED_VERSION='0.2.0'
     fi
-    local config_path=''
-    if config_path="$(find_project_config "$CHECKOUT_ROOT" 2>/dev/null)"; then
-        local -a config_values=()
-        if ! mapfile -t config_values < <(validate_project_config "$config_path"); then
-            incomplete 'project configuration is invalid for this MAM checkout'
-            return 1
-        fi
-        if ((${#config_values[@]} != 2)); then
-            incomplete 'project configuration is invalid for this MAM checkout'
-            return 1
-        fi
-        MAM_ROOT="${config_values[0]}"
-        PROJECT_ROOT="${config_values[1]}"
-        if ((MODERN_INSTALL == 0)); then
-            same_git_repository
-        fi
-    elif ((MODERN_INSTALL == 0)); then
-        incomplete 'no .mam/env.json was found above this MAM checkout'
+    if ! version_is_valid "$REQUESTED_VERSION"; then
+        incomplete "invalid release version: $REQUESTED_VERSION"
         return 1
     fi
+    if [[ -z "$CHECKOUT_ROOT" ]]; then
+        create_install_tmp
+        prepare_release_source
+    fi
     choose_source_python
+    validate_release_metadata
     run_tests
     prepare_local_bin
     install_with_pipx
-    if ((MODERN_INSTALL == 0)); then
-        persist_local_bin_path
-    fi
     resolve_installed_python
-    validate_explicit_manager
+    validate_installed_metadata
     if [[ -z "$INSTALL_TMP" ]]; then
         create_install_tmp
     fi
-    # A release install validates Codex delivery but deliberately leaves every
-    # existing project daemon stopped/running as the operator found it.  The
-    # legacy checkout path retains its historical service smoke for fixtures.
     run_lightweight_probe
     run_live_delivery_probe
-    if ((MODERN_INSTALL == 0)); then
-        start_project_service
-    else
-        printf 'MAM installation: PASS version=%s (service start is a separate command)\n' "$REQUESTED_VERSION"
-    fi
+    printf 'MAM installation: PASS version=%s commit=%s (service start is a separate command)\n' "$INSTALLED_VERSION" "$INSTALLED_COMMIT"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

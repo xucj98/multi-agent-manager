@@ -33,6 +33,8 @@ class InstallerScriptTests(unittest.TestCase):
         self._git("commit", self.primary, "-m", "fixture")
         self.checkout = self.project / "installer-checkout"
         self._git("worktree", self.primary, "add", "-b", "fixture-installer", str(self.checkout), "HEAD")
+        self.archive = self.root / "candidate.tar.gz"
+        subprocess.run(["tar", "-czf", str(self.archive), "-C", str(self.checkout), "."], check=True)
         branch = subprocess.check_output(["git", "-C", str(self.primary), "branch", "--show-current"], text=True).strip()
         (self.project / ".mam").mkdir()
         (self.project / ".mam" / "env.json").write_text(
@@ -90,6 +92,7 @@ class InstallerScriptTests(unittest.TestCase):
         for relative in (
             "scripts/install.sh",
             "multi_agent_manager/__init__.py",
+            "multi_agent_manager/release.py",
             "multi_agent_manager/job_runtime.py",
             "multi_agent_manager/wake_compat.py",
             "multi_agent_manager/liveprobe.py",
@@ -98,8 +101,18 @@ class InstallerScriptTests(unittest.TestCase):
         ):
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(self.source_root / relative, target)
-        (root / "pyproject.toml").write_text("[project]\nname = 'fixture'\nversion = '0'\n", encoding="utf-8")
+            if relative == "multi_agent_manager/release.py":
+                target.write_text(
+                    'RELEASE_VERSION = "0.2.0"\n'
+                    'RELEASE_TAG = "v0.2.0"\n'
+                    'RELEASE_COMMIT = "' + "a" * 40 + '"\n',
+                    encoding="utf-8",
+                )
+            else:
+                shutil.copy2(self.source_root / relative, target)
+        (root / "pyproject.toml").write_text(
+            "[project]\nname = 'multi-agent-manager'\nversion = '0.2.0'\n", encoding="utf-8"
+        )
         # Git does not retain an empty directory, while the installer requires
         # a tests directory before it will run its suite.
         (root / "tests" / "test_placeholder.py").write_text("# fixture\n", encoding="utf-8")
@@ -250,6 +263,7 @@ run_live_delivery_probe() {
             "FAKE_MAM": str(self.fake_mam),
             "FAKE_EXPECT_PROJECT": str(self.project),
             "FAKE_MANAGER": MANAGER,
+            "MAM_INSTALL_ARCHIVE": str(self.archive),
         })
         environment.update(overrides)
         return environment
@@ -298,7 +312,7 @@ run_live_delivery_probe() {
         with mock.patch.dict(os.environ, {"MAM_SERVICE_MANAGER": MANAGER}):
             result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.service_commands(), ["service status", "service start", "service status"])
+        self.assertEqual(self.service_commands(), [])
 
     def test_checkout_tests_remove_manager_control_value(self):
         (self.checkout / "tests" / "test_manager_environment.py").write_text(
@@ -320,6 +334,38 @@ run_live_delivery_probe() {
         self.assertEqual(self.service_commands(), [])
         self.assertNotIn("liveprobe", self.log.read_text())
 
+    def test_release_metadata_must_match_requested_version(self):
+        (self.checkout / "multi_agent_manager" / "release.py").write_text(
+            'RELEASE_VERSION = "0.1.0"\nRELEASE_TAG = "v0.1.0"\nRELEASE_COMMIT = "' + "a" * 40 + '"\n',
+            encoding="utf-8",
+        )
+        subprocess.run(["tar", "-czf", str(self.archive), "-C", str(self.checkout), "."], check=True)
+        result = self.run_installer()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("release metadata does not match requested version", result.stdout)
+        self.assertEqual(self.service_commands(), [])
+
+    def test_pyproject_version_must_match_requested_version(self):
+        (self.checkout / "pyproject.toml").write_text(
+            "[project]\nname = 'multi-agent-manager'\nversion = '0.1.0'\n", encoding="utf-8"
+        )
+        subprocess.run(["tar", "-czf", str(self.archive), "-C", str(self.checkout), "."], check=True)
+        result = self.run_installer()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("release metadata does not match requested version", result.stdout)
+        self.assertEqual(self.service_commands(), [])
+
+    def test_archive_release_commit_placeholder_is_rejected(self):
+        (self.checkout / "multi_agent_manager" / "release.py").write_text(
+            'RELEASE_VERSION = "0.2.0"\nRELEASE_TAG = "v0.2.0"\nRELEASE_COMMIT = "$Format:%H$"\n',
+            encoding="utf-8",
+        )
+        subprocess.run(["tar", "-czf", str(self.archive), "-C", str(self.checkout), "."], check=True)
+        result = self.run_installer()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("release metadata does not match requested version", result.stdout)
+        self.assertEqual(self.service_commands(), [])
+
     def test_same_repository_sibling_checkout_is_installed_and_path_persists(self):
         self.assertNotEqual(self.primary, self.checkout)
         original_bashrc = (self.home / ".bashrc").read_text()
@@ -328,24 +374,22 @@ run_live_delivery_probe() {
         legacy_trace = original_bashrc[original_bashrc.index(trace_begin) : original_bashrc.index(trace_end) + len(trace_end)]
         result = self.run_installer(CODEX_THREAD_ID="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("scheduler healthy", result.stdout)
+        self.assertIn("service start is a separate command", result.stdout)
         log = self.log.read_text()
-        self.assertIn(f"pipx args=install --force {self.checkout}", log)
+        self.assertIn("pipx args=install --force", log)
         self.assertIn(f"lightweight python={self.venv / 'bin' / 'python'}", log)
         self.assertIn(f"liveprobe python={self.venv / 'bin' / 'python'}", log)
         self.assertNotIn("wait python", log)
         self.assertLess(log.index("lightweight"), log.index("liveprobe"))
-        self.assertLess(log.index("liveprobe"), log.index("args=service status"))
-        self.assertEqual(self.service_commands(), ["service status", "service start", "service status"])
+        self.assertEqual(self.service_commands(), [])
         self.assertNotIn("aaaaaaaa", log)
         bashrc = (self.home / ".bashrc").read_text()
         self.assertIn("export KEEP_THIS=1", bashrc)
         self.assertIn("export AFTER_RETURN=1", bashrc)
         self.assertIn(legacy_trace, bashrc)
         self.assertEqual(bashrc.count(trace_begin), 1)
-        self.assertEqual(bashrc.count("# >>> MAM PATH >>>"), 1)
-        self.assertLess(bashrc.index("# >>> MAM PATH >>>"), bashrc.index('[[ -z "$PS1" ]] && return'))
-        self.assertTrue(list(self.home.glob(".bashrc.mam-path.*.bak")))
+        self.assertEqual(bashrc.count("# >>> MAM PATH >>>"), 0)
+        self.assertFalse(list(self.home.glob(".bashrc.mam-path.*.bak")))
         interactive = subprocess.run(
             ["bash", "--noprofile", "--rcfile", str(self.home / ".bashrc"), "-ic", "command -v mam"],
             env={**os.environ, "HOME": str(self.home), "PATH": "/usr/bin:/bin"},
@@ -354,8 +398,9 @@ run_live_delivery_probe() {
             stderr=subprocess.PIPE,
             check=False,
         )
-        self.assertEqual(interactive.returncode, 0, interactive.stderr)
-        self.assertEqual(interactive.stdout.strip(), str(self.home / ".local" / "bin" / "mam"))
+        # The installer does not promise to edit shell startup files; a
+        # caller-supplied shell may still have its own PATH setup.
+        self.assertEqual((self.home / ".bashrc").read_text(), original_bashrc)
         login = subprocess.run(
             ["bash", "--norc", "-lc", "command -v mam"],
             env={**os.environ, "HOME": str(self.home), "PATH": "/usr/bin:/bin"},
@@ -364,11 +409,10 @@ run_live_delivery_probe() {
             stderr=subprocess.PIPE,
             check=False,
         )
-        self.assertEqual(login.returncode, 0, login.stderr)
-        self.assertEqual(login.stdout.strip().splitlines()[-1], str(self.home / ".local" / "bin" / "mam"))
+        self.assertEqual((self.home / ".profile").read_text(), "export LOGIN_KEEP=1\n")
         again = self.run_installer()
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
-        self.assertEqual((self.home / ".bashrc").read_text().count("# >>> MAM PATH >>>"), 1)
+        self.assertEqual((self.home / ".bashrc").read_text().count("# >>> MAM PATH >>>"), 0)
         self.assertIn(legacy_trace, (self.home / ".bashrc").read_text())
 
     def test_fresh_shell_startup_does_not_add_trace_configuration(self):
@@ -380,7 +424,7 @@ run_live_delivery_probe() {
         self.assertNotIn("MAM Codex App Server trace", content)
         self.assertNotIn("export RUST_LOG=", content)
         self.assertNotIn("export LOG_FORMAT=", content)
-        self.assertEqual(content.count("# >>> MAM PATH >>>"), 1)
+        self.assertEqual(content.count("# >>> MAM PATH >>>"), 0)
 
     def test_checkout_test_environment_reaches_current_source_in_detached_daemon(self):
         """A fresh checkout must outrank an older package for the daemon child.
@@ -492,7 +536,7 @@ run_live_delivery_probe() {
         self.state.write_text("healthy\n", encoding="utf-8")
         result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.service_commands(), ["service status", "service stop", "service start", "service status"])
+        self.assertEqual(self.service_commands(), [])
         self.assertEqual(self.state.read_text().strip(), "healthy")
 
     def test_fresh_bootstrap_is_awaiting_manager_without_capturing_installer_thread(self):
@@ -500,30 +544,26 @@ run_live_delivery_probe() {
             CODEX_THREAD_ID="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", FAKE_START_STATE="awaiting_manager"
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("awaiting first Manager binding", result.stdout)
-        self.assertEqual(self.service_commands(), ["service status", "service start", "service status"])
+        self.assertIn("service start is a separate command", result.stdout)
+        self.assertEqual(self.service_commands(), [])
         self.assertNotIn("aaaaaaaa", self.log.read_text())
-        self.assertEqual(self.state.read_text().strip(), "awaiting_manager")
+        self.assertEqual(self.state.read_text().strip(), "stopped")
 
     def test_installed_launcher_uses_project_context_and_explicit_manager_only(self):
         result = self.run_installer(MAM_SERVICE_MANAGER=MANAGER)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         log = self.log.read_text()
-        self.assertIn(f"cwd={self.project} thread= args=service start --manager {MANAGER}", log)
+        self.assertNotIn("service", log)
         self.assertNotIn("CODEX_THREAD_ID", log)
 
     def test_bound_project_without_manager_is_nonzero_with_remediation(self):
         result = self.run_installer(FAKE_START_STATE="missing_manager")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("bound tasks have no persisted Manager", result.stdout)
-        self.assertIn("mam service start --manager AGENT-ID", result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("bound tasks have no persisted Manager", result.stdout)
 
     def test_start_failure_retains_specific_reason_and_redacts_secret(self):
         result = self.run_installer(FAKE_START_FAIL="1")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("mam service start failed", result.stdout)
-        self.assertIn("launcher path missing", result.stdout)
-        self.assertIn("TOKEN=<redacted>", result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("TOKEN=do-not-log", result.stdout + result.stderr)
 
     def test_unrecognized_trace_block_is_preserved(self):
@@ -536,8 +576,8 @@ run_live_delivery_probe() {
         self.assertIn('export RUST_LOG="off,codex_app_server::message_processor=trace,codex_app_server::app_server_tracing=info"\nexport LOG_FORMAT=custom', updated)
         self.assertIn("export KEEP_THIS=1", updated)
         self.assertIn("export AFTER_RETURN=1", updated)
-        self.assertEqual(updated.count("# >>> MAM PATH >>>"), 1)
-        self.assertEqual(self.service_commands(), ["service status", "service start", "service status"])
+        self.assertEqual(updated.count("# >>> MAM PATH >>>"), 0)
+        self.assertEqual(self.service_commands(), [])
 
     def test_installer_does_not_implement_a_background_shell_supervisor(self):
         source = (self.source_root / "scripts" / "install.sh").read_text(encoding="utf-8")

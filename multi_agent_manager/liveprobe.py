@@ -58,6 +58,12 @@ def _redact(value: Any, *, limit: int = 700) -> str:
     return re.sub(r"(?i)\b(token|secret|password|api[_-]?key)\s*=\s*[^\s,;]+", r"\1=<redacted>", text)
 
 
+def _missing_rollout(error: Exception) -> bool:
+    """Treat an App Server thread already absent from rollout storage as clean."""
+
+    return "no rollout found" in str(error).lower()
+
+
 def _mapping(value: Any, label: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise LiveProbeError(f"{label} returned no JSON object")
@@ -113,6 +119,22 @@ def _without_thread_id() -> Any:
     finally:
         if present and previous is not None:
             os.environ["CODEX_THREAD_ID"] = previous
+
+
+@contextlib.contextmanager
+def _as_thread(thread_id: str) -> Any:
+    """Run a fixture CLI operation as its persisted native executor thread."""
+
+    present = "CODEX_THREAD_ID" in os.environ
+    previous = os.environ.get("CODEX_THREAD_ID")
+    os.environ["CODEX_THREAD_ID"] = thread_id
+    try:
+        yield
+    finally:
+        if present and previous is not None:
+            os.environ["CODEX_THREAD_ID"] = previous
+        else:
+            os.environ.pop("CODEX_THREAD_ID", None)
 
 
 def _thread_status(result: Any) -> str:
@@ -345,12 +367,16 @@ class _LiveFixture:
             "idle": "idle_executor",
             "archived": "archived_executor",
         }
-        with _without_thread_id():
-            for task_role, thread_role in bindings.items():
-                try:
-                    cli.bind(self.store, SimpleNamespace(task=self.tasks[task_role], agent=self.threads[thread_role]))
-                except Exception as exc:
-                    raise LiveProbeError(f"cannot bind fixture {task_role} executor: {_redact(exc)}") from exc
+        for task_role, thread_role in bindings.items():
+            try:
+                # ``task bind --agent`` is intentionally restricted to the
+                # legacy caller identity.  A live fixture must exercise the
+                # current native flow: each executor starts its own task with
+                # its canonical CODEX_THREAD_ID in scope.
+                with _as_thread(self.threads[thread_role]):
+                    cli.start(self.store, SimpleNamespace(task=self.tasks[task_role]))
+            except Exception as exc:
+                raise LiveProbeError(f"cannot start fixture {task_role} executor: {_redact(exc)}") from exc
         self.evidence["checks"]["executor_bound_before_first_model_turn"] = True
         self.evidence["checks"]["manager_is_fixture_only"] = True
 
@@ -803,14 +829,15 @@ class _LiveFixture:
             errors.append(f"job cleanup: {_redact(exc)}")
             self.evidence["cleanup"]["jobs"] = "failed"
 
-        try:
-            with _without_thread_id():
-                for task_id in self.tasks.values():
+        task_errors = False
+        with _without_thread_id():
+            for task_id in self.tasks.values():
+                try:
                     cli.archive(self.store, SimpleNamespace(task=task_id, note="liveprobe fixture cleanup"))
-            self.evidence["cleanup"]["tasks"] = "archived"
-        except Exception as exc:
-            errors.append(f"task cleanup: {_redact(exc)}")
-            self.evidence["cleanup"]["tasks"] = "failed"
+                except Exception as exc:
+                    task_errors = True
+                    errors.append(f"task cleanup ({task_id}): {_redact(exc)}")
+        self.evidence["cleanup"]["tasks"] = "partial" if task_errors else "archived"
 
         if self.stream is not None:
             thread_errors = False
@@ -821,6 +848,13 @@ class _LiveFixture:
                         self._request("thread/archive", {"threadId": thread_id})
                         self.evidence["cleanup"]["thread_archive"][role] = "archived"
                     except Exception as exc:
+                        if _missing_rollout(exc):
+                            # A failed task-start can leave a persisted thread
+                            # id without a rollout record.  It is already
+                            # absent from Codex storage and needs no archive
+                            # retry or error escalation.
+                            self.evidence["cleanup"]["thread_archive"][role] = "not_found"
+                            continue
                         thread_errors = True
                         detail = _redact(exc)
                         self.evidence["cleanup"]["thread_archive"][role] = f"failed: {detail}"
