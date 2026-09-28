@@ -224,6 +224,10 @@ run_tests() {
         # passes.  Keeping it out of the suite makes fixture expectations
         # independent of a production service-start choice.
         unset MAM_SERVICE_MANAGER
+        # The outer release install may select this archive through the
+        # environment.  Nested installer fixtures must exercise their own
+        # checkout path instead of accidentally selecting the same archive.
+        unset MAM_INSTALL_ARCHIVE
         "$SOURCE_PYTHON" -B -m unittest discover -s tests -v
     ); then
         incomplete 'checkout tests failed; pipx and the existing scheduler were left untouched'
