@@ -1134,6 +1134,13 @@ def service_rebind_manager(store, args):
         raise Error(str(exc)) from exc
 
 
+def service_upgrade(store, args):
+    try:
+        return service_module().service_upgrade(store.config)
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
+
+
 def task_list(store, args):
     tasks = [data for data in store.all() if args.all or (data["status"] == "archived") == args.archived]
     agents = agent_observations(data["agent"] for data in tasks if data["agent"])
@@ -1277,6 +1284,8 @@ def parser():
 
     cli = argparse.ArgumentParser(prog="mam", description="Manage local cluster tasks, workspaces and processes.",
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    from .version import PROGRAM_VERSION
+    cli.add_argument("--version", action="version", version=PROGRAM_VERSION)
     commands = cli.add_subparsers(required=True)
     task = command(commands, "task", "manage tasks and publications")
     sub = task.add_subparsers(dest="command", required=True)
@@ -1354,6 +1363,8 @@ def parser():
     p = command(service, "rebind-manager", "transfer this instance to the calling native Manager")
     p.add_argument("--note", required=True, metavar="NOTE", help="reason for Manager handoff")
     p.set_defaults(func=service_rebind_manager)
+    p = command(service, "upgrade", "upgrade this stopped instance and migrate its local data")
+    p.set_defaults(func=service_upgrade)
     messages = command(commands, "message", "send a message to this project's Manager").add_subparsers(required=True)
     p = command(messages, "send", "queue a message for the Manager")
     p.add_argument("--message", required=True, metavar="TEXT", help="message text")

@@ -27,6 +27,34 @@ from typing import Any
 
 from . import job_runtime
 from .cli import ProjectConfig, Store, safe_path
+try:
+    from .migrations import MigrationError, backup_local, migrate_data, read_data_version, write_data_version
+    from .release import RELEASE_TAG
+    from .version import DATA_VERSION, info as program_info, source_commit
+except ImportError:  # A source-only 0.1.0 fixture may omit release helpers.
+    class MigrationError(RuntimeError):
+        pass
+
+    DATA_VERSION = "0.1.0"
+    RELEASE_TAG = "v0.1.0"
+
+    def read_data_version(root):
+        return "0.1.0"
+
+    def backup_local(root, destination=None):
+        raise MigrationError("release migration helpers are unavailable")
+
+    def migrate_data(root, target=DATA_VERSION):
+        return {"from": DATA_VERSION, "to": target, "steps": [], "changed": False}
+
+    def write_data_version(root, version, *, from_version=None):
+        return None
+
+    def program_info():
+        return {"version": "0.1.0", "commit": None, "data_version": DATA_VERSION}
+
+    def source_commit():
+        return None
 
 
 SERVICE_VERSION = 1
@@ -165,6 +193,11 @@ def _default_state(config: ProjectConfig) -> dict[str, Any]:
         "healthy": False,
         "error": None,
         "compatibility": None,
+        # ``version`` above is the service-state schema.  This field records
+        # the code that owns the running daemon and intentionally remains
+        # absent/unknown for old daemon state files.
+        "daemon_version": None,
+        "daemon_commit": None,
         "events": {},
         "history": [],
         "job_schedule": {},
@@ -383,8 +416,18 @@ def _status_mapping(store: Store, state: dict[str, Any]) -> dict[str, Any]:
         status = "pending"
     else:
         status = "healthy"
+    try:
+        data_version = read_data_version(store.root)
+    except MigrationError as exc:
+        data_version = None
+        data_error = str(exc)
+    else:
+        data_error = None
     result = {
         "status": status,
+        "program_version": program_info()["version"],
+        "daemon_version": state.get("daemon_version"),
+        "data_version": data_version,
         "message_channel": state.get("message_channel", "tool"),
         "running": alive,
         "healthy": bool(alive and state.get("healthy") and not state.get("error")),
@@ -398,6 +441,8 @@ def _status_mapping(store: Store, state: dict[str, Any]) -> dict[str, Any]:
     error = state.get("error") or process_error
     if error:
         result["error"] = error
+    if data_error:
+        result["data_version_error"] = data_error
     if state.get("diagnostics"):
         result["diagnostics"] = list(state["diagnostics"])
     return result
@@ -590,6 +635,12 @@ def start_service(config: ProjectConfig, manager: str | None = None) -> dict[str
 
     store = Store(config)
     with _service_start_lock(store):
+        # A new empty instance starts at the current data format.  Existing
+        # task records deliberately retain the 0.1.0 default until upgrade.
+        if not (store.root / ".local" / "data-version.json").exists() and not any(
+            (store.root / ".local" / "tasks").glob("*.json")
+        ):
+            write_data_version(store.root, DATA_VERSION)
         selected = resolve_manager(store, manager)
         state = _load_state(store)
         alive, process_error = _probe_service_process(state) if state.get("pid") is not None else (False, None)
@@ -657,6 +708,8 @@ def start_service(config: ProjectConfig, manager: str | None = None) -> dict[str
             "healthy": False,
             "error": None,
             "compatibility": _public_compatibility(compatibility),
+            "daemon_version": program_info()["version"],
+            "daemon_commit": source_commit(),
         })
         _save_state(store, state)
         try:
@@ -701,6 +754,79 @@ def stop_service(config: ProjectConfig) -> dict[str, Any]:
                 _save_state(store, state)
                 raise WakeRuntimeError(state["error"]) from exc
         return _status_mapping(store, state)
+
+
+def _merge_release(store: Store, target: str) -> dict[str, Any]:
+    """Merge the installed release commit into the configured MAM branch."""
+
+    current_branch = _git_output(store.root, "branch", "--show-current")
+    if current_branch != store.branch:
+        raise WakeRuntimeError(
+            f"MAM_ROOT is on branch {current_branch or '<detached>'}; check out configured MAM_BRANCH {store.branch} and retry"
+        )
+    verify = subprocess.run(
+        ["git", "-C", str(store.root), "cat-file", "-e", f"{target}^{{commit}}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if verify.returncode:
+        raise WakeRuntimeError(f"installed release commit is not available in MAM_ROOT: {target}")
+    merge = subprocess.run(
+        ["git", "-C", str(store.root), "merge", "--no-edit", target],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if merge.returncode:
+        detail = " ".join((merge.stdout + " " + merge.stderr).split())[:1200]
+        raise WakeRuntimeError(
+            f"Git merge of release {target} into {store.branch} failed; resolve conflicts and retry"
+            + (f": {detail}" if detail else "")
+        )
+    return {"branch": store.branch, "commit": target, "output": " ".join(merge.stdout.split())}
+
+
+def _git_output(root: Path, *args: str) -> str:
+    result = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=False)
+    if result.returncode:
+        raise WakeRuntimeError("git command failed: " + " ".join(args))
+    return result.stdout.strip()
+
+
+def service_upgrade(config: ProjectConfig) -> dict[str, Any]:
+    """Upgrade one stopped instance to the installed program's release."""
+
+    store = Store(config)
+    with _service_start_lock(store), store.lock("service-upgrade"):
+        state = _load_state(store)
+        alive, process_error = _probe_service_process(state) if state.get("pid") is not None else (False, None)
+        if alive:
+            raise WakeRuntimeError("service daemon is still running; run mam service stop and retry")
+        if process_error and state.get("pid") is not None and process_error != "service process is no longer running":
+            raise WakeRuntimeError(f"cannot verify service daemon is stopped: {process_error}")
+        target = source_commit()
+        if not target or len(target) != 40 or any(char not in "0123456789abcdef" for char in target):
+            raise WakeRuntimeError("installed program has no fixed release commit metadata; use a tagged source archive")
+        current_data = read_data_version(store.root)
+        backup = backup_local(store.root)
+        try:
+            merge = _merge_release(store, target)
+            migrations = migrate_data(store.root, DATA_VERSION)
+        except (MigrationError, WakeRuntimeError) as exc:
+            raise WakeRuntimeError(f"service upgrade incomplete; backup retained at {backup}: {exc}") from exc
+        return {
+            "status": "upgraded" if current_data != DATA_VERSION else "up-to-date",
+            "program_version": program_info()["version"],
+            "target_commit": target,
+            "target_tag": RELEASE_TAG,
+            "data_version": read_data_version(store.root),
+            "backup": str(backup),
+            "merge": merge,
+            "migrations": migrations,
+            "adaptation": "multi_agent_manager/migrations.py",
+            "daemon_running": False,
+        }
 
 
 def _public_compatibility(result: Mapping[str, Any] | None) -> dict[str, Any] | None:

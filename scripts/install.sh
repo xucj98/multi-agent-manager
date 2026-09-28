@@ -9,6 +9,9 @@ readonly STARTUP_WAIT_ATTEMPTS=40
 readonly STARTUP_WAIT_SECONDS=0.5
 
 CHECKOUT_ROOT=''
+REQUESTED_VERSION=''
+INSTALL_ARCHIVE="${MAM_INSTALL_ARCHIVE:-}"
+MODERN_INSTALL=0
 MAM_ROOT=''
 PROJECT_ROOT=''
 LOCAL_BIN=''
@@ -21,6 +24,38 @@ SERVICE_ERROR=''
 SERVICE_STATE=''
 SERVICE_MANAGER_ARGS=()
 
+parse_args() {
+    while (($#)); do
+        case "$1" in
+            --version)
+                if (($# < 2)) || [[ -z "$2" || "$2" == -* ]]; then
+                    incomplete '--version requires a release version'
+                    return 1
+                fi
+                REQUESTED_VERSION="$2"
+                shift 2
+                ;;
+            --version=*)
+                REQUESTED_VERSION="${1#*=}"
+                [[ -n "$REQUESTED_VERSION" ]] || { incomplete '--version requires a release version'; return 1; }
+                shift
+                ;;
+            --)
+                shift
+                (($# == 0)) || { incomplete 'unexpected installer arguments'; return 1; }
+                ;;
+            *)
+                incomplete "unexpected installer argument: $1"
+                return 1
+                ;;
+        esac
+    done
+}
+
+version_is_valid() {
+    [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
+}
+
 incomplete() {
     # Keep an unattended install transcript self-contained.  Individual tools
     # have already bounded/redacted external diagnostics before reaching here.
@@ -32,6 +67,40 @@ repository_root() {
     local scripts
     scripts="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)" || return 1
     cd -- "$scripts/.." && pwd -P
+}
+
+prepare_release_source() {
+    local archive="$INSTALL_ARCHIVE" url="" source_dir="$INSTALL_TMP/source" first
+    mkdir -p -- "$source_dir"
+    if [[ -z "$archive" ]]; then
+        url="https://github.com/xucj98/multi-agent-manager/archive/refs/tags/v${REQUESTED_VERSION}.tar.gz"
+        archive="$INSTALL_TMP/source.tar.gz"
+        if ! command -v curl >/dev/null 2>&1; then
+            incomplete 'curl is required to download the selected MAM release'
+            return 1
+        fi
+        printf 'MAM installation: downloading %s\n' "$url"
+        if ! curl -fsSL --retry 2 -- "$url" -o "$archive"; then
+            incomplete "download failed for release $REQUESTED_VERSION"
+            return 1
+        fi
+    elif [[ "$archive" != /* || ! -f "$archive" || -L "$archive" ]]; then
+        incomplete 'MAM_INSTALL_ARCHIVE must be an absolute regular file'
+        return 1
+    fi
+    if ! tar -xf "$archive" -C "$source_dir"; then
+        incomplete "cannot unpack source archive: $archive"
+        return 1
+    fi
+    first="$(find "$source_dir" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+    if [[ -n "$first" && -f "$first/pyproject.toml" ]]; then
+        CHECKOUT_ROOT="$first"
+    elif [[ -f "$source_dir/pyproject.toml" ]]; then
+        CHECKOUT_ROOT="$source_dir"
+    else
+        incomplete 'source archive does not contain a pyproject.toml checkout'
+        return 1
+    fi
 }
 
 find_project_config() {
@@ -167,7 +236,7 @@ prepare_local_bin() {
         incomplete 'HOME must be a single-line absolute path'
         return 1
     fi
-    LOCAL_BIN="$HOME/.local/bin"
+    LOCAL_BIN="${PIPX_BIN_DIR:-$HOME/.local/bin}"
     if ! mkdir -p -- "$LOCAL_BIN"; then
         incomplete 'cannot create ~/.local/bin for the pipx launcher'
         return 1
@@ -344,7 +413,9 @@ persist_local_bin_path() {
 
 resolve_installed_python() {
     local pipx_home
-    if ! pipx_home="$(pipx environment --value PIPX_HOME 2>/dev/null)"; then
+    if [[ -n "${PIPX_HOME:-}" ]]; then
+        pipx_home="$PIPX_HOME"
+    elif ! pipx_home="$(pipx environment --value PIPX_HOME 2>/dev/null)"; then
         incomplete 'cannot identify the pipx environment for the installed MAM interpreter'
         return 1
     fi
@@ -436,7 +507,8 @@ PY
 run_lightweight_probe() {
     local output="$INSTALL_TMP/compatibility.json" errors="$INSTALL_TMP/compatibility.stderr" detail
     printf 'MAM proactive wakeup: running non-model App Server API compatibility probe\n'
-    if ! (cd -- "$PROJECT_ROOT" && env -u CODEX_THREAD_ID "$INSTALLED_PYTHON" -B -m multi_agent_manager.wake_compat --json >"$output" 2>"$errors"); then
+    local probe_root="${PROJECT_ROOT:-$INSTALL_TMP}"
+    if ! (cd -- "$probe_root" && env -u CODEX_THREAD_ID "$INSTALLED_PYTHON" -B -m multi_agent_manager.wake_compat --json >"$output" 2>"$errors"); then
         detail="$(bounded_diagnostic "$output" "$errors")"
         incomplete "the App Server API compatibility probe failed${detail:+: $detail}"
         return 1
@@ -472,7 +544,8 @@ run_live_delivery_probe() {
     local output="$INSTALL_TMP/liveprobe.out" errors="$INSTALL_TMP/liveprobe.stderr"
     local evidence="$INSTALL_TMP/liveprobe-evidence.json" detail
     printf 'MAM proactive wakeup: running isolated real delivery acceptance\n'
-    if ! (cd -- "$PROJECT_ROOT" && env -u CODEX_THREAD_ID "$INSTALLED_PYTHON" -B -m multi_agent_manager.liveprobe \
+    local probe_root="${PROJECT_ROOT:-$INSTALL_TMP}"
+    if ! (cd -- "$probe_root" && env -u CODEX_THREAD_ID "$INSTALLED_PYTHON" -B -m multi_agent_manager.liveprobe \
         --compatibility "$COMPATIBILITY_JSON" --root "$INSTALL_TMP/liveprobe" --evidence "$evidence" >"$output" 2>"$errors"); then
         detail="$(bounded_diagnostic "$output" "$errors" "$evidence")"
         incomplete "isolated real delivery acceptance failed${detail:+: $detail}"
@@ -602,47 +675,80 @@ start_project_service() {
 }
 
 main() {
-    if (($#)); then
-        printf 'usage: bash scripts/install.sh\n' >&2
-        return 64
+    parse_args "$@" || return 1
+    local local_checkout=''
+    if [[ -z "$REQUESTED_VERSION" && -z "$INSTALL_ARCHIVE" ]]; then
+        local_checkout="$(repository_root 2>/dev/null || true)"
+        if [[ ! -f "$local_checkout/pyproject.toml" || ! -d "$local_checkout/tests" ]]; then
+            # A curl | bash invocation has no checkout to inspect.  The
+            # current release is the latest formal release until a newer tag
+            # is published; callers can pin it explicitly with --version.
+            REQUESTED_VERSION='0.2.0'
+        fi
     fi
-    CHECKOUT_ROOT="$(repository_root)" || {
-        incomplete 'cannot resolve the MAM checkout containing this installer'
-        return 1
-    }
-    if [[ ! -f "$CHECKOUT_ROOT/pyproject.toml" || ! -d "$CHECKOUT_ROOT/tests" ]]; then
-        incomplete 'scripts/install.sh must be run from a multi-agent-manager checkout'
-        return 1
+    if [[ -n "$REQUESTED_VERSION" ]] || [[ -n "$INSTALL_ARCHIVE" ]]; then
+        MODERN_INSTALL=1
+        if [[ -z "$REQUESTED_VERSION" ]]; then
+            REQUESTED_VERSION='0.2.0'
+        fi
+        if ! version_is_valid "$REQUESTED_VERSION"; then
+            incomplete "invalid release version: $REQUESTED_VERSION"
+            return 1
+        fi
+        create_install_tmp
+        prepare_release_source
+    else
+        CHECKOUT_ROOT="$local_checkout" || {
+            incomplete 'cannot resolve the MAM checkout containing this installer'
+            return 1
+        }
+        if [[ ! -f "$CHECKOUT_ROOT/pyproject.toml" || ! -d "$CHECKOUT_ROOT/tests" ]]; then
+            incomplete 'scripts/install.sh must be run from a multi-agent-manager checkout; pass --version for a release install'
+            return 1
+        fi
     fi
-    local config_path
-    if ! config_path="$(find_project_config "$CHECKOUT_ROOT")"; then
+    local config_path=''
+    if config_path="$(find_project_config "$CHECKOUT_ROOT" 2>/dev/null)"; then
+        local -a config_values=()
+        if ! mapfile -t config_values < <(validate_project_config "$config_path"); then
+            incomplete 'project configuration is invalid for this MAM checkout'
+            return 1
+        fi
+        if ((${#config_values[@]} != 2)); then
+            incomplete 'project configuration is invalid for this MAM checkout'
+            return 1
+        fi
+        MAM_ROOT="${config_values[0]}"
+        PROJECT_ROOT="${config_values[1]}"
+        if ((MODERN_INSTALL == 0)); then
+            same_git_repository
+        fi
+    elif ((MODERN_INSTALL == 0)); then
         incomplete 'no .mam/env.json was found above this MAM checkout'
         return 1
     fi
-    local -a config_values=()
-    if ! mapfile -t config_values < <(validate_project_config "$config_path"); then
-        incomplete 'project configuration is invalid for this MAM checkout'
-        return 1
-    fi
-    if ((${#config_values[@]} != 2)); then
-        incomplete 'project configuration is invalid for this MAM checkout'
-        return 1
-    fi
-    MAM_ROOT="${config_values[0]}"
-    PROJECT_ROOT="${config_values[1]}"
-    same_git_repository
     choose_source_python
     run_tests
     prepare_local_bin
     install_with_pipx
-    persist_local_bin_path
+    if ((MODERN_INSTALL == 0)); then
+        persist_local_bin_path
+    fi
     resolve_installed_python
     validate_explicit_manager
-    create_install_tmp
-    # Complete both delivery probes before replacing the current scheduler.
+    if [[ -z "$INSTALL_TMP" ]]; then
+        create_install_tmp
+    fi
+    # A release install validates Codex delivery but deliberately leaves every
+    # existing project daemon stopped/running as the operator found it.  The
+    # legacy checkout path retains its historical service smoke for fixtures.
     run_lightweight_probe
     run_live_delivery_probe
-    start_project_service
+    if ((MODERN_INSTALL == 0)); then
+        start_project_service
+    else
+        printf 'MAM installation: PASS version=%s (service start is a separate command)\n' "$REQUESTED_VERSION"
+    fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
