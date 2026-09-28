@@ -2,7 +2,7 @@
 
 ## 核心原则
 
-MAM 是 multi-agent 项目管理工具。使用细节可查阅 `mam --help` 或[接口文档](docs/commands/)，语法中的大写词需要替换为实际值，`[]` 表示可选，`|` 表示任选其一。本文说明 MAM 通用流程；项目的文档、实验记录、产物留存和代码合并要求写在[项目说明](.local/README.md)或各 REPO 的 README.md、AGENTS.md。
+MAM 是 multi-agent 项目管理工具。使用细节可查阅 `mam --help` 或[接口文档](docs/commands/)，语法中的大写词需要替换为实际值，`[]` 表示可选，`|` 表示任选其一，`$` 表示环境变量。本文说明 MAM 通用流程；项目的文档、实验记录、产物留存和代码合并要求写在[项目说明](.local/README.md)或各 REPO 的 README.md、AGENTS.md。
 
 项目的目录结构如下：
 
@@ -75,17 +75,32 @@ mam task show [TASK-ID|AGENT-PATH]
 
 ## 执行与交付
 
-Subagent 首次执行任务时调用 `mam task start` 登记，再读取已发布要求，为每个需要修改或独立 review 的仓库创建 worktree：
+### 开始任务
+
+Subagent 先登记任务，再读取已发布要求，然后根据需要创建 worktree：
 
 ```text
-mam task start TASK-ID
-mam task show [TASK-ID|AGENT-PATH]
-mam workspace add --repo REPO --base COMMIT
+mam task start TASK-ID                       # 登记任务
+mam task show [TASK-ID|AGENT-PATH]           # 显示任务
+mam workspace add --repo REPO --base COMMIT  # 创建 worktree
 ```
 
-Subagent 查看自己任务时可不提供 `TASK-ID|AGENT-PATH`，MAM 从 `CODEX_THREAD_ID` 自动确认身份。返工时也要调用 `mam task start`，任务进入 working；发布 report 后进入 pending，归档后为 archived。普通问答无需 start。
+- Subagent 查看自己任务时可不提供 `TASK-ID|AGENT-PATH`，MAM 从 `$CODEX_THREAD_ID` 自动确认身份。
+- 返工时也要调用 `mam task start`，任务进入 working；发布 report 后进入 pending，归档后为 archived。普通问答无需 start。
 
-subagent 执行任务过程中应及时更新任务进度。直接修改 `workspace/TASK-ID/.task/report.md` 草稿，简洁记录当前进展，中间结果无需发布。Manager 可读取草稿了解进度；`mam task show --file report` 只返回已发布。
+### 向 Manager 发消息
+
+需要 Manager 反馈时，不要使用 Codex 原生协作工具。
+
+```text
+mam message send --message TEXT [--immediate]
+```
+
+默认在 Manager 空闲时唤醒并投递；加 `--immediate` 可投递到正在执行的 turn。
+
+### 报告结果
+
+Subagent 执行任务过程中应及时更新任务进度。直接修改 `workspace/TASK-ID/.task/report.md` 草稿，简洁记录当前进展，中间结果无需发布。Manager 可读取草稿了解进度；`mam task show --file report` 只返回已发布。
 
 完成后按[文件留存原则](#文件留存原则)整理成果，并在各 worktree 中用 `git commit` 提交代码。编辑 `workspace/TASK-ID/.task/report.md`，说明完成项、交付 commit、验证结果和成果位置；需要保留的一次性附件放 `.task/files/`。发布前将进度草稿整理为交付简报，再提交报告和附件：
 
@@ -142,17 +157,6 @@ mam service status
 原生 subagent 无法直接唤醒时，MAM 通知 Manager 转发。Manager 按通知中的执行者路径调用 `followup_task`，要求检查指定 job 的结果、按最新 task.md 继续工作并归档 job。通知通过 TASK-ID 定位时，先查看任务并确认执行者；需要换人则按任务接续流程处理。消息格式见 [mam service](docs/commands/service.md#消息与状态输出)。
 
 新 Manager 接管本实例时，在旧 Manager 已结束 turn 后调用 `mam service rebind-manager --note NOTE`。任务和工作目录保留，后续 Manager 通知发给接管者；Codex 原生父子关系不变，旧树执行者仍需通过 TASK-ID 定位，或交给新 subagent 接手。
-
-### 向 Manager 发消息
-
-需要 Manager 反馈时，使用及时消息；可以等当前工作结束后处理的信息加 `--defer`：
-
-```text
-mam message send --message TEXT [--task TASK-ID|AGENT-PATH]
-mam message send --message TEXT --defer [--task TASK-ID|AGENT-PATH]
-```
-
-及时消息进入 Manager 当前 turn，抄送消息等待其空闲；两类消息在 Manager idle 时都会唤醒。MAM 自动识别发送者并关联其任务，未绑定 task 也可发送。详见 [mam message](docs/commands/message.md)。
 
 ## MAM 开发指南
 

@@ -4,12 +4,12 @@
 
 | 接口 | 操作 |
 | --- | --- |
-| `mam message send --message TEXT [--defer] [--task TASK-ID\|AGENT-PATH]` | 保存消息并返回消息标识和投递状态；默认及时发送，`--defer` 表示抄送。 |
+| `mam message send --message TEXT [--immediate] [--task TASK-ID\|AGENT-PATH]` | 保存消息并返回消息标识和投递状态；默认在 Manager 空闲时投递，`--immediate` 可投递到当前 turn。 |
 
 | 类型 | Manager active | Manager idle |
 | --- | --- | --- |
-| 及时信息（默认） | 送入当前 turn | 唤醒并投递 |
-| 抄送信息（`--defer`） | 排队，等当前 turn 结束 | 唤醒并投递 |
+| 默认 | 排队，等当前 turn 结束 | 唤醒并投递 |
+| `--immediate` | 送入当前 turn | 唤醒并投递 |
 
 已绑定任务时自动关联；`--task` 可显式指定当前实例的任务，未绑定任务也可发送。消息包含发送者和正文，接收后由 Manager 决定后续动作。
 

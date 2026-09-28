@@ -53,7 +53,7 @@ mam service set message-channel user
 
 默认 `tool`，以工具输出投递；`user` 以可见的用户消息投递，便于验收。设置作用于本实例全部 MAM 消息，运行中的服务无需重启，重启后继续沿用。`mam service status` 的 `message_channel` 显示当前选择。
 
-执行者主动发送及时信息或抄送信息使用 [mam message](message.md)。
+执行者使用 [mam message](message.md) 发送消息，默认在 Manager 空闲时投递；加 `--immediate` 可投递到当前 turn。
 
 ## 消息与状态输出
 
