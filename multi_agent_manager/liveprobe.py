@@ -216,14 +216,13 @@ def _fixture_executor_path(role: str) -> str:
     return f"/root/liveprobe/{role}"
 
 
-def _delivery_input(turn: Mapping[str, Any], expected_lines: list[str]) -> dict[str, str] | None:
-    """Match one inbound MAM message in the completed scheduler turn."""
+def _inbound_items(turn: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Extract inbound text from one fixture-owned scheduler turn."""
 
-    if turn.get("status") != "completed":
-        return None
+    inbound: list[dict[str, str]] = []
     items = turn.get("items")
     if not isinstance(items, list):
-        return None
+        return inbound
     for item in items:
         if not isinstance(item, Mapping):
             continue
@@ -236,7 +235,8 @@ def _delivery_input(turn: Mapping[str, Any], expected_lines: list[str]) -> dict[
                 part["text"] for part in content
                 if isinstance(part, Mapping) and part.get("type") == "text" and isinstance(part.get("text"), str)
             )
-        elif kind == "functionCallOutput" and item.get("name") == "message" and item.get("namespace") == "mam":
+            inbound.append({"item_type": kind, "text": text})
+        elif kind == "functionCallOutput":
             output = item.get("output")
             if isinstance(output, str):
                 text = output
@@ -248,11 +248,26 @@ def _delivery_input(turn: Mapping[str, Any], expected_lines: list[str]) -> dict[
                 )
             else:
                 continue
-        else:
+            inbound.append({
+                "item_type": kind, "text": text,
+                "name": str(item.get("name", "")), "namespace": str(item.get("namespace", "")),
+            })
+    return inbound
+
+
+def _delivery_input(turn: Mapping[str, Any], expected_lines: list[str]) -> dict[str, str] | None:
+    """Match one inbound MAM message in the completed scheduler turn."""
+
+    if turn.get("status") != "completed":
+        return None
+    for item in _inbound_items(turn):
+        if item["item_type"] == "functionCallOutput" and (
+            item["name"] != "message" or item["namespace"] != "mam"
+        ):
             continue
-        lines = text.splitlines()
+        lines = item["text"].splitlines()
         if all(line in lines for line in expected_lines):
-            return {"item_type": kind, "text": text}
+            return {"item_type": item["item_type"], "text": item["text"]}
     return None
 
 
@@ -771,16 +786,23 @@ class _LiveFixture:
         completed_id = self._wait_for_completion_event(role, label, phase, deadline=deadline)
         self._wait_for_idle(role, label, deadline=deadline)
         turns = self._thread_turns_after_idle(role, phase)
-        if len(turns) >= minimum_turns:
-            turn = next((item for item in turns if item.get("id") == completed_id), None)
-            if isinstance(turn, Mapping):
-                received = _delivery_input(turn, expected)
-                if received is not None:
-                    self.evidence["delivery_inputs"][phase] = {
-                        "thread_id": self.threads[role], "turn_id": completed_id, **received,
-                    }
-                    self._record_paged_history(role, phase, turns)
-                    return turn
+        turn = next((item for item in turns if item.get("id") == completed_id), None)
+        receipt: dict[str, Any] = {
+            "thread_id": self.threads[role], "turn_id": completed_id,
+            "matched": False, "observed_turns": _turn_summaries(turns),
+        }
+        if isinstance(turn, Mapping):
+            receipt["status"] = turn.get("status")
+            receipt["inbound_items"] = [
+                {**item, "text": _redact(item["text"])} for item in _inbound_items(turn)
+            ]
+        self.evidence["delivery_inputs"][phase] = receipt
+        if isinstance(turn, Mapping) and len(turns) >= minimum_turns:
+            received = _delivery_input(turn, expected)
+            if received is not None:
+                receipt.update({**received, "text": _redact(received["text"]), "matched": True})
+                self._record_paged_history(role, phase, turns)
+                return turn
         raise LiveProbeError(f"fixture {label} completed turn {completed_id} without matching inbound delivery")
 
     def _start_baseline_turn(self, role: str) -> None:

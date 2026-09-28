@@ -119,6 +119,7 @@ class FakeStream:
         self.manager_delivery_reply_override: str | None = None
         self.manager_baseline_reply_override: str | None = None
         self.failed_turn_ids: set[str] = set()
+        self.history_omitted_turn_ids: set[str] = set()
 
     def _all_roles_have_baseline(self):
         return all(f"turn-{role}-baseline" in self.completed_turn_ids for role in liveprobe._ROLE_ORDER)
@@ -220,7 +221,10 @@ class FakeStream:
                 raise AssertionError("paged history was requested before turn/completed")
             if thread_id in self.history_unsupported:
                 raise RuntimeError("list_turns is not supported yet")
-            return {"data": list(reversed(self.turns[thread_id]))}
+            return {"data": [
+                turn for turn in reversed(self.turns[thread_id])
+                if turn["id"] not in self.history_omitted_turn_ids
+            ]}
         if method == "turn/start":
             role = liveprobe._ROLE_ORDER[self.direct_baseline_starts]
             if thread_id != THREAD_IDS[role]:
@@ -340,6 +344,8 @@ class LiveProbeTests(unittest.TestCase):
         self.assertEqual(result["model_turns"], 6)
         self.assertEqual(result["cleanup"]["threads"], "archived")
         self.assertEqual(result["delivery_inputs"]["manager_delivery"]["item_type"], "userMessage")
+        self.assertTrue(result["delivery_inputs"]["manager_delivery"]["matched"])
+        self.assertEqual(result["delivery_inputs"]["manager_delivery"]["status"], "completed")
         self.assertIn("/root/liveprobe/idle_executor needs follow-up", result["delivery_inputs"]["manager_delivery"]["text"])
         self.assertIn("/root/liveprobe/archived_executor needs follow-up", result["delivery_inputs"]["manager_delivery"]["text"])
         self.assertEqual(result["delivery_inputs"]["exited_job_delivery"]["item_type"], "userMessage")
@@ -464,11 +470,15 @@ class LiveProbeTests(unittest.TestCase):
             self._run_fixture(root, evidence_path=evidence_path)
         evidence = json.loads(evidence_path.read_text())
         self.assertFalse(evidence["checks"]["manager_delivery"])
-        self.assertEqual(evidence["delivery_inputs"], {})
+        receipt = evidence["delivery_inputs"]["manager_delivery"]
+        self.assertFalse(receipt["matched"])
+        self.assertEqual(receipt["status"], "completed")
+        self.assertEqual(receipt["inbound_items"][0]["text"], "unrelated user message")
         self.assertEqual(evidence["cleanup"]["threads"], "archived")
 
     def test_wrong_executor_path_does_not_count_as_manager_delivery(self):
         root = self.base / "fixture-wrong-path"
+        evidence_path = self.base / "wrong-path.json"
         self.stream.manager_delivery_input_override = (
             "[MAM Message]\n"
             "/root/liveprobe/other_executor needs follow-up. Check the report; continue the work, "
@@ -477,7 +487,30 @@ class LiveProbeTests(unittest.TestCase):
             "request review, or archive the task."
         )
         with self.assertRaisesRegex(liveprobe.LiveProbeError, "without matching inbound delivery"):
-            self._run_fixture(root)
+            self._run_fixture(root, evidence_path=evidence_path)
+        evidence = json.loads(evidence_path.read_text())
+        receipt = evidence["delivery_inputs"]["manager_delivery"]
+        self.assertEqual(receipt["thread_id"], THREAD_IDS["manager"])
+        self.assertEqual(receipt["turn_id"], "turn-manager-delivery")
+        self.assertEqual(receipt["status"], "completed")
+        self.assertFalse(receipt["matched"])
+        self.assertEqual(receipt["inbound_items"][0]["item_type"], "userMessage")
+        self.assertIn("/root/liveprobe/other_executor needs follow-up", receipt["inbound_items"][0]["text"])
+        self.assertEqual(evidence["cleanup"]["threads"], "archived")
+
+    def test_missing_corresponding_turn_records_observed_turns(self):
+        root = self.base / "fixture-missing-turn"
+        evidence_path = self.base / "missing-turn.json"
+        self.stream.history_omitted_turn_ids.add("turn-manager-delivery")
+        with self.assertRaisesRegex(liveprobe.LiveProbeError, "without matching inbound delivery"):
+            self._run_fixture(root, evidence_path=evidence_path)
+        receipt = json.loads(evidence_path.read_text())["delivery_inputs"]["manager_delivery"]
+        self.assertEqual(receipt["thread_id"], THREAD_IDS["manager"])
+        self.assertEqual(receipt["turn_id"], "turn-manager-delivery")
+        self.assertFalse(receipt["matched"])
+        self.assertEqual(receipt["observed_turns"][0]["id"], "turn-manager-baseline")
+        self.assertNotIn("status", receipt)
+        self.assertNotIn("inbound_items", receipt)
 
     def test_wrong_job_id_or_recipient_is_not_matching_inbound_delivery(self):
         expected = [
@@ -503,9 +536,14 @@ class LiveProbeTests(unittest.TestCase):
 
     def test_failed_turn_does_not_count_as_delivery(self):
         root = self.base / "fixture-failed-manager-turn"
+        evidence_path = self.base / "failed-turn.json"
         self.stream.failed_turn_ids.add("turn-manager-delivery")
         with self.assertRaisesRegex(liveprobe.LiveProbeError, "without matching inbound delivery"):
-            self._run_fixture(root)
+            self._run_fixture(root, evidence_path=evidence_path)
+        receipt = json.loads(evidence_path.read_text())["delivery_inputs"]["manager_delivery"]
+        self.assertEqual(receipt["status"], "failed")
+        self.assertFalse(receipt["matched"])
+        self.assertEqual(receipt["inbound_items"][0]["item_type"], "userMessage")
 
     def test_matching_mam_function_call_output_is_valid_inbound_delivery(self):
         expected = ["[MAM Message]", f"Job {JOB_ID} has exited."]
