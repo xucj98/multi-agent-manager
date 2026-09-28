@@ -416,6 +416,22 @@ class _LiveFixture:
             data["status"] = "working"
             self.store.write(data)
 
+    def _commit_git_fixture_state(self) -> None:
+        """Make the disposable Store clean before ``task archive`` preflight."""
+
+        subprocess.run(
+            ["git", "-C", str(self.config.mam_root), "add", "-A"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        subprocess.run(
+            ["git", "-C", str(self.config.mam_root), "commit", "--quiet", "--allow-empty", "-m", "liveprobe fixture state"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
     def _spawn_blocker(self) -> subprocess.Popen[bytes]:
         try:
             process = self.process_factory(
@@ -869,6 +885,7 @@ class _LiveFixture:
         with _without_thread_id():
             for task_id in self.tasks.values():
                 try:
+                    self._commit_git_fixture_state()
                     cli.archive(self.store, SimpleNamespace(task=task_id, note="liveprobe fixture cleanup"))
                 except Exception as exc:
                     task_errors = True
