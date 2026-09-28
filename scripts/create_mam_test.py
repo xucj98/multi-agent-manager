@@ -198,22 +198,29 @@ def create(version: str, root: Path, *, seed: str = "HEAD") -> dict:
     # Check prerequisites before allocating the caller's requested root.
     if version == "0.1.0":
         _old_snapshot(repo)
-    _write_project(root, mam_root, branch, repo, seed)
-    version_dir = root / ".versions" / version
-    package_parent, source_commit = _package_for_version(repo, version, version_dir)
-    launcher = _venv_and_launcher(version_dir, package_parent)
-    metadata = {
-        "version": version,
-        "source_commit": source_commit,
-        "package": str(package_parent),
-        "program": str(launcher),
-        "fixture": str(repo / "tests" / "fixtures" / version / "create.py"),
-    }
-    (version_dir / "release.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
-    fixture = _run_fixture(repo, version, root, mam_root, package_parent)
-    metadata["fixture_result"] = fixture
-    (root / ".mam" / "test-instance.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
-    return {"root": str(root), "version": version, "mam": str(launcher), "mam_root": str(mam_root), "fixture": fixture}
+    try:
+        _write_project(root, mam_root, branch, repo, seed)
+        version_dir = root / ".versions" / version
+        package_parent, source_commit = _package_for_version(repo, version, version_dir)
+        launcher = _venv_and_launcher(version_dir, package_parent)
+        metadata = {
+            "version": version,
+            "source_commit": source_commit,
+            "package": str(package_parent),
+            "program": str(launcher),
+            "fixture": str(repo / "tests" / "fixtures" / version / "create.py"),
+        }
+        (version_dir / "release.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+        fixture = _run_fixture(repo, version, root, mam_root, package_parent)
+        metadata["fixture_result"] = fixture
+        (root / ".mam" / "test-instance.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+        return {"root": str(root), "version": version, "mam": str(launcher), "mam_root": str(mam_root), "fixture": fixture}
+    except Exception:
+        # All files below root were allocated by this invocation.  Preserve a
+        # pre-existing root via the early refusal above, while ensuring a
+        # failed fixture cannot leave a daemon-ready half-instance behind.
+        shutil.rmtree(root, ignore_errors=True)
+        raise
 
 
 def main(argv: list[str] | None = None) -> int:
