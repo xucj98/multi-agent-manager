@@ -471,6 +471,30 @@ class LiveProbeTests(unittest.TestCase):
             1,
         )
 
+    def test_empty_rollout_resume_stops_after_bounded_retry_limit(self):
+        root = self.base / "fixture-empty-rollout-retry-limit"
+        evidence_path = self.base / "empty-rollout-retry-limit.json"
+        empty_error = "failed to read session metadata /tmp/rollout.jsonl: rollout at /tmp/rollout.jsonl is empty"
+        self.stream.resume_failures[THREAD_IDS["manager"]] = [empty_error] * 6
+        with self.assertRaisesRegex(liveprobe.LiveProbeError, r"rollout at /tmp/rollout\.jsonl is empty"):
+            self._run_fixture(root, evidence_path=evidence_path)
+
+        evidence = json.loads(evidence_path.read_text())
+        self.assertEqual(
+            evidence["resume_persistence"]["manager"],
+            {
+                "attempts": 6,
+                "retry_delays": [0.05, 0.1, 0.2, 0.4, 0.8],
+                "result": "failed_retry_limit",
+            },
+        )
+        self.assertEqual(self.stream.resume_calls[THREAD_IDS["manager"]], 6)
+        self.assertEqual(self.state["sleeps"][:5], [0.05, 0.1, 0.2, 0.4, 0.8])
+        self.assertEqual(
+            [method for method, _ in self.state["requests"]].count("turn/start"),
+            1,
+        )
+
     def test_unrelated_resume_error_is_not_retried(self):
         root = self.base / "fixture-empty-rollout-unrelated-error"
         evidence_path = self.base / "empty-rollout-unrelated-error.json"
