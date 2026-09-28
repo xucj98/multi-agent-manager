@@ -39,8 +39,27 @@ def run(argv: list[str], *, cwd: Path | None = None, env: dict[str, str] | None 
     return result
 
 
-def create_instance(version: str, path: Path, log: Path, *, seed: str = "HEAD") -> dict[str, Any]:
-    result = run([sys.executable, str(root_dir() / "scripts" / "create_mam_test.py"), "--version", version, "--root", str(path), "--seed", seed], log=log)
+def create_instance(
+    version: str,
+    path: Path,
+    log: Path,
+    *,
+    seed: str = "HEAD",
+    source_ref: str | None = None,
+) -> dict[str, Any]:
+    command = [
+        sys.executable,
+        str(root_dir() / "scripts" / "create_mam_test.py"),
+        "--version",
+        version,
+        "--root",
+        str(path),
+        "--seed",
+        seed,
+    ]
+    if source_ref:
+        command.extend(("--source-ref", source_ref))
+    result = run(command, log=log)
     if result.returncode:
         raise IntegrationError(f"create {path} failed: {result.stderr[-1000:]}")
     try:
@@ -55,7 +74,9 @@ def create_instance(version: str, path: Path, log: Path, *, seed: str = "HEAD") 
 def build_archive(output_root: Path, log: Path, expected_version: str, *, published: bool = False) -> tuple[Path, str]:
     checkout = root_dir()
     ref = f"refs/tags/v{expected_version}" if published else "HEAD"
-    rev = run(["git", "-C", str(checkout), "rev-parse", ref], log=log)
+    # Resolve annotated tags to their commit object.  Archival substitution
+    # and installed release metadata identify the commit, never the tag object.
+    rev = run(["git", "-C", str(checkout), "rev-parse", f"{ref}^{{commit}}"], log=log)
     if rev.returncode:
         source = f"tag v{expected_version}" if published else "candidate checkout"
         raise IntegrationError(f"{source} is not available in the local repository")
@@ -70,6 +91,16 @@ def build_archive(output_root: Path, log: Path, expected_version: str, *, publis
     result = run(["git", "-C", str(checkout), "archive", "--format=tar.gz", f"--output={archive}", ref], log=log)
     if result.returncode:
         raise IntegrationError(f"candidate archive failed: {result.stderr[-1000:]}")
+    try:
+        with tarfile.open(archive, "r:gz") as package:
+            release_members = [member for member in package.getmembers() if member.name.endswith("multi_agent_manager/release.py")]
+            if len(release_members) != 1:
+                raise IntegrationError("candidate archive has no unique release metadata file")
+            release_text = package.extractfile(release_members[0]).read().decode("utf-8")
+    except (OSError, UnicodeDecodeError, tarfile.TarError, AttributeError) as exc:
+        raise IntegrationError(f"candidate archive metadata could not be read: {exc}") from exc
+    if f'RELEASE_COMMIT = "{rev.stdout.strip()}"' not in release_text:
+        raise IntegrationError("candidate archive did not substitute its selected commit in release metadata")
     return archive, rev.stdout.strip()
 
 
@@ -318,14 +349,19 @@ def migration_retry(launcher: Path, instance: Path, install_root: Path, log: Pat
 def verify_source_isolation(
     instances: list[tuple[Path, dict[str, Any]]],
     candidate_commit: str,
+    selected_ref: str,
+    checkout_head: str,
     baseline_refs: dict[str, dict[str, str]],
     source_refs: dict[str, str],
 ) -> dict[str, Any]:
     source = root_dir()
-    if git_output(source, "rev-parse", "HEAD") != candidate_commit:
+    if git_output(source, "rev-parse", "HEAD") != checkout_head:
         raise IntegrationError("candidate checkout HEAD changed during integration")
     if git_refs(source) != source_refs:
         raise IntegrationError("candidate checkout refs changed during integration")
+    selected = git_output(source, "rev-parse", f"{selected_ref}^{{commit}}")
+    if selected != candidate_commit:
+        raise IntegrationError("selected release ref no longer names the archived candidate commit")
     if run(["git", "-C", str(source), "status", "--porcelain"]).stdout.strip():
         raise IntegrationError("candidate checkout gained working-tree changes during integration")
     origins: dict[str, str] = {}
@@ -344,6 +380,8 @@ def verify_source_isolation(
             raise IntegrationError(f"non-MAM refs changed in isolated instance {instance}")
     return {
         "candidate_head": candidate_commit,
+        "checkout_head": checkout_head,
+        "selected_ref": selected_ref,
         "origins": origins,
         "task_roots": [str(path) for path, _ in instances],
         "baseline_refs": baseline_refs,
@@ -469,7 +507,11 @@ def verify_installed_candidate(install_root: Path, expected_version: str, expect
         "print(release.RELEASE_VERSION)\n"
         "print(release.RELEASE_COMMIT)\n"
     )
-    result = run([str(interpreters[0]), "-c", code], log=log)
+    # The integration runner itself lives in this checkout.  Do not let its
+    # cwd or PYTHONPATH shadow the package installed in the isolated pipx venv.
+    isolated_env = os.environ.copy()
+    isolated_env.pop("PYTHONPATH", None)
+    result = run([str(interpreters[0]), "-c", code], cwd=install_root, env=isolated_env, log=log)
     if result.returncode:
         raise IntegrationError(f"installed candidate metadata query failed: {result.stderr[-800:]}")
     values = result.stdout.strip().splitlines()
@@ -526,6 +568,12 @@ def integration(
     try:
         if (from_version, to_version) != ("0.1.0", "0.2.0"):
             raise IntegrationError("only the complete 0.1.0 -> 0.2.0 chain is supported")
+        selected_ref = f"refs/tags/v{to_version}" if published else "HEAD"
+        checkout_head = git_output(root_dir(), "rev-parse", "HEAD")
+        if published:
+            selected_check = run(["git", "-C", str(root_dir()), "rev-parse", f"{selected_ref}^{{commit}}"], log=log)
+            if selected_check.returncode:
+                raise IntegrationError(f"published source tag v{to_version} is not available in the local repository")
         instances: list[tuple[Path, dict[str, Any]]] = []
         for index, name in enumerate(("mam-test", "mam-test-2")):
             path = root / name
@@ -657,10 +705,12 @@ def integration(
                 raise IntegrationError("candidate daemon did not stop after notification")
         outcome["scenarios"].append({"name": "restart-and-job-notification", "status": "passed", "codex": "controlled"})
         new_instance = root / "mam-test-new"
-        outcome["new_instance"] = create_instance(to_version, new_instance, log)
+        outcome["new_instance"] = create_instance(to_version, new_instance, log, seed=commit, source_ref=selected_ref if published else None)
         owned.append(new_instance)
         outcome["scenarios"].append({"name": "first-use-new-instance", "status": "passed"})
-        outcome["source_isolation"] = verify_source_isolation(instances, commit, baseline_refs, source_refs)
+        outcome["source_isolation"] = verify_source_isolation(
+            instances, commit, selected_ref, checkout_head, baseline_refs, source_refs
+        )
         outcome["scenarios"].append({"name": "candidate-and-instance-isolation", "status": "passed"})
     except (IntegrationError, OSError, subprocess.SubprocessError, tarfile.TarError) as exc:
         outcome["error"] = str(exc)

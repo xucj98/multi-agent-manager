@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
 
 
 TASK_BASELINE = "2eb71f96-e221-4571-9e18-c3352fc7634f"
@@ -73,24 +75,59 @@ def _old_snapshot(repo: Path) -> Path:
     return snapshot
 
 
-def _package_for_version(repo: Path, version: str, destination: Path) -> tuple[Path, str]:
+def _extract_release_source(repo: Path, ref: str, destination: Path) -> tuple[Path, str]:
+    """Materialize package and fixture files from one published Git ref."""
+
+    try:
+        source_commit = git(repo, "rev-parse", f"{ref}^{{commit}}")
+        archive = subprocess.run(
+            ["git", "-C", str(repo), "archive", "--format=tar", ref, "multi_agent_manager", "tests/fixtures/0.2.0"],
+            check=True,
+            capture_output=True,
+        ).stdout
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
+        raise CreateError(f"published source {ref} is unavailable: {detail[-500:]}") from exc
+    source = destination / "source"
+    source.mkdir(parents=True, exist_ok=False)
+    try:
+        with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as package:
+            package.extractall(source)
+    except (tarfile.TarError, OSError) as exc:
+        raise CreateError(f"published source {ref} could not be unpacked: {exc}") from exc
+    return source, source_commit
+
+
+def _package_for_version(
+    repo: Path, version: str, destination: Path, *, source_ref: str | None = None
+) -> tuple[Path, str, Path]:
     package = destination / "package"
     if version == "0.1.0":
         source = _old_snapshot(repo)
         _copy_package(source, package / "multi_agent_manager")
         source_commit = "archived-old-source-snapshot"
+        fixture = repo / "tests" / "fixtures" / version / "create.py"
     elif version == "0.2.0":
-        source = repo / "multi_agent_manager"
+        source_tree = None
+        if source_ref:
+            source_tree, source_commit = _extract_release_source(repo, source_ref, destination)
+            source = source_tree / "multi_agent_manager"
+            fixture = source_tree / "tests" / "fixtures" / version / "create.py"
+        else:
+            source = repo / "multi_agent_manager"
+            fixture = repo / "tests" / "fixtures" / version / "create.py"
+            try:
+                source_commit = git(repo, "rev-parse", "HEAD")
+            except subprocess.CalledProcessError:
+                source_commit = "working-tree"
         if not source.is_dir():
             raise CreateError(f"candidate package source is missing: {source}")
         _copy_package(source, package / "multi_agent_manager")
-        try:
-            source_commit = git(repo, "rev-parse", "HEAD")
-        except subprocess.CalledProcessError:
-            source_commit = "working-tree"
     else:
         raise CreateError(f"unsupported test version: {version}")
-    return package, source_commit
+    if not fixture.is_file():
+        raise CreateError(f"fixture writer is missing: {fixture}")
+    return package, source_commit, fixture
 
 
 def _venv_and_launcher(destination: Path, package_parent: Path) -> Path:
@@ -166,10 +203,7 @@ def _write_project(project: Path, mam_root: Path, branch: str, seed_repo: Path, 
     run(["git", "-C", str(mam_root), "commit", "-q", "-m", "fixture base"])
 
 
-def _run_fixture(repo: Path, version: str, root: Path, mam_root: Path, package_parent: Path) -> dict:
-    fixture = repo / "tests" / "fixtures" / version / "create.py"
-    if not fixture.is_file():
-        raise CreateError(f"fixture writer is missing: {fixture}")
+def _run_fixture(fixture: Path, version: str, root: Path, mam_root: Path, package_parent: Path) -> dict:
     command = [
         str(package_parent.parent / ".venv" / "bin" / "python"),
         str(fixture),
@@ -179,7 +213,10 @@ def _run_fixture(repo: Path, version: str, root: Path, mam_root: Path, package_p
         "--mam-root", str(mam_root),
         "--package", str(package_parent),
     ]
-    result = subprocess.run(command, cwd=repo, capture_output=True, text=True)
+    # The fixture may come from a temporary archive tree rather than the
+    # developer checkout.  Its package path is explicit, so only use the
+    # fixture's own source tree as cwd.
+    result = subprocess.run(command, cwd=fixture.parents[3], capture_output=True, text=True)
     if result.returncode:
         raise CreateError(f"fixture failed for {version}: {result.stderr[-3000:]}{result.stdout[-1000:]}")
     try:
@@ -191,7 +228,7 @@ def _run_fixture(repo: Path, version: str, root: Path, mam_root: Path, package_p
     return value
 
 
-def create(version: str, root: Path, *, seed: str = "HEAD") -> dict:
+def create(version: str, root: Path, *, seed: str = "HEAD", source_ref: str | None = None) -> dict:
     if version not in SUPPORTED:
         raise CreateError(f"unsupported test version: {version}; choose one of {', '.join(sorted(SUPPORTED))}")
     root = root.expanduser().resolve()
@@ -207,17 +244,17 @@ def create(version: str, root: Path, *, seed: str = "HEAD") -> dict:
     try:
         _write_project(root, mam_root, branch, repo, seed)
         version_dir = root / ".versions" / version
-        package_parent, source_commit = _package_for_version(repo, version, version_dir)
+        package_parent, source_commit, fixture_path = _package_for_version(repo, version, version_dir, source_ref=source_ref)
         launcher = _venv_and_launcher(version_dir, package_parent)
         metadata = {
             "version": version,
             "source_commit": source_commit,
             "package": str(package_parent),
             "program": str(launcher),
-            "fixture": str(repo / "tests" / "fixtures" / version / "create.py"),
+            "fixture": str(fixture_path),
         }
         (version_dir / "release.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
-        fixture = _run_fixture(repo, version, root, mam_root, package_parent)
+        fixture = _run_fixture(fixture_path, version, root, mam_root, package_parent)
         metadata["fixture_result"] = fixture
         (root / ".mam" / "test-instance.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         return {"root": str(root), "version": version, "mam": str(launcher), "mam_root": str(mam_root), "fixture": fixture}
@@ -234,9 +271,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", required=True, help="data/program version, for example 0.1.0")
     parser.add_argument("--root", required=True, type=Path, help="new test PROJECT_ROOT")
     parser.add_argument("--seed", default="HEAD", help="candidate repository commit used as the MAM_ROOT base")
+    parser.add_argument("--source-ref", default=None, help="published Git ref used for a current-release package and fixture")
     args = parser.parse_args(argv)
     try:
-        print(json.dumps(create(args.version, args.root, seed=args.seed), ensure_ascii=False, indent=2, sort_keys=True))
+        print(json.dumps(create(args.version, args.root, seed=args.seed, source_ref=args.source_ref), ensure_ascii=False, indent=2, sort_keys=True))
     except (CreateError, OSError, subprocess.CalledProcessError) as exc:
         print(f"create_mam_test: {exc}", file=sys.stderr)
         return 1
