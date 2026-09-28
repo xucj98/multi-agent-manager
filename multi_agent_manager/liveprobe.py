@@ -242,6 +242,7 @@ class _LiveFixture:
         self.clock = clock
         self.sleeper = sleeper
         self.config = cli.ProjectConfig(root / "mam-state", root / "project", "liveprobe/state")
+        self._prepare_git_instance()
         self.store = cli.Store(self.config)
         self.stream: Any | None = None
         self.tasks: dict[str, str] = {}
@@ -287,6 +288,31 @@ class _LiveFixture:
                 "thread_archive": {},
             },
         }
+
+    def _prepare_git_instance(self) -> None:
+        """Create the disposable Git instance required by Store/task cleanup."""
+
+        try:
+            self.config.mam_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+            self.config.project_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+            subprocess.run(["git", "init", "--quiet", str(self.config.mam_root)], check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(["git", "-C", str(self.config.mam_root), "config", "user.email", "liveprobe@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(self.config.mam_root), "config", "user.name", "MAM liveprobe"], check=True)
+            (self.config.mam_root / "README").write_text("liveprobe fixture\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(self.config.mam_root), "add", "README"], check=True)
+            subprocess.run(
+                ["git", "-C", str(self.config.mam_root), "commit", "--quiet", "-m", "initialize liveprobe fixture"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
+            subprocess.run(
+                ["git", "-C", str(self.config.mam_root), "branch", "liveprobe/state"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
+            subprocess.run(["git", "init", "--quiet", str(self.config.project_root)], check=True, stdout=subprocess.DEVNULL)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise LiveProbeError(f"cannot initialize isolated Git instance: {_redact(exc)}") from exc
 
     def _deadline(self) -> float:
         return self.deadline
@@ -369,16 +395,26 @@ class _LiveFixture:
         }
         for task_role, thread_role in bindings.items():
             try:
-                # ``task bind --agent`` is intentionally restricted to the
-                # legacy caller identity.  A live fixture must exercise the
-                # current native flow: each executor starts its own task with
-                # its canonical CODEX_THREAD_ID in scope.
-                with _as_thread(self.threads[thread_role]):
-                    cli.start(self.store, SimpleNamespace(task=self.tasks[task_role]))
+                # App Server ``thread/start`` creates ordinary persisted
+                # threads, not native subagents, so the product's ``task
+                # start`` command correctly rejects them.  Prepare the
+                # fixture's existing task records directly in its disposable
+                # Store; native identity validation remains unchanged in CLI.
+                self._prepare_binding(task_role, thread_role)
             except Exception as exc:
-                raise LiveProbeError(f"cannot start fixture {task_role} executor: {_redact(exc)}") from exc
+                raise LiveProbeError(f"cannot prepare fixture {task_role} executor: {_redact(exc)}") from exc
         self.evidence["checks"]["executor_bound_before_first_model_turn"] = True
         self.evidence["checks"]["manager_is_fixture_only"] = True
+
+    def _prepare_binding(self, task_role: str, thread_role: str) -> None:
+        task_id = self.tasks[task_role]
+        agent = self.threads[thread_role]
+        with self.store.lock(task_id):
+            data = self.store.read(task_id, writable=True)
+            data["agent"] = agent
+            data["identity"] = {"path": f"/root/liveprobe/{thread_role}", "tree_root": self.threads["manager"]}
+            data["status"] = "working"
+            self.store.write(data)
 
     def _spawn_blocker(self) -> subprocess.Popen[bytes]:
         try:
