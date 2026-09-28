@@ -132,7 +132,7 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
             self.assertEqual(cli.main(["service", "set", "message-channel", "tool"], cwd=self.projects), 0)
         self.assertEqual(json.loads(output.getvalue()), {"message_channel": "tool"})
 
-    def test_unbound_sender_can_queue_message_with_optional_task(self):
+    def test_unbound_sender_can_queue_default_and_immediate_messages_with_optional_task(self):
         task, manager = self.task_with_manager()
         sender = str(uuid.uuid4())
         with patch.dict(os.environ, {"CODEX_THREAD_ID": sender}), \
@@ -141,14 +141,97 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
                 self.assertEqual(cli.main(["message", "send", "--message", "FYI"], cwd=self.projects), 0)
             first = json.loads(output.getvalue())
             with patch("sys.stdout", new_callable=io.StringIO) as output:
-                self.assertEqual(cli.main(["message", "send", "--message", "Follow-up", "--defer", "--task", task], cwd=self.projects), 0)
+                self.assertEqual(cli.main(["message", "send", "--message", "Follow-up", "--immediate", "--task", task], cwd=self.projects), 0)
             second = json.loads(output.getvalue())
         events = wake_runtime._load_state(self.store)["events"]
         self.assertIsNone(events[first["id"]]["task"])
         self.assertEqual(events[second["id"]]["task"], task)
-        self.assertTrue(events[second["id"]]["defer"])
+        self.assertTrue(events[first["id"]]["defer"])
+        self.assertFalse(events[second["id"]]["defer"])
         self.assertEqual(first["status"], "queued")
         self.assertEqual(first["service"], "disabled")
+
+    def test_message_send_help_uses_immediate_and_rejects_defer(self):
+        help_output = subprocess.check_output(
+            mam_command("message", "send", "--help"), cwd=self.projects, text=True,
+        )
+        self.assertIn("--immediate", help_output)
+        self.assertNotIn("--defer", help_output)
+        result = subprocess.run(
+            mam_command("message", "send", "--message", "legacy", "--defer"),
+            cwd=self.projects, capture_output=True, text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unrecognized arguments", result.stderr)
+
+    def test_cli_message_modes_follow_scheduler_delivery(self):
+        manager = str(uuid.uuid4())
+        sender = str(uuid.uuid4())
+        wake_runtime._record_manager(self.store, manager, source="test")
+        statuses = {manager: "active"}
+        turns = {manager: {"id": "manager-turn", "status": "inProgress"}}
+        starts = []
+
+        class Stream:
+            def resume(self, agent):
+                return {"thread": {"id": agent, "status": {"type": statuses[agent]}, "turns": []}}
+
+            def read(self, agent):
+                return self.resume(agent)
+
+            def latest_turn(self, agent):
+                return turns.get(agent)
+
+            def start_turn(self, agent, text, *, message_channel="tool"):
+                starts.append((agent, text, message_channel))
+                turns[agent] = {"id": f"accepted-{len(starts)}", "status": "inProgress"}
+                return {"turn": {"id": turns[agent]["id"], "status": "inProgress"}}
+
+            def close(self):
+                return None
+
+        scheduler = wake_runtime.WakeScheduler(
+            self.store,
+            compatibility=lambda: {"socket_path": "/tmp/fake.sock", "capabilities": {}, "diagnostics": {}},
+            agent_probe=lambda agents, socket_path: {
+                agent: {"status": statuses[agent], "error": None} for agent in agents
+            },
+            stream_factory=lambda socket_path: Stream(),
+            clock=lambda: 1000.0,
+        )
+
+        def send(arguments):
+            with patch.dict(os.environ, {"CODEX_THREAD_ID": sender}), \
+                 patch.object(identity, "read", return_value=identity.ThreadIdentity(sender, "/root/free", manager)), \
+                 patch("sys.stdout", new_callable=io.StringIO) as output:
+                self.assertEqual(cli.main(["message", "send", *arguments], cwd=self.projects), 0)
+            return json.loads(output.getvalue())
+
+        default = send(["--message", "background"])
+        immediate = send(["--message", "urgent", "--immediate"])
+        scheduler.run_once()
+        self.assertEqual(len(starts), 1)
+        self.assertIn("urgent", starts[0][1])
+        self.assertEqual(starts[0][2], "tool")
+        events = wake_runtime._load_state(self.store)["events"]
+        self.assertIn(default["id"], events)
+        self.assertNotIn(immediate["id"], events)
+
+        statuses[manager] = "idle"
+        turns[manager] = {"id": "accepted-1", "status": "completed"}
+        scheduler.run_once()
+        self.assertEqual(len(starts), 2)
+        self.assertIn("background", starts[1][1])
+        self.assertEqual(starts[1][2], "tool")
+        self.assertNotIn(default["id"], wake_runtime._load_state(self.store)["events"])
+
+        turns[manager] = {"id": "accepted-2", "status": "completed"}
+        idle_immediate = send(["--message", "idle urgent", "--immediate"])
+        scheduler.run_once()
+        self.assertEqual(len(starts), 3)
+        self.assertIn("idle urgent", starts[2][1])
+        self.assertEqual(starts[2][2], "tool")
+        self.assertNotIn(idle_immediate["id"], wake_runtime._load_state(self.store)["events"])
 
     def test_message_queue_reports_enabled_service_without_process_as_unavailable(self):
         _, manager = self.task_with_manager()

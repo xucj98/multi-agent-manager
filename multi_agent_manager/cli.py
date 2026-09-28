@@ -1121,7 +1121,7 @@ def message_send(store, args):
     try:
         return service_module().enqueue_message(
             store, sender=sender.agent, sender_path=sender.path, sender_tree=sender.tree_root,
-            message=args.message, defer=args.defer, task=task,
+            message=args.message, defer=not args.immediate, task=task,
         )
     except RuntimeError as exc:
         raise Error(str(exc)) from exc
@@ -1355,9 +1355,9 @@ def parser():
     p.add_argument("--note", required=True, metavar="NOTE", help="reason for Manager handoff")
     p.set_defaults(func=service_rebind_manager)
     messages = command(commands, "message", "send a message to this project's Manager").add_subparsers(required=True)
-    p = command(messages, "send", "queue a timely message or an idle-time copy")
+    p = command(messages, "send", "queue a message for the Manager")
     p.add_argument("--message", required=True, metavar="TEXT", help="message text")
-    p.add_argument("--defer", action="store_true", help="deliver when Manager becomes idle")
+    p.add_argument("--immediate", action="store_true", help="deliver in the Manager's current turn or wake when idle")
     p.add_argument("--task", metavar="TASK-ID|AGENT-PATH", help="related task, if any")
     p.set_defaults(func=message_send)
     w = command(commands, "workspace", "manage repository worktrees and their environments").add_subparsers(required=True)

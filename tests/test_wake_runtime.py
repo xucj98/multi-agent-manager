@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -251,6 +253,16 @@ class WakeRuntimeTests(unittest.TestCase):
             message=value, defer=defer, task=task,
         )
 
+    def cli_message(self, value, *, immediate=False):
+        arguments = ["message", "send", "--message", value]
+        if immediate:
+            arguments.append("--immediate")
+        with mock.patch.object(cli, "project_config", return_value=self.config), \
+             mock.patch.dict(os.environ, {"CODEX_THREAD_ID": EXECUTOR}), \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(cli.main(arguments, cwd=self.project_root), 0)
+        return json.loads(output.getvalue())
+
     def test_timely_message_enters_active_turn_once_and_survives_restart(self):
         self.statuses[MANAGER] = "active"
         self.turns[MANAGER] = {"id": "manager-turn", "status": "inProgress"}
@@ -338,9 +350,10 @@ class WakeRuntimeTests(unittest.TestCase):
     def test_deferred_message_waits_for_completed_manager_turn(self):
         self.statuses[MANAGER] = "active"
         self.turns[MANAGER] = {"id": "manager-turn", "status": "inProgress"}
-        self.message("background copy", defer=True)
+        queued = self.cli_message("background copy")
         self.scheduler().run_once()
         self.assertEqual(self.starts, [])
+        self.assertTrue(self.state()["events"][queued["id"]]["defer"])
         self.statuses[MANAGER] = "idle"
         self.scheduler().run_once()
         self.assertEqual(self.starts, [], "stale idle metadata must not inject into an active turn")
@@ -354,14 +367,19 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(self.state()["message_channel"], "user")
         self.statuses[MANAGER] = "active"
         self.turns[MANAGER] = {"id": "manager-turn", "status": "inProgress"}
-        self.message("urgent")
+        self.cli_message("urgent", immediate=True)
         self.scheduler().run_once()
         self.assertEqual(self.channels, [(MANAGER, "user-steer")])
-        self.message("copy", defer=True)
+        self.cli_message("copy")
         self.statuses[MANAGER] = "idle"
         self.turns[MANAGER] = {"id": "manager-turn", "status": "completed"}
         self.scheduler().run_once()
         self.assertEqual(self.channels[-1], (MANAGER, "user"))
+        self.cli_message("idle urgent", immediate=True)
+        self.turns[MANAGER] = {"id": "accepted-2", "status": "completed"}
+        self.scheduler().run_once()
+        self.assertEqual(self.channels[-1], (MANAGER, "user"))
+        self.assertIn("idle urgent", self.starts[-1][1])
 
     def test_tool_failure_remains_visible_without_user_fallback(self):
         self.message("keep tool channel")
