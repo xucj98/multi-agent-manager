@@ -28,7 +28,7 @@ curl -fsSL "https://raw.githubusercontent.com/xucj98/multi-agent-manager/main/sc
 project=/absolute/path/to/PROJECT_ROOT
 mam_branch=project/PROJECT_NAME
 
-git clone git@github.com:xucj98/multi-agent-manager.git "$project/multi-agent-manager"
+git clone --branch "v$(mam --version)" git@github.com:xucj98/multi-agent-manager.git "$project/multi-agent-manager"
 cd "$project/multi-agent-manager"
 git switch -c "$mam_branch"
 mkdir -p "$project/.mam"
