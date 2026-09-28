@@ -14,6 +14,11 @@ import sys
 import tarfile
 from typing import Any
 
+try:
+    from scripts.integration_runtime import RuntimeHarness, RuntimeIntegrationError
+except ModuleNotFoundError:  # direct ``python scripts/test_integration.py`` execution
+    from integration_runtime import RuntimeHarness, RuntimeIntegrationError
+
 
 class IntegrationError(RuntimeError):
     pass
@@ -316,7 +321,13 @@ def pipx_install(source: Path, env: dict[str, str], log: Path) -> Path:
     return launcher
 
 
-def controlled_job(instance: Path, metadata: dict[str, Any], log: Path) -> tuple[subprocess.Popen[bytes], str]:
+def controlled_job(
+    instance: Path,
+    metadata: dict[str, Any],
+    log: Path,
+    *,
+    runtime_env: dict[str, str] | None = None,
+) -> tuple[subprocess.Popen[bytes], str]:
     """Start and register one owned process using the old installed writer."""
 
     process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"])
@@ -325,7 +336,7 @@ def controlled_job(instance: Path, metadata: dict[str, Any], log: Path) -> tuple
         [metadata["mam"], "job", "add", fixture["task"], "--note", "release integration controlled job",
          "--host", "local", "--pid", str(process.pid)],
         cwd=instance,
-        env={**os.environ, "CODEX_THREAD_ID": fixture["worker"]},
+        env={**(runtime_env or os.environ), "CODEX_THREAD_ID": fixture["worker"]},
         log=log,
     )
     if result.returncode:
@@ -432,6 +443,7 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
     outcome: dict[str, Any] = {"root": str(root), "from": from_version, "to": to_version, "scenarios": []}
     owned: list[Path] = []
     processes: list[subprocess.Popen[bytes]] = []
+    runtimes: list[RuntimeHarness] = []
     try:
         if (from_version, to_version) != ("0.1.0", "0.2.0"):
             raise IntegrationError("only the complete 0.1.0 -> 0.2.0 chain is supported")
@@ -454,16 +466,31 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
         if removed_origin.returncode:
             raise IntegrationError(f"could not prepare the no-origin instance: {removed_origin.stderr[-800:]}")
         outcome["scenarios"].append({"name": "create-no-origin-instance", "status": "passed"})
-        jobs: list[tuple[Path, dict[str, Any], subprocess.Popen[bytes], str]] = []
         for instance, metadata in instances:
-            process, job_id = controlled_job(instance, metadata, log)
+            runtimes.append(RuntimeHarness(instance, metadata, log))
+        jobs: list[tuple[Path, dict[str, Any], subprocess.Popen[bytes], str]] = []
+        for (instance, metadata), runtime in zip(instances, runtimes):
+            process, job_id = controlled_job(instance, metadata, log, runtime_env=runtime.env)
             processes.append(process)
             jobs.append((instance, metadata, process, job_id))
-        # The second process exits while the service is considered stopped;
-        # the first remains alive across package installation and upgrade.
-        jobs[1][2].terminate()
-        jobs[1][2].wait(timeout=5)
-        outcome["scenarios"].append({"name": "controlled-jobs-and-daemon-stop", "status": "passed", "codex": "simulated"})
+        old_daemons = []
+        for (instance, metadata), runtime in zip(instances, runtimes):
+            old_daemons.append(runtime.start(Path(metadata["mam"])))
+            if not runtime.status(Path(metadata["mam"])).get("running"):
+                raise IntegrationError(f"old daemon did not report running in {instance}")
+        for (instance, metadata), runtime in zip(instances, runtimes):
+            stopped = runtime.stop(Path(metadata["mam"]))
+            if not stopped.get("stopped"):
+                raise IntegrationError(f"old daemon did not stop in {instance}")
+        # The second process exits during the real daemon-stopped window; the
+        # first remains alive across package installation and upgrade.
+        terminate_owned_process(jobs[1][2])
+        outcome["scenarios"].append({
+            "name": "controlled-jobs-and-daemon-stop",
+            "status": "passed",
+            "codex": "simulated",
+            "old_daemons": old_daemons,
+        })
         archive, commit = build_archive(root, log)
         outcome["candidate"] = {"archive": str(archive), "commit": commit}
         if target_exists(Path(instances[0][1]["mam_root"]), commit):
@@ -516,10 +543,27 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
         if restored.get("data_version") != "0.2.0" or restored.get("status") != "upgraded":
             raise IntegrationError(f"backup restore did not complete a fresh migration: {restored}")
         outcome["scenarios"].append({"name": "backup-restore-and-retry", "status": "passed", "backup": str(first_backup)})
-        job_states = [verify_job(launcher, instance, job_id, log) for instance, _, _, job_id in jobs]
-        if job_states[0].get("status") != "running" or job_states[1].get("status") != "exited":
-            raise IntegrationError(f"controlled job lifecycle was not retained: {job_states}")
+        runtime_starts = []
+        for (instance, metadata), runtime in zip(instances, runtimes):
+            runtime_starts.append(runtime.start(launcher))
+            if not runtime.status(launcher).get("running"):
+                raise IntegrationError(f"candidate daemon did not report running in {instance}")
+        running_job = runtimes[0].wait_for_job_state(jobs[0][3], "running", timeout=60)
+        exited_job = runtimes[1].wait_for_job_state(jobs[1][3], "exited", timeout=60)
+        notification = runtimes[1].verify_notification(jobs[1][3], timeout=60)
+        job_states = [running_job, exited_job]
         outcome["job_states"] = job_states
+        outcome["runtime"] = {
+            "candidate_daemons": runtime_starts,
+            "running_job": running_job,
+            "exited_job": exited_job,
+            "notification": notification,
+            "codex": "controlled",
+        }
+        for runtime in runtimes:
+            if not runtime.stop(launcher).get("stopped"):
+                raise IntegrationError("candidate daemon did not stop after notification")
+        outcome["scenarios"].append({"name": "restart-and-job-notification", "status": "passed", "codex": "controlled"})
         new_instance = root / "mam-test-new"
         outcome["new_instance"] = create_instance(to_version, new_instance, log)
         owned.append(new_instance)
@@ -530,6 +574,11 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
         outcome["error"] = str(exc)
         outcome["scenarios"].append({"name": "integration", "status": "failed", "error": str(exc)})
     finally:
+        for runtime in runtimes:
+            try:
+                runtime.close()
+            except (RuntimeIntegrationError, OSError) as exc:
+                outcome.setdefault("cleanup_errors", []).append(str(exc))
         for process in processes:
             terminate_owned_process(process)
         if not keep:
