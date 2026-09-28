@@ -96,9 +96,8 @@ def install_candidate(instances: list[tuple[Path, dict[str, Any]]], archive: Pat
     with tarfile.open(archive, "r:gz") as package:
         package.extractall(extracted)
     entries = [item for item in extracted.iterdir() if item.is_dir()]
-    if len(entries) != 1:
-        raise IntegrationError("candidate archive has an unexpected layout")
-    install_script = entries[0] / "scripts" / "install.sh"
+    source = entries[0] if len(entries) == 1 and (entries[0] / "scripts" / "install.sh").is_file() else extracted
+    install_script = source / "scripts" / "install.sh"
     if not install_script.is_file():
         raise IntegrationError("candidate archive has no scripts/install.sh")
     result = run(["bash", str(install_script), "--version", "0.2.0"], cwd=instances[0][0], env=env, log=log)
