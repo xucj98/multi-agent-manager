@@ -72,6 +72,19 @@ class IntegrationRuntimeTests(unittest.TestCase):
                 new_launcher = Path(sys.executable).with_name("mam")
                 if not new_launcher.is_file():
                     new_launcher = ROOT / ".venv" / "bin" / "mam"
+                if not new_launcher.is_file():
+                    # A source archive has no checkout venv.  Point a temporary
+                    # launcher at the archived package so this test still
+                    # exercises a real new daemon process.
+                    new_launcher = Path(temporary) / "candidate-mam"
+                    new_launcher.write_text(
+                        f"#!{sys.executable}\n"
+                        f"import sys\nsys.path.insert(0, {str(ROOT)!r})\n"
+                        "from multi_agent_manager.cli import main\n"
+                        "raise SystemExit(main())\n",
+                        encoding="utf-8",
+                    )
+                    new_launcher.chmod(0o755)
                 self.assertTrue(new_launcher.is_file())
                 new = harness.start(new_launcher)
                 self.assertTrue(new["status"]["running"])
