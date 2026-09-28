@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import sys
 import tarfile
@@ -136,7 +137,14 @@ def install_candidate(instances: list[tuple[Path, dict[str, Any]]], archive: Pat
     install_script = source / "scripts" / "install.sh"
     if not install_script.is_file():
         raise IntegrationError("candidate archive has no scripts/install.sh")
-    result = run(["bash", str(install_script), "--version", "0.2.0"], cwd=instances[0][0], env=env, log=log)
+    install_command = ["bash", str(install_script), "--version", "0.2.0"]
+    # One installer regression test intentionally starts an interactive bash
+    # session.  Run the real installer under a local pseudo-terminal so that
+    # this check observes the same terminal boundary as a user invocation.
+    if shutil.which("script"):
+        command_text = " ".join(shlex.quote(item) for item in install_command)
+        install_command = ["script", "-qefc", command_text, "/dev/null"]
+    result = run(install_command, cwd=instances[0][0], env=env, log=log)
     if result.returncode:
         raise IntegrationError(f"candidate install failed: {result.stderr[-1500:]}")
     launcher = Path(env["PIPX_BIN_DIR"]) / "mam"

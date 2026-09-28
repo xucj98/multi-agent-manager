@@ -122,13 +122,17 @@ def _venv_and_launcher(destination: Path, package_parent: Path) -> Path:
 def _write_project(project: Path, mam_root: Path, branch: str, seed_repo: Path, seed: str = "HEAD") -> None:
     project.mkdir(parents=True, exist_ok=False)
     mam_root.mkdir(parents=True)
-    run(["git", "init", "-q", str(mam_root)])
-    # Keep the instance branch mergeable with the candidate release.  The
-    # fixture data is old, while the repository history already contains the
-    # release commit that ``service upgrade`` is expected to merge.
-    run(["git", "-C", str(mam_root), "remote", "add", "origin", str(seed_repo)])
-    run(["git", "-C", str(mam_root), "fetch", "-q", "origin", seed])
-    run(["git", "-C", str(mam_root), "switch", "-q", "-c", branch, "FETCH_HEAD"])
+    # Keep the instance branch mergeable with the candidate release whenever
+    # this checkout has Git history.  A source archive has no `.git`; fixture
+    # unit tests still need a valid standalone instance, so use an ordinary
+    # local branch in that case and let release integration provide history.
+    if (seed_repo / ".git").exists():
+        run(["git", "init", "-q", str(mam_root)])
+        run(["git", "-C", str(mam_root), "remote", "add", "origin", str(seed_repo)])
+        run(["git", "-C", str(mam_root), "fetch", "-q", "origin", seed])
+        run(["git", "-C", str(mam_root), "switch", "-q", "-c", branch, "FETCH_HEAD"])
+    else:
+        run(["git", "init", "-q", "-b", branch, str(mam_root)])
     git(mam_root, "config", "user.name", "MAM release integration")
     git(mam_root, "config", "user.email", "mam-integration@example.invalid")
     (project / ".mam").mkdir()
