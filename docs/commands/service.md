@@ -16,6 +16,24 @@
 
 接管前旧 Manager 必须已结束 turn，且状态可确认；新 Manager 正在调用命令不构成阻碍。已绑定的执行者不能成为 Manager。重复接管同一身份无副作用。任务、执行者、job、workspace 和服务记录保留；后续通知和未投递的主动消息发给新 Manager。原生父子关系不变，旧树的协作路径仍按旧树解释。
 
+## 实例升级（待开发）
+
+在 agent 暂停工作、现有 MAM 命令结束且 daemon 已停止后执行 `mam service upgrade`。命令根据当前目录对应的 `.mam/env.json` 升级一个实例：
+
+1. 备份 `MAM_ROOT/.local/`。
+2. 将已安装 `mam` 对应的发布 tag 或 commit 合并到 `MAM_BRANCH`。
+3. 按版本顺序执行数据迁移，输出升级结果、备份位置和各版升级适配说明的位置。
+
+新版程序保留自 0.1.0 起的完整迁移链，从实例记录的版本依次迁移到目标版本。每步迁移成功后再记录版本；中断或失败后可重试。测试在 [install.sh](install.md#安装与测试) 中完成，实例升级直接执行合并与迁移。
+
+本地修改妨碍合并时，可先 `git stash push -u`，升级后 `git stash pop`。合并冲突时暂停升级，按 Git 提示处理后重试 `mam service upgrade`。
+
+### 多实例与恢复
+
+系统程序更新后，逐实例升级、适配配置及 hooks，并对原先运行的实例显式执行 `mam service start`。失败实例保留备份、保持停止。停止的旧实例可延后升级，再次使用前执行 `mam service upgrade`。
+
+任务和 job 保留，长进程继续运行。恢复 daemon 后继续跟踪 job、处理停机期间退出的 job，并保留原有消息和投递记录。`mam service start` 启动时检查 App Server 连接与所需接口；`mam service status` 显示 `mam`、daemon 和数据版本。
+
 ## 何时通知
 
 | 情况 | 处理 |
