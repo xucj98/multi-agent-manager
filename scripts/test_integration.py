@@ -383,13 +383,9 @@ def verify_source_isolation(
     selected = git_output(source, "rev-parse", f"{selected_ref}^{{commit}}")
     if selected != candidate_commit:
         raise IntegrationError("selected release ref no longer names the archived candidate commit")
-    working_tree = run(["git", "-C", str(source), "status", "--porcelain", "--untracked-files=all"]).stdout.splitlines()
-    # The task report is intentionally kept beside this checkout and is not a
-    # candidate source change.  Every other tracked or untracked path must be
-    # absent after the run.
-    unexpected = [line for line in working_tree if not line[3:].startswith(".task/")]
-    if unexpected:
-        raise IntegrationError(f"candidate checkout gained working-tree changes during integration: {unexpected}")
+    working_tree = run(["git", "-C", str(source), "status", "--porcelain", "--untracked-files=all"]).stdout.strip()
+    if working_tree:
+        raise IntegrationError(f"candidate checkout gained working-tree changes during integration: {working_tree.splitlines()}")
     origins: dict[str, str] = {}
     for instance, metadata in instances:
         root = Path(metadata["mam_root"])
