@@ -159,6 +159,27 @@ def git_refs(repo: Path) -> dict[str, str]:
     return {line.split(" ", 1)[0]: line.split(" ", 1)[1] for line in output.splitlines() if " " in line}
 
 
+def source_refs(repo: Path) -> dict[str, str]:
+    """Snapshot refs owned by this checkout, excluding sibling task branches.
+
+    Multiple MAM tasks share the development repository.  A reviewer or
+    producer may advance its own task branch while this run is active; those
+    external refs are not writable by this integration process.  Keep the
+    candidate branch, main, tags, and remotes in the isolation assertion.
+    """
+
+    refs = git_refs(repo)
+    current = run(["git", "-C", str(repo), "symbolic-ref", "--quiet", "--short", "HEAD"])
+    current_ref = f"refs/heads/{current.stdout.strip()}" if current.returncode == 0 else ""
+    return {
+        name: value
+        for name, value in refs.items()
+        if name in {"refs/heads/main", current_ref}
+        or name.startswith("refs/remotes/")
+        or name.startswith("refs/tags/")
+    }
+
+
 def target_exists(repo: Path, target: str) -> bool:
     return run(["git", "-C", str(repo), "cat-file", "-e", f"{target}^{{commit}}"],).returncode == 0
 
@@ -352,12 +373,12 @@ def verify_source_isolation(
     selected_ref: str,
     checkout_head: str,
     baseline_refs: dict[str, dict[str, str]],
-    source_refs: dict[str, str],
+    expected_source_refs: dict[str, str],
 ) -> dict[str, Any]:
     source = root_dir()
     if git_output(source, "rev-parse", "HEAD") != checkout_head:
         raise IntegrationError("candidate checkout HEAD changed during integration")
-    if git_refs(source) != source_refs:
+    if source_refs(source) != expected_source_refs:
         raise IntegrationError("candidate checkout refs changed during integration")
     selected = git_output(source, "rev-parse", f"{selected_ref}^{{commit}}")
     if selected != candidate_commit:
@@ -619,7 +640,7 @@ def integration(
             "old_daemons": old_daemons,
         })
         baseline_refs = {instance.name: git_refs(Path(metadata["mam_root"])) for instance, metadata in instances}
-        source_refs = git_refs(root_dir())
+        source_ref_snapshot = source_refs(root_dir())
         archive, commit = build_archive(root, log, to_version, published=published)
         outcome["candidate"] = {"archive": str(archive), "commit": commit}
         if target_exists(Path(instances[0][1]["mam_root"]), commit):
@@ -709,7 +730,7 @@ def integration(
         owned.append(new_instance)
         outcome["scenarios"].append({"name": "first-use-new-instance", "status": "passed"})
         outcome["source_isolation"] = verify_source_isolation(
-            instances, commit, selected_ref, checkout_head, baseline_refs, source_refs
+            instances, commit, selected_ref, checkout_head, baseline_refs, source_ref_snapshot
         )
         outcome["scenarios"].append({"name": "candidate-and-instance-isolation", "status": "passed"})
     except (IntegrationError, OSError, subprocess.SubprocessError, tarfile.TarError) as exc:
