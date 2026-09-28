@@ -1,0 +1,29 @@
+Old installation: /root/.local/share/pipx/venvs/multi-agent-manager/lib/python3.12/site-packages/multi_agent_manager
+New installation: /root/.local/share/pipx/venvs/multi-agent-manager-dev/lib/python3.10/site-packages/multi_agent_manager
+
+Hash command: find PACKAGE -maxdepth 1 -name '*.py' -printf '%f\n' | sort | while read f; do sha256sum PACKAGE/$f; done
+
+Old package files:
+6ffeb238bccb1ef3c2a2bffccc96426ea25e8d1b8baff14ecb4602d6da8143f9  __init__.py
+1652c085fdd144b4a349dba2bcd100cfd92473452c56cae5e954b05b60fdcce0  cli.py
+0285f14ca317ee05adc88e1669e910ea5b1e77f4be0e9224be62195068e8f951  job_runtime.py
+64b4e271d4f447c982f7e305ca3807dbfe40ff602af20d09315baf882a77f42d  liveprobe.py
+9f66e1524cfa577052d55548eb96b05e0800e6dc31aeb0a7f36f4b5ae943aec4  wait_compat.py
+77e1571ce1b441130f00b7b31dd5b9876e2d5117af8c6404458099bff912509d  wait_runtime.py
+169c589b878f3f396409e3a62da9625c6b3999464d5a093fa2a4e7758b594415  wake_compat.py
+c926e9d9d9d916ad80bbb37219be8e26f52f0700fe6a88171669390691f55de2  wake_runtime.py
+
+New package files:
+6ffeb238bccb1ef3c2a2bffccc96426ea25e8d1b8baff14ecb4602d6da8143f9  __init__.py
+5fea5c43f0b8d5e311f607d4b6183c031837eab80db53e0fd8cf3f347be4f2ed  cli.py
+0142b18a42c064ddb08caa3afbee9aeb114453e0b3275ffe9d1f9d74f02bd32d  identity.py
+ebca91821f0d3e3743524ef62e94ace3eb39b98fa2983795768b8cf66aca7cde  job_runtime.py
+176561c696399d8be92618cbefb51cb2d966846637b1b9355fc91d2ec036677b  liveprobe.py
+169c589b878f3f396409e3a62da9625c6b3999464d5a093fa2a4e7758b594415  wake_compat.py
+c7990d01dd555f6bdf75ce6eaad0627e5c7598ed4ca171a5b38d30ba432964ba  wake_runtime.py
+
+The old source snapshot in old_source_snapshot/ has the same hashes above. No
+single repository commit matched every old installed file: cli.py matched
+bc8726f3e2f13351c52650f03bc88bd76a68ed25; wake_runtime.py matched
+46af8c2afd3790a8e1d0538e4f624170753e67fc. The snapshot is retained so the
+old-writer fixture remains reproducible after the old pipx install is replaced.
