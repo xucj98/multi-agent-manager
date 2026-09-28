@@ -148,6 +148,10 @@ def _publish_attachment(package_parent: Path, project_root: Path, mam_root: Path
             store.root, "commit-tree", tree, "-p", parent, "-m", f"Publish {task} fixture attachment"
         ).stdout.decode().strip()
         cli.git(store.root, "update-ref", f"refs/heads/{store.branch}", commit, parent)
+        # Keep the checkout index aligned with the branch updated above.  The
+        # old report draft remains a working-tree edit, while the attachment
+        # is now an ordinary tracked publication for the later release merge.
+        cli.git(store.root, "read-tree", store.branch)
 
 
 def create(*, project_root: Path, mam_root: Path, package_parent: Path, version: str = "0.1.0") -> dict:
