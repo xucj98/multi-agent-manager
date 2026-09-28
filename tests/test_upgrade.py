@@ -68,6 +68,26 @@ class UpgradeTests(unittest.TestCase):
         self.assertEqual(self.git("rev-parse", "HEAD"), self.old)
         self.assertEqual(list(self.root.glob(".local.backup-*")), [])
 
+    def test_missing_target_and_origin_fails_before_backup_or_data_write(self):
+        missing = "f" * 40
+        with mock.patch.object(wake_runtime, "source_commit", return_value=missing):
+            with self.assertRaisesRegex(wake_runtime.WakeRuntimeError, "no configured origin"):
+                wake_runtime.service_upgrade(self.config)
+        self.assertEqual(migrations.read_data_version(self.root), "0.1.0")
+        self.assertEqual(list(self.root.glob(".local.backup-*")), [])
+
+    def test_missing_local_target_is_fetched_from_configured_origin(self):
+        origin = self.project / "origin.git"
+        subprocess.run(["git", "clone", "--bare", str(self.root), str(origin)], check=True, capture_output=True)
+        self.git("remote", "add", "origin", str(origin))
+        self.git("branch", "-D", "release")
+        self.git("reflog", "expire", "--expire=now", "--all")
+        self.git("gc", "--prune=now")
+        with mock.patch.object(wake_runtime, "source_commit", return_value=self.target):
+            result = wake_runtime.service_upgrade(self.config)
+        self.assertEqual(result["data_version"], "0.2.0")
+        self.assertEqual(self.git("rev-parse", "HEAD"), self.target)
+
     def test_git_conflict_keeps_baseline_version_and_can_be_resolved_then_retried(self):
         self.git("checkout", "-q", "release")
         (self.root / "code.txt").write_text("release changed\n", encoding="utf-8")

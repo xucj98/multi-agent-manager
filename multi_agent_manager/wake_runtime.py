@@ -37,7 +37,6 @@ except ImportError:  # A source-only 0.1.0 fixture may omit release helpers.
 
     DATA_VERSION = "0.1.0"
     RELEASE_TAG = "v0.1.0"
-
     def read_data_version(root):
         return "0.1.0"
 
@@ -55,6 +54,9 @@ except ImportError:  # A source-only 0.1.0 fixture may omit release helpers.
 
     def source_commit():
         return None
+
+
+ADAPTATION_DOCUMENT = "docs/upgrades/0.2.0.md"
 
 
 SERVICE_VERSION = 1
@@ -764,14 +766,6 @@ def _merge_release(store: Store, target: str) -> dict[str, Any]:
         raise WakeRuntimeError(
             f"MAM_ROOT is on branch {current_branch or '<detached>'}; check out configured MAM_BRANCH {store.branch} and retry"
         )
-    verify = subprocess.run(
-        ["git", "-C", str(store.root), "cat-file", "-e", f"{target}^{{commit}}"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if verify.returncode:
-        raise WakeRuntimeError(f"installed release commit is not available in MAM_ROOT: {target}")
     merge = subprocess.run(
         ["git", "-C", str(store.root), "merge", "--no-edit", target],
         capture_output=True,
@@ -785,6 +779,49 @@ def _merge_release(store: Store, target: str) -> dict[str, Any]:
             + (f": {detail}" if detail else "")
         )
     return {"branch": store.branch, "commit": target, "output": " ".join(merge.stdout.split())}
+
+
+def _ensure_release_commit(store: Store, target: str) -> None:
+    """Ensure an installed release commit is available without changing remotes."""
+
+    verify = subprocess.run(
+        ["git", "-C", str(store.root), "cat-file", "-e", f"{target}^{{commit}}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if verify.returncode == 0:
+        return
+    origin = subprocess.run(
+        ["git", "-C", str(store.root), "config", "--get", "remote.origin.url"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if origin.returncode or not origin.stdout.strip():
+        raise WakeRuntimeError(
+            f"installed release commit {target} is unavailable and MAM_ROOT has no configured origin"
+        )
+    fetched = subprocess.run(
+        ["git", "-C", str(store.root), "fetch", "--no-tags", "origin", target],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if fetched.returncode:
+        detail = " ".join((fetched.stdout + " " + fetched.stderr).split())[:800]
+        raise WakeRuntimeError(
+            f"could not fetch installed release commit {target} from configured origin"
+            + (f": {detail}" if detail else "")
+        )
+    verify = subprocess.run(
+        ["git", "-C", str(store.root), "cat-file", "-e", f"{target}^{{commit}}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if verify.returncode:
+        raise WakeRuntimeError(f"configured origin did not provide installed release commit {target}")
 
 
 def _git_output(root: Path, *args: str) -> str:
@@ -809,6 +846,12 @@ def service_upgrade(config: ProjectConfig) -> dict[str, Any]:
         if not target or len(target) != 40 or any(char not in "0123456789abcdef" for char in target):
             raise WakeRuntimeError("installed program has no fixed release commit metadata; use a tagged source archive")
         current_data = read_data_version(store.root)
+        try:
+            _ensure_release_commit(store, target)
+        except WakeRuntimeError:
+            # Fetch/metadata failures happen before backup or migration, so a
+            # retry cannot mistake a partially prepared instance for success.
+            raise
         backup = backup_local(store.root)
         try:
             merge = _merge_release(store, target)
@@ -824,7 +867,7 @@ def service_upgrade(config: ProjectConfig) -> dict[str, Any]:
             "backup": str(backup),
             "merge": merge,
             "migrations": migrations,
-            "adaptation": "multi_agent_manager/migrations.py",
+            "adaptation": ADAPTATION_DOCUMENT,
             "daemon_running": False,
         }
 
