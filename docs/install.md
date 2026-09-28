@@ -21,8 +21,8 @@ curl -fsSL "https://raw.githubusercontent.com/xucj98/multi-agent-manager/main/sc
 | `MAM_ROOT` | 必填 | 保存任务文件与实例状态的 worktree 绝对路径 |
 | `PROJECT_ROOT` | 必填 | 包含各仓库和 workspace 的目录绝对路径 |
 | `MAM_BRANCH` | 必填 | `MAM_ROOT` 中用于发布任务文件的已有本地分支 |
-| `HOOK_TIMEOUTS.workspace_add` | 可选 | 创建 workspace 的 hook 时限 |
-| `HOOK_TIMEOUTS.before_task_archive` | 可选 | 归档前检查的 hook 时限 |
+| `HOOK_TIMEOUTS.workspace_add` | 可选 / 1800 秒 | 创建 workspace 的 hook 时限 |
+| `HOOK_TIMEOUTS.before_task_archive` | 可选 / 60 秒 | 归档前检查的 hook 时限 |
 
 ```bash
 project=/absolute/path/to/PROJECT_ROOT
