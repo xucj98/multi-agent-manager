@@ -36,6 +36,10 @@ EFFORT = "max"
 MAX_MODEL_TURNS = 12
 DEFAULT_TIMEOUT_SECONDS = 180.0
 POLL_SECONDS = 0.5
+# Codex acknowledges ``turn/start`` before the rollout JSONL is always visible
+# to a following ``thread/resume``.  Keep this retry bounded and local to that
+# post-turn persistence race; never replay the model turn itself.
+RESUME_PERSISTENCE_RETRY_DELAYS = (0.05, 0.1, 0.2, 0.4, 0.8)
 _MARKER = ".mam-liveprobe.json"
 _MARKER_KIND = "multi-agent-manager live delivery fixture v1"
 _ROLE_ORDER = ("manager", "job_executor", "idle_executor", "archived_executor")
@@ -62,6 +66,15 @@ def _missing_rollout(error: Exception) -> bool:
     """Treat an App Server thread already absent from rollout storage as clean."""
 
     return "no rollout found" in str(error).lower()
+
+
+def _empty_rollout_metadata(error: Exception) -> bool:
+    """Match only the observed post-turn empty-rollout persistence race."""
+
+    text = str(error).lower()
+    if "failed to read session metadata" not in text:
+        return False
+    return re.search(r"rollout at .+ is empty(?:$|[.;])", text) is not None
 
 
 def _mapping(value: Any, label: str) -> Mapping[str, Any]:
@@ -278,6 +291,7 @@ class _LiveFixture:
             "resources": {"tasks": {}, "threads": {}, "jobs": {}, "turns": {}},
             "history": {},
             "completion_events": {},
+            "resume_persistence": {},
             "turn_counts": {},
             "cleanup": {
                 "service": "not_started",
@@ -561,7 +575,30 @@ class _LiveFixture:
         this metadata-only resume subscribes before the turn can be inspected.
         """
 
-        result = self._request("thread/resume", {"threadId": self.threads[role], "excludeTurns": True})
+        record: dict[str, Any] = {"attempts": 0, "retry_delays": [], "result": "pending"}
+        self.evidence["resume_persistence"][role] = record
+        for retry_index, delay in enumerate((0.0, *RESUME_PERSISTENCE_RETRY_DELAYS)):
+            record["attempts"] += 1
+            try:
+                result = self._request(
+                    "thread/resume", {"threadId": self.threads[role], "excludeTurns": True}
+                )
+            except LiveProbeError as exc:
+                if not _empty_rollout_metadata(exc):
+                    record["result"] = "failed_unrelated_error"
+                    raise
+                if retry_index == len(RESUME_PERSISTENCE_RETRY_DELAYS):
+                    record["result"] = "failed_retry_limit"
+                    raise
+                if self.clock() + RESUME_PERSISTENCE_RETRY_DELAYS[retry_index] > self._deadline():
+                    record["result"] = "failed_timeout"
+                    raise
+                retry_delay = RESUME_PERSISTENCE_RETRY_DELAYS[retry_index]
+                record["retry_delays"].append(retry_delay)
+                self.sleeper(retry_delay)
+            else:
+                record["result"] = "subscribed_after_retry" if retry_index else "subscribed"
+                break
         status = _thread_status(result)
         if _status_is_interrupted(status) or status not in {"active", "idle", "notLoaded"}:
             raise LiveProbeError(f"fixture {role} could not subscribe from its {status} state")

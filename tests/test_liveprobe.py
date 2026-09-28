@@ -111,6 +111,8 @@ class FakeStream:
         self.active_after_turn_start: dict[str, int] = {}
         self.completion_polls_remaining: dict[str, int] = {}
         self.subscribed_threads: set[str] = set()
+        self.resume_failures: dict[str, list[str]] = {}
+        self.resume_calls: dict[str, int] = {}
         self.completed_turn_ids: set[str] = set()
         self.events: list[dict] = []
 
@@ -193,6 +195,10 @@ class FakeStream:
         if method == "thread/read":
             return self._thread_snapshot(thread_id, include_turns=params.get("includeTurns") is True)
         if method == "thread/resume":
+            self.resume_calls[thread_id] = self.resume_calls.get(thread_id, 0) + 1
+            failures = self.resume_failures.get(thread_id, [])
+            if failures:
+                raise RuntimeError(failures.pop(0))
             self.subscribed_threads.add(thread_id)
             return self._thread_snapshot(thread_id, include_turns=False)
         if method == "thread/turns/list":
@@ -258,6 +264,7 @@ class LiveProbeTests(unittest.TestCase):
             "job_archives": [],
             "task_archives": [],
             "binds": [],
+            "sleeps": [],
         }
         self.runtime = FakeRuntime(self.state)
         self.stream = FakeStream(self.state)
@@ -293,7 +300,7 @@ class LiveProbeTests(unittest.TestCase):
         self.processes += 1
         return FakeProcess(self.state, pid)
 
-    def _run_fixture(self, root, **kwargs):
+    def _run_fixture(self, root, *, timeout_seconds=2, **kwargs):
         def prepare_binding(fixture, task_role, thread_role):
             self.state["binds"].append((fixture.tasks[task_role], fixture.threads[thread_role]))
 
@@ -308,8 +315,8 @@ class LiveProbeTests(unittest.TestCase):
                 runtime_module=self.runtime,
                 stream_factory=lambda _socket: self.stream,
                 process_factory=self._process_factory,
-                timeout_seconds=2,
-                sleeper=lambda _seconds: None,
+                timeout_seconds=timeout_seconds,
+                sleeper=lambda seconds: self.state["sleeps"].append(seconds),
                 **kwargs,
             )
 
@@ -423,6 +430,63 @@ class LiveProbeTests(unittest.TestCase):
         self.assertEqual(result["status"], "passed")
         self.assertIn((THREAD_IDS["manager"], "active"), self.state["metadata_statuses"])
         self.assertEqual(result["calls"]["direct_turn_start"], 4)
+
+    def test_empty_rollout_resume_retries_without_replaying_turn(self):
+        root = self.base / "fixture-empty-rollout-retry"
+        self.stream.resume_failures[THREAD_IDS["manager"]] = [
+            "failed to read session metadata /tmp/rollout.jsonl: rollout at /tmp/rollout.jsonl is empty",
+            "failed to read session metadata /tmp/rollout.jsonl: rollout at /tmp/rollout.jsonl is empty",
+        ]
+        result = self._run_fixture(root)
+
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(self.stream.resume_calls[THREAD_IDS["manager"]], 3)
+        self.assertEqual(
+            result["resume_persistence"]["manager"],
+            {"attempts": 3, "retry_delays": [0.05, 0.1], "result": "subscribed_after_retry"},
+        )
+        self.assertEqual(self.state["sleeps"][:2], [0.05, 0.1])
+        self.assertEqual(
+            [method for method, _ in self.state["requests"]].count("turn/start"),
+            4,
+        )
+
+    def test_empty_rollout_resume_timeout_keeps_last_error_and_is_bounded(self):
+        root = self.base / "fixture-empty-rollout-timeout"
+        evidence_path = self.base / "empty-rollout-timeout.json"
+        self.stream.resume_failures[THREAD_IDS["manager"]] = [
+            "failed to read session metadata /tmp/rollout.jsonl: rollout at /tmp/rollout.jsonl is empty"
+        ]
+        with self.assertRaisesRegex(liveprobe.LiveProbeError, r"rollout at /tmp/rollout\.jsonl is empty"):
+            self._run_fixture(root, evidence_path=evidence_path, timeout_seconds=0.01)
+
+        evidence = json.loads(evidence_path.read_text())
+        self.assertEqual(
+            evidence["resume_persistence"]["manager"],
+            {"attempts": 1, "retry_delays": [], "result": "failed_timeout"},
+        )
+        self.assertEqual(self.stream.resume_calls[THREAD_IDS["manager"]], 1)
+        self.assertEqual(
+            [method for method, _ in self.state["requests"]].count("turn/start"),
+            1,
+        )
+
+    def test_unrelated_resume_error_is_not_retried(self):
+        root = self.base / "fixture-empty-rollout-unrelated-error"
+        evidence_path = self.base / "empty-rollout-unrelated-error.json"
+        self.stream.resume_failures[THREAD_IDS["manager"]] = [
+            "failed to read session metadata /tmp/rollout.jsonl: rollout at /tmp/rollout.jsonl is malformed"
+        ]
+        with self.assertRaisesRegex(liveprobe.LiveProbeError, "rollout.jsonl is malformed"):
+            self._run_fixture(root, evidence_path=evidence_path)
+
+        evidence = json.loads(evidence_path.read_text())
+        self.assertEqual(
+            evidence["resume_persistence"]["manager"],
+            {"attempts": 1, "retry_delays": [], "result": "failed_unrelated_error"},
+        )
+        self.assertEqual(self.stream.resume_calls[THREAD_IDS["manager"]], 1)
+        self.assertEqual(self.state["sleeps"], [])
 
     def test_idle_metadata_does_not_replace_the_baseline_completion_event(self):
         root = self.base / "fixture-completion-event"
