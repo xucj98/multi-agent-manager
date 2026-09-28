@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -60,10 +61,26 @@ def build_archive(output_root: Path, log: Path) -> tuple[Path, str]:
 
 
 def old_source(install_root: Path) -> Path:
-    manager = root_dir().parents[2] / "multi-agent-manager"
-    snapshot = manager / ".tasks" / "2eb71f96-e221-4571-9e18-c3352fc7634f" / "files" / "old_source_snapshot"
+    # The old writer is part of this repository's immutable test fixture.  Do
+    # not read the currently running manager's task archive: that would make
+    # the one-click test depend on another instance's layout and retention.
+    snapshot = root_dir() / "tests" / "baselines" / "0.1.0" / "multi_agent_manager"
     if not snapshot.is_dir():
-        raise IntegrationError(f"archived 0.1.0 source missing: {snapshot}")
+        raise IntegrationError(f"archived 0.1.0 source baseline missing: {snapshot}")
+    hashes = snapshot.parent / "package_hashes.txt"
+    if not hashes.is_file():
+        raise IntegrationError(f"archived 0.1.0 package hash manifest missing: {hashes}")
+    expected: dict[str, str] = {}
+    for line in hashes.read_text(encoding="utf-8").splitlines():
+        if line == "New package files:":
+            break
+        parts = line.split()
+        if len(parts) == 2 and len(parts[0]) == 64:
+            expected[parts[1]] = parts[0]
+    for name, digest in expected.items():
+        path = snapshot / name
+        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise IntegrationError(f"archived 0.1.0 baseline hash mismatch: {path}")
     source = install_root / "old-source"
     package = source / "multi_agent_manager"
     package.mkdir(parents=True)
@@ -74,6 +91,203 @@ def old_source(install_root: Path) -> Path:
         "[project]\nname='multi-agent-manager'\nversion='0.1.0'\ndescription='archived MAM fixture'\nrequires-python='>=3.10'\n"
         "[project.scripts]\nmam='multi_agent_manager.cli:main'\n", encoding="utf-8")
     return source
+
+
+def read_json(path: Path, label: str) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise IntegrationError(f"{label} is not valid JSON: {path}: {exc}") from exc
+    if not isinstance(value, dict):
+        raise IntegrationError(f"{label} is not a JSON object: {path}")
+    return value
+
+
+def git_output(repo: Path, *args: str) -> str:
+    result = run(["git", "-C", str(repo), *args])
+    if result.returncode:
+        raise IntegrationError(f"git {' '.join(args)} failed in {repo}: {result.stderr[-800:]}")
+    return result.stdout.strip()
+
+
+def target_exists(repo: Path, target: str) -> bool:
+    return run(["git", "-C", str(repo), "cat-file", "-e", f"{target}^{{commit}}"],).returncode == 0
+
+
+def verify_instance_data(
+    instance: Path,
+    metadata: dict[str, Any],
+    launcher: Path,
+    upgrade_result: dict[str, Any],
+    expected_commit: str,
+    log: Path,
+) -> dict[str, Any]:
+    """Check durable records, publication, workspace and the merged release."""
+
+    target = metadata.get("fixture")
+    if not isinstance(target, dict):
+        raise IntegrationError(f"fixture metadata is missing for {instance}")
+    task = target.get("task")
+    manager = target.get("manager")
+    if not isinstance(task, str) or not isinstance(manager, str):
+        raise IntegrationError(f"fixture metadata has no task/manager for {instance}")
+    root = Path(metadata["mam_root"])
+    version = read_json(root / ".local" / "data-version.json", "data version")
+    if version.get("version") != "0.2.0":
+        raise IntegrationError(f"data version was not migrated in {instance}: {version}")
+    if upgrade_result.get("data_version") != "0.2.0":
+        raise IntegrationError(f"upgrade result has no 0.2.0 data version in {instance}: {upgrade_result}")
+    if upgrade_result.get("program_version") != "0.2.0":
+        raise IntegrationError(f"upgrade result has no 0.2.0 program version in {instance}: {upgrade_result}")
+    if upgrade_result.get("status") != "upgraded":
+        raise IntegrationError(f"first upgrade did not migrate {instance}: {upgrade_result}")
+    target_result = upgrade_result.get("target_commit")
+    if target_result != expected_commit or len(target_result or "") != 40:
+        raise IntegrationError(f"upgrade target commit is not the archive HEAD in {instance}: {upgrade_result}")
+    if not isinstance(upgrade_result.get("target_tag"), str) or not upgrade_result["target_tag"]:
+        raise IntegrationError(f"upgrade result omitted release tag in {instance}")
+    branch = git_output(root, "branch", "--show-current")
+    if branch != "project/mam-test":
+        raise IntegrationError(f"MAM_BRANCH changed during upgrade in {instance}: {branch}")
+    if run(["git", "-C", str(root), "merge-base", "--is-ancestor", expected_commit, branch]).returncode:
+        raise IntegrationError(f"release commit was not merged into MAM_BRANCH in {instance}")
+
+    record = read_json(root / ".local" / "tasks" / f"{task}.json", "task record")
+    if record.get("id") != task or record.get("agent") != target.get("worker"):
+        raise IntegrationError(f"task binding changed during upgrade in {instance}: {record}")
+    repos = record.get("repos")
+    repo_record = repos.get("sample-repo") if isinstance(repos, dict) else None
+    if not isinstance(repo_record, dict) or repo_record.get("state") != "ready":
+        raise IntegrationError(f"workspace registration was not retained in {instance}: {record}")
+    workspace = Path(record.get("workspace", "")) / "sample-repo"
+    if not workspace.is_dir() or git_output(workspace, "branch", "--show-current") != f"task/{task}":
+        raise IntegrationError(f"workspace branch was not retained in {instance}: {workspace}")
+
+    task_path = f".tasks/{task}/task.md"
+    report_path = f".tasks/{task}/report.md"
+    attachment_path = f".tasks/{task}/files/fixture.txt"
+    for path, marker in ((task_path, None), (report_path, "Published"), (attachment_path, "fixture")):
+        result = run(["git", "-C", str(root), "show", f"{branch}:{path}"])
+        if result.returncode or (marker and marker not in result.stdout):
+            raise IntegrationError(f"published {path} was not retained in {instance}")
+    draft = root / ".tasks" / task / "report.md"
+    if not draft.is_file() or "draft retained before upgrade" not in draft.read_text(encoding="utf-8"):
+        raise IntegrationError(f"report draft was not retained in {instance}")
+
+    service_manager = read_json(root / ".local" / "service" / "manager.json", "service manager")
+    state = read_json(root / ".local" / "service" / "state.json", "service state")
+    if service_manager.get("manager") != manager or state.get("manager") != manager:
+        raise IntegrationError(f"recorded Manager changed during upgrade in {instance}")
+    history = state.get("history")
+    events = state.get("events")
+    if not isinstance(history, list) or not any(item.get("message") == "retained fixture message" for item in history if isinstance(item, dict)):
+        raise IntegrationError(f"message delivery history was lost in {instance}")
+    if not isinstance(events, dict) or not any(item.get("message") == "retained fixture message" for item in events.values() if isinstance(item, dict)):
+        raise IntegrationError(f"pending message event was lost in {instance}")
+    backup = upgrade_result.get("backup")
+    if not isinstance(backup, str) or not Path(backup).is_dir():
+        raise IntegrationError(f"upgrade backup is missing in {instance}: {backup}")
+    if not (Path(backup) / "tasks" / f"{task}.json").is_file():
+        raise IntegrationError(f"upgrade backup does not contain the old task record in {instance}")
+    status = run([str(launcher), "service", "status"], cwd=instance, log=log)
+    if status.returncode:
+        raise IntegrationError(f"service status failed after upgrade in {instance}: {status.stderr[-800:]}")
+    status_value = json.loads(status.stdout)
+    if not isinstance(status_value, dict) or status_value.get("program_version") != "0.2.0" or status_value.get("data_version") != "0.2.0":
+        raise IntegrationError(f"service status omitted migrated versions in {instance}: {status.stdout}")
+    return {
+        "task": task,
+        "data_version": version.get("version"),
+        "branch": branch,
+        "workspace": str(workspace),
+        "manager": manager,
+        "history_entries": len(history),
+        "event_entries": len(events),
+        "backup": backup,
+        "service_status": status_value,
+    }
+
+
+def induce_git_conflict(instance: Path, candidate_checkout: Path, target: str, log: Path) -> str:
+    """Create a tracked local edit that conflicts with the release merge."""
+
+    root = instance / "multi-agent-manager"
+    for relative in ("CHANGELOG.md", "docs/commands/service.md", "docs/install.md"):
+        old = run(["git", "-C", str(root), "show", f"project/mam-test:{relative}"])
+        release = run(["git", "-C", str(candidate_checkout), "show", f"{target}:{relative}"])
+        if old.returncode == 0 and release.returncode == 0 and old.stdout != release.stdout:
+            path = root / relative
+            path.write_text("local conflicting release edit\n", encoding="utf-8")
+            staged = run(["git", "-C", str(root), "add", relative], log=log)
+            committed = run(["git", "-C", str(root), "commit", "-m", "fixture conflict"], log=log)
+            if staged.returncode or committed.returncode:
+                raise IntegrationError(f"could not create Git conflict in {instance}")
+            return relative
+    raise IntegrationError(f"could not find a release file suitable for a Git conflict in {instance}")
+
+
+def resolve_git_conflict(instance: Path, relative: str, target: str, log: Path) -> None:
+    root = instance / "multi-agent-manager"
+    # service upgrade leaves a normal merge conflict in progress.  Abort it,
+    # then record the release version of the conflicting path as an explicit
+    # local resolution before retrying the real upgrade command.
+    aborted = run(["git", "-C", str(root), "merge", "--abort"], log=log)
+    if aborted.returncode:
+        raise IntegrationError(f"could not abort the expected Git conflict in {instance}: {aborted.stderr}")
+    checked = run(["git", "-C", str(root), "checkout", target, "--", relative], log=log)
+    staged = run(["git", "-C", str(root), "add", relative], log=log)
+    committed = run(["git", "-C", str(root), "commit", "-m", "resolve release conflict"], log=log)
+    if checked.returncode or staged.returncode or committed.returncode:
+        raise IntegrationError(f"could not record Git conflict resolution in {instance}")
+
+
+def restore_backup(instance: Path, backup: Path) -> None:
+    root = instance / "multi-agent-manager"
+    local = root / ".local"
+    if local.exists():
+        shutil.rmtree(local)
+    shutil.copytree(backup, local, symlinks=True)
+
+
+def migration_retry(launcher: Path, instance: Path, install_root: Path, log: Path) -> dict[str, Any]:
+    """Exercise an interrupted migration and retry against an isolated root."""
+
+    candidates = sorted((install_root / "pipx" / "venvs").glob("*/bin/python"))
+    if len(candidates) != 1:
+        raise IntegrationError(f"candidate Python is ambiguous in isolated pipx home: {candidates}")
+    python = candidates[0]
+    code = (
+        "from pathlib import Path\n"
+        "from multi_agent_manager import migrations\n"
+        f"root=Path({str(instance / 'multi-agent-manager')!r})\n"
+        "original=migrations.MIGRATIONS[('0.1.0','0.2.0')]\n"
+        "calls=[]\n"
+        "def fail_once(path):\n"
+        "    calls.append(path)\n"
+        "    if len(calls) == 1: raise migrations.MigrationError('integration interruption')\n"
+        "    return original(path)\n"
+        "migrations.MIGRATIONS[('0.1.0','0.2.0')]=fail_once\n"
+        "try:\n"
+        "    migrations.migrate_data(root)\n"
+        "except migrations.MigrationError as exc:\n"
+        "    assert 'interruption' in str(exc)\n"
+        "else:\n"
+        "    raise SystemExit('first migration unexpectedly succeeded')\n"
+        "assert not (root/'.local'/'data-version.json').exists()\n"
+        "result=migrations.migrate_data(root)\n"
+        "assert result['changed'] and migrations.read_data_version(root)=='0.2.0'\n"
+        "print('{\"status\":\"retried\",\"version\":\"'+migrations.read_data_version(root)+'\"}')\n"
+    )
+    result = run([str(python), "-c", code], cwd=instance, log=log)
+    if result.returncode:
+        raise IntegrationError(f"interrupted migration retry failed in {instance}: {result.stderr[-1000:]}")
+    try:
+        value = json.loads(result.stdout.strip().splitlines()[-1])
+    except (IndexError, json.JSONDecodeError) as exc:
+        raise IntegrationError(f"migration retry returned invalid evidence in {instance}") from exc
+    if value != {"status": "retried", "version": "0.2.0"}:
+        raise IntegrationError(f"migration retry returned incomplete evidence: {value}")
+    return value
 
 
 def pipx_install(source: Path, env: dict[str, str], log: Path) -> Path:
@@ -204,6 +418,14 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
             owned.append(path)
             instances.append((path, metadata))
         outcome["scenarios"].append({"name": "create-old-instances", "status": "passed"})
+        no_origin_path = root / "mam-test-no-origin"
+        no_origin = create_instance(from_version, no_origin_path, log, seed="9cf9ff9139a269ff49280d43c3b3510e4056df04")
+        owned.append(no_origin_path)
+        no_origin_root = Path(no_origin["mam_root"])
+        removed_origin = run(["git", "-C", str(no_origin_root), "remote", "remove", "origin"], log=log)
+        if removed_origin.returncode:
+            raise IntegrationError(f"could not prepare the no-origin instance: {removed_origin.stderr[-800:]}")
+        outcome["scenarios"].append({"name": "create-no-origin-instance", "status": "passed"})
         jobs: list[tuple[Path, dict[str, Any], subprocess.Popen[bytes], str]] = []
         for instance, metadata in instances:
             process, job_id = controlled_job(instance, metadata, log)
@@ -216,25 +438,59 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
         outcome["scenarios"].append({"name": "controlled-jobs-and-daemon-stop", "status": "passed", "codex": "simulated"})
         archive, commit = build_archive(root, log)
         outcome["candidate"] = {"archive": str(archive), "commit": commit}
+        if target_exists(Path(instances[0][1]["mam_root"]), commit):
+            raise IntegrationError("old instance unexpectedly already contains the candidate commit")
+        outcome["scenarios"].append({"name": "target-commit-missing-before-upgrade", "status": "passed", "instance": instances[0][0].name})
         install_root = root / "mam-test-install"
         owned.append(install_root)
         launcher = install_candidate(instances, archive, install_root, log)
         outcome["scenarios"].append({"name": "pipx-install-and-update", "status": "passed", "launcher": str(launcher)})
         upgrade_results: list[dict[str, Any]] = []
+        conflict_file = induce_git_conflict(instances[0][0], root_dir(), commit, log)
+        conflict_error = None
+        try:
+            upgrade(instances[0][0], launcher, log)
+        except IntegrationError as exc:
+            conflict_error = str(exc)
+        if not conflict_error or "merge" not in conflict_error.lower():
+            raise IntegrationError("Git conflict scenario did not fail at the merge boundary")
+        conflict_backups = sorted(Path(instances[0][1]["mam_root"]).glob(".local.backup-*"))
+        if not conflict_backups or (Path(instances[0][1]["mam_root"]) / ".local" / "data-version.json").exists():
+            raise IntegrationError("failed Git upgrade did not retain backup or baseline data version")
+        resolve_git_conflict(instances[0][0], conflict_file, commit, log)
+        outcome["scenarios"].append({"name": "git-conflict-and-retry", "status": "passed", "path": conflict_file})
         for instance, metadata in instances:
             result = upgrade(instance, launcher, log)
             upgrade_results.append(result)
             verify_task(instance, launcher, metadata["fixture"], log)
-            outcome["scenarios"].append({"name": f"upgrade:{instance.name}", "status": "passed"})
-            backup = result.get("backup")
-            if not isinstance(backup, str) or not Path(backup).is_dir():
-                raise IntegrationError(f"upgrade did not retain a .local backup for {instance}")
+            evidence = verify_instance_data(instance, metadata, launcher, result, commit, log)
+            outcome.setdefault("instance_evidence", {})[instance.name] = evidence
+            outcome["scenarios"].append({"name": f"upgrade:{instance.name}", "status": "passed", "data": evidence})
             repeat = upgrade(instance, launcher, log)
             if repeat.get("status") != "up-to-date":
                 raise IntegrationError(f"repeated upgrade was not idempotent for {instance}")
         outcome["upgrade_results"] = upgrade_results
         outcome["scenarios"].append({"name": "repeat-upgrade-and-backup", "status": "passed"})
+        missing_result = None
+        try:
+            upgrade(no_origin_path, launcher, log)
+        except IntegrationError as exc:
+            missing_result = str(exc)
+        if not missing_result or "origin" not in missing_result.lower():
+            raise IntegrationError("missing-origin upgrade did not fail with an origin diagnostic")
+        if target_exists(no_origin_root, commit) or list(no_origin_root.glob(".local.backup-*")):
+            raise IntegrationError("missing-origin failure unexpectedly mutated the instance")
+        outcome["scenarios"].append({"name": "missing-origin-failure", "status": "passed", "error": missing_result})
+        outcome["scenarios"].append({"name": "interrupted-migration-retry", "status": "passed", "evidence": migration_retry(launcher, no_origin_path, install_root, log)})
+        first_backup = Path(upgrade_results[0]["backup"])
+        restore_backup(instances[0][0], first_backup)
+        restored = upgrade(instances[0][0], launcher, log)
+        if restored.get("data_version") != "0.2.0" or restored.get("status") != "upgraded":
+            raise IntegrationError(f"backup restore did not complete a fresh migration: {restored}")
+        outcome["scenarios"].append({"name": "backup-restore-and-retry", "status": "passed", "backup": str(first_backup)})
         job_states = [verify_job(launcher, instance, job_id, log) for instance, _, _, job_id in jobs]
+        if job_states[0].get("status") != "running" or job_states[1].get("status") != "exited":
+            raise IntegrationError(f"controlled job lifecycle was not retained: {job_states}")
         outcome["job_states"] = job_states
         new_instance = root / "mam-test-new"
         outcome["new_instance"] = create_instance(to_version, new_instance, log)
