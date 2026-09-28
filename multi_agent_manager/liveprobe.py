@@ -212,6 +212,50 @@ def _turn_text(turn: Mapping[str, Any]) -> str:
     return "\n".join(values)
 
 
+def _fixture_executor_path(role: str) -> str:
+    return f"/root/liveprobe/{role}"
+
+
+def _delivery_input(turn: Mapping[str, Any], expected_lines: list[str]) -> dict[str, str] | None:
+    """Match one inbound MAM message in the completed scheduler turn."""
+
+    if turn.get("status") != "completed":
+        return None
+    items = turn.get("items")
+    if not isinstance(items, list):
+        return None
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        kind = item.get("type")
+        if kind == "userMessage":
+            content = item.get("content")
+            if not isinstance(content, list):
+                continue
+            text = "".join(
+                part["text"] for part in content
+                if isinstance(part, Mapping) and part.get("type") == "text" and isinstance(part.get("text"), str)
+            )
+        elif kind == "functionCallOutput" and item.get("name") == "message" and item.get("namespace") == "mam":
+            output = item.get("output")
+            if isinstance(output, str):
+                text = output
+            elif isinstance(output, list):
+                text = "".join(
+                    part["text"] for part in output
+                    if isinstance(part, Mapping) and part.get("type") == "input_text"
+                    and isinstance(part.get("text"), str)
+                )
+            else:
+                continue
+        else:
+            continue
+        lines = text.splitlines()
+        if all(line in lines for line in expected_lines):
+            return {"item_type": kind, "text": text}
+    return None
+
+
 def _status_is_interrupted(status: str) -> bool:
     return status.lower() in {"interrupted", "cancelled", "canceled", "paused", "suspended"}
 
@@ -290,6 +334,7 @@ class _LiveFixture:
             },
             "resources": {"tasks": {}, "threads": {}, "jobs": {}, "turns": {}},
             "history": {},
+            "delivery_inputs": {},
             "completion_events": {},
             "resume_persistence": {},
             "turn_counts": {},
@@ -426,7 +471,7 @@ class _LiveFixture:
         with self.store.lock(task_id):
             data = self.store.read(task_id, writable=True)
             data["agent"] = agent
-            data["identity"] = {"path": f"/root/liveprobe/{thread_role}", "tree_root": self.threads["manager"]}
+            data["identity"] = {"path": _fixture_executor_path(thread_role), "tree_root": self.threads["manager"]}
             data["status"] = "working"
             self.store.write(data)
 
@@ -719,7 +764,7 @@ class _LiveFixture:
                 f"thread/read(includeTurns=true) {comparison}"
             ) from exc
 
-    def _wait_for_turn_text(
+    def _wait_for_turn_delivery(
         self, role: str, expected: list[str], minimum_turns: int, label: str, phase: str
     ) -> Mapping[str, Any]:
         deadline = self._deadline()
@@ -727,12 +772,16 @@ class _LiveFixture:
         self._wait_for_idle(role, label, deadline=deadline)
         turns = self._thread_turns_after_idle(role, phase)
         if len(turns) >= minimum_turns:
-            for turn in turns:
-                text = _turn_text(turn)
-                if all(item in text for item in expected) and turn.get("status") == "completed":
+            turn = next((item for item in turns if item.get("id") == completed_id), None)
+            if isinstance(turn, Mapping):
+                received = _delivery_input(turn, expected)
+                if received is not None:
+                    self.evidence["delivery_inputs"][phase] = {
+                        "thread_id": self.threads[role], "turn_id": completed_id, **received,
+                    }
                     self._record_paged_history(role, phase, turns)
                     return turn
-        raise LiveProbeError(f"fixture {label} completed turn {completed_id} without the expected delivery text")
+        raise LiveProbeError(f"fixture {label} completed turn {completed_id} without matching inbound delivery")
 
     def _start_baseline_turn(self, role: str) -> None:
         self.stage = f"start fixture {role} baseline turn"
@@ -784,8 +833,13 @@ class _LiveFixture:
 
     def _wait_for_manager_delivery(self) -> None:
         self.stage = "verify fixture Manager delivery"
-        manager_payloads = ["[MAM Message]", "needs follow-up", self.tasks["idle"], self.tasks["archived"]]
-        manager_turn = self._wait_for_turn_text(
+        action = "needs follow-up. Check the report; continue the work, request review, or archive the task."
+        manager_payloads = [
+            "[MAM Message]",
+            f"{_fixture_executor_path('idle_executor')} {action}",
+            f"{_fixture_executor_path('archived_executor')} {action}",
+        ]
+        manager_turn = self._wait_for_turn_delivery(
             "manager", manager_payloads, 2, "Manager-ready scheduler turn", "manager_delivery"
         )
         manager_turn_id = manager_turn.get("id")
@@ -814,8 +868,11 @@ class _LiveFixture:
 
     def _wait_for_exited_job_delivery(self, job_id: str) -> dict[str, int]:
         self.stage = "verify exited-job scheduler delivery"
-        job_turn = self._wait_for_turn_text(
-            "job_executor", ["[MAM Message]", f"Job {job_id} has exited.", "archive the job"],
+        job_turn = self._wait_for_turn_delivery(
+            "job_executor", [
+                "[MAM Message]",
+                f"Job {job_id} has exited. Check the result, continue the task, and archive the job.",
+            ],
             2, "exited-job scheduler turn", "exited_job_delivery"
         )
         job_turn_id = job_turn.get("id")
