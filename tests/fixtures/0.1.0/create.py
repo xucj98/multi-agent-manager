@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import tempfile
 import sys
 import uuid
 
@@ -122,6 +123,33 @@ def _service_history(package_parent: Path, project_root: Path, mam_root: Path, m
     wake_runtime._save_state(store, state)
 
 
+def _publish_attachment(package_parent: Path, project_root: Path, mam_root: Path, task: str) -> None:
+    """Publish the old fixture's attachment with the archived Git helpers.
+
+    The archived 0.1.0 CLI publishes task/report documents but has no public
+    files publication command.  Keep the old CLI as the task/report writer,
+    then use its Store/Git primitives to create the historical files tree.
+    """
+
+    sys.path.insert(0, str(package_parent))
+    from multi_agent_manager import cli
+
+    store = cli.Store(cli.project_config(project_root))
+    parent = cli.head(store.root, store.branch)
+    attachment = store.logs / task / "files" / "fixture.txt"
+    path = f".tasks/{task}/files/fixture.txt"
+    with tempfile.TemporaryDirectory(prefix="old-file-publish-") as temporary:
+        env = {**os.environ, "GIT_INDEX_FILE": str(Path(temporary) / "index")}
+        cli.git(store.root, "read-tree", parent, env=env)
+        blob = cli.git(store.root, "hash-object", "-w", "--stdin", input=attachment.read_bytes()).stdout.decode().strip()
+        cli.git(store.root, "update-index", "--add", "--cacheinfo", "100644", blob, path, env=env)
+        tree = cli.git(store.root, "write-tree", env=env).stdout.decode().strip()
+        commit = cli.git(
+            store.root, "commit-tree", tree, "-p", parent, "-m", f"Publish {task} fixture attachment"
+        ).stdout.decode().strip()
+        cli.git(store.root, "update-ref", f"refs/heads/{store.branch}", commit, parent)
+
+
 def create(*, project_root: Path, mam_root: Path, package_parent: Path, version: str = "0.1.0") -> dict:
     project_root = project_root.resolve()
     mam_root = mam_root.resolve()
@@ -141,6 +169,7 @@ def create(*, project_root: Path, mam_root: Path, package_parent: Path, version:
     _invoke(package_parent, project_root, ["task", "publish", task, "--file", "task"], agent=manager)
     report_file.write_text("# archived fixture report\n\nPublished by 0.1.0.\n", encoding="utf-8")
     _invoke(package_parent, project_root, ["task", "publish", task, "--file", "report"], agent=manager)
+    _publish_attachment(package_parent, project_root, mam_root, task)
     # Leave a real draft behind so upgrade checks both published and working data.
     report_file.write_text(report_file.read_text(encoding="utf-8") + "draft retained before upgrade\n", encoding="utf-8")
 

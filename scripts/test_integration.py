@@ -52,11 +52,17 @@ def create_instance(version: str, path: Path, log: Path, *, seed: str = "HEAD") 
     return value
 
 
-def build_archive(output_root: Path, log: Path) -> tuple[Path, str]:
+def build_archive(output_root: Path, log: Path, expected_version: str) -> tuple[Path, str]:
     checkout = root_dir()
     rev = run(["git", "-C", str(checkout), "rev-parse", "HEAD"], log=log)
     if rev.returncode:
         raise IntegrationError("candidate checkout is not a Git repository")
+    release = checkout / "multi_agent_manager" / "release.py"
+    project = checkout / "pyproject.toml"
+    if not release.is_file() or f'RELEASE_VERSION = "{expected_version}"' not in release.read_text(encoding="utf-8"):
+        raise IntegrationError(f"candidate checkout does not provide published release metadata for {expected_version}")
+    if f'version = "{expected_version}"' not in project.read_text(encoding="utf-8"):
+        raise IntegrationError(f"candidate project metadata does not select published version {expected_version}")
     archive = output_root / "mam-test-install" / "candidate.tar.gz"
     archive.parent.mkdir(parents=True, exist_ok=True)
     result = run(["git", "-C", str(checkout), "archive", "--format=tar.gz", f"--output={archive}", "HEAD"], log=log)
@@ -506,7 +512,7 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
             "codex": "simulated",
             "old_daemons": old_daemons,
         })
-        archive, commit = build_archive(root, log)
+        archive, commit = build_archive(root, log, to_version)
         outcome["candidate"] = {"archive": str(archive), "commit": commit}
         if target_exists(Path(instances[0][1]["mam_root"]), commit):
             raise IntegrationError("old instance unexpectedly already contains the candidate commit")

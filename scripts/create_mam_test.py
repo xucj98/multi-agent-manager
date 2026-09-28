@@ -107,12 +107,14 @@ def _venv_and_launcher(destination: Path, package_parent: Path) -> Path:
         raise CreateError(f"cannot create isolated test environment: {result.stderr[-1000:]}")
     launcher = environment / "bin" / "mam"
     launcher.write_text(
-        f"#!{environment / 'bin' / 'python'}\n"
+        "#!/bin/sh\n"
+        "exec \"$(dirname -- \"$0\")/python\" - \"$@\" <<'PY'\n"
         f"PACKAGE_PARENT = {str(package_parent)!r}\n"
         "import sys\n"
         "sys.path.insert(0, PACKAGE_PARENT)\n"
         "from multi_agent_manager.cli import main\n"
-        "raise SystemExit(main())\n",
+        "raise SystemExit(main())\n"
+        "PY\n",
         encoding="utf-8",
     )
     launcher.chmod(0o755)
