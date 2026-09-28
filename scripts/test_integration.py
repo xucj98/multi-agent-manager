@@ -290,6 +290,22 @@ def migration_retry(launcher: Path, instance: Path, install_root: Path, log: Pat
     return value
 
 
+def verify_source_isolation(instances: list[tuple[Path, dict[str, Any]]], candidate_commit: str) -> dict[str, Any]:
+    source = root_dir()
+    if git_output(source, "rev-parse", "HEAD") != candidate_commit:
+        raise IntegrationError("candidate checkout HEAD changed during integration")
+    if run(["git", "-C", str(source), "status", "--porcelain"]).stdout.strip():
+        raise IntegrationError("candidate checkout gained working-tree changes during integration")
+    origins: dict[str, str] = {}
+    for instance, metadata in instances:
+        root = Path(metadata["mam_root"])
+        origin = run(["git", "-C", str(root), "config", "--get", "remote.origin.url"])
+        if origin.returncode:
+            raise IntegrationError(f"upgraded instance lost its isolated origin: {instance}")
+        origins[instance.name] = origin.stdout.strip()
+    return {"candidate_head": candidate_commit, "origins": origins, "task_roots": [str(path) for path, _ in instances]}
+
+
 def pipx_install(source: Path, env: dict[str, str], log: Path) -> Path:
     result = run(["pipx", "install", "--force", str(source)], cwd=source, env=env, log=log)
     if result.returncode:
@@ -313,14 +329,26 @@ def controlled_job(instance: Path, metadata: dict[str, Any], log: Path) -> tuple
         log=log,
     )
     if result.returncode:
-        process.terminate()
+        terminate_owned_process(process)
         raise IntegrationError(f"could not register controlled job in {instance}: {result.stderr[-1000:]}")
     try:
         value = json.loads(result.stdout)
         return process, value["id"]
     except (json.JSONDecodeError, KeyError) as exc:
-        process.terminate()
+        terminate_owned_process(process)
         raise IntegrationError(f"old job writer returned invalid JSON in {instance}") from exc
+
+
+def terminate_owned_process(process: subprocess.Popen[bytes]) -> None:
+    """Stop an owned process and always reap it, including kill fallback."""
+
+    if process.poll() is None:
+        process.terminate()
+    try:
+        process.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=3)
 
 
 def verify_job(launcher: Path, instance: Path, job_id: str, log: Path) -> dict[str, Any]:
@@ -496,17 +524,14 @@ def integration(root: Path, from_version: str, to_version: str, keep: bool) -> t
         outcome["new_instance"] = create_instance(to_version, new_instance, log)
         owned.append(new_instance)
         outcome["scenarios"].append({"name": "first-use-new-instance", "status": "passed"})
+        outcome["source_isolation"] = verify_source_isolation(instances, commit)
+        outcome["scenarios"].append({"name": "candidate-and-instance-isolation", "status": "passed"})
     except (IntegrationError, OSError, subprocess.SubprocessError, tarfile.TarError) as exc:
         outcome["error"] = str(exc)
         outcome["scenarios"].append({"name": "integration", "status": "failed", "error": str(exc)})
     finally:
         for process in processes:
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=3)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+            terminate_owned_process(process)
         if not keep:
             for path in owned:
                 if path.exists():
