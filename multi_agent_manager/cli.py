@@ -260,11 +260,12 @@ def caller_identity():
         raise Error(str(exc)) from exc
 
 
-def task_target(store, target):
+def task_target(store, target, *, include_archived=False):
     """Resolve a TASK-ID or a path only within the caller's native tree."""
     if target is None:
         caller = caller_agent()
-        found = [data for data in store.all() if data.get("status") != "archived" and data.get("agent") == caller]
+        found = [data for data in store.all()
+                 if (include_archived or data.get("status") != "archived") and data.get("agent") == caller]
         if len(found) != 1:
             raise Error("current executor has no unique active task; specify TASK-ID")
         return found[0]["id"]
@@ -273,7 +274,7 @@ def task_target(store, target):
     current = caller_identity()
     matches = []
     for data in store.all():
-        if data.get("status") == "archived" or not data.get("agent"):
+        if (not include_archived and data.get("status") == "archived") or not data.get("agent"):
             continue
         known = data.get("identity")
         if not isinstance(known, dict) or not known.get("tree_root") or not known.get("path"):
@@ -402,7 +403,7 @@ def create(store, args):
                 raise Error("source report has no registered delivery commits")
             review = {"task": args.review, "commits": commits}
     task = str(uuid.uuid4())
-    data = {"id": task, "title": args.title, "agent": None, "status": "working", "created_at": now(),
+    data = {"id": task, "title": args.title, "agent": None, "status": "pending", "created_at": now(),
             "workspace": str(store.workspaces / task), "repos": {}, "jobs": [], "report": None,
             "review": review, "archive": None, "error": None}
     with store.lock("bindings"), store.lock(task):
@@ -447,6 +448,8 @@ def start(store, args):
         if wake_runtime.recorded_manager(store) == identity.agent:
             raise Error("the recorded Manager cannot become a task executor")
         data = store.read(task, writable=True)
+        if data.get("status") == "archived":
+            raise Error("archived tasks cannot be started")
         conflicts = [item["id"] for item in store.all() if item["id"] != task and
                      item["status"] != "archived" and item.get("agent") == identity.agent]
         if conflicts:
@@ -463,9 +466,12 @@ def start(store, args):
         changed = current != identity.agent or data["status"] != "working" or data.get("identity") != {
             "path": identity.path, "tree_root": identity.tree_root,
         }
+        old_status = data.get("status")
         data["agent"] = identity.agent
         data["identity"] = {"path": identity.path, "tree_root": identity.tree_root}
         data["status"] = "working"
+        if old_status != "working":
+            data["wake_reminder_count"] = 0
         if changed:
             store.write(data)
     return {"id": task, "agent": identity.agent, "path": identity.path,
@@ -698,6 +704,19 @@ def publish_draft(store, args, kind):
     with store.lock(args.task), store.lock("publish"):
         publish_branch(store)
         data = store.read(args.task, writable=True)
+        if kind == "report":
+            observations = agent_observations([data["agent"]] if data.get("agent") else [])
+            from .task_state import refresh_state
+            updated, _, _ = refresh_state(data, agent_state(data.get("agent"), observations))
+            if updated != data:
+                data = updated
+                store.write(data)
+            if data.get("status") not in {"working", "pending"}:
+                raise Error("report refused; task must be working or pending")
+            unarchived = [job.get("id") for job in data.get("jobs", [])
+                          if isinstance(job, dict) and job.get("status") != "archived"]
+            if unarchived:
+                raise Error("report refused; unarchived registered jobs: " + ", ".join(unarchived))
         draft = store.doc(args.task, kind)
         if not draft.is_file():
             raise Error(f"missing draft: {draft}")
@@ -724,7 +743,6 @@ def publish_draft(store, args, kind):
             if report is not None:
                 sync_files_index(store, args.task, file_blobs)
                 data["report"] = {**report, "revision": existing["revision"]}
-                data["status"] = "pending"
                 store.write(data)
             return {"id": args.task, "file": kind, "revision": existing["revision"], "unchanged": True}
         parent = head(store.root, store.branch)
@@ -744,7 +762,6 @@ def publish_draft(store, args, kind):
             git(store.root, "update-ref", f"refs/heads/{store.branch}", commit, parent)
         if report is not None:
             data["report"] = {**report, "revision": commit}
-            data["status"] = "pending"
         store.write(data)
         # Update only this entry; Git locks the shared index and keeps other entries.
         # Use the published blob so an edit made during publication stays a draft.
@@ -809,6 +826,9 @@ def refresh_jobs(data, jobs=None):
         if observation["status"] in ("running", "exited"):
             job["status"] = observation["status"]
             job["checked_at"] = observation["checked_at"]
+    from .task_state import refresh_state
+    updated, _, _ = refresh_state(data, None)
+    data.update(updated)
 
 
 def job_add(store, args):
@@ -816,6 +836,8 @@ def job_add(store, args):
         raise Error("PID must be positive")
     with store.lock(args.task):
         data = store.read(args.task, writable=True)
+        if data.get("status") == "archived":
+            raise Error("archived tasks cannot register jobs")
         observation = runtime().probe_process(args.host, args.pid)
         if observation["status"] != "running" or not observation.get("identity") or observation.get("error"):
             raise Error(f"cannot register process without confirmed running identity: {observation}")
@@ -823,6 +845,9 @@ def job_add(store, args):
                "identity": observation["identity"], "status": "running", "checked_at": observation["checked_at"],
                "started_at": observation["identity"].get("started_at"), "probe": observation, "archive": None}
         data["jobs"].append(job)
+        if data.get("status") != "working":
+            data["status"] = "working"
+            data["wake_reminder_count"] = 0
         store.write(data)
     return {"task": args.task, **job}
 
@@ -932,6 +957,14 @@ def render_task_status(data, docs, drafts):
     report = data.get("report") if isinstance(data.get("report"), dict) else {}
     commits = report.get("commits") if isinstance(report.get("commits"), dict) else {}
     result = {key: data.get(key) for key in ("id", "title", "status", "agent", "workspace")}
+    from .task_state import REMINDER_LIMIT, reminder_count
+    count = reminder_count(data)
+    result["wake_reminder_count"] = count
+    result["wake_reminder_limit"] = REMINDER_LIMIT
+    if count >= REMINDER_LIMIT:
+        result["reminder_status"] = "Reminder limit reached"
+    if data.get("status") == "blocked" and data.get("block_note"):
+        result["block_note"] = data["block_note"]
     known = data.get("identity")
     if isinstance(known, dict) and known.get("path") and known.get("tree_root"):
         result["agent_path"] = known["path"]
@@ -1043,13 +1076,29 @@ def job_archive(store, args):
             if job["status"] != "archived":
                 job["status"] = "archived"
                 job["archive"] = {"note": args.note, "at": now()}
+                from .task_state import refresh_state
+                observations = agent_observations([data["agent"]] if data.get("agent") else [])
+                updated, _, _ = refresh_state(data, agent_state(data.get("agent"), observations))
+                data.update(updated)
                 store.write(data)
             return job
     raise Error(f"JOB-ID is not registered: {args.job}")
 
 
 def status(store, args):
-    data = store.read(args.task)
+    if os.environ.get("MAM_HOOK_ACTIVE"):
+        data = store.read(args.task)
+    else:
+        with store.lock(args.task):
+            data = store.read(args.task)
+            if data.get("status") != "archived":
+                data = store.read(args.task, writable=True)
+                observations = agent_observations([data["agent"]] if data.get("agent") else [])
+                from .task_state import refresh_state
+                updated, _, _ = refresh_state(data, agent_state(data.get("agent"), observations))
+                if updated != data:
+                    data = updated
+                    store.write(data)
     docs = {kind: optional_doc(store, args.task, kind) for kind in ("task", "report")}
     drafts = {}
     for kind, document in docs.items():
@@ -1142,9 +1191,61 @@ def service_upgrade(store, args):
 
 
 def task_list(store, args):
-    tasks = [data for data in store.all() if args.all or (data["status"] == "archived") == args.archived]
-    agents = agent_observations(data["agent"] for data in tasks if data["agent"])
-    return [{**data, "agent_state": agent_state(data["agent"], agents, unbound="unbound")} for data in tasks]
+    from .task_state import refresh_state
+    tasks = store.all()
+    agents = agent_observations(data["agent"] for data in tasks if data.get("agent"))
+    refreshed = []
+    for item in tasks:
+        if os.environ.get("MAM_HOOK_ACTIVE") or item.get("status") == "archived":
+            data = item
+            observation = agent_state(data.get("agent"), agents, unbound="unbound")
+        else:
+            with store.lock(item["id"]):
+                data = store.read(item["id"])
+                if data.get("status") == "archived":
+                    observation = agent_state(data.get("agent"), agents, unbound="unbound")
+                    if args.all or args.archived:
+                        refreshed.append({**data, "agent_state": observation})
+                    continue
+                data = store.read(item["id"], writable=True)
+                observation = agent_state(data.get("agent"), agents, unbound="unbound")
+                updated, _, _ = refresh_state(data, observation)
+                if updated != data:
+                    data = updated
+                    store.write(data)
+        if args.all or (data["status"] == "archived") == args.archived:
+            refreshed.append({**data, "agent_state": observation})
+    return refreshed
+
+
+def task_block(store, args):
+    from . import wake_runtime
+    from .task_state import refresh_state, set_blocked
+    caller = caller_agent()
+    try:
+        manager = wake_runtime.resolve_manager(store)
+    except RuntimeError as exc:
+        raise Error(str(exc)) from exc
+    if manager is None or caller != manager:
+        raise Error("task block must be called by the recorded Manager")
+    identity = caller_identity()
+    if identity.path != "/root" or identity.tree_root != caller:
+        raise Error("task block requires the recorded native root Manager")
+    if not isinstance(args.note, str) or not args.note.strip():
+        raise Error("--note must describe why the task is blocked")
+    with store.lock(args.task):
+        data = store.read(args.task, writable=True)
+        observations = agent_observations([data["agent"]] if data.get("agent") else [])
+        updated, _, _ = refresh_state(data, agent_state(data.get("agent"), observations))
+        if updated != data:
+            data = updated
+            store.write(data)
+        if data.get("status") != "pending":
+            raise Error("task block requires a pending task")
+        data = set_blocked(data, args.note.strip())
+        store.write(data)
+    return {"id": args.task, "status": data["status"], "block_note": data["block_note"],
+            "wake_reminder_count": data.get("wake_reminder_count", 0)}
 
 
 def show(store, args):
@@ -1163,13 +1264,18 @@ def print_table(header, rows):
 
 
 def print_task_list(tasks):
+    from .task_state import REMINDER_LIMIT, reminder_count
     rows = []
     for task in tasks:
         agent = task.get("identity", {}).get("path") or task["agent"] or "未绑定"
         state = task["agent_state"]["status"]
         rows.append("\t".join((one_line(task["title"]), one_line(task["status"]), task["id"], one_line(agent),
-                              "未绑定" if state == "unbound" else one_line(state))))
-    print_table(("标题", "任务状态", "TASK-ID", "执行者", "agent状态"), (row.split("\t") for row in rows))
+                              "未绑定" if state == "unbound" else one_line(state),
+                              f"{reminder_count(task)}/{REMINDER_LIMIT}",
+                              "Reminder limit reached" if reminder_count(task) >= REMINDER_LIMIT else "",
+                              one_line(task.get("block_note") if task.get("status") == "blocked" else None))))
+    print_table(("标题", "任务状态", "TASK-ID", "执行者", "agent状态", "提醒次数", "提醒状态", "阻断说明"),
+                (row.split("\t") for row in rows))
 
 
 def displayed_job_status(job):
@@ -1240,6 +1346,11 @@ def archive(store, args):
         data = store.read(args.task)
         if data["status"] == "archived":
             return data["archive"]
+        from .task_state import refresh_state
+        updated, _, _ = refresh_state(data, None)
+        if updated != data:
+            data = updated
+            store.write(data)
         archive_preflight(store, data)
         force = bool(getattr(args, "force", False))
         project_hook(store, data, "before_task_archive", options={"note": args.note, "force": force})
@@ -1324,6 +1435,10 @@ def parser():
     p = command(sub, "status", "show concise task, repo and cached job status")
     p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="TASK-ID or native collaboration path; defaults to caller task")
     p.set_defaults(func=status)
+    p = command(sub, "block", "mark a pending task blocked as the recorded Manager")
+    p.add_argument("task", metavar="TASK-ID|AGENT-PATH", help="registered TASK-ID or native collaboration path")
+    p.add_argument("--note", required=True, metavar="NOTE", help="why the task is blocked")
+    p.set_defaults(func=task_block)
     p = command(sub, "archive", "delete the entire task workspace, registered worktrees and task branches; Manager owns deliverables and branch policy")
     p.add_argument("task", metavar="TASK-ID|AGENT-PATH", help="registered TASK-ID or native collaboration path")
     p.add_argument("--note", required=True, metavar="NOTE", help="purpose, result or reason for this operation")
@@ -1386,8 +1501,8 @@ def main(argv=None, *, cwd=None):
         if os.environ.get("MAM_HOOK_ACTIVE") and args.func not in {show, status, task_list, service_status}:
             raise Error("MAM hook cannot invoke a command that may modify task state")
         store = Store(project_config(cwd))
-        if args.func in {show, publish, report, status, workspace_add, job_add, archive}:
-            args.task = task_target(store, args.task)
+        if args.func in {show, publish, report, status, task_block, workspace_add, job_add, archive}:
+            args.task = task_target(store, args.task, include_archived=args.func == status)
         elif args.func == job_list and args.task:
             args.task = task_target(store, args.task)
         result = args.func(store, args)
