@@ -17,6 +17,7 @@ import uuid
 from unittest.mock import patch
 
 from multi_agent_manager import cli, identity, wake_runtime
+from multi_agent_manager import task_state
 
 ROOT = Path(__file__).resolve().parents[1]
 _CLI_BOOTSTRAP = (
@@ -328,7 +329,7 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
             text=True,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(result.stdout.splitlines(), ["标题\t任务状态\tTASK-ID\t执行者\tagent状态"])
+        self.assertEqual(result.stdout.splitlines(), ["标题\t任务状态\tTASK-ID\t执行者\tagent状态\t提醒次数\t提醒状态\t阻断说明"])
         self.assertFalse(marker.exists())
 
 
@@ -421,7 +422,7 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
                         ("job", "list", "--task")):
             result = subprocess.run(mam_command(*command), cwd=self.projects, capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0, command)
-        self.assertEqual(self.store.read(task)["status"], "working")
+        self.assertEqual(self.store.read(task)["status"], "pending")
 
     def test_attach_command_is_removed(self):
         task = self.task()
@@ -511,13 +512,13 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
                 self.assertEqual(self.git(self.root, "diff", "--cached", "--", relative), "")
 
     def test_task_list_text_has_header_and_status_keeps_records(self):
-        header = "标题\t任务状态\tTASK-ID\t执行者\tagent状态"
+        header = "标题\t任务状态\tTASK-ID\t执行者\tagent状态\t提醒次数\t提醒状态\t阻断说明"
         self.assertEqual(self.task_command_output("list").splitlines(), [header])
         rejected = subprocess.run(mam_command("task", "list", "--json"), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(rejected.returncode, 2)
         unbound = self.call("create", "--title", "中文\n标题\twith whitespace")["id"]
         self.assertEqual(self.task_command_output("list").splitlines()[1].split("\t"),
-                         ["中文 标题 with whitespace", "working", unbound, "未绑定", "未绑定"])
+                         ["中文 标题 with whitespace", "pending", unbound, "未绑定", "未绑定", "0/3", "", ""])
         bound = self.task()
         self.fixture_bind(bound, "bound-agent")
         calls = []
@@ -527,8 +528,8 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
             rows = {fields[2]: fields for fields in (line.split("\t") for line in lines[1:])}
             self.assertEqual(calls, [["bound-agent"]])
             self.assertEqual(len(rows), 2)
-            self.assertEqual(rows[unbound], ["中文 标题 with whitespace", "working", unbound, "未绑定", "未绑定"])
-            self.assertEqual(rows[bound][3:], ["bound-agent", "unknown"])
+            self.assertEqual(rows[unbound], ["中文 标题 with whitespace", "pending", unbound, "未绑定", "未绑定", "0/3", "", ""])
+            self.assertEqual(rows[bound][3:], ["bound-agent", "unknown", "0/3", "", ""])
         self.assertEqual(self.call("status", bound)["agent"], "bound-agent")
 
     def test_task_show_text_is_published_markdown(self):
@@ -570,7 +571,13 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
             "archived_count": 1})
         self.assertNotIn("identity", result["jobs"]["unarchived"][0])
         self.assertNotIn("probe", result["jobs"]["unarchived"][0])
-        self.assertEqual(record.read_bytes(), before)
+        after = json.loads(record.read_text())
+        before_data = json.loads(before)
+        self.assertEqual(after["status"], "working")
+        self.assertEqual(after["wake_reminder_count"], 0)
+        before_data["status"] = after["status"]
+        before_data["wake_reminder_count"] = after["wake_reminder_count"]
+        self.assertEqual(after, before_data)
 
     def test_job_list_filters_before_probes_and_keeps_realtime_status(self):
         def job(name, pid, status):
@@ -1097,7 +1104,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         archive_help = subprocess.check_output([command, "task", "archive", "--help"], cwd="/tmp", text=True)
         self.assertIn("delete the entire task workspace", " ".join(archive_help.split()))
         rows = subprocess.check_output([command, "task", "list"], cwd=self.projects, text=True)
-        self.assertEqual(rows.splitlines(), ["标题\t任务状态\tTASK-ID\t执行者\tagent状态"])
+        self.assertEqual(rows.splitlines(), ["标题\t任务状态\tTASK-ID\t执行者\tagent状态\t提醒次数\t提醒状态\t阻断说明"])
         installed = subprocess.check_output([str(python), "-I", "-c",
             "import multi_agent_manager; print(multi_agent_manager.__file__)"], cwd="/tmp", text=True)
         self.assertTrue(Path(installed.strip()).is_relative_to(environment))
@@ -1648,12 +1655,12 @@ base=$(git rev-parse --verify "$1^{commit}")
             with self.assertRaisesRegex(cli.Error, "already bound"):
                 cli.start(self.store, types.SimpleNamespace(task=second))
         self.report(first)
-        self.assertEqual(self.store.read(first)["status"], "pending")
+        self.assertEqual(self.store.read(first)["status"], "working")
         with patch.object(cli, "caller_identity", return_value=a), patch.dict(os.environ, {"CODEX_THREAD_ID": agent_a}):
             cli.start(self.store, types.SimpleNamespace(task=None))
         self.assertEqual(self.store.read(first)["status"], "working")
         self.assertTrue(self.call("report", first)["unchanged"])
-        self.assertEqual(self.store.read(first)["status"], "pending")
+        self.assertEqual(self.store.read(first)["status"], "working")
         with patch.object(cli, "caller_identity", return_value=b), patch.dict(os.environ, {"CODEX_THREAD_ID": agent_b}):
             cli.start(self.store, types.SimpleNamespace(task=second))
             self.assertEqual(cli.task_target(self.store, "/root/worker"), second)
@@ -2053,6 +2060,105 @@ Path(context['task']['task_dir'], 'task.md').write_text('changed during hook')
         self.call("archive", task, "--note", "second pass")
         self.assertEqual(calls.read_text(), "xx")
         self.assertFalse(second_path.parent.exists())
+
+    def test_task_block_requires_manager_and_pending_status(self):
+        task, manager = self.task_with_manager()
+        args = types.SimpleNamespace(task=task, note="waiting on decision")
+        with patch.object(cli, "caller_agent", return_value=manager), \
+             patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(manager, "/root", manager)), \
+             patch.object(wake_runtime, "resolve_manager", return_value=manager):
+            result = cli.task_block(self.store, args)
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["block_note"], "waiting on decision")
+        data = self.store.read(task)
+        data["status"] = "working"
+        data["agent"] = "worker"
+        self.store.write(data)
+        with patch.object(cli, "caller_agent", return_value=manager), \
+             patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(manager, "/root", manager)), \
+             patch.object(wake_runtime, "resolve_manager", return_value=manager), \
+             patch.object(cli, "agent_observations", return_value={"worker": {"status": "unknown"}}), \
+             self.assertRaisesRegex(cli.Error, "requires a pending task"):
+            cli.task_block(self.store, args)
+
+    def test_task_block_rejects_non_manager(self):
+        task, manager = self.task_with_manager()
+        args = types.SimpleNamespace(task=task, note="waiting")
+        with patch.object(cli, "caller_agent", return_value=str(uuid.uuid4())), \
+             patch.object(wake_runtime, "resolve_manager", return_value=manager), \
+             self.assertRaisesRegex(cli.Error, "recorded Manager"):
+            cli.task_block(self.store, args)
+
+    def test_task_list_and_status_refresh_task_lifecycle(self):
+        task = self.task()
+        agent = str(uuid.uuid4())
+        self.fixture_bind(task, agent)
+        observations = {agent: {"status": "active"}}
+        with patch.object(cli, "agent_observations", side_effect=lambda _: observations):
+            result = cli.task_list(self.store, types.SimpleNamespace(all=True, archived=False))
+        saved = self.store.read(task)
+        self.assertEqual(saved["status"], "working")
+        self.assertEqual(result[0]["status"], "working")
+        saved["wake_reminder_count"] = 2
+        self.store.write(saved)
+        with patch.object(cli, "agent_observations", side_effect=lambda _: {agent: {"status": "idle"}}):
+            current = cli.status(self.store, types.SimpleNamespace(task=task))
+        self.assertEqual(current["status"], "pending")
+        self.assertEqual(current["wake_reminder_count"], 0)
+        saved = self.store.read(task)
+        saved["status"] = "blocked"
+        saved["block_note"] = "waiting"
+        saved["wake_reminder_count"] = 1
+        self.store.write(saved)
+        with patch.object(cli, "agent_observations", side_effect=lambda _: {agent: {"status": "unknown"}}):
+            current = cli.status(self.store, types.SimpleNamespace(task=task))
+        self.assertEqual(current["status"], "blocked")
+        self.assertEqual(current["block_note"], "waiting")
+        self.assertEqual(current["wake_reminder_count"], 1)
+        with patch.object(cli, "agent_observations", side_effect=lambda _: {agent: {"status": "active"}}):
+            current = cli.status(self.store, types.SimpleNamespace(task=task))
+        self.assertEqual(current["status"], "working")
+        self.assertEqual(current["wake_reminder_count"], 0)
+
+    def test_task_state_refresh_and_reminder_accounting(self):
+        base = {"status": "pending", "agent": "worker", "jobs": [], "wake_reminder_count": 2}
+        unknown, old, new = task_state.refresh_state(base, {"status": "unknown"})
+        self.assertEqual((old, new, unknown["status"]), ("pending", "pending", "pending"))
+        self.assertEqual(unknown["wake_reminder_count"], 2)
+        not_loaded, _, _ = task_state.refresh_state(
+            {"status": "working", "agent": "worker", "jobs": [], "wake_reminder_count": 1},
+            {"status": "notLoaded"},
+        )
+        self.assertEqual((not_loaded["status"], not_loaded["wake_reminder_count"]), ("working", 1))
+        resumed, _, _ = task_state.refresh_state(
+            {"status": "blocked", "agent": "worker", "jobs": [], "wake_reminder_count": 2},
+            {"status": "active"},
+        )
+        self.assertEqual((resumed["status"], resumed["wake_reminder_count"]), ("working", 0))
+        active, _, _ = task_state.refresh_state(unknown, {"status": "active"})
+        self.assertEqual(active["status"], "working")
+        self.assertEqual(active["wake_reminder_count"], 0)
+        for expected in ("working", "working", "working"):
+            active, accepted = task_state.record_reminder(active, expected)
+            self.assertTrue(accepted)
+        active, accepted = task_state.record_reminder(active, "working")
+        self.assertFalse(accepted)
+        self.assertEqual(task_state.reminder_count(active), 3)
+        self.assertEqual(task_state.refresh_state(active, {"status": "active"})[0]["wake_reminder_count"], 3)
+        with_job = {"status": "pending", "agent": None, "jobs": [{"status": "exited"}]}
+        self.assertEqual(task_state.refresh_state(with_job, None)[0]["status"], "working")
+        archived = {"status": "archived", "agent": "worker", "jobs": [{"status": "running"}]}
+        self.assertEqual(task_state.refresh_state(archived, {"status": "active"})[0]["status"], "archived")
+
+    def test_report_refuses_unarchived_jobs(self):
+        task = self.task()
+        data = self.store.read(task)
+        data["jobs"] = [{"id": "unknown-job", "status": "unknown"}]
+        self.store.write(data)
+        self.store.doc(task, "report").write_text("Results are ready.\n")
+        denied = self.call("report", task, ok=False)
+        self.assertIn("unarchived registered jobs: unknown-job", denied["error"])
+        self.assertEqual(self.store.read(task)["status"], "working")
 
 
 if __name__ == "__main__":
