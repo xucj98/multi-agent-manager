@@ -44,7 +44,9 @@ mam workspace add TASK-ID --repo mam-dev --base main
 
 测试自行创建临时仓库和数据，使用模拟 Codex 接口，覆盖命令、状态处理和迁移用例。每次代码修改后运行相关测试，交付前运行完整测试集。
 
-提交代码、发布 report 后，由 Manager 验收并裁决 review 意见，再合入开发库的 `main`。Manager 编写规划和核心文档可直接修改该库。任务派发与收尾见 [README](../README.md#任务管理)。
+提交代码、发布 report 后，由 Manager 验收并裁决 review 意见。Subagent 负责合入准备，包括必要的 `main` 同步、冲突处理和验证，使 Manager 可直接合入；同步时机和验证范围按改动影响确定。验收采用的代码由 Manager 合入开发库的 `main`。
+
+Manager 编写规划和核心文档可直接修改该库。通用交付流程见 [README](../README.md#执行与交付)，本项目的成果留存与归档要求见[项目说明](../.local/README.md#本项目收尾规则)。
 
 ## 发版集成测试（待开发）
 
