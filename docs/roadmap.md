@@ -7,7 +7,8 @@
 | 编号 | 任务 | 要做什么 |
 | --- | --- | --- |
 | 11 | [版本发布与升级](development.md#版本与发版待开发) | 提供程序安装、实例升级、按版本创建 `mam-test` 和一键集成测试；每版附版本说明、升级适配说明与迁移脚本。 |
-| 5 | [job 提交](commands/job.md#待开发) | 用 `mam job submit --command` 一次完成登记与启动，返回 JOB-ID。 |
-| 6 | [跨集群同步](commands/workspace.md#跨集群同步) | 同步任务的 worktree 和指定文件，支持远端运行及结果取回。 |
-| 7 | [GPU 排队](commands/job.md#待开发) | 为 job 指定 GPU 数量、空闲显存和平均利用率条件，在当前实例内排队启动。 |
+| 12 | [任务状态与提醒规则](designs/wakeup.md) | 根据 agent/job 运行情况自动更新任务状态，增加阻塞与提醒上限，按当前状态生成自动提醒，统一消息格式。 |
+| 5 | [job 提交](designs/job.md#待开发) | 用 `mam job submit --command` 一次完成登记与启动，返回 JOB-ID。 |
+| 6 | [跨集群同步](designs/workspace.md#跨集群同步) | 同步任务的 worktree 和指定文件，支持远端运行及结果取回。 |
+| 7 | [GPU 排队](designs/job.md#待开发) | 为 job 指定 GPU 数量、空闲显存和平均利用率条件，在当前实例内排队启动。 |
 | 10 | Token 用量与优化 | 按用途统计 cache input、no-cache input、output 和费用，区分 272k 上下文价格；减少无效轮询、空操作和重复读取，比较优化前后的用量。 |

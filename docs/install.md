@@ -70,7 +70,7 @@ mam service status
 4. 各个实例按 `docs/upgrades/VERSION.md` 适配、验证配置及 hooks。
 5. 各个实例运行 `mam service start` 和 `mam service status` 启动 service 并确认。
 
-详细说明见 [install.sh](commands/install.md) 和 [mam service upgrade](commands/service.md#实例升级待开发)。
+详细说明见 [install.sh](designs/install.md) 和 [mam service upgrade](designs/service.md#实例升级待开发)。
 
 ## 项目 hooks
 

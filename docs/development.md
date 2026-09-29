@@ -44,7 +44,9 @@ mam workspace add TASK-ID --repo mam-dev --base main
 
 测试自行创建临时仓库和数据，使用模拟 Codex 接口，覆盖命令、状态处理和迁移用例。每次代码修改后运行相关测试，交付前运行完整测试集。
 
-提交代码、发布 report 后，由 Manager 验收并裁决 review 意见，再合入开发库的 `main`。Manager 编写规划和核心文档可直接修改该库。任务派发与收尾见 [README](../README.md#任务管理)。
+提交代码、发布 report 后，由 Manager 验收并裁决 review 意见。Subagent 负责合入准备，包括必要的 `main` 同步、冲突处理和验证，使 Manager 可直接合入；同步时机和验证范围按改动影响确定。验收采用的代码由 Manager 合入开发库的 `main`。
+
+Manager 编写规划和核心文档可直接修改该库。通用交付流程见 [README](../README.md#执行与交付)，本项目的成果留存与归档要求见[项目说明](../.local/README.md#本项目收尾规则)。
 
 ## 发版集成测试（待开发）
 
@@ -136,7 +138,7 @@ MAM 从当前目录向上查找 `.mam/env.json`，因此这里使用 `mam-test` 
 - `README.md`、`AGENTS.md` 面向日常使用；`install.md` 面向安装配置；本页面向开发。
 - 已有明确名称的对象直接使用原名，如 `MAM_BRANCH`、`install.sh`；中文用于解释用途。
 - roadmap 只列任务和要做什么。
-- `docs/commands/` 帮助使用者深入理解 MAM 的行为和设计思考，也帮助开发者在不阅读源码的情况下了解系统整体。内容包括接口用法和设计说明，保持通俗简洁，不涉及具体实现细节。
+- `docs/designs/` 帮助使用者深入理解 MAM 的行为和设计思考，也帮助开发者在不阅读源码的情况下了解系统整体。内容包括接口用法和设计说明，保持通俗简洁，不涉及具体实现细节。
 - 环境专属说明写入项目 `.local/README.md`，公共文档适用于各部署环境。
 
 ## 版本与发版（待开发）
@@ -155,9 +157,9 @@ MAM 从当前目录向上查找 `.mam/env.json`，因此这里使用 `mam-test` 
 
 版本说明回答“本版改了什么”，升级适配说明回答“项目需要做什么”。跨多个版本升级时，按顺序阅读各版适配说明；项目 hooks 仍由各项目负责调整。
 
-实例的数据版本与 service 状态结构版本分别记录。迁移规则见 [mam service upgrade](commands/service.md#实例升级待开发)，操作流程见[安装说明](install.md#更新待开发)。保留固定的 0.1.0 程序与生成脚本作为首个测试基线。
+实例的数据版本与 service 状态结构版本分别记录。迁移规则见 [mam service upgrade](designs/service.md#实例升级待开发)，操作流程见[安装说明](install.md#更新待开发)。保留固定的 0.1.0 程序与生成脚本作为首个测试基线。
 
-日常测试和[发版集成测试](#发版集成测试待开发)通过后发布。安装阶段的测试与结果说明见 [install.sh](commands/install.md#安装与测试)。
+日常测试和[发版集成测试](#发版集成测试待开发)通过后发布。安装阶段的测试与结果说明见 [install.sh](designs/install.md#安装与测试)。
 
 ## 单实例固定版本试用
 
