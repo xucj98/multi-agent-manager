@@ -2,7 +2,7 @@
 
 ## 核心原则
 
-MAM 是 multi-agent 项目管理工具。使用细节可查阅 `mam --help` 或[接口文档](docs/commands/)，语法中的大写词需要替换为实际值，`[]` 表示可选，`|` 表示任选其一，`$` 表示环境变量。本文说明 MAM 通用流程；项目的文档、实验记录、产物留存和代码合并要求写在[项目说明](.local/README.md)或各 REPO 的 README.md、AGENTS.md。
+MAM 是 multi-agent 项目管理工具。使用细节可查阅 `mam --help` 或[设计文档](docs/designs/)，语法中的大写词需要替换为实际值，`[]` 表示可选，`|` 表示任选其一，`$` 表示环境变量。本文说明 MAM 通用流程；项目具体要求写在[项目说明](.local/README.md)或各 REPO 的 README.md、AGENTS.md。
 
 项目的目录结构如下：
 
@@ -48,19 +48,21 @@ Manager 无关联任务的临时文件统一放在 `PROJECT_ROOT/workspace/tmp/`
 
 ## 任务管理
 
-Manager 先创建任务、填写并发布要求，再通过 Codex 原生工具创建 subagent，提供 TASK-ID 并要求其阅读 AGENTS.md 和已发布任务。执行者自行登记；完成后由 Manager 验收、安排 review 或归档。
+Manager 先创建任务、填写并发布要求，再通过 Codex 原生工具创建 subagent，提供 TASK-ID 并要求其阅读 AGENTS.md 和已发布任务。完成后由 Manager 验收、安排 review、设置 block 或归档。
 
 ```text
 mam task create --title TITLE [--review TASK-ID|AGENT-PATH]
 mam task publish TASK-ID|AGENT-PATH
 mam task archive TASK-ID|AGENT-PATH --note NOTE [--force]
+mam task block TASK-ID|AGENT-PATH --note NOTE
 ```
 
 - `create` 返回 TASK-ID；在 `.tasks/TASK-ID/task.md` 写明目标、范围、交付和验收要求。
-- 途中追加要求时，先更新并发布 task.md，再通知执行者读取。执行者和 reviewer 始终以最新已发布要求为准；report 无需绑定要求版本。
-- Review 任务用 `--review TASK-ID|AGENT-PATH` 指定源任务，结合最新 task.md、report.md 和交付代码独立验收。
-- 返工时通知原执行者调用 `mam task start` 后继续；需要换人时，先确认旧执行者已结束 turn，再让新执行者 `mam task start TASK-ID` 接手。原 workspace、分支、环境和 job 保留，无需再次创建。
-- 交付后的验收、留存和归档按[任务收尾](#任务收尾)完成。
+- 途中追加要求时，先更新并发布 task.md，再通知执行者读取。
+- Review 任务用 `--review TASK-ID|AGENT-PATH` 指定源任务，结合 task.md、report.md 和交付代码独立验收。
+- 返工或收尾需补充工作时，通知原执行者继续；需要换人时，让新执行者 `mam task start TASK-ID` 接手。
+- 交付后由 Manager [验收](#验收)，通过后进入[任务收尾](#任务收尾)。
+- 需要暂缓处理时，例如等待用户裁决，由 Manager 设置 `blocked`。
 
 查看已有任务、进程及一个任务的详情：
 
@@ -71,22 +73,21 @@ mam task status [TASK-ID|AGENT-PATH]
 mam task show [TASK-ID|AGENT-PATH]
 ```
 
-`mam task status` 显示已保存的 job 观测，不会实时探测。
-
 ## 执行与交付
+
+任务按执行、报告、验收、收尾推进；各阶段的交付、验证与合入要求由项目约定。
 
 ### 开始任务
 
-Subagent 先登记任务，再读取已发布要求，然后根据需要创建 worktree：
+Subagent 首次接手时登记身份，再读取已发布要求，然后根据需要创建 worktree：
 
 ```text
-mam task start TASK-ID                       # 登记任务
+mam task start TASK-ID                       # 登记身份
 mam task show [TASK-ID|AGENT-PATH]           # 显示任务
 mam workspace add --repo REPO --base COMMIT  # 创建 worktree
 ```
 
 - Subagent 查看自己任务时可不提供 `TASK-ID|AGENT-PATH`，MAM 从 `$CODEX_THREAD_ID` 自动确认身份。
-- 返工时也要调用 `mam task start`，任务进入 working；发布 report 后进入 pending，归档后为 archived。普通问答无需 start。
 
 ### 向 Manager 发消息
 
@@ -98,27 +99,36 @@ mam message send --message TEXT [--immediate]
 
 默认在 Manager 空闲时唤醒并投递；加 `--immediate` 可投递到正在执行的 turn。
 
+### 更新进展
+
+Subagent 执行任务过程中应及时更新任务进度，如 job 开始或归档。直接修改 `workspace/TASK-ID/.task/report.md` 草稿，记录当前进展，无需提交报告。Manager 可读取草稿了解进度；`mam task show --file report` 只返回已发布。
+
 ### 报告结果
 
-Subagent 执行任务过程中应及时更新任务进度。直接修改 `workspace/TASK-ID/.task/report.md` 草稿，简洁记录当前进展，中间结果无需发布。Manager 可读取草稿了解进度；`mam task show --file report` 只返回已发布。
+Subagent 在发布报告前完成交付准备：
 
-完成后按[文件留存原则](#文件留存原则)整理成果，并在各 worktree 中用 `git commit` 提交代码。编辑 `workspace/TASK-ID/.task/report.md`，说明完成项、交付 commit、验证结果和成果位置；需要保留的一次性附件放 `.task/files/`。发布前将进度草稿整理为交付简报，再提交报告和附件：
+1. 完成任务和相关文档更新，按[文件留存原则](#文件留存原则)和项目要求整理文件，并整理干净 worktree。
+2. 将 `workspace/TASK-ID/.task/report.md` 的进度草稿整理为结果报告，说明完成项、交付 commit、实际验证的版本与结果、成果位置及未解决问题。
+
+发布报告和附件：
 
 ```text
 mam task report
 ```
 
-report 在同一次提交中发布报告及 `.task/files/` 的新增、修改和删除。
+### 验收
+
+Manager 对照最新 task.md 检查报告和交付版本，可派遣 reviewer 独立验收，明确通过、返工、暂缓或舍弃的结论。返工由 subagent 处理并重新报告；通过或决定舍弃后进入收尾。
 
 ### 任务收尾
 
-1. 执行者整理代码和产物，同步相关文档；需保留的文件按[文件留存原则](#文件留存原则)、具体项目和代码库要求处理。报告说明结果、验证方法、未解决问题和产物位置，让接手者不依赖原对话也能理解。
-2. 确认全部 job 已归档。job 的逐次收尾见[进程管理](#进程管理)，不能留到 task 归档时一并处理。
-3. 执行者按项目要求提交需保留的代码，发布附件和最终 report；Manager 按最新 task.md 验收，需要时独立 review，并对 review 结论作出裁决。返工继续原任务。
-4. Manager 按项目规则确认成果去向，再调用 `mam task archive TASK-ID|AGENT-PATH --note NOTE`。归档只检查全部 job 已归档、`.tasks/TASK-ID/` 下 Git 干净、项目归档 hook 通过（没有则跳过）。通过后清理 worktree 登记、任务分支和整个 workspace，含 ignored 内容；须提前保存成果，中央任务记录和软链接目标保留。
-5. Manager 核对归档结果，确认任务已归档、工作目录和分支已清理。失败时按提示处理后重试；阶段结束时也检查自己的 workspace/tmp，将必要内容转存后清理其余文件。
+收尾由 Manager 组织，subagent 按需处理冲突、补充验证和整理成果，使代码交付可由 Manager 直接合入。
 
-执行者默认应先整理干净 worktree。归档使用 `git worktree remove` 和 `git branch -d`；明确舍弃剩余改动或未合并代码时，`--force` 改用 `git worktree remove --force` 和 `git branch -D`，不跳过上述归档条件。详见 [mam task](docs/commands/task.md#附件与归档)。
+1. Manager 按项目要求，将成果合入目标分支，通过 ref/tag 保留或明确舍弃。
+2. 确认最终报告及必要附件已发布，调用 `mam task archive TASK-ID|AGENT-PATH --note NOTE` 归档任务及关联 review；归档说明记录结论和成果去向。
+3. 核对任务归档及 worktree、分支、workspace 的清理结果，并整理 Manager 本次工作的临时文件。
+
+归档会删除整个 workspace，包括 ignored 内容；`.tasks/TASK-ID/report.md`和软链接目标保留。成果已另行留存或明确舍弃时，可用 `--force`；条件与清理范围见 [mam task](docs/designs/task.md#附件与归档)。
 
 ## 进程管理
 
@@ -134,34 +144,18 @@ mam job archive JOB-ID --note NOTE
 - HOST 可以使用 ssh 别名或 username@hostname。
 - list 省略 `--task` 时显示所有任务中未归档的 job；已绑定执行者登记 job 时可省略任务参数。
 
-job 状态包括 `running`、`exited`、`unknown`、`archived`；exited 表示进程已退出，unknown 表示暂时无法确认。进程退出后，Manager 收到转发通知时，通知对应执行者检查结果、按项目要求更新文档或实验记录，再归档该 job。原生转发方式见[自动唤醒](#自动唤醒)。
+进程退出后，所属执行者检查结果、按项目要求更新文档或实验记录，再归档 job。
 
-一个任务可以多次启动、处理和归档 job；全部 job 已归档、任务成果验收完成后，才进行一次最终 task 归档。`mam job archive` 只结束 MAM 跟踪并保留记录，不停止进程；也可用于明确不再跟踪的运行中进程。
-
-拟议接口为 `mam job submit [TASK-ID|AGENT-PATH] --command COMMAND`，一次完成登记与启动；已绑定执行者可省略任务参数，Manager 可用协作路径定位任务。详见 [mam job](docs/commands/job.md#待开发)。
+`mam job archive` 结束 MAM 跟踪并保留记录，不停止进程；也可用于明确不再跟踪的运行中进程。接口与状态定义见 [mam job](docs/designs/job.md)。
 
 ## 自动唤醒
 
-当前可执行的工作处理完后，正常结束 turn。已登记的长进程可以继续运行，MAM 会在需要处理后续工作时唤醒负责人，无需调用等待命令或定时查询状态。
-
-- 有未归档的 exited job：由执行者按任务要求处理并归档。
-- 原任务与关联的未归档 review 中，任一执行者 active 或有 running job：等待执行推进。
-- 原任务与关联 review 都空闲：提醒 Manager 检查报告，安排继续执行、review 或归档。Manager 再次空闲时，仍需处理的待办会继续提醒。
-
-自动提醒在负责人空闲时合并投递。服务的启动、停止和故障处理见[安装说明](docs/install.md)，查看当前服务状态使用：
-
-```text
-mam service status
-```
-
-原生 subagent 无法直接唤醒时，MAM 通知 Manager 转发。Manager 按通知中的执行者路径调用 `followup_task`，要求检查指定 job 的结果、按最新 task.md 继续工作并归档 job。通知通过 TASK-ID 定位时，先查看任务并确认执行者；需要换人则按任务接续流程处理。消息格式见 [mam service](docs/commands/service.md#消息与状态输出)。
-
-新 Manager 接管本实例时，在旧 Manager 已结束 turn 后调用 `mam service rebind-manager --note NOTE`。任务和工作目录保留，后续 Manager 通知发给接管者；Codex 原生父子关系不变，旧树执行者仍需通过 TASK-ID 定位，或交给新 subagent 接手。
+当前可执行的工作处理完后，正常结束 turn。已登记的长进程可以继续运行，MAM 会在需要时唤醒负责人，无需调用等待命令或轮询。具体设计见[自动唤醒设计](docs/designs/wakeup.md)。
 
 ## MAM 开发指南
 
 MAM 自身的开发 worktree、环境、验证和合并步骤见[MAM 开发指南](docs/development.md)。
 
-## MAM 接口说明
+## MAM 设计说明
 
-各命令的参数、返回内容和使用约束见 [mam task](docs/commands/task.md)、[mam job](docs/commands/job.md)、[mam message](docs/commands/message.md)、[mam service](docs/commands/service.md)、[mam workspace](docs/commands/workspace.md)。各页的“待开发”部分为拟议接口，后续任务见 [roadmap](docs/roadmap.md)。
+接口与行为设计见 [mam task](docs/designs/task.md)、[mam job](docs/designs/job.md)、[mam message](docs/designs/message.md)、[mam service](docs/designs/service.md)、[mam workspace](docs/designs/workspace.md) 和[自动唤醒](docs/designs/wakeup.md)。各页的“待开发”部分为拟议设计，后续任务见 [roadmap](docs/roadmap.md)。
