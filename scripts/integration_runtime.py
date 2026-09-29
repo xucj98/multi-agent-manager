@@ -243,7 +243,11 @@ class ControlledCodexEndpoint:
                 message = json.loads(payload.decode("utf-8"))
                 if isinstance(message, Mapping):
                     self._handle(connection, dict(message))
-        except (OSError, ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        except OSError as exc:
+            if not self._closed.is_set() and str(exc) != "App Server fixture connection closed":
+                with self._lock:
+                    self._server_errors.append(str(exc))
+        except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             if not self._closed.is_set():
                 with self._lock:
                     self._server_errors.append(str(exc))
