@@ -2,7 +2,7 @@
 
 ## 核心原则
 
-MAM 是 multi-agent 项目管理工具。使用细节可查阅 `mam --help` 或[接口文档](docs/commands/)，语法中的大写词需要替换为实际值，`[]` 表示可选，`|` 表示任选其一，`$` 表示环境变量。本文说明 MAM 通用流程；项目的文档、实验记录、产物留存和代码合并要求写在[项目说明](.local/README.md)或各 REPO 的 README.md、AGENTS.md。
+MAM 是 multi-agent 项目管理工具。使用细节可查阅 `mam --help` 或[接口文档](docs/designs/)，语法中的大写词需要替换为实际值，`[]` 表示可选，`|` 表示任选其一，`$` 表示环境变量。本文说明 MAM 通用流程；项目的文档、实验记录、产物留存和代码合并要求写在[项目说明](.local/README.md)或各 REPO 的 README.md、AGENTS.md。
 
 项目的目录结构如下：
 
@@ -118,7 +118,7 @@ report 在同一次提交中发布报告及 `.task/files/` 的新增、修改和
 4. Manager 按项目规则确认成果去向，再调用 `mam task archive TASK-ID|AGENT-PATH --note NOTE`。归档只检查全部 job 已归档、`.tasks/TASK-ID/` 下 Git 干净、项目归档 hook 通过（没有则跳过）。通过后清理 worktree 登记、任务分支和整个 workspace，含 ignored 内容；须提前保存成果，中央任务记录和软链接目标保留。
 5. Manager 核对归档结果，确认任务已归档、工作目录和分支已清理。失败时按提示处理后重试；阶段结束时也检查自己的 workspace/tmp，将必要内容转存后清理其余文件。
 
-执行者默认应先整理干净 worktree。归档使用 `git worktree remove` 和 `git branch -d`；明确舍弃剩余改动或未合并代码时，`--force` 改用 `git worktree remove --force` 和 `git branch -D`，不跳过上述归档条件。详见 [mam task](docs/commands/task.md#附件与归档)。
+执行者默认应先整理干净 worktree。归档使用 `git worktree remove` 和 `git branch -d`；明确舍弃剩余改动或未合并代码时，`--force` 改用 `git worktree remove --force` 和 `git branch -D`，不跳过上述归档条件。详见 [mam task](docs/designs/task.md#附件与归档)。
 
 ## 进程管理
 
@@ -138,7 +138,7 @@ job 状态包括 `running`、`exited`、`unknown`、`archived`；exited 表示�
 
 一个任务可以多次启动、处理和归档 job；全部 job 已归档、任务成果验收完成后，才进行一次最终 task 归档。`mam job archive` 只结束 MAM 跟踪并保留记录，不停止进程；也可用于明确不再跟踪的运行中进程。
 
-拟议接口为 `mam job submit [TASK-ID|AGENT-PATH] --command COMMAND`，一次完成登记与启动；已绑定执行者可省略任务参数，Manager 可用协作路径定位任务。详见 [mam job](docs/commands/job.md#待开发)。
+拟议接口为 `mam job submit [TASK-ID|AGENT-PATH] --command COMMAND`，一次完成登记与启动；已绑定执行者可省略任务参数，Manager 可用协作路径定位任务。详见 [mam job](docs/designs/job.md#待开发)。
 
 ## 自动唤醒
 
@@ -154,7 +154,7 @@ job 状态包括 `running`、`exited`、`unknown`、`archived`；exited 表示�
 mam service status
 ```
 
-原生 subagent 无法直接唤醒时，MAM 通知 Manager 转发。Manager 按通知中的执行者路径调用 `followup_task`，要求检查指定 job 的结果、按最新 task.md 继续工作并归档 job。通知通过 TASK-ID 定位时，先查看任务并确认执行者；需要换人则按任务接续流程处理。消息格式见 [mam service](docs/commands/service.md#消息与状态输出)。
+原生 subagent 无法直接唤醒时，MAM 通知 Manager 转发。Manager 按通知中的执行者路径调用 `followup_task`，要求检查指定 job 的结果、按最新 task.md 继续工作并归档 job。通知通过 TASK-ID 定位时，先查看任务并确认执行者；需要换人则按任务接续流程处理。消息格式见 [mam service](docs/designs/service.md#消息与状态输出)。
 
 新 Manager 接管本实例时，在旧 Manager 已结束 turn 后调用 `mam service rebind-manager --note NOTE`。任务和工作目录保留，后续 Manager 通知发给接管者；Codex 原生父子关系不变，旧树执行者仍需通过 TASK-ID 定位，或交给新 subagent 接手。
 
@@ -164,4 +164,4 @@ MAM 自身的开发 worktree、环境、验证和合并步骤见[MAM 开发指�
 
 ## MAM 接口说明
 
-各命令的参数、返回内容和使用约束见 [mam task](docs/commands/task.md)、[mam job](docs/commands/job.md)、[mam message](docs/commands/message.md)、[mam service](docs/commands/service.md)、[mam workspace](docs/commands/workspace.md)。各页的“待开发”部分为拟议接口，后续任务见 [roadmap](docs/roadmap.md)。
+各命令的参数、返回内容和使用约束见 [mam task](docs/designs/task.md)、[mam job](docs/designs/job.md)、[mam message](docs/designs/message.md)、[mam service](docs/designs/service.md)、[mam workspace](docs/designs/workspace.md)。各页的“待开发”部分为拟议接口，后续任务见 [roadmap](docs/roadmap.md)。
