@@ -1236,12 +1236,15 @@ def task_block(store, args):
     with store.lock(args.task):
         data = store.read(args.task, writable=True)
         observations = agent_observations([data["agent"]] if data.get("agent") else [])
-        updated, _, _ = refresh_state(data, agent_state(data.get("agent"), observations))
+        executor_state = agent_state(data.get("agent"), observations)
+        updated, _, _ = refresh_state(data, executor_state)
         if updated != data:
             data = updated
             store.write(data)
         if data.get("status") != "pending":
             raise Error("task block requires a pending task")
+        if data.get("agent") and executor_state.get("status") != "idle":
+            raise Error("task block requires a confirmed idle executor")
         data = set_blocked(data, args.note.strip())
         store.write(data)
     return {"id": args.task, "status": data["status"], "block_note": data["block_note"],

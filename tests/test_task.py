@@ -2071,8 +2071,17 @@ Path(context['task']['task_dir'], 'task.md').write_text('changed during hook')
         self.assertEqual(result["status"], "blocked")
         self.assertEqual(result["block_note"], "waiting on decision")
         data = self.store.read(task)
-        data["status"] = "working"
+        data["status"] = "pending"
         data["agent"] = "worker"
+        self.store.write(data)
+        with patch.object(cli, "caller_agent", return_value=manager), \
+             patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(manager, "/root", manager)), \
+             patch.object(wake_runtime, "resolve_manager", return_value=manager), \
+             patch.object(cli, "agent_observations", return_value={"worker": {"status": "unknown"}}), \
+             self.assertRaisesRegex(cli.Error, "requires a confirmed idle executor"):
+            cli.task_block(self.store, args)
+        self.assertEqual(self.store.read(task)["status"], "pending")
+        data["status"] = "working"
         self.store.write(data)
         with patch.object(cli, "caller_agent", return_value=manager), \
              patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(manager, "/root", manager)), \
