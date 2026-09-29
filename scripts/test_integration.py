@@ -533,6 +533,19 @@ def install_candidate(
     return launcher, {"status": "passed", "kind": "real-codex-delivery"}
 
 
+def installer_runtime_environment(
+    runtimes: list[RuntimeHarness], instances: list[tuple[Path, dict[str, Any]]]
+) -> dict[str, str] | None:
+    """Use the private App Server during install only when explicitly requested."""
+
+    if os.environ.get("MAM_INTEGRATION_RUNTIME") != "controlled":
+        return None
+    return {
+        **runtimes[0].env,
+        "CODEX_THREAD_ID": instances[0][1]["fixture"]["worker"],
+    }
+
+
 def verify_installed_candidate(install_root: Path, expected_version: str, expected_commit: str, log: Path) -> dict[str, str]:
     interpreters = sorted((install_root / "pipx" / "venvs").glob("*/bin/python"))
     if len(interpreters) != 1:
@@ -666,10 +679,7 @@ def integration(
         outcome["scenarios"].append({"name": "target-commit-missing-before-upgrade", "status": "passed", "instance": instances[0][0].name})
         install_root = root / "mam-test-install"
         owned.append(install_root)
-        install_env = {
-            **runtimes[0].env,
-            "CODEX_THREAD_ID": instances[0][1]["fixture"]["worker"],
-        }
+        install_env = installer_runtime_environment(runtimes, instances)
         launcher, real_delivery = install_candidate(
             instances, archive, install_root, log, runtime_env=install_env
         )

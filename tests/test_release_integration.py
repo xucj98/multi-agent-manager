@@ -16,6 +16,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseFixtureTests(unittest.TestCase):
+    def test_installer_uses_private_endpoint_only_when_controlled_mode_is_explicit(self):
+        from scripts import test_integration
+
+        runtime = mock.Mock()
+        runtime.env = {"MAM_INTEGRATION_RUNTIME": "controlled", "MAM_APP_SERVER_SOCKET": "/tmp/fixture.sock"}
+        instances = [(Path("/tmp/fixture"), {"fixture": {"worker": "fixture-worker"}})]
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertIsNone(test_integration.installer_runtime_environment([runtime], instances))
+        with mock.patch.dict(os.environ, {"MAM_INTEGRATION_RUNTIME": "controlled"}, clear=True):
+            self.assertEqual(
+                test_integration.installer_runtime_environment([runtime], instances),
+                {**runtime.env, "CODEX_THREAD_ID": "fixture-worker"},
+            )
+
     def test_controlled_archive_install_isolated_from_default_socket_and_not_real_delivery(self):
         from scripts import test_integration
 
