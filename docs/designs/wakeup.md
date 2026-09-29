@@ -1,4 +1,4 @@
-# 自动唤醒设计（待开发）
+# 自动唤醒设计
 
 收件人空闲时，依据当前 task/job 状态即时生成并合并投递自动提醒。`blocked` 和已归档任务不产生自动提醒。
 
@@ -15,6 +15,6 @@ review 只考虑与原任务的直接关联；没有 review 时只检查本任�
 
 每个 task（包括 review）独立保存自动提醒次数，两种类型共用一个计数器，仅在自身状态实际变化时清零。成功发起一次自动唤醒，本次涉及的各 task 分别计一次；同一 task 的多条提醒合并计一次。次数未达上限且当前条件仍成立时，可在收件人再次空闲时提醒。
 
-最后一次在对应条目末尾追加 `Final reminder (N/N) for this round.`，达到上限后停止自动提醒。`mam task status` 展示次数和上限，达到上限时显示 `Reminder limit reached`。上限 N 暂定为 3。
+每轮最多提醒 3 次，最后一次在对应条目末尾追加 `Final reminder (3/3) for this round.`，此后停止自动提醒。`mam task status` 展示次数和上限，达到上限时显示 `Reminder limit reached`。
 
-自动提醒采用统一的[消息格式](service.md#消息格式待开发)。[主动消息](message.md)按发送者提供的正文保存和投递。
+自动提醒采用统一的[消息格式](service.md#消息格式)。[主动消息](message.md)按发送者提供的正文保存和投递。

@@ -57,7 +57,7 @@ mam service set message-channel user
 
 主动消息的发送方式见 [mam message](message.md)。
 
-## 消息格式（待开发）
+## 消息格式
 
 一次投递使用一个 `[MAM MESSAGE]` 总标题。每条消息以 `[类型 | 来源]` 开头，正文另起一行，条目之间空一行；两种投递渠道使用相同格式。
 
