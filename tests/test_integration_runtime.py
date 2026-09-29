@@ -123,8 +123,6 @@ class IntegrationRuntimeTests(unittest.TestCase):
 
     def test_legacy_task_without_identity_uses_exact_task_locator_fallback(self) -> None:
         delivery = self._delivery(locator="task: fixture-task-id")
-        delivery["message"] += "\n\n" + delivery["message"].split("\n\n", 1)[1]
-        delivery["params"]["toolOutput"]["output"] = delivery["message"]
         result = validate_job_notification(
             delivery, self._event(path=None),
             job_id="fixture-job-id", task_id="fixture-task-id", recipient="worker-thread",
@@ -133,6 +131,17 @@ class IntegrationRuntimeTests(unittest.TestCase):
         )
         self.assertIsNone(result["executor_path"])
         self.assertEqual(result["executor_locator"], "task: fixture-task-id")
+
+        duplicate = self._delivery(locator="task: fixture-task-id")
+        duplicate["message"] += "\n\n" + duplicate["message"].split("\n\n", 1)[1]
+        duplicate["params"]["toolOutput"]["output"] = duplicate["message"]
+        with self.assertRaisesRegex(RuntimeIntegrationError, "does not match"):
+            validate_job_notification(
+                duplicate, self._event(path=None),
+                job_id="fixture-job-id", task_id="fixture-task-id", recipient="worker-thread",
+                executor_path=None, allow_task_fallback=True, expected_input_type="tool",
+                current_turn_id="turn-current",
+            )
 
         with self.assertRaisesRegex(RuntimeIntegrationError, "no fixture executor path"):
             validate_job_notification(

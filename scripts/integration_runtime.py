@@ -99,7 +99,7 @@ def validate_job_notification(
     message = notification.get("message")
     if isinstance(message, str) and job_id in message:
         raise RuntimeIntegrationError("job notification unexpectedly exposes a JOB-ID")
-    if not isinstance(message, str) or expected_message not in message:
+    if message != expected_message:
         raise RuntimeIntegrationError("job notification does not match the fixture executor message")
     return {
         "job": job_id,
