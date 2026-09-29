@@ -8,4 +8,3 @@ current commit dynamically.
 RELEASE_VERSION = "0.2.0"
 RELEASE_TAG = "v0.2.0"
 RELEASE_COMMIT = "$Format:%H$"
-
