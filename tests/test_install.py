@@ -94,6 +94,7 @@ class InstallerScriptTests(unittest.TestCase):
             "multi_agent_manager/__init__.py",
             "multi_agent_manager/release.py",
             "multi_agent_manager/job_runtime.py",
+            "multi_agent_manager/task_state.py",
             "multi_agent_manager/wake_compat.py",
             "multi_agent_manager/liveprobe.py",
             "multi_agent_manager/wake_runtime.py",
