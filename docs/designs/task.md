@@ -4,7 +4,7 @@
 
 ## 任务状态
 
-以下为待开发设计。新任务为 `pending`；未归档任务根据执行者和 job 的当前运行情况自动判断 `working`、`pending`。
+新任务为 `pending`；未归档任务根据执行者和 job 的当前运行情况自动判断 `working`、`pending`。
 
 | 状态 | 条件 |
 | --- | --- |
@@ -13,13 +13,13 @@
 | `blocked` | Manager 暂缓处理，停止自动提醒 |
 | `archived` | Manager 完成收尾并调用 `task archive` |
 
-### 任务阻塞（待开发）
+### 任务阻塞
 
 ```text
 mam task block TASK-ID|AGENT-PATH --note NOTE
 ```
 
-`task block` 仅由 Manager 判断和调用，状态时 `pending` 才可设置。`--note` 必填，`task list/status` 展示原因。执行者或 job 开始运行时，`blocked` 自动转为 `working`。
+`task block` 仅由 Manager 判断和调用，状态为 `pending` 才可设置。`--note` 必填，`task list/status` 展示原因。执行者恢复运行或有未归档的 job 时，`blocked` 自动转为 `working`。
 
 ## 创建与开始
 
@@ -38,11 +38,11 @@ Manager 用原生工具创建或通知 subagent。换人前让旧执行者结束
 | `mam task show [TASK-ID\|AGENT-PATH] [--file task\|report] [--json]` | 读取 MAM_BRANCH 当前最新已发布文档，默认 task；不读取草稿，--json 同时返回正文和发布信息。 |
 | `mam task publish TASK-ID\|AGENT-PATH` | Manager 发布任务要求，必须显式指定任务，返回发布 commit。 |
 | `mam task report [TASK-ID\|AGENT-PATH]` | 一起提交报告和 `.task/files/` 附件，返回发布 commit |
-| `mam task status [TASK-ID\|AGENT-PATH]` | 返回任务、执行者、仓库交付、发布记录、草稿提示和保存的 job 观测；不探测 job。拟增加阻塞原因及[提醒次数](wakeup.md#提醒次数)（待开发）。 |
+| `mam task status [TASK-ID\|AGENT-PATH]` | 返回任务、执行者、仓库交付、发布记录、草稿提示、阻塞原因、[提醒次数](wakeup.md#提醒次数)和保存的 job 观测；不探测 job。 |
 
 Manager 编辑 task.md；执行者经 workspace 的 `.task/report.md` 和 `.task/files/` 编辑简报、附件。report 草稿用于记录当前进展，完成交付后再发布。publish 只提交 task.md；report 将报告与附件放入同一个提交，校验失败时不发布。
 
-`task report` 条件（待开发）：任务处于 `working` 或 `pending`，且所属 job 已全部归档。
+`task report` 要求任务处于 `working` 或 `pending`，且所属 job 已全部归档。
 
 附件先整理到 `.task/files/`，report 同步其中的新增、修改、删除和可执行位变化。仅附件变化也会发布；报告和附件均无变化时不创建新 commit。附件仅接受普通文件（包括可执行文件），不接受符号链接。发布保留无关暂存内容和其他草稿。
 
