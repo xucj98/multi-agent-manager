@@ -1,6 +1,6 @@
 # mam service
 
-管理当前 MAM 实例的自动唤醒服务。Agent 完成当前可执行工作后结束 turn，服务在需要后续处理时通知负责人。
+管理当前 MAM 实例的自动唤醒服务。通知条件与次数限制见[自动唤醒设计](wakeup.md)。
 
 ## 接口
 
@@ -34,20 +34,6 @@
 
 任务和 job 保留，长进程继续运行。恢复 daemon 后继续跟踪 job、处理停机期间退出的 job，并保留原有消息和投递记录。`mam service start` 启动时检查 App Server 连接与所需接口；`mam service status` 显示 `mam`、daemon 和数据版本。
 
-## 何时通知
-
-| 情况 | 处理 |
-| --- | --- |
-| 有未归档的 exited job | 通知执行者检查结果并归档 job |
-| 原任务与关联的未归档 review 中，有 active agent 或 running job | 等待执行推进 |
-| 原任务与关联 review 都空闲 | 通知 Manager 检查报告、继续派工、review 或归档 |
-
-自动提醒在负责人空闲时投递。每次按当前任务、job 和 review 状态判断并合批；Manager 再次空闲时，尚待处理的事项继续提醒。原任务与 review 双向关联，同一 review 可以接续多轮返工。exited job 始终保留收尾待办。
-
-用户暂停或中断的 turn 等待用户恢复；状态无法确认时保留诊断，待确认后处理。
-
-通知以 `[MAM Message]` 开头，给出相关任务或执行者、job 及下一步动作。
-
 ## 状态与故障处理
 
 | status | 含义 |
@@ -60,8 +46,6 @@
 
 `running` 和 `healthy` 描述服务自身；有这些标志仍可能存在未投递的待办。
 
-某些 subagent 不接受直接唤醒时，服务会通知 Manager 协调。Manager 先查看执行者状态和 report，确认尚未处理后，通过原生 follow-up 通知执行者收尾。服务状态中的 blocked 待办会保留，直到对应工作被处理。
-
 ## 消息渠道
 
 ```text
@@ -71,20 +55,27 @@ mam service set message-channel user
 
 默认 `tool`，以工具输出投递；`user` 以可见的用户消息投递，便于验收。设置作用于本实例全部 MAM 消息，运行中的服务无需重启，重启后继续沿用。`mam service status` 的 `message_channel` 显示当前选择。
 
-执行者使用 [mam message](message.md) 发送消息，默认在 Manager 空闲时投递；加 `--immediate` 可投递到当前 turn。
+主动消息的发送方式见 [mam message](message.md)。
 
-## 消息与状态输出
+## 消息格式（待开发）
 
-通知优先使用当前 Manager 可用的执行者路径；其他任务用 TASK-ID 定位。Manager 转发 job 消息示例：
+一次投递使用一个 `[MAM MESSAGE]` 总标题。每条消息以 `[类型 | 来源]` 开头，正文另起一行，条目之间空一行；两种投递渠道使用相同格式。
 
-```text
-[MAM Message]
-/root/worker: job JOB-ID has exited. Use followup_task to ask the executor to check the result and archive the job.
-```
-
-执行者结束当前工作后的通知示例：
+消息共三类：`message` 为主动消息，来源是发送者；`job exited` 为进程退出通知，`task pending` 为任务待处理提醒，来源均为对应任务的执行者。
 
 ```text
-[MAM Message]
-/root/worker needs follow-up. Check the report; continue the work, request review, or archive the task.
+[MAM MESSAGE]
+
+[message | /root/worker]
+我已完成迁移并发布报告，请检查。
+
+[job exited | /root/trainer]
+There are exited jobs. Ask the executor to check the results and archive them.
+
+[task pending | /root/reviewer]
+Check the task and any published report; start or continue the work, request review, block or archive the task.
 ```
+
+固定提示使用英文，主动消息保留发送者的正文。job 直接通知执行者时，正文为 `There are exited jobs. Check the results and archive them.`；需要 Manager 转发时使用上例。具体 job 由执行者通过 `mam job list --task TASK-ID` 查询。
+
+来源优先显示当前 Manager 可识别的 `AGENT-PATH`；缺少路径时，主动消息显示 `agent: AGENT-ID`，自动提醒显示 `task: TASK-ID`。
