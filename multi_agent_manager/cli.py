@@ -1220,7 +1220,7 @@ def task_list(store, args):
 
 def task_block(store, args):
     from . import wake_runtime
-    from .task_state import refresh_state, set_blocked
+    from .task_state import confirmed_idle, refresh_state, set_blocked
     caller = caller_agent()
     try:
         manager = wake_runtime.resolve_manager(store)
@@ -1243,7 +1243,7 @@ def task_block(store, args):
             store.write(data)
         if data.get("status") != "pending":
             raise Error("task block requires a pending task")
-        if data.get("agent") and executor_state.get("status") != "idle":
+        if data.get("agent") and not confirmed_idle(executor_state):
             raise Error("task block requires a confirmed idle executor")
         data = set_blocked(data, args.note.strip())
         store.write(data)
