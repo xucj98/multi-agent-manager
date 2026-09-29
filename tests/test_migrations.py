@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from multi_agent_manager import migrations
+from multi_agent_manager import migrations, task_state
 
 
 class MigrationTests(unittest.TestCase):
@@ -28,7 +28,9 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(result["to"], "0.2.0")
         self.assertEqual(result["steps"], [{"from": "0.1.0", "to": "0.2.0"}])
         self.assertEqual(migrations.read_data_version(self.root), "0.2.0")
-        self.assertEqual(json.loads(self.record.read_text()), {"id": "kept", "jobs": [{"status": "stopped"}]})
+        old_task = json.loads(self.record.read_text())
+        self.assertEqual(old_task, {"id": "kept", "jobs": [{"status": "stopped"}]})
+        self.assertEqual(task_state.reminder_count(old_task), 0)
         self.assertEqual(migrations.migrate_data(self.root)["steps"], [])
 
     def test_failed_step_does_not_record_destination_and_retry_continues(self):

@@ -2071,6 +2071,7 @@ Path(context['task']['task_dir'], 'task.md').write_text('changed during hook')
         self.assertEqual(result["status"], "blocked")
         self.assertEqual(result["block_note"], "waiting on decision")
         data = self.store.read(task)
+        self.assertEqual(data["wake_reminder_count"], 0)
         data["status"] = "working"
         data["agent"] = "worker"
         self.store.write(data)
@@ -2121,6 +2122,12 @@ Path(context['task']['task_dir'], 'task.md').write_text('changed during hook')
         self.assertEqual(current["wake_reminder_count"], 0)
 
     def test_task_state_refresh_and_reminder_accounting(self):
+        legacy = {"status": "working", "agent": "worker", "jobs": []}
+        self.assertEqual(task_state.reminder_count(legacy), 0)
+        legacy, accepted = task_state.record_reminder(legacy, "working")
+        self.assertTrue(accepted)
+        self.assertEqual(task_state.reminder_count(legacy), 1)
+
         base = {"status": "pending", "agent": "worker", "jobs": [], "wake_reminder_count": 2}
         unknown, old, new = task_state.refresh_state(base, {"status": "unknown"})
         self.assertEqual((old, new, unknown["status"]), ("pending", "pending", "pending"))
