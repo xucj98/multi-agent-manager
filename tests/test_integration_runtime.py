@@ -18,8 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class IntegrationRuntimeTests(unittest.TestCase):
     @staticmethod
-    def _delivery(input_type: str = "tool", *, recipient: str = "worker-thread", turn_id: str = "turn-current") -> dict:
-        message = "[MAM MESSAGE]\n\n[job exited | /root/fixture-worker]\nThere are exited jobs. Check the results and archive them."
+    def _delivery(input_type: str = "tool", *, recipient: str = "worker-thread", turn_id: str = "turn-current", locator: str = "/root/fixture-worker") -> dict:
+        message = f"[MAM MESSAGE]\n\n[job exited | {locator}]\nThere are exited jobs. Check the results and archive them."
         params = {"threadId": recipient}
         if input_type == "tool":
             params.update({"input": [], "toolOutput": {"name": "message", "namespace": "mam", "output": message}})
@@ -28,12 +28,15 @@ class IntegrationRuntimeTests(unittest.TestCase):
         return {"thread_id": recipient, "method": "turn/start", "message": message, "params": params, "turn_id": turn_id}
 
     @staticmethod
-    def _event(*, recipient: str = "worker-thread", path: str = "/root/fixture-worker", turn_id: str = "turn-current") -> dict:
-        return {
+    def _event(*, recipient: str = "worker-thread", path: str | None = "/root/fixture-worker", turn_id: str = "turn-current") -> dict:
+        event = {
             "kind": "job_stopped", "job": "fixture-job-id", "task": "fixture-task-id",
             "executor": recipient, "delivery": "accepted",
-            "recipient": recipient, "executor_path": path, "accepted_turn_id": turn_id,
+            "recipient": recipient, "accepted_turn_id": turn_id,
         }
+        if path is not None:
+            event["executor_path"] = path
+        return event
 
     def test_notification_matches_fixture_thread_path_input_and_current_turn(self) -> None:
         for input_type in ("tool", "user"):
@@ -118,6 +121,55 @@ class IntegrationRuntimeTests(unittest.TestCase):
                 current_turn_id="turn-current",
             )
 
+    def test_legacy_task_without_identity_uses_exact_task_locator_fallback(self) -> None:
+        delivery = self._delivery(locator="task: fixture-task-id")
+        delivery["message"] += "\n\n" + delivery["message"].split("\n\n", 1)[1]
+        delivery["params"]["toolOutput"]["output"] = delivery["message"]
+        result = validate_job_notification(
+            delivery, self._event(path=None),
+            job_id="fixture-job-id", task_id="fixture-task-id", recipient="worker-thread",
+            executor_path=None, allow_task_fallback=True, expected_input_type="tool",
+            current_turn_id="turn-current",
+        )
+        self.assertIsNone(result["executor_path"])
+        self.assertEqual(result["executor_locator"], "task: fixture-task-id")
+
+        with self.assertRaisesRegex(RuntimeIntegrationError, "no fixture executor path"):
+            validate_job_notification(
+                self._delivery(locator="task: fixture-task-id"), self._event(path=None),
+                job_id="fixture-job-id", task_id="fixture-task-id", recipient="worker-thread",
+                executor_path=None, expected_input_type="tool", current_turn_id="turn-current",
+            )
+
+        with self.assertRaisesRegex(RuntimeIntegrationError, "path does not match"):
+            validate_job_notification(
+                self._delivery(locator="task: fixture-task-id"), self._event(),
+                job_id="fixture-job-id", task_id="fixture-task-id", recipient="worker-thread",
+                executor_path=None, allow_task_fallback=True, expected_input_type="tool",
+                current_turn_id="turn-current",
+            )
+
+    def test_missing_identity_is_only_allowed_for_archived_010_fixture(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="mam-integration-missing-identity-") as temporary:
+            instance = Path(temporary) / "instance"
+            task_dir = instance / "multi-agent-manager" / ".local" / "tasks"
+            task_dir.mkdir(parents=True)
+            worker = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+            manager = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            task_id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+            (task_dir / f"{task_id}.json").write_text(
+                json.dumps({"id": task_id, "agent": worker}), encoding="utf-8"
+            )
+            metadata = {"version": "0.2.0", "mam_root": str(task_dir.parents[1]), "fixture": {
+                "manager": manager, "worker": worker, "task": task_id,
+            }}
+            harness = RuntimeHarness(instance, metadata, Path(temporary) / "missing-identity.log")
+            try:
+                with self.assertRaisesRegex(RuntimeIntegrationError, "unique native executor path"):
+                    harness._fixture_executor_path()
+            finally:
+                harness.close()
+
     def _create_old_instance(self, root: Path) -> dict:
         result = subprocess.run(
             [sys.executable, str(ROOT / "scripts" / "create_mam_test.py"), "--version", "0.1.0", "--root", str(root)],
@@ -200,7 +252,8 @@ class IntegrationRuntimeTests(unittest.TestCase):
                 self.assertEqual(evidence["recipient"], metadata["fixture"]["worker"])
                 self.assertEqual(evidence["input_type"], "tool")
                 self.assertEqual(evidence["event"]["accepted_turn_id"], evidence["turn_id"])
-                self.assertTrue(evidence["executor_path"].startswith("/root/"))
+                self.assertIsNone(evidence["executor_path"])
+                self.assertEqual(evidence["executor_locator"], f"task: {metadata['fixture']['task']}")
                 self.assertNotIn(exiting_job, evidence["message"])
                 self.assertTrue(any(item.get("method") == "turn/start" for item in evidence["requests"]))
                 self.assertTrue(evidence["event"]["delivery"] == "accepted")

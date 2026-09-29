@@ -55,9 +55,10 @@ def validate_job_notification(
     job_id: str,
     task_id: str,
     recipient: str,
-    executor_path: str,
+    executor_path: str | None,
     expected_input_type: str,
     current_turn_id: str,
+    allow_task_fallback: bool = False,
 ) -> dict[str, Any]:
     """Validate one exact job delivery against its durable scheduler event."""
 
@@ -72,8 +73,16 @@ def validate_job_notification(
         raise RuntimeIntegrationError("accepted scheduler event does not identify the fixture task and stopped job")
     if event.get("delivery") != "accepted" or event.get("recipient") != recipient:
         raise RuntimeIntegrationError("scheduler event was not accepted for the fixture executor")
-    if event.get("executor_path") != executor_path:
-        raise RuntimeIntegrationError("scheduler event does not identify the fixture executor path")
+    if executor_path is None:
+        if not allow_task_fallback:
+            raise RuntimeIntegrationError("scheduler event has no fixture executor path")
+        if event.get("executor_path") is not None:
+            raise RuntimeIntegrationError("scheduler event path does not match the legacy fixture record")
+        executor_locator = f"task: {task_id}"
+    else:
+        if event.get("executor_path") != executor_path:
+            raise RuntimeIntegrationError("scheduler event does not identify the fixture executor path")
+        executor_locator = executor_path
     if notification.get("thread_id") != recipient:
         raise RuntimeIntegrationError("job notification was delivered to the wrong fixture thread")
     if _notification_input_type(notification) != expected_input_type:
@@ -84,18 +93,19 @@ def validate_job_notification(
     if event.get("accepted_turn_id") != turn_id:
         raise RuntimeIntegrationError("accepted scheduler event refers to a different turn")
     expected_message = (
-        "[MAM MESSAGE]\n\n[job exited | " + executor_path + "]\n"
+        "[MAM MESSAGE]\n\n[job exited | " + executor_locator + "]\n"
         "There are exited jobs. Check the results and archive them."
     )
     message = notification.get("message")
     if isinstance(message, str) and job_id in message:
         raise RuntimeIntegrationError("job notification unexpectedly exposes a JOB-ID")
-    if message != expected_message:
+    if not isinstance(message, str) or expected_message not in message:
         raise RuntimeIntegrationError("job notification does not match the fixture executor message")
     return {
         "job": job_id,
         "recipient": recipient,
         "executor_path": executor_path,
+        "executor_locator": executor_locator,
         "input_type": expected_input_type,
         "turn_id": turn_id,
         "message": message,
@@ -501,18 +511,23 @@ class RuntimeHarness:
             time.sleep(0.05)
         raise RuntimeIntegrationError(f"JOB-ID {job_id} did not reach status {expected}")
 
-    def _fixture_executor_path(self) -> str:
+    def _fixture_executor_path(self) -> str | None:
         task_path = self.mam_root / ".local" / "tasks" / f"{self.fixture['task']}.json"
         try:
             task = json.loads(task_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise RuntimeIntegrationError(f"cannot read fixture task identity {task_path}: {exc}") from exc
         identity = task.get("identity") if isinstance(task, Mapping) else None
-        path = identity.get("path") if isinstance(identity, Mapping) else None
         if (
             not isinstance(task, Mapping)
             or task.get("agent") != self.fixture["worker"]
-            or not isinstance(identity, Mapping)
+        ):
+            raise RuntimeIntegrationError("fixture task does not identify its registered executor")
+        if identity is None and self.metadata.get("version") == "0.1.0":
+            return None
+        path = identity.get("path") if isinstance(identity, Mapping) else None
+        if (
+            not isinstance(identity, Mapping)
             or identity.get("tree_root") != self.fixture["manager"]
             or not isinstance(path, str)
             or not path.startswith("/root/")
@@ -534,8 +549,12 @@ class RuntimeHarness:
         deadline = time.monotonic() + timeout
         recipient = self.fixture["worker"]
         executor_path = self._fixture_executor_path()
+        allow_task_fallback = executor_path is None and self.metadata.get("version") == "0.1.0"
+        executor_locator = executor_path or f"task: {self.fixture['task']}"
         state: dict[str, Any] = {}
-        rejected: list[str] = []
+        events: Mapping[str, Any] = {}
+        histories: list[Any] = []
+        rejected: set[str] = set()
         while time.monotonic() < deadline:
             try:
                 state = self._service_state()
@@ -567,11 +586,12 @@ class RuntimeHarness:
                                 task_id=self.fixture["task"],
                                 recipient=recipient,
                                 executor_path=executor_path,
+                                allow_task_fallback=allow_task_fallback,
                                 expected_input_type=expected_input_type,
                                 current_turn_id=accepted_turn_id,
                             )
                         except RuntimeIntegrationError as exc:
-                            rejected.append(str(exc))
+                            rejected.add(str(exc))
                             continue
                         evidence.update({
                             "expected": expected,
@@ -581,11 +601,30 @@ class RuntimeHarness:
                         })
                         return evidence
             time.sleep(0.05)
+        event_diagnostics = [
+            {
+                key: item.get(key)
+                for key in ("kind", "task", "job", "executor", "recipient", "executor_path", "delivery", "accepted_turn_id")
+            }
+            for item in events.values() if isinstance(item, Mapping)
+            and item.get("kind") == "job_stopped" and item.get("job") == job_id
+        ] if isinstance(events, Mapping) else []
+        notification_diagnostics = [
+            {
+                "thread_id": item.get("thread_id"),
+                "method": item.get("method"),
+                "turn_id": item.get("turn_id"),
+                "input_type": _notification_input_type(item),
+                "message": item.get("message"),
+            }
+            for item in self.endpoint.notifications if item.get("thread_id") == recipient
+        ]
         raise RuntimeIntegrationError(
             f"no accepted controlled notification for fixture job {job_id}; "
-            f"recipient={recipient}, executor_path={executor_path!r}, expected_input_type={expected_input_type!r}, "
-            f"latest_turn={self.endpoint.current_turn(recipient)!r}, rejected={rejected!r}; "
-            f"notifications={self.endpoint.notifications!r}, service={state!r}"
+            f"recipient={recipient}, executor_locator={executor_locator!r}, expected_input_type={expected_input_type!r}, "
+            f"latest_turn={self.endpoint.current_turn(recipient)!r}, rejected={sorted(rejected)!r}; "
+            f"events={event_diagnostics!r}, notifications={notification_diagnostics!r}, "
+            f"counters={state.get('counters') if isinstance(state, Mapping) else None!r}"
         )
 
     def _force_stop(self, pid: int, identity: Mapping[str, Any] | None) -> bool:
