@@ -144,11 +144,11 @@ class FakeStream:
             return
         self.manager_delivery_added = True
         notification = (
-            "[MAM Message]\n"
-            "/root/liveprobe/idle_executor needs follow-up. "
-            "Check the report; continue the work, request review, or archive the task.\n"
-            "/root/liveprobe/archived_executor needs follow-up. "
-            "Check the report; continue the work, request review, or archive the task."
+            "[MAM MESSAGE]\n\n"
+            "[task pending | /root/liveprobe/idle_executor]\n"
+            "Check the task and any published report; start or continue the work, request review, block or archive the task.\n\n"
+            "[task pending | /root/liveprobe/archived_executor]\n"
+            "Check the task and any published report; start or continue the work, request review, block or archive the task."
         )
         self._append_turn(
             THREAD_IDS["manager"],
@@ -165,8 +165,9 @@ class FakeStream:
             THREAD_IDS["job_executor"],
             "turn-job-delivery",
             (
-                "[MAM Message]\n"
-                f"Job {JOB_ID} has exited. Check the result, continue the task, and archive the job."
+                "[MAM MESSAGE]\n\n"
+                "[job exited | /root/liveprobe/job_executor]\n"
+                "There are exited jobs. Check the results and archive them."
             ),
             assistant_text="PROBE_JOB_EXECUTOR_BASELINE_READY",
         )
@@ -346,10 +347,35 @@ class LiveProbeTests(unittest.TestCase):
         self.assertEqual(result["delivery_inputs"]["manager_delivery"]["item_type"], "userMessage")
         self.assertTrue(result["delivery_inputs"]["manager_delivery"]["matched"])
         self.assertEqual(result["delivery_inputs"]["manager_delivery"]["status"], "completed")
-        self.assertIn("/root/liveprobe/idle_executor needs follow-up", result["delivery_inputs"]["manager_delivery"]["text"])
-        self.assertIn("/root/liveprobe/archived_executor needs follow-up", result["delivery_inputs"]["manager_delivery"]["text"])
+        self.assertEqual(result["delivery_inputs"]["manager_delivery"]["thread_id"], THREAD_IDS["manager"])
+        self.assertEqual(
+            result["delivery_inputs"]["manager_delivery"]["turn_id"],
+            result["resources"]["turns"]["manager_ready_delivery"],
+        )
+        self.assertIn(
+            "[task pending | /root/liveprobe/idle_executor]",
+            result["delivery_inputs"]["manager_delivery"]["text"],
+        )
+        self.assertIn(
+            "[task pending | /root/liveprobe/archived_executor]",
+            result["delivery_inputs"]["manager_delivery"]["text"],
+        )
         self.assertEqual(result["delivery_inputs"]["exited_job_delivery"]["item_type"], "userMessage")
-        self.assertIn(JOB_ID, result["delivery_inputs"]["exited_job_delivery"]["text"])
+        self.assertEqual(result["delivery_inputs"]["exited_job_delivery"]["thread_id"], THREAD_IDS["job_executor"])
+        self.assertEqual(
+            result["delivery_inputs"]["exited_job_delivery"]["turn_id"],
+            result["resources"]["turns"]["exited_job_delivery"],
+        )
+        self.assertEqual(result["delivery_inputs"]["exited_job_delivery"]["status"], "completed")
+        self.assertIn(
+            "[job exited | /root/liveprobe/job_executor]",
+            result["delivery_inputs"]["exited_job_delivery"]["text"],
+        )
+        self.assertIn(
+            "There are exited jobs. Check the results and archive them.",
+            result["delivery_inputs"]["exited_job_delivery"]["text"],
+        )
+        self.assertNotIn(JOB_ID, result["delivery_inputs"]["exited_job_delivery"]["text"])
         self.assertEqual(
             result["checks"],
             {
@@ -457,11 +483,11 @@ class LiveProbeTests(unittest.TestCase):
         root = self.base / "fixture-assistant-only"
         evidence_path = self.base / "assistant-only.json"
         notification = (
-            "[MAM Message]\n"
-            "/root/liveprobe/idle_executor needs follow-up. Check the report; continue the work, "
-            "request review, or archive the task.\n"
-            "/root/liveprobe/archived_executor needs follow-up. Check the report; continue the work, "
-            "request review, or archive the task."
+            "[MAM MESSAGE]\n\n"
+            "[task pending | /root/liveprobe/idle_executor]\n"
+            "Check the task and any published report; start or continue the work, request review, block or archive the task.\n\n"
+            "[task pending | /root/liveprobe/archived_executor]\n"
+            "Check the task and any published report; start or continue the work, request review, block or archive the task."
         )
         self.stream.manager_delivery_input_override = "unrelated user message"
         self.stream.manager_delivery_reply_override = notification
@@ -480,11 +506,11 @@ class LiveProbeTests(unittest.TestCase):
         root = self.base / "fixture-wrong-path"
         evidence_path = self.base / "wrong-path.json"
         self.stream.manager_delivery_input_override = (
-            "[MAM Message]\n"
-            "/root/liveprobe/other_executor needs follow-up. Check the report; continue the work, "
-            "request review, or archive the task.\n"
-            "/root/liveprobe/archived_executor needs follow-up. Check the report; continue the work, "
-            "request review, or archive the task."
+            "[MAM MESSAGE]\n\n"
+            "[task pending | /root/liveprobe/other_executor]\n"
+            "Check the task and any published report; start or continue the work, request review, block or archive the task.\n\n"
+            "[task pending | /root/liveprobe/archived_executor]\n"
+            "Check the task and any published report; start or continue the work, request review, block or archive the task."
         )
         with self.assertRaisesRegex(liveprobe.LiveProbeError, "without matching inbound delivery"):
             self._run_fixture(root, evidence_path=evidence_path)
@@ -495,7 +521,7 @@ class LiveProbeTests(unittest.TestCase):
         self.assertEqual(receipt["status"], "completed")
         self.assertFalse(receipt["matched"])
         self.assertEqual(receipt["inbound_items"][0]["item_type"], "userMessage")
-        self.assertIn("/root/liveprobe/other_executor needs follow-up", receipt["inbound_items"][0]["text"])
+        self.assertIn("[task pending | /root/liveprobe/other_executor]", receipt["inbound_items"][0]["text"])
         self.assertEqual(evidence["cleanup"]["threads"], "archived")
 
     def test_missing_corresponding_turn_records_observed_turns(self):
@@ -512,27 +538,28 @@ class LiveProbeTests(unittest.TestCase):
         self.assertNotIn("status", receipt)
         self.assertNotIn("inbound_items", receipt)
 
-    def test_wrong_job_id_or_recipient_is_not_matching_inbound_delivery(self):
+    def test_wrong_job_executor_path_or_message_type_is_not_matching_inbound_delivery(self):
         expected = [
-            "[MAM Message]",
-            f"Job {JOB_ID} has exited. Check the result, continue the task, and archive the job.",
+            "[MAM MESSAGE]",
+            "[job exited | /root/liveprobe/job_executor]",
+            "There are exited jobs. Check the results and archive them.",
         ]
-        wrong_job = {
+        wrong_executor = {
             "status": "completed",
             "items": [{"type": "userMessage", "content": [{
-                "type": "text", "text": "[MAM Message]\nJob another-job has exited. Check the result, "
-                "continue the task, and archive the job.",
+                "type": "text", "text": "[MAM MESSAGE]\n\n[job exited | /root/liveprobe/other_executor]\n"
+                "There are exited jobs. Check the results and archive them.",
             }]}],
         }
-        self.assertIsNone(liveprobe._delivery_input(wrong_job, expected))
-        manager_message = {
+        self.assertIsNone(liveprobe._delivery_input(wrong_executor, expected))
+        wrong_type = {
             "status": "completed",
             "items": [{"type": "userMessage", "content": [{
-                "type": "text", "text": "[MAM Message]\n/root/liveprobe/job_executor needs follow-up. "
-                "Check the report; continue the work, request review, or archive the task.",
+                "type": "text", "text": "[MAM MESSAGE]\n\n[task pending | /root/liveprobe/job_executor]\n"
+                "There are exited jobs. Check the results and archive them.",
             }]}],
         }
-        self.assertIsNone(liveprobe._delivery_input(manager_message, expected))
+        self.assertIsNone(liveprobe._delivery_input(wrong_type, expected))
 
     def test_failed_turn_does_not_count_as_delivery(self):
         root = self.base / "fixture-failed-manager-turn"
@@ -546,8 +573,14 @@ class LiveProbeTests(unittest.TestCase):
         self.assertEqual(receipt["inbound_items"][0]["item_type"], "userMessage")
 
     def test_matching_mam_function_call_output_is_valid_inbound_delivery(self):
-        expected = ["[MAM Message]", f"Job {JOB_ID} has exited."]
-        payload = f"[MAM Message]\nJob {JOB_ID} has exited."
+        expected = [
+            "[MAM MESSAGE]", "[job exited | /root/liveprobe/job_executor]",
+            "There are exited jobs. Check the results and archive them.",
+        ]
+        payload = (
+            "[MAM MESSAGE]\n\n[job exited | /root/liveprobe/job_executor]\n"
+            "There are exited jobs. Check the results and archive them."
+        )
         turn = {"status": "completed", "items": [{
             "type": "functionCallOutput", "name": "message", "namespace": "mam",
             "output": [{"type": "input_text", "text": payload}],
