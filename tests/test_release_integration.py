@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import socket
 import subprocess
 import sys
 import tarfile
@@ -15,6 +16,59 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseFixtureTests(unittest.TestCase):
+    def test_controlled_archive_install_isolated_from_default_socket_and_not_real_delivery(self):
+        from scripts import test_integration
+
+        with tempfile.TemporaryDirectory(prefix="mam controlled archive ") as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            (source / "scripts").mkdir(parents=True)
+            (source / "scripts" / "install.sh").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            archive = root / "candidate.tar.gz"
+            with tarfile.open(archive, "w:gz") as package:
+                package.add(source, arcname="candidate")
+
+            instance = root / "instance"
+            instance.mkdir()
+            install_root = root / "isolated-install"
+            log = root / "integration.log"
+            endpoint = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            socket_path = root / "controlled.sock"
+            endpoint.bind(str(socket_path))
+            seen = {}
+
+            def fake_pipx_install(_source, env, _log):
+                bin_dir = Path(env["PIPX_BIN_DIR"])
+                bin_dir.mkdir(parents=True, exist_ok=True)
+                launcher = bin_dir / "mam"
+                launcher.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                launcher.chmod(0o755)
+
+            def fake_run(argv, *, cwd, env, log):
+                seen.update({"socket": env.get("MAM_APP_SERVER_SOCKET"), "thread": env.get("CODEX_THREAD_ID")})
+                return subprocess.CompletedProcess(argv, 0, "", "")
+
+            try:
+                with mock.patch.object(test_integration, "pipx_install", side_effect=fake_pipx_install), \
+                     mock.patch.object(test_integration, "run", side_effect=fake_run):
+                    launcher, delivery = test_integration.install_candidate(
+                        [(instance, {"fixture": {"worker": "fixture-worker"}})],
+                        archive, install_root, log,
+                        runtime_env={
+                            "MAM_INTEGRATION_RUNTIME": "controlled",
+                            "MAM_APP_SERVER_SOCKET": str(socket_path),
+                            "CODEX_THREAD_ID": "fixture-worker",
+                        },
+                    )
+            finally:
+                endpoint.close()
+
+            self.assertTrue(launcher.is_file())
+            self.assertEqual(seen, {"socket": str(socket_path), "thread": "fixture-worker"})
+            self.assertEqual(delivery["status"], "failed")
+            self.assertIn("no real Codex delivery was exercised", delivery["error"])
+            self.assertTrue(delivery["controlled_migration_allowed"])
+
     def test_create_old_fixture_uses_archived_writer_and_refuses_reuse(self):
         with tempfile.TemporaryDirectory(prefix="mam release fixture ") as temporary:
             instance = Path(temporary) / "mam-test"

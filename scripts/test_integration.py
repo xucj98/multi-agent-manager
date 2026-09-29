@@ -191,6 +191,8 @@ def verify_instance_data(
     upgrade_result: dict[str, Any],
     expected_commit: str,
     log: Path,
+    *,
+    env: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Check durable records, publication, workspace and the merged release."""
 
@@ -265,7 +267,7 @@ def verify_instance_data(
         raise IntegrationError(f"upgrade backup is missing in {instance}: {backup}")
     if not (Path(backup) / "tasks" / f"{task}.json").is_file():
         raise IntegrationError(f"upgrade backup does not contain the old task record in {instance}")
-    status = run([str(launcher), "service", "status"], cwd=instance, log=log)
+    status = run([str(launcher), "service", "status"], cwd=instance, env=env, log=log)
     if status.returncode:
         raise IntegrationError(f"service status failed after upgrade in {instance}: {status.stderr[-800:]}")
     status_value = json.loads(status.stdout)
@@ -475,10 +477,14 @@ def verify_job(launcher: Path, instance: Path, job_id: str, log: Path) -> dict[s
 
 
 def install_candidate(
-    instances: list[tuple[Path, dict[str, Any]]], archive: Path, install_root: Path, log: Path
+    instances: list[tuple[Path, dict[str, Any]]], archive: Path, install_root: Path, log: Path,
+    *, runtime_env: dict[str, str] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
-    env = {**os.environ, "MAM_INSTALL_ARCHIVE": str(archive.resolve()), "PIPX_HOME": str(install_root / "pipx"),
+    env = {**(runtime_env or os.environ), "MAM_INSTALL_ARCHIVE": str(archive.resolve()), "PIPX_HOME": str(install_root / "pipx"),
            "PIPX_BIN_DIR": str(install_root / "bin"), "HOME": str(install_root / "home")}
+    controlled = env.get("MAM_INTEGRATION_RUNTIME") == "controlled"
+    if controlled and not Path(env.get("MAM_APP_SERVER_SOCKET", "")).is_socket():
+        raise IntegrationError("controlled archive install has no live private App Server endpoint")
     for key in ("PIPX_HOME", "PIPX_BIN_DIR", "HOME"):
         Path(env[key]).mkdir(parents=True, exist_ok=True)
     pipx_install(old_source(install_root), env, log)
@@ -517,6 +523,13 @@ def install_candidate(
             "error": transcript[transcript.rfind(marker):].strip(),
             "controlled_migration_allowed": True,
         }
+    if controlled:
+        return launcher, {
+            "status": "failed",
+            "kind": "real-codex-delivery",
+            "error": "not accepted: installer probe used the controlled App Server endpoint; no real Codex delivery was exercised",
+            "controlled_migration_allowed": True,
+        }
     return launcher, {"status": "passed", "kind": "real-codex-delivery"}
 
 
@@ -542,11 +555,13 @@ def verify_installed_candidate(install_root: Path, expected_version: str, expect
     return {"version": values[0], "commit": values[1], "python": str(interpreters[0])}
 
 
-def verify_task(instance: Path, launcher: Path, fixture: dict[str, Any], log: Path) -> None:
+def verify_task(
+    instance: Path, launcher: Path, fixture: dict[str, Any], log: Path, *, env: dict[str, str] | None = None
+) -> None:
     task = fixture.get("task")
     if not task:
         raise IntegrationError(f"fixture did not report a task for {instance}")
-    result = run([str(launcher), "task", "status", str(task)], cwd=instance, log=log)
+    result = run([str(launcher), "task", "status", str(task)], cwd=instance, env=env, log=log)
     if result.returncode:
         raise IntegrationError(f"task was not readable after upgrade in {instance}: {result.stderr[-700:]}")
     try:
@@ -557,8 +572,10 @@ def verify_task(instance: Path, launcher: Path, fixture: dict[str, Any], log: Pa
         raise IntegrationError(f"task status returned an unexpected task in {instance}")
 
 
-def upgrade(instance: Path, launcher: Path, log: Path) -> dict[str, Any]:
-    result = run([str(launcher), "service", "upgrade"], cwd=instance, log=log)
+def upgrade(
+    instance: Path, launcher: Path, log: Path, *, env: dict[str, str] | None = None
+) -> dict[str, Any]:
+    result = run([str(launcher), "service", "upgrade"], cwd=instance, env=env, log=log)
     if result.returncode:
         raise IntegrationError(f"service upgrade failed for {instance}: {result.stderr[-1500:]}")
     try:
@@ -649,7 +666,13 @@ def integration(
         outcome["scenarios"].append({"name": "target-commit-missing-before-upgrade", "status": "passed", "instance": instances[0][0].name})
         install_root = root / "mam-test-install"
         owned.append(install_root)
-        launcher, real_delivery = install_candidate(instances, archive, install_root, log)
+        install_env = {
+            **runtimes[0].env,
+            "CODEX_THREAD_ID": instances[0][1]["fixture"]["worker"],
+        }
+        launcher, real_delivery = install_candidate(
+            instances, archive, install_root, log, runtime_env=install_env
+        )
         outcome["real_delivery"] = real_delivery
         outcome["installed_metadata"] = verify_installed_candidate(install_root, to_version, commit, log)
         outcome["scenarios"].append({
@@ -662,7 +685,7 @@ def integration(
         conflict_file = induce_git_conflict(instances[0][0], root_dir(), commit, log)
         conflict_error = None
         try:
-            upgrade(instances[0][0], launcher, log)
+            upgrade(instances[0][0], launcher, log, env=runtimes[0].env)
         except IntegrationError as exc:
             conflict_error = str(exc)
         if not conflict_error or "merge" not in conflict_error.lower():
@@ -672,25 +695,25 @@ def integration(
             raise IntegrationError("failed Git upgrade did not retain backup or baseline data version")
         resolve_git_conflict(instances[0][0], conflict_file, commit, log)
         outcome["scenarios"].append({"name": "git-conflict-and-retry", "status": "passed", "path": conflict_file})
-        for instance, metadata in instances:
-            result = upgrade(instance, launcher, log)
+        for (instance, metadata), runtime in zip(instances, runtimes):
+            result = upgrade(instance, launcher, log, env=runtime.env)
             upgrade_results.append(result)
-            verify_task(instance, launcher, metadata["fixture"], log)
-            evidence = verify_instance_data(instance, metadata, launcher, result, commit, log)
+            verify_task(instance, launcher, metadata["fixture"], log, env=runtime.env)
+            evidence = verify_instance_data(instance, metadata, launcher, result, commit, log, env=runtime.env)
             outcome.setdefault("instance_evidence", {})[instance.name] = evidence
             outcome["scenarios"].append({"name": f"upgrade:{instance.name}", "status": "passed", "data": evidence})
             if instance == instances[0][0]:
                 other_root = Path(instances[1][1]["mam_root"])
                 if git_refs(other_root) != baseline_refs[instances[1][0].name]:
                     raise IntegrationError("upgrading the first instance changed the second instance refs")
-            repeat = upgrade(instance, launcher, log)
+            repeat = upgrade(instance, launcher, log, env=runtime.env)
             if repeat.get("status") != "up-to-date":
                 raise IntegrationError(f"repeated upgrade was not idempotent for {instance}")
         outcome["upgrade_results"] = upgrade_results
         outcome["scenarios"].append({"name": "repeat-upgrade-and-backup", "status": "passed"})
         missing_result = None
         try:
-            upgrade(no_origin_path, launcher, log)
+            upgrade(no_origin_path, launcher, log, env=runtimes[0].env)
         except IntegrationError as exc:
             missing_result = str(exc)
         if not missing_result or "origin" not in missing_result.lower():
@@ -701,7 +724,7 @@ def integration(
         outcome["scenarios"].append({"name": "interrupted-migration-retry", "status": "passed", "evidence": migration_retry(launcher, no_origin_path, install_root, log)})
         first_backup = Path(upgrade_results[0]["backup"])
         restore_backup(instances[0][0], first_backup)
-        restored = upgrade(instances[0][0], launcher, log)
+        restored = upgrade(instances[0][0], launcher, log, env=runtimes[0].env)
         if restored.get("data_version") != "0.2.0" or restored.get("status") != "upgraded":
             raise IntegrationError(f"backup restore did not complete a fresh migration: {restored}")
         outcome["scenarios"].append({"name": "backup-restore-and-retry", "status": "passed", "backup": str(first_backup)})
