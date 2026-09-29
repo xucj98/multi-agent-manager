@@ -1,6 +1,6 @@
 # 版本说明
 
-## 0.2.0（未发布）
+## 0.2.0
 
 - 安装与实例配置分开：`install.sh` 安装或更新系统程序，`mam service upgrade` 升级一个实例，`mam service start` 启动服务。
 - 提供程序、daemon 和数据版本信息，按版本连续迁移，以及按版本创建 `mam-test` 和一键集成测试。

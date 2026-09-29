@@ -31,10 +31,10 @@ from typing import Any
 from . import cli, job_runtime
 
 
-MODEL = "gpt-5.6-terra"
+MODEL = "gpt-6-sol"
 EFFORT = "max"
 MAX_MODEL_TURNS = 12
-DEFAULT_TIMEOUT_SECONDS = 180.0
+DEFAULT_TIMEOUT_SECONDS = 600.0
 POLL_SECONDS = 0.5
 # Codex acknowledges ``turn/start`` before the rollout JSONL is always visible
 # to a following ``thread/resume``.  Keep this retry bounded and local to that
@@ -49,6 +49,16 @@ _BASELINE_MARKERS = {
     "idle_executor": "PROBE_IDLE_EXECUTOR_BASELINE_READY",
     "archived_executor": "PROBE_ARCHIVED_EXECUTOR_BASELINE_READY",
 }
+
+
+def _baseline_prompt(role: str) -> str:
+    # Normal MAM agents have performed real tools before receiving a wakeup.
+    # Materialize that history without shell, filesystem, or network access.
+    marker = _BASELINE_MARKERS[role]
+    return (
+        f'Call functions.exec once with exactly this JavaScript: text("{marker}"); '
+        f"then reply exactly {marker}."
+    )
 
 
 class LiveProbeError(RuntimeError):
@@ -440,12 +450,14 @@ class _LiveFixture:
                 # only those IDs are ever archived during cleanup.
                 "ephemeral": False,
                 "model": MODEL,
-                "effort": EFFORT,
+                "config": {"model_reasoning_effort": EFFORT},
                 "sandbox": "read-only",
                 "approvalPolicy": "never",
                 "developerInstructions": (
-                    "MAM installer acceptance fixture. Reply with the requested short marker only; "
-                    "do not use tools, files, network, or create agents."
+                    "MAM installer acceptance fixture. Perform only the one harmless code execution "
+                    "explicitly requested by the initial baseline, then reply with the requested marker. "
+                    "Do not run shell commands, access files or network, or create agents. "
+                    "On later MAM notifications, acknowledge briefly without using tools."
                 ),
             },
         )
@@ -814,7 +826,7 @@ class _LiveFixture:
             "turn/start",
             {
                 "threadId": self.threads[role],
-                "input": [{"type": "text", "text": f"Reply exactly {marker}."}],
+                "input": [{"type": "text", "text": _baseline_prompt(role)}],
                 "model": MODEL,
                 "effort": EFFORT,
             },

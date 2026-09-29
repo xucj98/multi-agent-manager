@@ -197,8 +197,8 @@ class FakeStream:
                 raise AssertionError("fixture threads were created before all tasks were registered")
             if params.get("ephemeral") is not False:
                 raise AssertionError("fixture threads must be persisted")
-            if params.get("model") != liveprobe.MODEL or params.get("effort") != liveprobe.EFFORT:
-                raise AssertionError("fixture thread did not select gpt-5.6-terra/max")
+            if params.get("model") != "gpt-6-sol" or params.get("config", {}).get("model_reasoning_effort") != "max":
+                raise AssertionError("fixture thread did not select gpt-6-sol/max")
             role = liveprobe._ROLE_ORDER[self.thread_starts]
             self.thread_starts += 1
             return {"thread": {"id": THREAD_IDS[role], "status": {"type": "idle"}}}
@@ -230,15 +230,15 @@ class FakeStream:
             role = liveprobe._ROLE_ORDER[self.direct_baseline_starts]
             if thread_id != THREAD_IDS[role]:
                 raise AssertionError("direct baseline turns must use the four dedicated roles in order")
-            if params.get("model") != liveprobe.MODEL or params.get("effort") != liveprobe.EFFORT:
-                raise AssertionError("baseline turn did not select gpt-5.6-terra/max")
+            if params.get("model") != "gpt-6-sol" or params.get("effort") != "max":
+                raise AssertionError("baseline turn did not select gpt-6-sol/max")
             marker = liveprobe._BASELINE_MARKERS[role]
-            if params.get("input") != [{"type": "text", "text": f"Reply exactly {marker}."}]:
-                raise AssertionError("baseline turn did not use its deterministic marker")
+            if params.get("input") != [{"type": "text", "text": liveprobe._baseline_prompt(role)}]:
+                raise AssertionError("baseline turn did not request its harmless tool call")
             turn_id = f"turn-{role}-baseline"
             self.direct_baseline_starts += 1
             reply = self.manager_baseline_reply_override if role == "manager" else None
-            self._append_turn(thread_id, turn_id, f"Reply exactly {marker}.", assistant_text=reply or marker)
+            self._append_turn(thread_id, turn_id, liveprobe._baseline_prompt(role), assistant_text=reply or marker)
             self.active_reads_remaining[thread_id] = self.active_after_turn_start.get(thread_id, 0)
             return {"turn": {"id": turn_id}}
         if method in {"thread/archive", "turn/interrupt"}:
@@ -422,7 +422,7 @@ class LiveProbeTests(unittest.TestCase):
             self.assertEqual(params["model"], liveprobe.MODEL)
             self.assertEqual(params["effort"], liveprobe.EFFORT)
             self.assertEqual(
-                params["input"], [{"type": "text", "text": f"Reply exactly {liveprobe._BASELINE_MARKERS[role]}."}]
+                params["input"], [{"type": "text", "text": liveprobe._baseline_prompt(role)}]
             )
             start_index = next(
                 index
