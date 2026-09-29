@@ -855,11 +855,16 @@ class _LiveFixture:
 
     def _wait_for_manager_delivery(self) -> None:
         self.stage = "verify fixture Manager delivery"
-        action = "needs follow-up. Check the report; continue the work, request review, or archive the task."
+        action = (
+            "Check the task and any published report; start or continue the work, request review, "
+            "block or archive the task."
+        )
         manager_payloads = [
-            "[MAM Message]",
-            f"{_fixture_executor_path('idle_executor')} {action}",
-            f"{_fixture_executor_path('archived_executor')} {action}",
+            "[MAM MESSAGE]",
+            f"[task pending | {_fixture_executor_path('idle_executor')}]",
+            action,
+            f"[task pending | {_fixture_executor_path('archived_executor')}]",
+            action,
         ]
         manager_turn = self._wait_for_turn_delivery(
             "manager", manager_payloads, 2, "Manager-ready scheduler turn", "manager_delivery"
@@ -888,12 +893,13 @@ class _LiveFixture:
             raise LiveProbeError(f"fixture pre-stop turn distribution is unexpected: {counts}")
         self.evidence["checks"]["idle_executors_received_no_turn"] = True
 
-    def _wait_for_exited_job_delivery(self, job_id: str) -> dict[str, int]:
+    def _wait_for_exited_job_delivery(self) -> dict[str, int]:
         self.stage = "verify exited-job scheduler delivery"
         job_turn = self._wait_for_turn_delivery(
             "job_executor", [
-                "[MAM Message]",
-                f"Job {job_id} has exited. Check the result, continue the task, and archive the job.",
+                "[MAM MESSAGE]",
+                f"[job exited | {_fixture_executor_path('job_executor')}]",
+                "There are exited jobs. Check the results and archive them.",
             ],
             2, "exited-job scheduler turn", "exited_job_delivery"
         )
@@ -942,7 +948,7 @@ class _LiveFixture:
         # process finish.  The detached scheduler must later observe the exit
         # itself; this module does not refresh the job record on its behalf.
         self._release_blocker(self.blockers[0])
-        self._wait_for_exited_job_delivery(job_id)
+        self._wait_for_exited_job_delivery()
         self.evidence["status"] = "passed"
         return self.evidence
 
