@@ -16,7 +16,7 @@
 
 接管前旧 Manager 必须已结束 turn，且状态可确认；新 Manager 正在调用命令不构成阻碍。已绑定的执行者不能成为 Manager。重复接管同一身份无副作用。任务、执行者、job、workspace 和服务记录保留；后续通知和未投递的主动消息发给新 Manager。原生父子关系不变，旧树的协作路径仍按旧树解释。
 
-## 实例升级（待开发）
+## 实例升级
 
 在 agent 暂停工作、现有 MAM 命令结束且 daemon 已停止后执行 `mam service upgrade`。命令根据当前目录对应的 `.mam/env.json` 升级一个实例：
 

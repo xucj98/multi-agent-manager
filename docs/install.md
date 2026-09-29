@@ -4,7 +4,7 @@
 
 MAM 支持一台机器上同时存在多个 MAM 实例，每个实例对应一个 `PROJECT_ROOT`，有自己独立的 service。
 
-## 首次使用（待调整）
+## 首次使用
 
 ### 安装
 
@@ -58,7 +58,7 @@ mam service start
 mam service status
 ```
 
-## 更新（待开发）
+## 更新
 
 操作者确认所有使用 MAM 的实例，安排 agent 暂停工作、停止 service。维护期间暂停 MAM 调用及 `MAM_ROOT` 文件编辑。task 和 job 可以保留，长进程继续运行。
 
@@ -70,7 +70,7 @@ mam service status
 4. 各个实例按 `docs/upgrades/VERSION.md` 适配、验证配置及 hooks。
 5. 各个实例运行 `mam service start` 和 `mam service status` 启动 service 并确认。
 
-详细说明见 [install.sh](designs/install.md) 和 [mam service upgrade](designs/service.md#实例升级待开发)。
+详细说明见 [install.sh](designs/install.md) 和 [mam service upgrade](designs/service.md#实例升级)。
 
 ## 项目 hooks
 
