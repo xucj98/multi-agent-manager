@@ -510,6 +510,21 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertNotIn("first", self.starts[0][1])
         self.assertNotIn("second", self.starts[0][1])
 
+    def test_task_state_change_resets_only_its_own_reminder_count(self):
+        self.task(TASK_ONE, agent=EXECUTOR)
+        self.task(TASK_TWO, agent=EXECUTOR_TWO)
+        self.scheduler().run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+        self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
+        self.assertEqual(self.store.read(TASK_TWO)["wake_reminder_count"], 1)
+
+        self.statuses[EXECUTOR] = "active"
+        self.scheduler().run_once()
+        self.assertEqual(self.store.read(TASK_ONE)["status"], "working")
+        self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 0)
+        self.assertEqual(self.store.read(TASK_TWO)["status"], "pending")
+        self.assertEqual(self.store.read(TASK_TWO)["wake_reminder_count"], 1)
+
     def test_rejected_and_uncertain_reminders_do_not_increment_task_count(self):
         self.task(TASK_ONE)
         self.stream_failure = job_runtime.AppServerRpcError("rejected before turn start")
