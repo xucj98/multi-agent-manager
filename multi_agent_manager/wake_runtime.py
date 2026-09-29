@@ -1707,10 +1707,31 @@ class WakeScheduler:
                 if stream is not None:
                     with contextlib.suppress(Exception):
                         stream.close()
-            _, _, status = self._turn_boundary(latest)
-            if self._terminal_turn(status):
-                for event in events:
+            _, latest_id, status = self._turn_boundary(latest)
+            for event in events:
+                accepted_id = event.get("accepted_turn_id")
+                detail = None
+                if not isinstance(accepted_id, str) or not accepted_id:
+                    detail = "accepted turn ID is missing; completion cannot be verified safely"
+                elif accepted_id == event.get("before_turn_id"):
+                    detail = "accepted turn ID matches the pre-delivery turn; completion cannot be verified safely"
+                elif latest_id != accepted_id:
+                    detail = f"latest turn {latest_id or 'unknown'} does not match accepted turn {accepted_id}"
+                elif self._terminal_turn(status):
                     self._resolve_event(state, event["signature"], reason="accepted reminder turn completed")
+                    continue
+                else:
+                    turn_error = event.pop("turn_completion_error", None)
+                    if turn_error and event.get("last_condition_error") == turn_error:
+                        event.pop("last_condition_error", None)
+                    continue
+                event["turn_completion_error"] = detail
+                event["last_condition_error"] = detail
+                state.setdefault("diagnostics", []).append({
+                    "kind": "accepted_turn_unverified",
+                    "task": str(event.get("task")),
+                    "message": detail,
+                })
 
     def _deliver(
         self, state: dict[str, Any], auto_candidates: Mapping[str, Mapping[str, Any]] | None = None
@@ -1888,15 +1909,26 @@ class WakeScheduler:
                     self.next_compatibility_retry = self.clock() + COMPATIBILITY_RETRY_SECONDS
             else:
                 turn = response.get("turn") if isinstance(response, Mapping) else None
-                accepted_turn = turn.get("id") if isinstance(turn, Mapping) else before_turn_id
+                accepted_turn = turn.get("id") if isinstance(turn, Mapping) else None
                 for event in current:
                     event.update({
                         "delivery": "accepted",
                         "accepted_at": _timestamp(),
-                        "accepted_turn_id": accepted_turn,
+                        "accepted_turn_id": accepted_turn if isinstance(accepted_turn, str) and accepted_turn else None,
                         "acknowledgement": "turn/start RPC response",
                         "last_error": None,
                     })
+                    if not isinstance(accepted_turn, str) or not accepted_turn:
+                        detail = "turn/start was acknowledged without a turn ID; completion cannot be verified safely"
+                        event["turn_completion_error"] = detail
+                        event["last_condition_error"] = detail
+                        state.setdefault("diagnostics", []).append({
+                            "kind": "accepted_turn_unverified",
+                            "task": str(event.get("task")),
+                            "message": detail,
+                        })
+                    else:
+                        event.pop("last_condition_error", None)
                     event.pop("failure_kind", None)
                     if event.get("kind") == "message":
                         self._resolve_event(state, event["signature"], reason="message accepted")

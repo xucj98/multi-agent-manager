@@ -420,10 +420,53 @@ class WakeRuntimeTests(unittest.TestCase):
         self.store.write(task)
         self.scheduler().run_once()
         self.assertEqual(len(self.starts), 1)
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["accepted_turn_id"], "accepted-1")
+
+        self.turns[MANAGER] = {"id": "unrelated-completed-turn", "status": "completed"}
+        self.scheduler().run_once()
+        self.assertEqual(len(self.starts), 1)
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "accepted")
+        self.assertIn("does not match accepted turn accepted-1", event["last_condition_error"])
+
         self.turns[MANAGER] = {"id": "accepted-1", "status": "completed"}
         self.scheduler().run_once()
         self.assertEqual(len(self.starts), 2)
         self.assertEqual(self.starts[0][1], self.starts[1][1])
+
+    def test_acknowledgement_without_turn_id_stays_accepted_and_cannot_rearm(self):
+        self.task(TASK_ONE)
+        original_factory = self.stream_factory
+
+        def no_id_factory(socket_path):
+            stream = original_factory(socket_path)
+            start = stream.start_turn
+
+            def start_without_turn_id(agent, text, *, message_channel="tool"):
+                start(agent, text, message_channel=message_channel)
+                return {"accepted": True}
+
+            stream.start_turn = start_without_turn_id
+            return stream
+
+        self.stream_factory = no_id_factory
+        scheduler = self.scheduler()
+        scheduler.run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "accepted")
+        self.assertIsNone(event["accepted_turn_id"])
+        self.assertIn("without a turn ID", event["last_condition_error"])
+        self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
+
+        self.turns[MANAGER] = {"id": "old-completed-turn", "status": "completed"}
+        scheduler.run_once()
+        event = next(iter(self.state()["events"].values()))
+        self.assertEqual(event["delivery"], "accepted")
+        self.assertIsNone(event["accepted_turn_id"])
+        self.assertEqual(len(self.starts), 1)
+        self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
+        self.assertTrue(any(item["kind"] == "accepted_turn_unverified" for item in self.state()["diagnostics"]))
 
     def test_failed_manager_turn_rearms_current_task_reminder_when_idle(self):
         self.task(TASK_ONE)
