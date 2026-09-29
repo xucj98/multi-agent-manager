@@ -2071,8 +2071,32 @@ Path(context['task']['task_dir'], 'task.md').write_text('changed during hook')
         self.assertEqual(result["status"], "blocked")
         self.assertEqual(result["block_note"], "waiting on decision")
         data = self.store.read(task)
-        data["status"] = "working"
+        data["status"] = "pending"
         data["agent"] = "worker"
+        self.store.write(data)
+        with patch.object(cli, "caller_agent", return_value=manager), \
+             patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(manager, "/root", manager)), \
+             patch.object(wake_runtime, "resolve_manager", return_value=manager), \
+             patch.object(cli, "agent_observations", return_value={"worker": {"status": "unknown"}}), \
+             self.assertRaisesRegex(cli.Error, "requires a confirmed idle executor"):
+            cli.task_block(self.store, args)
+        self.assertEqual(self.store.read(task)["status"], "pending")
+        with patch.object(cli, "caller_agent", return_value=manager), \
+             patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(manager, "/root", manager)), \
+             patch.object(wake_runtime, "resolve_manager", return_value=manager), \
+             patch.object(cli, "agent_observations", return_value={"worker": {"status": "notLoaded"}}):
+            allowed = cli.task_block(self.store, args)
+        self.assertEqual(allowed["status"], "blocked")
+        data = self.store.read(task)
+        data["status"] = "pending"
+        self.store.write(data)
+        with patch.object(cli, "caller_agent", return_value=manager), \
+             patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(manager, "/root", manager)), \
+             patch.object(wake_runtime, "resolve_manager", return_value=manager), \
+             patch.object(cli, "agent_observations", return_value={"worker": {"status": "notLoaded", "error": "systemError"}}), \
+             self.assertRaisesRegex(cli.Error, "requires a confirmed idle executor"):
+            cli.task_block(self.store, args)
+        data["status"] = "working"
         self.store.write(data)
         with patch.object(cli, "caller_agent", return_value=manager), \
              patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(manager, "/root", manager)), \
@@ -2129,7 +2153,12 @@ Path(context['task']['task_dir'], 'task.md').write_text('changed during hook')
             {"status": "working", "agent": "worker", "jobs": [], "wake_reminder_count": 1},
             {"status": "notLoaded"},
         )
-        self.assertEqual((not_loaded["status"], not_loaded["wake_reminder_count"]), ("working", 1))
+        self.assertEqual((not_loaded["status"], not_loaded["wake_reminder_count"]), ("pending", 0))
+        failed_probe, _, _ = task_state.refresh_state(
+            {"status": "working", "agent": "worker", "jobs": [], "wake_reminder_count": 1},
+            {"status": "notLoaded", "error": "systemError"},
+        )
+        self.assertEqual((failed_probe["status"], failed_probe["wake_reminder_count"]), ("working", 1))
         resumed, _, _ = task_state.refresh_state(
             {"status": "blocked", "agent": "worker", "jobs": [], "wake_reminder_count": 2},
             {"status": "active"},

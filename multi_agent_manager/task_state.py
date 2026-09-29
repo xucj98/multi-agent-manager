@@ -20,6 +20,14 @@ def _unarchived_jobs(task: Mapping[str, Any]) -> bool:
     )
 
 
+def confirmed_idle(executor_observation: Mapping[str, Any] | None) -> bool:
+    return (
+        isinstance(executor_observation, Mapping)
+        and executor_observation.get("status") in {"idle", "notLoaded"}
+        and not executor_observation.get("error")
+    )
+
+
 def refresh_state(task: Mapping[str, Any], executor_observation: Mapping[str, Any] | None
                   ) -> tuple[dict[str, Any], str | None, str]:
     """Return a refreshed task and its before/after state.
@@ -37,13 +45,14 @@ def refresh_state(task: Mapping[str, Any], executor_observation: Mapping[str, An
         new = "working"
     else:
         observed = executor_observation.get("status") if isinstance(executor_observation, Mapping) else None
-        if observed == "active":
+        has_error = isinstance(executor_observation, Mapping) and bool(executor_observation.get("error"))
+        if observed == "active" and not has_error:
             new = "working"
         elif current == "blocked":
             new = "blocked"
         elif not task.get("agent"):
             new = "pending"
-        elif observed == "idle":
+        elif confirmed_idle(executor_observation):
             new = "pending"
         else:
             new = current
