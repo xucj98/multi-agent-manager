@@ -197,8 +197,8 @@ class FakeStream:
                 raise AssertionError("fixture threads were created before all tasks were registered")
             if params.get("ephemeral") is not False:
                 raise AssertionError("fixture threads must be persisted")
-            if params.get("model") != "gpt-6-sol" or params.get("config", {}).get("model_reasoning_effort") != "max":
-                raise AssertionError("fixture thread did not select gpt-6-sol/max")
+            if params.get("model") != "gpt-6-sol" or params.get("config", {}).get("model_reasoning_effort") != "high":
+                raise AssertionError("fixture thread did not select gpt-6-sol/high")
             role = liveprobe._ROLE_ORDER[self.thread_starts]
             self.thread_starts += 1
             return {"thread": {"id": THREAD_IDS[role], "status": {"type": "idle"}}}
@@ -230,8 +230,8 @@ class FakeStream:
             role = liveprobe._ROLE_ORDER[self.direct_baseline_starts]
             if thread_id != THREAD_IDS[role]:
                 raise AssertionError("direct baseline turns must use the four dedicated roles in order")
-            if params.get("model") != "gpt-6-sol" or params.get("effort") != "max":
-                raise AssertionError("baseline turn did not select gpt-6-sol/max")
+            if params.get("model") != "gpt-6-sol" or params.get("effort") != "high":
+                raise AssertionError("baseline turn did not select gpt-6-sol/high")
             marker = liveprobe._BASELINE_MARKERS[role]
             if params.get("input") != [{"type": "text", "text": liveprobe._baseline_prompt(role)}]:
                 raise AssertionError("baseline turn did not request its harmless tool call")

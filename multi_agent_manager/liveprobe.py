@@ -32,7 +32,7 @@ from . import cli, job_runtime
 
 
 MODEL = "gpt-6-sol"
-EFFORT = "max"
+EFFORT = "high"
 MAX_MODEL_TURNS = 12
 DEFAULT_TIMEOUT_SECONDS = 600.0
 POLL_SECONDS = 0.5
