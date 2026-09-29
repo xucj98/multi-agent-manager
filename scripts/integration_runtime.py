@@ -26,6 +26,84 @@ class RuntimeIntegrationError(RuntimeError):
     """The controlled runtime did not observe the expected lifecycle."""
 
 
+def _notification_input_type(notification: Mapping[str, Any]) -> str | None:
+    """Classify the App Server input shape used for a delivered message."""
+
+    if notification.get("method") != "turn/start":
+        return None
+    params = notification.get("params")
+    if not isinstance(params, Mapping):
+        return None
+    tool = params.get("toolOutput")
+    if isinstance(tool, Mapping):
+        if tool.get("name") == "message" and tool.get("namespace") == "mam":
+            return "tool"
+        return None
+    inputs = params.get("input")
+    if isinstance(inputs, list) and inputs and all(
+        isinstance(item, Mapping) and item.get("type") == "text" and isinstance(item.get("text"), str)
+        for item in inputs
+    ):
+        return "user"
+    return None
+
+
+def validate_job_notification(
+    notification: Mapping[str, Any],
+    event: Mapping[str, Any],
+    *,
+    job_id: str,
+    task_id: str,
+    recipient: str,
+    executor_path: str,
+    expected_input_type: str,
+    current_turn_id: str,
+) -> dict[str, Any]:
+    """Validate one exact job delivery against its durable scheduler event."""
+
+    if expected_input_type not in {"tool", "user"}:
+        raise ValueError("expected_input_type must be tool or user")
+    if (
+        event.get("kind") != "job_stopped"
+        or event.get("job") != job_id
+        or event.get("task") != task_id
+        or event.get("executor") != recipient
+    ):
+        raise RuntimeIntegrationError("accepted scheduler event does not identify the fixture task and stopped job")
+    if event.get("delivery") != "accepted" or event.get("recipient") != recipient:
+        raise RuntimeIntegrationError("scheduler event was not accepted for the fixture executor")
+    if event.get("executor_path") != executor_path:
+        raise RuntimeIntegrationError("scheduler event does not identify the fixture executor path")
+    if notification.get("thread_id") != recipient:
+        raise RuntimeIntegrationError("job notification was delivered to the wrong fixture thread")
+    if _notification_input_type(notification) != expected_input_type:
+        raise RuntimeIntegrationError("job notification used the wrong App Server input type")
+    turn_id = notification.get("turn_id")
+    if not isinstance(turn_id, str) or not turn_id or turn_id != current_turn_id:
+        raise RuntimeIntegrationError("job notification does not belong to the current fixture turn")
+    if event.get("accepted_turn_id") != turn_id:
+        raise RuntimeIntegrationError("accepted scheduler event refers to a different turn")
+    expected_message = (
+        "[MAM MESSAGE]\n\n[job exited | " + executor_path + "]\n"
+        "There are exited jobs. Check the results and archive them."
+    )
+    message = notification.get("message")
+    if isinstance(message, str) and job_id in message:
+        raise RuntimeIntegrationError("job notification unexpectedly exposes a JOB-ID")
+    if message != expected_message:
+        raise RuntimeIntegrationError("job notification does not match the fixture executor message")
+    return {
+        "job": job_id,
+        "recipient": recipient,
+        "executor_path": executor_path,
+        "input_type": expected_input_type,
+        "turn_id": turn_id,
+        "message": message,
+        "notification": dict(notification),
+        "event": dict(event),
+    }
+
+
 def _take(connection: socket.socket, size: int) -> bytes:
     data = bytearray()
     while len(data) < size:
@@ -93,6 +171,9 @@ class ControlledCodexEndpoint:
             manager: {"id": "fixture-manager-turn", "status": "completed"},
             worker: {"id": "fixture-worker-turn", "status": "completed"},
         }
+        self._turns: dict[str, dict[str, dict[str, str]]] = {
+            thread_id: {turn["id"]: dict(turn)} for thread_id, turn in self._latest_turn.items()
+        }
         self._turn_counter = 0
         self._thread = threading.Thread(target=self._serve, name="mam-controlled-codex", daemon=True)
         self._thread.start()
@@ -111,6 +192,16 @@ class ControlledCodexEndpoint:
     def errors(self) -> list[str]:
         with self._lock:
             return list(self._server_errors)
+
+    def current_turn(self, thread_id: str) -> dict[str, str] | None:
+        with self._lock:
+            value = self._latest_turn.get(thread_id)
+            return dict(value) if value is not None else None
+
+    def turn_state(self, thread_id: str, turn_id: str) -> dict[str, str] | None:
+        with self._lock:
+            value = self._turns.get(thread_id, {}).get(turn_id)
+            return dict(value) if value is not None else None
 
     def _serve(self) -> None:
         while not self._closed.is_set():
@@ -240,13 +331,19 @@ class ControlledCodexEndpoint:
             }
             with self._lock:
                 self._notifications.append(delivery)
-            self._statuses[thread_id] = "active"
-            self._latest_turn[thread_id] = {"id": turn_id, "status": "inProgress"}
+                self._statuses[thread_id] = "active"
+                turn_state = {"id": turn_id, "status": "inProgress"}
+                self._turns.setdefault(thread_id, {})[turn_id] = turn_state
+                self._latest_turn[thread_id] = dict(turn_state)
             def complete_turn() -> None:
                 if self._closed.is_set():
                     return
-                self._statuses[thread_id] = "idle"
-                self._latest_turn[thread_id] = {"id": turn_id, "status": "completed"}
+                with self._lock:
+                    turn_state = {"id": turn_id, "status": "completed"}
+                    self._turns.setdefault(thread_id, {})[turn_id] = turn_state
+                    if self._latest_turn.get(thread_id, {}).get("id") == turn_id:
+                        self._statuses[thread_id] = "idle"
+                        self._latest_turn[thread_id] = dict(turn_state)
             threading.Timer(0.15, complete_turn).start()
             self._reply(connection, request_id, {"turn": {"id": turn_id, "status": "inProgress"}})
             return
@@ -404,43 +501,90 @@ class RuntimeHarness:
             time.sleep(0.05)
         raise RuntimeIntegrationError(f"JOB-ID {job_id} did not reach status {expected}")
 
-    def verify_notification(self, job_id: str, expected: str = "exited", *, timeout: float = 60.0) -> dict[str, Any]:
+    def _fixture_executor_path(self) -> str:
+        task_path = self.mam_root / ".local" / "tasks" / f"{self.fixture['task']}.json"
+        try:
+            task = json.loads(task_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeIntegrationError(f"cannot read fixture task identity {task_path}: {exc}") from exc
+        identity = task.get("identity") if isinstance(task, Mapping) else None
+        path = identity.get("path") if isinstance(identity, Mapping) else None
+        if (
+            not isinstance(task, Mapping)
+            or task.get("agent") != self.fixture["worker"]
+            or not isinstance(identity, Mapping)
+            or identity.get("tree_root") != self.fixture["manager"]
+            or not isinstance(path, str)
+            or not path.startswith("/root/")
+            or any(segment in ("", ".", "..") for segment in path.split("/")[1:])
+        ):
+            raise RuntimeIntegrationError("fixture task has no unique native executor path")
+        return path
+
+    def verify_notification(
+        self,
+        job_id: str,
+        expected: str = "exited",
+        *,
+        expected_input_type: str = "tool",
+        timeout: float = 60.0,
+    ) -> dict[str, Any]:
         if expected != "exited":
             raise ValueError("controlled notification verification currently expects exited jobs")
         deadline = time.monotonic() + timeout
         recipient = self.fixture["worker"]
+        executor_path = self._fixture_executor_path()
+        state: dict[str, Any] = {}
+        rejected: list[str] = []
         while time.monotonic() < deadline:
-            matches = [
-                item for item in self.endpoint.notifications
-                if item.get("thread_id") == recipient and job_id in str(item.get("message", ""))
-                and "exited" in str(item.get("message", ""))
-            ]
             try:
                 state = self._service_state()
             except RuntimeIntegrationError:
-                state = {}
+                time.sleep(0.05)
+                continue
             events = state.get("events", {}) if isinstance(state, Mapping) else {}
             histories = state.get("history", []) if isinstance(state, Mapping) else []
             event_matches = [
                 dict(item) for item in events.values() if isinstance(item, Mapping)
                 and item.get("kind") == "job_stopped" and item.get("job") == job_id
                 and item.get("recipient") == recipient and item.get("delivery") == "accepted"
+                and item.get("executor_path") == executor_path
             ] if isinstance(events, Mapping) else []
-            if matches and event_matches:
-                return {
-                    "job": job_id,
-                    "expected": expected,
-                    "recipient": recipient,
-                    "message": matches[0]["message"],
-                    "notification": matches[0],
-                    "event": event_matches[0],
-                    "pending": list(events.values()) if isinstance(events, Mapping) else [],
-                    "history": list(histories) if isinstance(histories, list) else [],
-                    "requests": self.requests,
-                }
+            for event in event_matches:
+                accepted_turn_id = event.get("accepted_turn_id")
+                if not isinstance(accepted_turn_id, str):
+                    continue
+                completed_turn = self.endpoint.turn_state(recipient, accepted_turn_id)
+                if completed_turn and completed_turn.get("status") == "completed":
+                    for notification in self.endpoint.notifications:
+                        if notification.get("turn_id") != accepted_turn_id:
+                            continue
+                        try:
+                            evidence = validate_job_notification(
+                                notification,
+                                event,
+                                job_id=job_id,
+                                task_id=self.fixture["task"],
+                                recipient=recipient,
+                                executor_path=executor_path,
+                                expected_input_type=expected_input_type,
+                                current_turn_id=accepted_turn_id,
+                            )
+                        except RuntimeIntegrationError as exc:
+                            rejected.append(str(exc))
+                            continue
+                        evidence.update({
+                            "expected": expected,
+                            "pending": list(events.values()) if isinstance(events, Mapping) else [],
+                            "history": list(histories) if isinstance(histories, list) else [],
+                            "requests": self.requests,
+                        })
+                        return evidence
             time.sleep(0.05)
         raise RuntimeIntegrationError(
-            f"no accepted controlled notification for JOB-ID {job_id}; "
+            f"no accepted controlled notification for fixture job {job_id}; "
+            f"recipient={recipient}, executor_path={executor_path!r}, expected_input_type={expected_input_type!r}, "
+            f"latest_turn={self.endpoint.current_turn(recipient)!r}, rejected={rejected!r}; "
             f"notifications={self.endpoint.notifications!r}, service={state!r}"
         )
 
@@ -496,4 +640,4 @@ class RuntimeHarness:
         return result
 
 
-__all__ = ["ControlledCodexEndpoint", "RuntimeHarness", "RuntimeIntegrationError"]
+__all__ = ["ControlledCodexEndpoint", "RuntimeHarness", "RuntimeIntegrationError", "validate_job_notification"]

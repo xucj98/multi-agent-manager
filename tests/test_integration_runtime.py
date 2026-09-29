@@ -5,17 +5,119 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
 from multi_agent_manager import job_runtime
-from scripts.integration_runtime import RuntimeHarness, RuntimeIntegrationError
+from scripts.integration_runtime import RuntimeHarness, RuntimeIntegrationError, validate_job_notification
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class IntegrationRuntimeTests(unittest.TestCase):
+    @staticmethod
+    def _delivery(input_type: str = "tool", *, recipient: str = "worker-thread", turn_id: str = "turn-current") -> dict:
+        message = "[MAM MESSAGE]\n\n[job exited | /root/fixture-worker]\nThere are exited jobs. Check the results and archive them."
+        params = {"threadId": recipient}
+        if input_type == "tool":
+            params.update({"input": [], "toolOutput": {"name": "message", "namespace": "mam", "output": message}})
+        else:
+            params["input"] = [{"type": "text", "text": message}]
+        return {"thread_id": recipient, "method": "turn/start", "message": message, "params": params, "turn_id": turn_id}
+
+    @staticmethod
+    def _event(*, recipient: str = "worker-thread", path: str = "/root/fixture-worker", turn_id: str = "turn-current") -> dict:
+        return {
+            "kind": "job_stopped", "job": "fixture-job-id", "task": "fixture-task-id",
+            "executor": recipient, "delivery": "accepted",
+            "recipient": recipient, "executor_path": path, "accepted_turn_id": turn_id,
+        }
+
+    def test_notification_matches_fixture_thread_path_input_and_current_turn(self) -> None:
+        for input_type in ("tool", "user"):
+            with self.subTest(input_type=input_type):
+                result = validate_job_notification(
+                    self._delivery(input_type), self._event(), job_id="fixture-job-id",
+                    task_id="fixture-task-id",
+                    recipient="worker-thread", executor_path="/root/fixture-worker",
+                    expected_input_type=input_type, current_turn_id="turn-current",
+                )
+                self.assertEqual(result["input_type"], input_type)
+                self.assertEqual(result["turn_id"], "turn-current")
+                self.assertEqual(result["executor_path"], "/root/fixture-worker")
+                self.assertNotIn("fixture-job-id", result["message"])
+
+    def test_notification_rejects_wrong_thread_executor_path_and_old_turn(self) -> None:
+        valid_delivery = self._delivery()
+        valid_event = self._event()
+        invalid_cases = (
+            (self._delivery(recipient="other-thread"), valid_event, "wrong fixture thread"),
+            (valid_delivery, self._event(path="/root/other-worker"), "fixture executor path"),
+            (self._delivery(turn_id="turn-old"), valid_event, "current fixture turn"),
+        )
+        for delivery, event, message in invalid_cases:
+            with self.subTest(message=message), self.assertRaisesRegex(RuntimeIntegrationError, message):
+                validate_job_notification(
+                    delivery, event, job_id="fixture-job-id", recipient="worker-thread",
+                    task_id="fixture-task-id",
+                    executor_path="/root/fixture-worker", expected_input_type="tool",
+                    current_turn_id="turn-current",
+                )
+
+    def test_notification_rejects_wrong_input_type_and_job_id_echo(self) -> None:
+        with self.assertRaisesRegex(RuntimeIntegrationError, "input type"):
+            validate_job_notification(
+                self._delivery("user"), self._event(), job_id="fixture-job-id",
+                task_id="fixture-task-id",
+                recipient="worker-thread", executor_path="/root/fixture-worker",
+                expected_input_type="tool", current_turn_id="turn-current",
+            )
+
+    def test_later_turn_does_not_erase_completed_accepted_turn(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="mam-integration-turn-history-") as temporary:
+            instance = Path(temporary) / "instance"
+            instance.mkdir()
+            metadata = {"mam_root": str(instance / "multi-agent-manager"), "fixture": {
+                "manager": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "worker": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                "task": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            }}
+            harness = RuntimeHarness(instance, metadata, Path(temporary) / "turns.log")
+            stream = job_runtime.AppServerEventStream.connect(harness.endpoint.path)
+            try:
+                first = stream.start_turn(metadata["fixture"]["worker"], "first controlled turn")
+                first_id = first["turn"]["id"]
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    state = harness.endpoint.turn_state(metadata["fixture"]["worker"], first_id)
+                    if state and state.get("status") == "completed":
+                        break
+                    time.sleep(0.01)
+                self.assertEqual(state, {"id": first_id, "status": "completed"})
+                second = stream.start_turn(metadata["fixture"]["worker"], "later controlled turn")
+                second_id = second["turn"]["id"]
+                self.assertNotEqual(first_id, second_id)
+                self.assertEqual(harness.endpoint.current_turn(metadata["fixture"]["worker"])["id"], second_id)
+                self.assertEqual(
+                    harness.endpoint.turn_state(metadata["fixture"]["worker"], first_id),
+                    {"id": first_id, "status": "completed"},
+                )
+            finally:
+                stream.close()
+                harness.close()
+        delivery = self._delivery()
+        delivery["message"] += " fixture-job-id"
+        delivery["params"]["toolOutput"]["output"] = delivery["message"]
+        with self.assertRaisesRegex(RuntimeIntegrationError, "JOB-ID"):
+            validate_job_notification(
+                delivery, self._event(), job_id="fixture-job-id", recipient="worker-thread",
+                task_id="fixture-task-id",
+                executor_path="/root/fixture-worker", expected_input_type="tool",
+                current_turn_id="turn-current",
+            )
+
     def _create_old_instance(self, root: Path) -> dict:
         result = subprocess.run(
             [sys.executable, str(ROOT / "scripts" / "create_mam_test.py"), "--version", "0.1.0", "--root", str(root)],
@@ -96,7 +198,10 @@ class IntegrationRuntimeTests(unittest.TestCase):
                 self.assertEqual(harness.wait_for_job_state(exiting_job, "exited", timeout=60)["id"], exiting_job)
                 evidence = harness.verify_notification(exiting_job)
                 self.assertEqual(evidence["recipient"], metadata["fixture"]["worker"])
-                self.assertIn(exiting_job, evidence["message"])
+                self.assertEqual(evidence["input_type"], "tool")
+                self.assertEqual(evidence["event"]["accepted_turn_id"], evidence["turn_id"])
+                self.assertTrue(evidence["executor_path"].startswith("/root/"))
+                self.assertNotIn(exiting_job, evidence["message"])
                 self.assertTrue(any(item.get("method") == "turn/start" for item in evidence["requests"]))
                 self.assertTrue(evidence["event"]["delivery"] == "accepted")
                 self.assertTrue(evidence["history"])
