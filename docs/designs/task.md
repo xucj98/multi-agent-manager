@@ -1,6 +1,6 @@
 # mam task
 
-`mam task` 创建任务、登记执行者、发布要求和成果、查询及归档。任务可用 TASK-ID 或 AGENT-PATH 定位；AGENT-PATH 是当前原生协作树内的完整执行者路径，如 `/root/worker`。Manager 显式指定任务；已绑定执行者可按下表省略任务参数。首次发布、未绑定或已归档任务使用 TASK-ID。路径身份无法确认或不唯一时返回错误，不跨树猜测。
+`mam task` 创建任务、登记执行者、发布要求和成果、查询及归档。任务可用 TASK-ID 或 AGENT-PATH 定位；AGENT-PATH 是完整执行者路径，如 `/root/worker`。设置 CODEX_THREAD_ID 时限定调用者的原生协作树；普通终端未设置时，显式路径按本项目登记记录唯一匹配。Manager 显式指定任务；已绑定执行者可按下表省略任务参数。首次发布、未绑定或已归档任务使用 TASK-ID。路径身份无法确认或不唯一时返回错误，可改用 TASK-ID。
 
 ## 任务状态
 

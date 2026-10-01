@@ -1669,6 +1669,70 @@ base=$(git rev-parse --verify "$1^{commit}")
         with patch.object(cli, "caller_identity", return_value=a), patch.dict(os.environ, {"CODEX_THREAD_ID": agent_a}):
             self.assertEqual(cli.task_target(self.store, "/root/worker"), first)
 
+    def test_terminal_task_path_resolves_registered_identity_without_caller(self):
+        task = self.task()
+        revision = self.publish(task)
+        data = self.store.read(task)
+        data["agent"] = str(uuid.uuid4())
+        data["identity"] = {"path": "/root/worker", "tree_root": str(uuid.uuid4())}
+        self.store.write(data)
+        with patch.dict(os.environ):
+            os.environ.pop("CODEX_THREAD_ID", None)
+            result = self.call("show", "/root/worker", "--json")
+            self.assertEqual(result["content"], "# test task\n")
+            self.assertEqual(result["revision"], revision)
+            self.assertEqual(self.call("show", task, "--json"), result)
+            self.assertIn("CODEX_THREAD_ID", self.call("show", ok=False)["error"])
+            self.assertIn("CODEX_THREAD_ID", self.call("block", "/root/worker", "--note", "wait", ok=False)["error"])
+
+    def test_terminal_task_path_rejects_missing_and_ambiguous_records(self):
+        tasks = [self.task(), self.task()]
+        for task in tasks:
+            data = self.store.read(task)
+            data["agent"] = str(uuid.uuid4())
+            data["identity"] = {"path": "/root/worker", "tree_root": str(uuid.uuid4())}
+            self.store.write(data)
+        with patch.dict(os.environ):
+            os.environ.pop("CODEX_THREAD_ID", None)
+            for path, count in (("/root/worker", 2), ("/root/missing", 0)):
+                with self.subTest(path=path):
+                    error = self.call("show", path, ok=False)["error"]
+                    self.assertIn(f"{count} matching", error)
+                    self.assertIn("this project", error)
+                    self.assertIn("TASK-ID", error)
+            data["status"] = "archived"
+            self.store.write(data)
+            self.assertEqual(cli.task_target(self.store, "/root/worker"), tasks[0])
+            with self.assertRaisesRegex(cli.Error, "2 matching"):
+                cli.task_target(self.store, "/root/worker", include_archived=True)
+
+    def test_task_path_keeps_caller_tree_scope_and_identity_failures(self):
+        task = self.task()
+        agent, root = str(uuid.uuid4()), str(uuid.uuid4())
+        data = self.store.read(task)
+        data["agent"] = agent
+        data["identity"] = {"path": "/root/worker", "tree_root": root}
+        self.store.write(data)
+        caller = str(uuid.uuid4())
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": caller}), \
+                patch.object(identity, "read", return_value=identity.ThreadIdentity(caller, "/root", caller)):
+            with self.assertRaisesRegex(cli.Error, "0 matching.*collaboration tree"):
+                cli.task_target(self.store, "/root/worker")
+        for invalid in ("", "invalid", " " + caller, "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"):
+            with self.subTest(identity=invalid), patch.dict(os.environ, {"CODEX_THREAD_ID": invalid}):
+                self.assertIn("canonical AGENT-ID", self.call("show", "/root/worker", ok=False)["error"])
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": caller}), \
+                patch.object(identity, "read", side_effect=identity.IdentityError("unavailable native identity")):
+            with self.assertRaisesRegex(cli.Error, "unavailable native identity"):
+                cli.task_target(self.store, "/root/worker")
+        data.pop("identity")
+        self.store.write(data)
+        with patch.dict(os.environ), \
+                patch.object(identity, "read", side_effect=identity.IdentityError("unavailable legacy identity")):
+            os.environ.pop("CODEX_THREAD_ID", None)
+            with self.assertRaisesRegex(cli.Error, "cannot verify legacy executor identity.*unavailable legacy identity"):
+                cli.task_target(self.store, "/root/worker")
+
     def test_start_handoff_requires_old_executor_quiescent(self):
         task = self.task()
         old, new, root = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())

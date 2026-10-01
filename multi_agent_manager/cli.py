@@ -261,7 +261,7 @@ def caller_identity():
 
 
 def task_target(store, target, *, include_archived=False):
-    """Resolve a TASK-ID or a path only within the caller's native tree."""
+    """Resolve a TASK-ID or a path, scoped to the caller's tree when present."""
     if target is None:
         caller = caller_agent()
         found = [data for data in store.all()
@@ -271,7 +271,7 @@ def task_target(store, target, *, include_archived=False):
         return found[0]["id"]
     if not target.startswith("/"):
         return identifier(target)
-    current = caller_identity()
+    current = caller_identity() if "CODEX_THREAD_ID" in os.environ else None
     matches = []
     for data in store.all():
         if (not include_archived and data.get("status") == "archived") or not data.get("agent"):
@@ -284,10 +284,11 @@ def task_target(store, target, *, include_archived=False):
             except identity.IdentityError as exc:
                 raise Error(f"cannot verify legacy executor identity for {data['id']}: {exc}") from exc
             known = {"path": observed.path, "tree_root": observed.tree_root}
-        if known["tree_root"] == current.tree_root and known["path"] == target:
+        if known["path"] == target and (current is None or known["tree_root"] == current.tree_root):
             matches.append(data["id"])
     if len(matches) != 1:
-        raise Error(f"native path {target} has {len(matches)} matching active tasks in this collaboration tree")
+        scope = "this collaboration tree" if current is not None else "this project"
+        raise Error(f"native path {target} has {len(matches)} matching tasks in {scope}; specify TASK-ID")
     return matches[0]
 
 
