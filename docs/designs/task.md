@@ -19,7 +19,7 @@
 mam task block TASK-ID|AGENT-PATH --note NOTE
 ```
 
-`task block` 仅由 Manager 判断和调用，状态为 `pending` 才可设置。`--note` 必填，`task list/status` 展示原因。执行者恢复运行或有未归档的 job 时，`blocked` 自动转为 `working`。
+`task block` 仅由 Manager 判断和调用，状态为 `pending` 才可设置。`--note` 必填，`task status` 展示原因。执行者恢复运行或有未归档的 job 时，`blocked` 自动转为 `working`。
 
 ## 创建与开始
 

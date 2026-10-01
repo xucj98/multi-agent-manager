@@ -1267,17 +1267,13 @@ def print_table(header, rows):
 
 
 def print_task_list(tasks):
-    from .task_state import REMINDER_LIMIT, reminder_count
     rows = []
     for task in tasks:
         agent = task.get("identity", {}).get("path") or task["agent"] or "未绑定"
         state = task["agent_state"]["status"]
         rows.append("\t".join((one_line(task["title"]), one_line(task["status"]), task["id"], one_line(agent),
-                              "未绑定" if state == "unbound" else one_line(state),
-                              f"{reminder_count(task)}/{REMINDER_LIMIT}",
-                              "Reminder limit reached" if reminder_count(task) >= REMINDER_LIMIT else "",
-                              one_line(task.get("block_note") if task.get("status") == "blocked" else None))))
-    print_table(("标题", "任务状态", "TASK-ID", "执行者", "agent状态", "提醒次数", "提醒状态", "阻断说明"),
+                              "未绑定" if state == "unbound" else one_line(state))))
+    print_table(("标题", "任务状态", "TASK-ID", "执行者", "agent状态"),
                 (row.split("\t") for row in rows))
 
 

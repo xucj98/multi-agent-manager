@@ -329,7 +329,7 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
             text=True,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(result.stdout.splitlines(), ["标题\t任务状态\tTASK-ID\t执行者\tagent状态\t提醒次数\t提醒状态\t阻断说明"])
+        self.assertEqual(result.stdout.splitlines(), ["标题\t任务状态\tTASK-ID\t执行者\tagent状态"])
         self.assertFalse(marker.exists())
 
 
@@ -512,13 +512,13 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
                 self.assertEqual(self.git(self.root, "diff", "--cached", "--", relative), "")
 
     def test_task_list_text_has_header_and_status_keeps_records(self):
-        header = "标题\t任务状态\tTASK-ID\t执行者\tagent状态\t提醒次数\t提醒状态\t阻断说明"
+        header = "标题\t任务状态\tTASK-ID\t执行者\tagent状态"
         self.assertEqual(self.task_command_output("list").splitlines(), [header])
         rejected = subprocess.run(mam_command("task", "list", "--json"), capture_output=True, text=True, cwd=self.projects)
         self.assertEqual(rejected.returncode, 2)
         unbound = self.call("create", "--title", "中文\n标题\twith whitespace")["id"]
         self.assertEqual(self.task_command_output("list").splitlines()[1].split("\t"),
-                         ["中文 标题 with whitespace", "pending", unbound, "未绑定", "未绑定", "0/3", "", ""])
+                         ["中文 标题 with whitespace", "pending", unbound, "未绑定", "未绑定"])
         bound = self.task()
         self.fixture_bind(bound, "bound-agent")
         calls = []
@@ -528,8 +528,8 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
             rows = {fields[2]: fields for fields in (line.split("\t") for line in lines[1:])}
             self.assertEqual(calls, [["bound-agent"]])
             self.assertEqual(len(rows), 2)
-            self.assertEqual(rows[unbound], ["中文 标题 with whitespace", "pending", unbound, "未绑定", "未绑定", "0/3", "", ""])
-            self.assertEqual(rows[bound][3:], ["bound-agent", "unknown", "0/3", "", ""])
+            self.assertEqual(rows[unbound], ["中文 标题 with whitespace", "pending", unbound, "未绑定", "未绑定"])
+            self.assertEqual(rows[bound][3:], ["bound-agent", "unknown"])
         self.assertEqual(self.call("status", bound)["agent"], "bound-agent")
 
     def test_task_show_text_is_published_markdown(self):
@@ -1106,7 +1106,7 @@ base=$(git rev-parse --verify "$1^{commit}")
         archive_help = subprocess.check_output([command, "task", "archive", "--help"], cwd="/tmp", text=True)
         self.assertIn("delete the entire task workspace", " ".join(archive_help.split()))
         rows = subprocess.check_output([command, "task", "list"], cwd=self.projects, text=True)
-        self.assertEqual(rows.splitlines(), ["标题\t任务状态\tTASK-ID\t执行者\tagent状态\t提醒次数\t提醒状态\t阻断说明"])
+        self.assertEqual(rows.splitlines(), ["标题\t任务状态\tTASK-ID\t执行者\tagent状态"])
         installed = subprocess.check_output([str(python), "-I", "-c",
             "import multi_agent_manager; print(multi_agent_manager.__file__)"], cwd="/tmp", text=True)
         self.assertTrue(Path(installed.strip()).is_relative_to(environment))
