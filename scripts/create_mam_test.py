@@ -19,7 +19,7 @@ import tarfile
 
 
 TASK_BASELINE = "2eb71f96-e221-4571-9e18-c3352fc7634f"
-SUPPORTED = {"0.1.0", "0.2.0", "0.2.1"}
+SUPPORTED = {"0.1.0", "0.2.0", "0.2.1", "0.2.2"}
 
 
 class CreateError(RuntimeError):
@@ -107,7 +107,7 @@ def _package_for_version(
         _copy_package(source, package / "multi_agent_manager")
         source_commit = "archived-old-source-snapshot"
         fixture = repo / "tests" / "fixtures" / version / "create.py"
-    elif version in {"0.2.0", "0.2.1"}:
+    elif version in {"0.2.0", "0.2.1", "0.2.2"}:
         source_tree = None
         if source_ref:
             source_tree, source_commit = _extract_release_source(repo, source_ref, destination)

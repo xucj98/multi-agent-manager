@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the complete 0.1.0 to 0.2.1 release installation and upgrade checks."""
+"""Run the complete 0.1.0 to 0.2.2 release installation and upgrade checks."""
 from __future__ import annotations
 
 import argparse
@@ -216,8 +216,8 @@ def run_full_unit_suite(log: Path) -> dict[str, Any]:
 def release_preflight(from_version: str, to_version: str, *, published: bool, log: Path) -> tuple[str, str]:
     """Validate a release request before allocating fixtures or running gates."""
 
-    if (from_version, to_version) != ("0.1.0", "0.2.1"):
-        raise IntegrationError("only the complete 0.1.0 -> 0.2.1 chain is supported")
+    if (from_version, to_version) != ("0.1.0", "0.2.2"):
+        raise IntegrationError("only the complete 0.1.0 -> 0.2.2 chain is supported")
     selected_ref = f"refs/tags/v{to_version}" if published else "HEAD"
     checkout_head = git_output(root_dir(), "rev-parse", "HEAD")
     if published:
@@ -251,12 +251,19 @@ def verify_instance_data(
         raise IntegrationError(f"fixture metadata has no task/manager for {instance}")
     root = Path(metadata["mam_root"])
     version = read_json(root / ".local" / "data-version.json", "data version")
-    if version.get("version") != "0.2.1":
+    if version.get("version") != "0.2.2":
         raise IntegrationError(f"data version was not migrated in {instance}: {version}")
-    if upgrade_result.get("data_version") != "0.2.1":
-        raise IntegrationError(f"upgrade result has no 0.2.1 data version in {instance}: {upgrade_result}")
-    if upgrade_result.get("program_version") != "0.2.1":
-        raise IntegrationError(f"upgrade result has no 0.2.1 program version in {instance}: {upgrade_result}")
+    expected_steps = [
+        {"from": "0.1.0", "to": "0.2.0"},
+        {"from": "0.2.0", "to": "0.2.1"},
+        {"from": "0.2.1", "to": "0.2.2"},
+    ]
+    if upgrade_result.get("migrations", {}).get("steps") != expected_steps:
+        raise IntegrationError(f"upgrade skipped a historical migration receipt in {instance}: {upgrade_result}")
+    if upgrade_result.get("data_version") != "0.2.2":
+        raise IntegrationError(f"upgrade result has no 0.2.2 data version in {instance}: {upgrade_result}")
+    if upgrade_result.get("program_version") != "0.2.2":
+        raise IntegrationError(f"upgrade result has no 0.2.2 program version in {instance}: {upgrade_result}")
     if upgrade_result.get("status") != "upgraded":
         raise IntegrationError(f"first upgrade did not migrate {instance}: {upgrade_result}")
     target_result = upgrade_result.get("target_commit")
@@ -317,7 +324,7 @@ def verify_instance_data(
     if status.returncode:
         raise IntegrationError(f"service status failed after upgrade in {instance}: {status.stderr[-800:]}")
     status_value = json.loads(status.stdout)
-    if not isinstance(status_value, dict) or status_value.get("program_version") != "0.2.1" or status_value.get("data_version") != "0.2.1":
+    if not isinstance(status_value, dict) or status_value.get("program_version") != "0.2.2" or status_value.get("data_version") != "0.2.2":
         raise IntegrationError(f"service status omitted migrated versions in {instance}: {status.stdout}")
     return {
         "task": task,
@@ -400,7 +407,7 @@ def migration_retry(launcher: Path, instance: Path, install_root: Path, log: Pat
         "    raise SystemExit('first migration unexpectedly succeeded')\n"
         "assert not (root/'.local'/'data-version.json').exists()\n"
         "result=migrations.migrate_data(root)\n"
-        "assert result['changed'] and migrations.read_data_version(root)=='0.2.1'\n"
+        "assert result['changed'] and migrations.read_data_version(root)=='0.2.2'\n"
         "print('{\"status\":\"retried\",\"version\":\"'+migrations.read_data_version(root)+'\"}')\n"
     )
     result = run([str(python), "-c", code], cwd=instance, log=log)
@@ -410,7 +417,7 @@ def migration_retry(launcher: Path, instance: Path, install_root: Path, log: Pat
         value = json.loads(result.stdout.strip().splitlines()[-1])
     except (IndexError, json.JSONDecodeError) as exc:
         raise IntegrationError(f"migration retry returned invalid evidence in {instance}") from exc
-    if value != {"status": "retried", "version": "0.2.1"}:
+    if value != {"status": "retried", "version": "0.2.2"}:
         raise IntegrationError(f"migration retry returned incomplete evidence: {value}")
     return value
 
@@ -586,7 +593,7 @@ def install_candidate(
     install_script = source / "scripts" / "install.sh"
     if not install_script.is_file():
         raise IntegrationError("candidate archive has no scripts/install.sh")
-    install_command = ["bash", str(install_script), "--version", "0.2.1"]
+    install_command = ["bash", str(install_script), "--version", "0.2.2"]
     # One installer regression test intentionally starts an interactive bash
     # session.  Run the real installer under a local pseudo-terminal so that
     # this check observes the same terminal boundary as a user invocation.
@@ -604,7 +611,7 @@ def install_candidate(
         # limitation, but only when the installer persisted structured evidence
         # naming that exact failed stage.  Generic installer failures remain
         # fatal even when a launcher happened to be created.
-        evidence = controlled_compatibility_failure(Path(env["HOME"]), "0.2.1") if controlled else None
+        evidence = controlled_compatibility_failure(Path(env["HOME"]), "0.2.2") if controlled else None
         if evidence is None:
             raise IntegrationError(f"candidate install failed: {transcript[-1500:]}")
         return launcher, {
@@ -784,19 +791,54 @@ def integration(
             "launcher": str(launcher),
             "real_delivery": real_delivery["status"],
         })
-        # Keep a real 0.2.0 writer in the default run so the no-op 0.2.0 to
-        # 0.2.1 migration is exercised separately from the full 0.1 chain.
-        prior_path = root / "mam-test-0.2.0"
-        prior = create_instance("0.2.0", prior_path, log, seed="refs/tags/v0.2.0", source_ref="refs/tags/v0.2.0")
-        owned.append(prior_path)
-        prior_upgrade = upgrade(prior_path, launcher, log)
-        if prior_upgrade.get("data_version") != "0.2.1" or prior_upgrade.get("status") != "upgraded":
-            raise IntegrationError(f"0.2.0 -> 0.2.1 upgrade was not applied: {prior_upgrade}")
-        outcome["scenarios"].append({
-            "name": "upgrade:0.2.0-to-0.2.1",
-            "status": "passed",
-            "data_version": prior_upgrade.get("data_version"),
-        })
+        # Retain the 0.2.0 writer and exercise the immediately previous
+        # release with its actual published package and fixture.
+        prior_instances: list[tuple[Path, dict[str, Any]]] = []
+        for prior_version, expected_steps in (
+            ("0.2.0", [{"from": "0.2.0", "to": "0.2.1"}, {"from": "0.2.1", "to": "0.2.2"}]),
+            ("0.2.1", [{"from": "0.2.1", "to": "0.2.2"}]),
+        ):
+            prior_path = root / f"mam-test-{prior_version}"
+            prior_ref = f"refs/tags/v{prior_version}"
+            prior = create_instance(prior_version, prior_path, log, seed=prior_ref, source_ref=prior_ref)
+            owned.append(prior_path)
+            prior_root = Path(prior["mam_root"])
+            writer_metadata = read_json(prior_path / ".versions" / prior_version / "release.json", "old writer metadata")
+            old_commit = git_output(root_dir(), "rev-parse", f"{prior_ref}^{{commit}}")
+            if writer_metadata.get("source_commit") != old_commit:
+                raise IntegrationError(f"old writer does not match {prior_ref}: {writer_metadata}")
+            # Historical fixtures predate explicit receipts.  Let the old
+            # program itself write its data version before candidate upgrade.
+            old_upgrade = upgrade(prior_path, Path(prior["mam"]), log)
+            if old_upgrade.get("program_version") != prior_version or old_upgrade.get("data_version") != prior_version or old_upgrade.get("target_commit") != old_commit:
+                raise IntegrationError(f"old writer failed to initialize {prior_version} data: {old_upgrade}")
+            baseline_refs[prior_path.name] = git_refs(prior_root)
+            prior_instances.append((prior_path, prior))
+            task_id = prior["fixture"]["task"]
+            preserved_paths = [
+                prior_root / ".local" / "tasks" / f"{task_id}.json",
+                prior_root / ".tasks" / task_id / "task.md",
+                prior_root / ".tasks" / task_id / "report.md",
+                prior_root / ".tasks" / task_id / "files" / "fixture.txt",
+            ]
+            before = {path: path.read_bytes() for path in preserved_paths}
+            prior_upgrade = upgrade(prior_path, launcher, log)
+            if prior_upgrade.get("data_version") != "0.2.2" or prior_upgrade.get("status") != "upgraded" or prior_upgrade.get("migrations", {}).get("steps") != expected_steps:
+                raise IntegrationError(f"{prior_version} -> 0.2.2 upgrade was not applied: {prior_upgrade}")
+            if any(path.read_bytes() != content for path, content in before.items()):
+                raise IntegrationError(f"candidate upgrade rewrote {prior_version} fixture records")
+            verify_task(prior_path, launcher, prior["fixture"], log)
+            repeated = upgrade(prior_path, launcher, log)
+            if repeated.get("status") != "up-to-date" or repeated.get("migrations", {}).get("steps") != []:
+                raise IntegrationError(f"repeated {prior_version} upgrade was not idempotent: {repeated}")
+            outcome["scenarios"].append({
+                "name": f"upgrade:{prior_version}-to-0.2.2",
+                "status": "passed",
+                "writer": writer_metadata,
+                "old_upgrade": old_upgrade,
+                "upgrade": prior_upgrade,
+                "records_preserved": True,
+            })
         upgrade_results: list[dict[str, Any]] = []
         conflict_file = induce_git_conflict(instances[0][0], root_dir(), commit, log)
         conflict_error = None
@@ -841,7 +883,7 @@ def integration(
         first_backup = Path(upgrade_results[0]["backup"])
         restore_backup(instances[0][0], first_backup)
         restored = upgrade(instances[0][0], launcher, log, env=runtimes[0].env)
-        if restored.get("data_version") != "0.2.1" or restored.get("status") != "upgraded":
+        if restored.get("data_version") != "0.2.2" or restored.get("status") != "upgraded":
             raise IntegrationError(f"backup restore did not complete a fresh migration: {restored}")
         outcome["scenarios"].append({"name": "backup-restore-and-retry", "status": "passed", "backup": str(first_backup)})
         runtime_starts = []
@@ -870,7 +912,7 @@ def integration(
         owned.append(new_instance)
         outcome["scenarios"].append({"name": "first-use-new-instance", "status": "passed"})
         outcome["source_isolation"] = verify_source_isolation(
-            instances, commit, selected_ref, checkout_head, baseline_refs, source_ref_snapshot
+            instances + prior_instances, commit, selected_ref, checkout_head, baseline_refs, source_ref_snapshot
         )
         outcome["scenarios"].append({"name": "candidate-and-instance-isolation", "status": "passed"})
     except (IntegrationError, OSError, subprocess.SubprocessError, tarfile.TarError) as exc:
@@ -919,7 +961,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--keep", action="store_true", help="retain created instances for diagnosis")
     args = parser.parse_args(argv)
     explicit_target = args.to_version is not None
-    target_version = args.to_version or "0.2.1"
+    target_version = args.to_version or "0.2.2"
     code, outcome = integration(args.root, args.from_version, target_version, args.keep, published=explicit_target)
     print(json.dumps(outcome, indent=2, ensure_ascii=False, sort_keys=True))
     return code

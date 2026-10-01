@@ -71,7 +71,7 @@ Manager 编写规划和核心文档可直接修改该库。通用交付流程见
 默认从当前 checkout 构建候选发布包，覆盖首次安装、上一版本升级及从 0.1.0 开始的完整迁移链。`--from VERSION` 可指定起始版本，`--to VERSION` 可指定已发布的目标版本，例如：
 
 ```bash
-.venv/bin/python scripts/test_integration.py --from 0.1.0 --to 0.2.1 --root ../tmp
+.venv/bin/python scripts/test_integration.py --from 0.1.0 --to 0.2.2 --root ../tmp
 ```
 
 创建脚本使用新目录；已有实例保留并报错。完整测试成功时退出码为 `0`，失败时为非 `0`，输出场景结果与日志位置。测试只清理本次创建的资源。

@@ -18,8 +18,8 @@ PROGRAM_VERSION = RELEASE_VERSION
 BASELINE_VERSION = "0.1.0"
 DATA_VERSION = PROGRAM_VERSION
 # Keep every released data format in the chain so a fresh 0.1.0 instance
-# reaches the current format through the real 0.2.0 receipt.
-MIGRATION_VERSIONS = (BASELINE_VERSION, "0.2.0", DATA_VERSION)
+# reaches the current format through every intermediate receipt.
+MIGRATION_VERSIONS = (BASELINE_VERSION, "0.2.0", "0.2.1", DATA_VERSION)
 
 
 def source_commit() -> str | None:

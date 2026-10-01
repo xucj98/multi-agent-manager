@@ -29,7 +29,7 @@ from . import job_runtime, task_state
 from .cli import ProjectConfig, Store, safe_path
 try:
     from .migrations import MigrationError, backup_local, migrate_data, read_data_version, write_data_version
-    from .release import RELEASE_TAG
+    from .release import RELEASE_TAG, RELEASE_VERSION
     from .version import DATA_VERSION, info as program_info, source_commit
 except ImportError:  # A source-only 0.1.0 fixture may omit release helpers.
     class MigrationError(RuntimeError):
@@ -37,6 +37,7 @@ except ImportError:  # A source-only 0.1.0 fixture may omit release helpers.
 
     DATA_VERSION = "0.1.0"
     RELEASE_TAG = "v0.1.0"
+    RELEASE_VERSION = "0.1.0"
     def read_data_version(root):
         return "0.1.0"
 
@@ -56,7 +57,7 @@ except ImportError:  # A source-only 0.1.0 fixture may omit release helpers.
         return None
 
 
-ADAPTATION_DOCUMENT = "docs/upgrades/0.2.0.md"
+ADAPTATION_DOCUMENT = f"docs/upgrades/{RELEASE_VERSION}.md"
 
 
 SERVICE_VERSION = 1
