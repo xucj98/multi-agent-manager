@@ -105,8 +105,16 @@ def _migrate_010_to_020(root: Path) -> None:
         raise MigrationError(f"instance local state is missing: {_local(root)}")
 
 
+def _migrate_020_to_021(root: Path) -> None:
+    """Install the 0.2.1 receipt without rewriting 0.2.0 records."""
+
+    if not _local(root).is_dir():
+        raise MigrationError(f"instance local state is missing: {_local(root)}")
+
+
 MIGRATIONS: dict[tuple[str, str], Callable[[Path], None]] = {
-    (BASELINE_VERSION, DATA_VERSION): _migrate_010_to_020,
+    ("0.1.0", "0.2.0"): _migrate_010_to_020,
+    ("0.2.0", DATA_VERSION): _migrate_020_to_021,
 }
 
 

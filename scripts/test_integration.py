@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the 0.1.0 to 0.2.0 release installation and upgrade checks."""
+"""Run the complete 0.1.0 to 0.2.1 release installation and upgrade checks."""
 from __future__ import annotations
 
 import argparse
@@ -205,12 +205,12 @@ def verify_instance_data(
         raise IntegrationError(f"fixture metadata has no task/manager for {instance}")
     root = Path(metadata["mam_root"])
     version = read_json(root / ".local" / "data-version.json", "data version")
-    if version.get("version") != "0.2.0":
+    if version.get("version") != "0.2.1":
         raise IntegrationError(f"data version was not migrated in {instance}: {version}")
-    if upgrade_result.get("data_version") != "0.2.0":
-        raise IntegrationError(f"upgrade result has no 0.2.0 data version in {instance}: {upgrade_result}")
-    if upgrade_result.get("program_version") != "0.2.0":
-        raise IntegrationError(f"upgrade result has no 0.2.0 program version in {instance}: {upgrade_result}")
+    if upgrade_result.get("data_version") != "0.2.1":
+        raise IntegrationError(f"upgrade result has no 0.2.1 data version in {instance}: {upgrade_result}")
+    if upgrade_result.get("program_version") != "0.2.1":
+        raise IntegrationError(f"upgrade result has no 0.2.1 program version in {instance}: {upgrade_result}")
     if upgrade_result.get("status") != "upgraded":
         raise IntegrationError(f"first upgrade did not migrate {instance}: {upgrade_result}")
     target_result = upgrade_result.get("target_commit")
@@ -271,7 +271,7 @@ def verify_instance_data(
     if status.returncode:
         raise IntegrationError(f"service status failed after upgrade in {instance}: {status.stderr[-800:]}")
     status_value = json.loads(status.stdout)
-    if not isinstance(status_value, dict) or status_value.get("program_version") != "0.2.0" or status_value.get("data_version") != "0.2.0":
+    if not isinstance(status_value, dict) or status_value.get("program_version") != "0.2.1" or status_value.get("data_version") != "0.2.1":
         raise IntegrationError(f"service status omitted migrated versions in {instance}: {status.stdout}")
     return {
         "task": task,
@@ -354,7 +354,7 @@ def migration_retry(launcher: Path, instance: Path, install_root: Path, log: Pat
         "    raise SystemExit('first migration unexpectedly succeeded')\n"
         "assert not (root/'.local'/'data-version.json').exists()\n"
         "result=migrations.migrate_data(root)\n"
-        "assert result['changed'] and migrations.read_data_version(root)=='0.2.0'\n"
+        "assert result['changed'] and migrations.read_data_version(root)=='0.2.1'\n"
         "print('{\"status\":\"retried\",\"version\":\"'+migrations.read_data_version(root)+'\"}')\n"
     )
     result = run([str(python), "-c", code], cwd=instance, log=log)
@@ -364,7 +364,7 @@ def migration_retry(launcher: Path, instance: Path, install_root: Path, log: Pat
         value = json.loads(result.stdout.strip().splitlines()[-1])
     except (IndexError, json.JSONDecodeError) as exc:
         raise IntegrationError(f"migration retry returned invalid evidence in {instance}") from exc
-    if value != {"status": "retried", "version": "0.2.0"}:
+    if value != {"status": "retried", "version": "0.2.1"}:
         raise IntegrationError(f"migration retry returned incomplete evidence: {value}")
     return value
 
@@ -497,7 +497,7 @@ def install_candidate(
     install_script = source / "scripts" / "install.sh"
     if not install_script.is_file():
         raise IntegrationError("candidate archive has no scripts/install.sh")
-    install_command = ["bash", str(install_script), "--version", "0.2.0"]
+    install_command = ["bash", str(install_script), "--version", "0.2.1"]
     # One installer regression test intentionally starts an interactive bash
     # session.  Run the real installer under a local pseudo-terminal so that
     # this check observes the same terminal boundary as a user invocation.
@@ -618,8 +618,8 @@ def integration(
     processes: list[subprocess.Popen[bytes]] = []
     runtimes: list[RuntimeHarness] = []
     try:
-        if (from_version, to_version) != ("0.1.0", "0.2.0"):
-            raise IntegrationError("only the complete 0.1.0 -> 0.2.0 chain is supported")
+        if (from_version, to_version) != ("0.1.0", "0.2.1"):
+            raise IntegrationError("only the complete 0.1.0 -> 0.2.1 chain is supported")
         selected_ref = f"refs/tags/v{to_version}" if published else "HEAD"
         checkout_head = git_output(root_dir(), "rev-parse", "HEAD")
         if published:
@@ -691,6 +691,19 @@ def integration(
             "launcher": str(launcher),
             "real_delivery": real_delivery["status"],
         })
+        # Keep a real 0.2.0 writer in the default run so the no-op 0.2.0 to
+        # 0.2.1 migration is exercised separately from the full 0.1 chain.
+        prior_path = root / "mam-test-0.2.0"
+        prior = create_instance("0.2.0", prior_path, log, seed="refs/tags/v0.2.0", source_ref="refs/tags/v0.2.0")
+        owned.append(prior_path)
+        prior_upgrade = upgrade(prior_path, launcher, log)
+        if prior_upgrade.get("data_version") != "0.2.1" or prior_upgrade.get("status") != "upgraded":
+            raise IntegrationError(f"0.2.0 -> 0.2.1 upgrade was not applied: {prior_upgrade}")
+        outcome["scenarios"].append({
+            "name": "upgrade:0.2.0-to-0.2.1",
+            "status": "passed",
+            "data_version": prior_upgrade.get("data_version"),
+        })
         upgrade_results: list[dict[str, Any]] = []
         conflict_file = induce_git_conflict(instances[0][0], root_dir(), commit, log)
         conflict_error = None
@@ -735,7 +748,7 @@ def integration(
         first_backup = Path(upgrade_results[0]["backup"])
         restore_backup(instances[0][0], first_backup)
         restored = upgrade(instances[0][0], launcher, log, env=runtimes[0].env)
-        if restored.get("data_version") != "0.2.0" or restored.get("status") != "upgraded":
+        if restored.get("data_version") != "0.2.1" or restored.get("status") != "upgraded":
             raise IntegrationError(f"backup restore did not complete a fresh migration: {restored}")
         outcome["scenarios"].append({"name": "backup-restore-and-retry", "status": "passed", "backup": str(first_backup)})
         runtime_starts = []
@@ -801,7 +814,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--keep", action="store_true", help="retain created instances for diagnosis")
     args = parser.parse_args(argv)
     explicit_target = args.to_version is not None
-    target_version = args.to_version or "0.2.0"
+    target_version = args.to_version or "0.2.1"
     code, outcome = integration(args.root, args.from_version, target_version, args.keep, published=explicit_target)
     print(json.dumps(outcome, indent=2, ensure_ascii=False, sort_keys=True))
     return code

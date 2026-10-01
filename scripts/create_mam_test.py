@@ -19,7 +19,7 @@ import tarfile
 
 
 TASK_BASELINE = "2eb71f96-e221-4571-9e18-c3352fc7634f"
-SUPPORTED = {"0.1.0", "0.2.0"}
+SUPPORTED = {"0.1.0", "0.2.0", "0.2.1"}
 
 
 class CreateError(RuntimeError):
@@ -81,7 +81,7 @@ def _extract_release_source(repo: Path, ref: str, destination: Path) -> tuple[Pa
     try:
         source_commit = git(repo, "rev-parse", f"{ref}^{{commit}}")
         archive = subprocess.run(
-            ["git", "-C", str(repo), "archive", "--format=tar", ref, "multi_agent_manager", "tests/fixtures/0.2.0"],
+            ["git", "-C", str(repo), "archive", "--format=tar", ref, "multi_agent_manager", "tests/fixtures"],
             check=True,
             capture_output=True,
         ).stdout
@@ -107,7 +107,7 @@ def _package_for_version(
         _copy_package(source, package / "multi_agent_manager")
         source_commit = "archived-old-source-snapshot"
         fixture = repo / "tests" / "fixtures" / version / "create.py"
-    elif version == "0.2.0":
+    elif version in {"0.2.0", "0.2.1"}:
         source_tree = None
         if source_ref:
             source_tree, source_commit = _extract_release_source(repo, source_ref, destination)
@@ -136,9 +136,15 @@ def _venv_and_launcher(destination: Path, package_parent: Path) -> Path:
     # venv from that interpreter records the inner venv as ``home`` and loses
     # the standard library on this cluster's relocatable Python build.  Use
     # the actual shared base interpreter instead.
-    base_python = Path(sys.base_prefix) / "bin" / "python3.10"
-    if not base_python.is_file():
-        base_python = Path(sys.base_prefix) / "bin" / "python"
+    candidates = [
+        Path(sys.base_prefix) / "bin" / "python3",
+        Path(sys.base_prefix) / "bin" / "python",
+        Path(getattr(sys, "_base_executable", "")),
+        Path(sys.executable),
+    ]
+    base_python = next((candidate for candidate in candidates if candidate.is_file() and os.access(candidate, os.X_OK)), None)
+    if base_python is None:
+        raise CreateError("cannot locate a runnable base Python interpreter")
     result = subprocess.run([str(base_python), "-m", "venv", "--without-pip", str(environment)], capture_output=True, text=True)
     if result.returncode:
         raise CreateError(f"cannot create isolated test environment: {result.stderr[-1000:]}")

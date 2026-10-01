@@ -63,5 +63,5 @@ git -C "$worktree" check-ignore -q .venv/ || {
 "$worktree/.venv/bin/python" -m pip install --no-deps --editable "$worktree"
 (
   cd "$worktree"
-  "$worktree/.venv/bin/python" -B "$worktree/.venv/bin/mam" task list
+  "$worktree/.venv/bin/python" -B -c 'import multi_agent_manager; from multi_agent_manager import cli'
 )

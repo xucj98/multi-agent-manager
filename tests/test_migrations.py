@@ -25,9 +25,12 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(migrations.read_data_version(self.root), "0.1.0")
         result = migrations.migrate_data(self.root)
         self.assertEqual(result["from"], "0.1.0")
-        self.assertEqual(result["to"], "0.2.0")
-        self.assertEqual(result["steps"], [{"from": "0.1.0", "to": "0.2.0"}])
-        self.assertEqual(migrations.read_data_version(self.root), "0.2.0")
+        self.assertEqual(result["to"], "0.2.1")
+        self.assertEqual(result["steps"], [
+            {"from": "0.1.0", "to": "0.2.0"},
+            {"from": "0.2.0", "to": "0.2.1"},
+        ])
+        self.assertEqual(migrations.read_data_version(self.root), "0.2.1")
         old_task = json.loads(self.record.read_text())
         self.assertEqual(old_task, {"id": "kept", "jobs": [{"status": "stopped"}]})
         self.assertEqual(task_state.reminder_count(old_task), 0)
@@ -49,7 +52,16 @@ class MigrationTests(unittest.TestCase):
             self.assertFalse((self.root / ".local" / migrations.VERSION_FILE).exists())
             result = migrations.migrate_data(self.root)
         self.assertTrue(result["changed"])
-        self.assertEqual(migrations.read_data_version(self.root), "0.2.0")
+        self.assertEqual(migrations.read_data_version(self.root), "0.2.1")
+
+    def test_020_to_021_is_an_explicit_noop_receipt(self):
+        version_file = self.root / ".local" / migrations.VERSION_FILE
+        version_file.write_text('{"version":"0.2.0","history":[]}\n', encoding="utf-8")
+        before = self.record.read_bytes()
+        result = migrations.migrate_data(self.root)
+        self.assertEqual(result["steps"], [{"from": "0.2.0", "to": "0.2.1"}])
+        self.assertEqual(migrations.read_data_version(self.root), "0.2.1")
+        self.assertEqual(self.record.read_bytes(), before)
 
     def test_backup_copies_only_local_and_never_overwrites_existing_backup(self):
         (self.root / "outside.txt").write_text("outside", encoding="utf-8")

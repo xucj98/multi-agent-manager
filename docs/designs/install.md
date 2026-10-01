@@ -14,12 +14,12 @@ install.sh [--version VERSION]
 
 ## 指定版本
 
-`VERSION` 为发布版本号，例如 `0.2.0`。需要固定安装或升级的目标版本时，在 Bash 中执行：
+`VERSION` 为发布版本号，例如 `0.2.1`。需要固定安装或升级的目标版本时，在 Bash 中执行：
 
 ```bash
 set -o pipefail
 curl -fsSL "https://raw.githubusercontent.com/xucj98/multi-agent-manager/main/scripts/install.sh" \
-  | bash -s -- --version 0.2.0
+  | bash -s -- --version 0.2.1
 echo $?
 ```
 
@@ -27,7 +27,7 @@ echo $?
 
 ## 安装与测试
 
-脚本下载选定版本的源码发布包并解压，运行日常自动化测试（含数据迁移单元用例），通过 pipx 安装或更新 `mam`，再验证与当前 Codex 的接口兼容性和真实消息投递。全部通过后报告安装成功；测试使用独立实例，临时文件在结束时清理。完整的旧版升级场景在[发版集成测试](../development.md#发版集成测试)中验收。
+脚本下载选定版本的源码发布包并解压，运行必要的包和关键文件 smoke，通过 pipx 安装或更新 `mam`，再调用 `mam-codex-check` 完成分层兼容性验收。版本、提交、阶段耗时、测试摘要和原始证据会保留在用户数据目录；临时工作目录仍在结束时清理。完整的旧版升级场景在[发版集成测试](../development.md#发版集成测试)中验收。
 
 ## 结果与重试
 

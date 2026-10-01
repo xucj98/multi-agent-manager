@@ -169,7 +169,7 @@ class IntegrationRuntimeTests(unittest.TestCase):
             (task_dir / f"{task_id}.json").write_text(
                 json.dumps({"id": task_id, "agent": worker}), encoding="utf-8"
             )
-            metadata = {"version": "0.2.0", "mam_root": str(task_dir.parents[1]), "fixture": {
+            metadata = {"version": "0.2.1", "mam_root": str(task_dir.parents[1]), "fixture": {
                 "manager": manager, "worker": worker, "task": task_id,
             }}
             harness = RuntimeHarness(instance, metadata, Path(temporary) / "missing-identity.log")

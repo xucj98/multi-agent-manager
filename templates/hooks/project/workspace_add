@@ -13,6 +13,8 @@ name = context["repo"]
 record = next(item for item in context["repos"] if item["name"] == name)
 source = Path(record["source"])
 entry = source / ".local" / "hooks" / "workspace_add"
+if entry.resolve() == Path(__file__).resolve():
+    sys.exit("project workspace_add hook cannot dispatch to itself")
 if entry.is_symlink() or not entry.is_file() or not os.access(entry, os.X_OK):
     sys.exit(f"repo workspace_add hook must be an executable regular file: {entry}")
 sys.exit(subprocess.run([str(entry)], input=payload, cwd=source).returncode)

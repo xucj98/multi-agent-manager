@@ -994,6 +994,7 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
         scripts.mkdir()
         implementation = ROOT / "scripts"
         (scripts / "create_worktree.sh").write_bytes((implementation / "create_worktree.sh").read_bytes())
+        self.assertNotIn(" task list", (implementation / "create_worktree.sh").read_text())
         shutil.copytree(ROOT / "multi_agent_manager", self.root / "multi_agent_manager", ignore=shutil.ignore_patterns("__pycache__"))
         shutil.copyfile(ROOT / "pyproject.toml", self.root / "pyproject.toml")
         self.git(self.root, "add", "scripts", "multi_agent_manager", "pyproject.toml")
@@ -1015,6 +1016,7 @@ cd "$source_root"
 base=$(git rev-parse --verify "$1^{commit}")
 """ + f"python={shlex.quote(str(test_python))}\n" + """git show "$base:scripts/create_worktree.sh" | bash -s -- "$base" "$2" "$3" "$python"
 """)
+        self.assertIn('git show "$base:scripts/create_worktree.sh"', (self.root / ".local/create_worktree.sh").read_text())
         linked = self.projects / "production state"
         self.git(self.root, "worktree", "add", "-b", "project/state-vla", str(linked), "main")
         self.config = self.configure(self.projects, linked, "project/state-vla")
@@ -1837,6 +1839,23 @@ base=$(git rev-parse --verify "$1^{commit}")
         self.clean_task(task)
         self.call("archive", task, "--note", "template dispatch complete")
 
+    def test_project_hook_dispatcher_rejects_self_forwarding(self):
+        state = self.projects / "state-self"
+        self.git(self.root, "worktree", "add", "-b", "project/state-self", str(state), "main")
+        self.config = self.configure(self.projects, state, "project/state-self")
+        self.store = cli.Store(self.config)
+        source = self.source("self-hook")
+        entry = state / ".local/hooks/workspace_add"
+        shutil.copyfile(ROOT / "templates/hooks/project/workspace_add", entry)
+        entry.chmod(0o755)
+        repo_entry = source / ".local/hooks/workspace_add"
+        repo_entry.parent.mkdir(exist_ok=True)
+        shutil.copyfile(entry, repo_entry)
+        repo_entry.chmod(0o755)
+        task = self.task()
+        result = self.add(task, "self-hook", ok=False)
+        self.assertIn("cannot dispatch to itself", result["error"])
+
     def test_project_hook_entry_context_and_failure_retry(self):
         source = self.source("context-repo")
         task = self.task()
@@ -1924,7 +1943,7 @@ Path(%r).write_text(json.dumps({'cwd': str(Path.cwd()), 'context': context}))
         self.assertFalse(capture.exists())
         self.assertIsNotNone(result["at"])
 
-    def test_hook_timeout_kills_child_process_and_rejects_reentry(self):
+    def test_hook_timeout_kills_child_process_group(self):
         task = self.task()
         config_path = self.projects / ".mam/env.json"
         config = json.loads(config_path.read_text())
@@ -1938,7 +1957,11 @@ Path(%r).write_text(json.dumps({'cwd': str(Path.cwd()), 'context': context}))
         self.assertIn("timed out", refused["error"])
         time.sleep(0.7)
         self.assertFalse(marker.exists())
+    def test_hook_rejects_reentrant_task_command(self):
+        task = self.task()
+        entry = self.root / ".local/hooks/workspace_add"
         entry.write_text(f"#!/bin/sh\n{shlex.quote(sys.executable)} -B -c 'import sys; sys.path.insert(0, sys.argv.pop(1)); from multi_agent_manager.cli import main; raise SystemExit(main())' {shlex.quote(str(ROOT))} task report {task}\n")
+        entry.chmod(0o755)
         refused = self.add(task, ok=False)
         self.assertIn("cannot invoke a command that may modify task state", refused["error"])
         self.assertEqual(self.store.read(task)["repos"]["multi-agent-manager"]["state"], "failed")

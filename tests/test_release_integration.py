@@ -128,7 +128,7 @@ class ReleaseFixtureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="mam release missing tag ") as temporary:
             root = Path(temporary) / "run"
             result = subprocess.run(
-                [sys.executable, str(ROOT / "scripts" / "test_integration.py"), "--root", str(root), "--to", "0.2.0"],
+                [sys.executable, str(ROOT / "scripts" / "test_integration.py"), "--root", str(root), "--to", "0.2.1"],
                 cwd=ROOT, check=False, capture_output=True, text=True, timeout=10,
             )
             self.assertNotEqual(result.returncode, 0)
@@ -152,17 +152,17 @@ class ReleaseFixtureTests(unittest.TestCase):
             package = repository / "multi_agent_manager"
             package.mkdir()
             (package / "release.py").write_text(
-                'RELEASE_VERSION = "0.2.0"\nRELEASE_TAG = "v0.2.0"\nRELEASE_COMMIT = "$Format:%H$"\n',
+            'RELEASE_VERSION = "0.2.1"\nRELEASE_TAG = "v0.2.1"\nRELEASE_COMMIT = "$Format:%H$"\n',
                 encoding="utf-8",
             )
-            (repository / "pyproject.toml").write_text('[project]\nname = "multi-agent-manager"\nversion = "0.2.0"\n', encoding="utf-8")
+            (repository / "pyproject.toml").write_text('[project]\nname = "multi-agent-manager"\nversion = "0.2.1"\n', encoding="utf-8")
             git("add", ".")
             git("commit", "-q", "-m", "release")
-            git("tag", "-a", "v0.2.0", "-m", "published")
-            tag_object = git("rev-parse", "refs/tags/v0.2.0")
-            expected = git("rev-parse", "refs/tags/v0.2.0^{commit}")
+            git("tag", "-a", "v0.2.1", "-m", "published")
+            tag_object = git("rev-parse", "refs/tags/v0.2.1")
+            expected = git("rev-parse", "refs/tags/v0.2.1^{commit}")
             with mock.patch.object(test_integration, "root_dir", return_value=repository):
-                archive, selected = test_integration.build_archive(Path(temporary), Path(temporary) / "archive.log", "0.2.0", published=True)
+                archive, selected = test_integration.build_archive(Path(temporary), Path(temporary) / "archive.log", "0.2.1", published=True)
             self.assertNotEqual(tag_object, expected)
             self.assertEqual(selected, expected)
             with tarfile.open(archive, "r:gz") as package_archive:

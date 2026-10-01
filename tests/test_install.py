@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import http.server
 import os
 from pathlib import Path
 import re
@@ -8,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -104,15 +106,15 @@ class InstallerScriptTests(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             if relative == "multi_agent_manager/release.py":
                 target.write_text(
-                    'RELEASE_VERSION = "0.2.0"\n'
-                    'RELEASE_TAG = "v0.2.0"\n'
+                    'RELEASE_VERSION = "0.2.1"\n'
+                    'RELEASE_TAG = "v0.2.1"\n'
                     'RELEASE_COMMIT = "' + "a" * 40 + '"\n',
                     encoding="utf-8",
                 )
             else:
                 shutil.copy2(self.source_root / relative, target)
         (root / "pyproject.toml").write_text(
-            "[project]\nname = 'multi-agent-manager'\nversion = '0.2.0'\n", encoding="utf-8"
+            "[project]\nname = 'multi-agent-manager'\nversion = '0.2.1'\n", encoding="utf-8"
         )
         # Git does not retain an empty directory, while the installer requires
         # a tests directory before it will run its suite.
@@ -229,23 +231,15 @@ exit 72
     @staticmethod
     def _probe_stubs() -> str:
         return r'''
-run_lightweight_probe() {
-    printf 'lightweight python=%s\n' "$INSTALLED_PYTHON" >> "$FAKE_LOG"
-    if [[ "${FAKE_LIGHTWEIGHT_FAIL:-}" == 1 ]]; then
-        incomplete 'simulated App Server API compatibility failure'
+run_compatibility_check() {
+    printf 'compatibility python=%s\n' "$INSTALLED_PYTHON" >> "$FAKE_LOG"
+    if [[ "${FAKE_COMPATIBILITY_FAIL:-}" == 1 ]]; then
+        incomplete 'simulated Codex compatibility failure'
         return 1
     fi
     COMPATIBILITY_JSON="$INSTALL_TMP/compatibility.json"
-    printf '%s\n' '{"socket_path":"/tmp/fake-app-server.sock","capabilities":{"model_requests":0},"diagnostics":{}}' > "$COMPATIBILITY_JSON"
-    printf 'MAM proactive wakeup: non-model App Server API compatibility PASS\n'
-}
-run_live_delivery_probe() {
-    printf 'liveprobe python=%s\n' "$INSTALLED_PYTHON" >> "$FAKE_LOG"
-    if [[ "${FAKE_LIVEPROBE_FAIL:-}" == 1 ]]; then
-        incomplete 'simulated isolated delivery failure'
-        return 1
-    fi
-    printf 'MAM proactive wakeup: isolated real delivery PASS\n'
+    printf '%s\n' '{"status":"passed","code":"compatibility","stages":[{"name":"non-model","status":"passed","duration_seconds":0.01}],"counts":{"model_requests":0}}' > "$COMPATIBILITY_JSON"
+    printf 'MAM installation: shared Codex compatibility PASS\n'
 }
 '''
 
@@ -358,7 +352,7 @@ run_live_delivery_probe() {
 
     def test_archive_release_commit_placeholder_is_rejected(self):
         (self.checkout / "multi_agent_manager" / "release.py").write_text(
-            'RELEASE_VERSION = "0.2.0"\nRELEASE_TAG = "v0.2.0"\nRELEASE_COMMIT = "$Format:%H$"\n',
+            'RELEASE_VERSION = "0.2.1"\nRELEASE_TAG = "v0.2.1"\nRELEASE_COMMIT = "$Format:%H$"\n',
             encoding="utf-8",
         )
         subprocess.run(["tar", "-czf", str(self.archive), "-C", str(self.checkout), "."], check=True)
@@ -366,6 +360,42 @@ run_live_delivery_probe() {
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("release metadata does not match requested version", result.stdout)
         self.assertEqual(self.service_commands(), [])
+
+    def test_default_archive_download_uses_real_local_http_and_curl_output_before_separator(self):
+        directory = self.root / "http-root"
+        directory.mkdir()
+        shutil.copy2(self.archive, directory / "candidate.tar.gz")
+        handler = lambda *args, **kwargs: http.server.SimpleHTTPRequestHandler(
+            *args, directory=str(directory), **kwargs
+        )
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.shutdown)
+        self.addCleanup(server.server_close)
+        environment = self._fixture_environment({
+            "MAM_INSTALL_URL": f"http://127.0.0.1:{server.server_port}/candidate.tar.gz",
+        })
+        environment.pop("MAM_INSTALL_ARCHIVE", None)
+        result = subprocess.run(
+            ["bash", "-c", 'source "$1"; INSTALL_TMP="$2"; REQUESTED_VERSION="0.2.1"; prepare_release_source; test -f "$CHECKOUT_ROOT/pyproject.toml"',
+             "bash", str(self.checkout / "scripts" / "install.sh"), str(self.root / "download-tmp")],
+            cwd=self.checkout, env=environment, text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_nested_relocatable_venv_python3_is_selected_without_python_alias(self):
+        candidate = self.checkout / ".venv" / "bin" / "python3"
+        candidate.parent.mkdir(parents=True)
+        candidate.symlink_to(Path(sys.executable).resolve())
+        environment = self._fixture_environment({"PATH": f"{self.fake_bin}:/usr/bin:/bin"})
+        result = subprocess.run(
+            ["bash", "-c", 'source "$1"; CHECKOUT_ROOT="$2"; choose_source_python; printf "%s\\n" "$SOURCE_PYTHON"',
+             "bash", str(self.checkout / "scripts" / "install.sh"), str(self.checkout)],
+            cwd=self.checkout, env=environment, text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(Path(result.stdout.strip()), candidate)
 
     def test_same_repository_sibling_checkout_is_installed_and_path_persists(self):
         self.assertNotEqual(self.primary, self.checkout)
@@ -375,13 +405,11 @@ run_live_delivery_probe() {
         legacy_trace = original_bashrc[original_bashrc.index(trace_begin) : original_bashrc.index(trace_end) + len(trace_end)]
         result = self.run_installer(CODEX_THREAD_ID="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("service start is a separate command", result.stdout)
+        self.assertIn("evidence=", result.stdout)
         log = self.log.read_text()
         self.assertIn("pipx args=install --force", log)
-        self.assertIn(f"lightweight python={self.venv / 'bin' / 'python'}", log)
-        self.assertIn(f"liveprobe python={self.venv / 'bin' / 'python'}", log)
+        self.assertIn(f"compatibility python={self.venv / 'bin' / 'python'}", log)
         self.assertNotIn("wait python", log)
-        self.assertLess(log.index("lightweight"), log.index("liveprobe"))
         self.assertEqual(self.service_commands(), [])
         self.assertNotIn("aaaaaaaa", log)
         bashrc = (self.home / ".bashrc").read_text()
@@ -427,145 +455,25 @@ run_live_delivery_probe() {
         self.assertNotIn("export LOG_FORMAT=", content)
         self.assertEqual(content.count("# >>> MAM PATH >>>"), 0)
 
-    def test_checkout_test_environment_reaches_current_source_in_detached_daemon(self):
-        """A fresh checkout must outrank an older package for the daemon child.
-
-        The test interpreter deliberately has an old ``multi_agent_manager``
-        in its site-packages.  The checkout has no editable environment.  The
-        fixture test starts the real detached fresh-project daemon, whose cwd
-        is the separate MAM state root just like ``_spawn_service`` uses.
-        """
-
-        self.assertFalse((self.checkout / ".venv").exists())
-        source_environment = self.root / "old-installed-python"
-        subprocess.run([sys.executable, "-m", "venv", str(source_environment)], check=True)
-        source_python = source_environment / "bin" / "python"
-        site_packages = Path(
-            subprocess.check_output([str(source_python), "-c", "import site; print(site.getsitepackages()[0])"], text=True).strip()
-        )
-        stale_package = site_packages / "multi_agent_manager"
-        stale_package.mkdir()
-        (stale_package / "__init__.py").write_text('"""Old installed package fixture."""\n', encoding="utf-8")
-        stale_marker = self.root / "old-package-daemon-ran"
-        (stale_package / "wake_runtime.py").write_text(
-            "from pathlib import Path\n"
-            "import os\n"
-            "Path(os.environ['MAM_STALE_DAEMON_MARKER']).write_text('old package ran\\n', encoding='utf-8')\n"
-            "raise SystemExit(91)\n",
-            encoding="utf-8",
-        )
-        daemon_root = self.root / "daemon-state"
-        daemon_projects = self.root / "daemon-projects"
-        daemon_root.mkdir()
-        daemon_projects.mkdir()
-        (self.checkout / "tests" / "test_detached_source_import.py").write_text(
-            "from pathlib import Path\n"
-            "import os\n"
-            "import time\n"
-            "import unittest\n"
-            "\n"
-            "from multi_agent_manager import cli, job_runtime, wake_runtime\n"
-            "\n"
-            "\n"
-            "class DetachedSourceImportTests(unittest.TestCase):\n"
-            "    def test_daemon_uses_checkout_runtime_after_cwd_changes(self):\n"
-            "        checkout = Path(os.environ['MAM_CHECKOUT_ROOT']).resolve()\n"
-            "        self.assertEqual(Path(wake_runtime.__file__).resolve(), checkout / 'multi_agent_manager' / 'wake_runtime.py')\n"
-            "        config = cli.ProjectConfig(Path(os.environ['MAM_TEST_DAEMON_ROOT']), Path(os.environ['MAM_TEST_DAEMON_PROJECTS']), 'project/daemon')\n"
-            "        store = cli.Store(config)\n"
-            "        started = False\n"
-            "        try:\n"
-            "            result = wake_runtime.start_service(config)\n"
-            "            started = True\n"
-            "            self.assertEqual(result['status'], 'awaiting_manager')\n"
-            "            self.assertTrue(result['healthy'])\n"
-            "            self.assertFalse(Path(os.environ['MAM_STALE_DAEMON_MARKER']).exists())\n"
-            "        finally:\n"
-            "            if started:\n"
-            "                wake_runtime.stop_service(config)\n"
-            "                deadline = time.monotonic() + 5.0\n"
-            "                while time.monotonic() < deadline:\n"
-            "                    state = wake_runtime._load_state(store)\n"
-            "                    observed = job_runtime.probe_process('local', state['pid'], state['identity'])\n"
-            "                    if observed['status'] == 'exited':\n"
-            "                        break\n"
-            "                    time.sleep(0.05)\n"
-            "                else:\n"
-            "                    self.fail('fresh detached daemon did not stop')\n",
-            encoding="utf-8",
-        )
-        result = self.run_checkout_tests(
-            PATH=f"{source_python.parent}:{self.fake_bin}:{os.environ['PATH']}",
-            PYTHONPATH="",
-            MAM_CHECKOUT_ROOT=str(self.checkout),
-            MAM_TEST_DAEMON_ROOT=str(daemon_root),
-            MAM_TEST_DAEMON_PROJECTS=str(daemon_projects),
-            MAM_STALE_DAEMON_MARKER=str(stale_marker),
-        )
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertFalse(stale_marker.exists())
-
     def test_existing_service_requires_live_app_server_before_service_status(self):
         missing = self.root / "missing.sock"
         self.state.write_text("healthy\n", encoding="utf-8")
         result = self.run_installer(probe_stubs=False, MAM_APP_SERVER_SOCKET=str(missing), FAKE_START_STATE="awaiting_manager")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("App Server API compatibility probe failed", result.stdout + result.stderr)
+        self.assertIn("shared Codex compatibility acceptance failed", result.stdout + result.stderr)
         self.assertEqual(self.service_commands(), [])
         self.assertEqual(self.state.read_text().strip(), "healthy")
 
-    def test_lightweight_compatibility_failure_keeps_existing_scheduler_running(self):
+    def test_compatibility_failure_keeps_existing_scheduler_running(self):
         self.state.write_text("healthy\n", encoding="utf-8")
-        result = self.run_installer(FAKE_LIGHTWEIGHT_FAIL="1")
+        result = self.run_installer(FAKE_COMPATIBILITY_FAIL="1")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("simulated App Server API compatibility failure", result.stdout)
+        self.assertIn("simulated Codex compatibility failure", result.stdout)
         log = self.log.read_text()
-        self.assertIn("lightweight", log)
+        self.assertIn("compatibility", log)
         self.assertNotIn("liveprobe", log)
         self.assertEqual(self.service_commands(), [])
         self.assertEqual(self.state.read_text().strip(), "healthy")
-
-    def test_live_delivery_failure_happens_before_existing_scheduler_stop(self):
-        self.state.write_text("healthy\n", encoding="utf-8")
-        result = self.run_installer(FAKE_LIVEPROBE_FAIL="1")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("simulated isolated delivery failure", result.stdout)
-        self.assertEqual(self.service_commands(), [])
-        self.assertEqual(self.state.read_text().strip(), "healthy")
-
-    def test_upgrade_stops_then_restarts_only_the_existing_project_singleton(self):
-        self.state.write_text("healthy\n", encoding="utf-8")
-        result = self.run_installer()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.service_commands(), [])
-        self.assertEqual(self.state.read_text().strip(), "healthy")
-
-    def test_fresh_bootstrap_is_awaiting_manager_without_capturing_installer_thread(self):
-        result = self.run_installer(
-            CODEX_THREAD_ID="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", FAKE_START_STATE="awaiting_manager"
-        )
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("service start is a separate command", result.stdout)
-        self.assertEqual(self.service_commands(), [])
-        self.assertNotIn("aaaaaaaa", self.log.read_text())
-        self.assertEqual(self.state.read_text().strip(), "stopped")
-
-    def test_installed_launcher_uses_project_context_and_explicit_manager_only(self):
-        result = self.run_installer(MAM_SERVICE_MANAGER=MANAGER)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        log = self.log.read_text()
-        self.assertNotIn("service", log)
-        self.assertNotIn("CODEX_THREAD_ID", log)
-
-    def test_bound_project_without_manager_is_nonzero_with_remediation(self):
-        result = self.run_installer(FAKE_START_STATE="missing_manager")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("bound tasks have no persisted Manager", result.stdout)
-
-    def test_start_failure_retains_specific_reason_and_redacts_secret(self):
-        result = self.run_installer(FAKE_START_FAIL="1")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("TOKEN=do-not-log", result.stdout + result.stderr)
 
     def test_unrecognized_trace_block_is_preserved(self):
         path = self.home / ".bashrc"
@@ -589,63 +497,20 @@ run_live_delivery_probe() {
             code = line.split("#", 1)[0]
             self.assertIsNone(re.search(r"(?<![>&])&(?![&0-9])", code), line)
 
+    def test_release_installation_keeps_full_regression_out_of_installer(self):
+        source = (self.source_root / "scripts" / "install.sh").read_text(encoding="utf-8")
+        self.assertIn("multi_agent_manager.compatibility --output", source)
+        self.assertIn("scripts/test_integration.py", (self.source_root / "scripts" / "test_integration.py").read_text())
+        self.assertNotIn("unittest discover", source)
 
-class LiveprobeEvidenceValidationTests(unittest.TestCase):
-    script = Path(__file__).resolve().parents[1] / "scripts" / "install.sh"
-    required_checks = (
-        "all_roles_baselined_before_service",
-        "baseline_history_read_after_idle",
-        "job_delivery",
-        "manager_delivery",
-        "manager_is_fixture_only",
-        "turn_budget",
-        "service_stopped_after_delivery",
-        "idle_executors_received_no_turn",
-    )
-
-    def validate(self, evidence: dict[str, object]) -> subprocess.CompletedProcess[str]:
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "evidence.json"
-            path.write_text(json.dumps(evidence), encoding="utf-8")
-            return subprocess.run(
-                [
-                    "bash",
-                    "-c",
-                    'source "$1"; INSTALLED_PYTHON="$2"; validate_liveprobe_evidence "$3"',
-                    "bash",
-                    str(self.script),
-                    sys.executable,
-                    str(path),
-                ],
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-
-    def evidence(self, model_turns: object = 6) -> dict[str, object]:
-        return {
-            "status": "passed",
-            "model_turns": model_turns,
-            "checks": {name: True for name in self.required_checks},
-        }
-
-    def test_accepts_bounded_model_turns_with_service_shutdown_evidence(self):
-        for turns in (6, 12):
-            with self.subTest(turns=turns):
-                result = self.validate(self.evidence(turns))
-                self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_rejects_out_of_budget_or_obsolete_quiet_window_evidence(self):
-        for turns in (5, 13, True):
-            with self.subTest(turns=turns):
-                self.assertNotEqual(self.validate(self.evidence(turns)).returncode, 0)
-        evidence = self.evidence()
-        checks = evidence["checks"]
-        assert isinstance(checks, dict)
-        checks.pop("service_stopped_after_delivery")
-        checks["quiet_window_no_duplicate_starts"] = True
-        self.assertNotEqual(self.validate(evidence).returncode, 0)
-
+    def test_install_evidence_is_persisted_outside_temporary_directory(self):
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        evidence = sorted((self.home / ".local" / "share" / "multi-agent-manager" / "install-evidence").glob("*.json"))
+        self.assertEqual(len(evidence), 2)
+        summary = json.loads(next(path for path in evidence if not path.name.endswith("compatibility.json")).read_text())
+        self.assertEqual(summary["version"], "0.2.1")
+        self.assertEqual(summary["tests"]["mode"], "install-smoke")
 
 if __name__ == "__main__":
     unittest.main()

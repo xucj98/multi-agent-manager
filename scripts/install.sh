@@ -22,6 +22,8 @@ INSTALLED_VERSION=''
 INSTALLED_COMMIT=''
 INSTALL_TMP=''
 COMPATIBILITY_JSON=''
+INSTALL_EVIDENCE_PATH=''
+INSTALL_TEST_COUNT=1
 SERVICE_ERROR=''
 SERVICE_STATE=''
 SERVICE_MANAGER_ARGS=()
@@ -75,14 +77,14 @@ prepare_release_source() {
     local archive="$INSTALL_ARCHIVE" url="" source_dir="$INSTALL_TMP/source" first
     mkdir -p -- "$source_dir"
     if [[ -z "$archive" ]]; then
-        url="https://github.com/xucj98/multi-agent-manager/archive/refs/tags/v${REQUESTED_VERSION}.tar.gz"
+        url="${MAM_INSTALL_URL:-https://github.com/xucj98/multi-agent-manager/archive/refs/tags/v${REQUESTED_VERSION}.tar.gz}"
         archive="$INSTALL_TMP/source.tar.gz"
         if ! command -v curl >/dev/null 2>&1; then
             incomplete 'curl is required to download the selected MAM release'
             return 1
         fi
         printf 'MAM installation: downloading %s\n' "$url"
-        if ! curl -fsSL --retry 2 -- "$url" -o "$archive"; then
+        if ! curl -fsSL --retry 2 -o "$archive" -- "$url"; then
             incomplete "download failed for release $REQUESTED_VERSION"
             return 1
         fi
@@ -196,12 +198,24 @@ PY
 }
 
 choose_source_python() {
-    if [[ -x "$CHECKOUT_ROOT/.venv/bin/python" ]]; then
-        SOURCE_PYTHON="$CHECKOUT_ROOT/.venv/bin/python"
-    elif command -v python3 >/dev/null 2>&1; then
+    local candidate
+    for candidate in "$CHECKOUT_ROOT/.venv/bin/python" "$CHECKOUT_ROOT/.venv/bin/python3"; do
+        if [[ -x "$candidate" ]]; then
+            SOURCE_PYTHON="$candidate"
+            break
+        fi
+    done
+    if [[ -z "$SOURCE_PYTHON" ]] && command -v python3 >/dev/null 2>&1; then
         SOURCE_PYTHON="$(command -v python3)"
-    else
-        incomplete 'Python 3 is required to run the MAM test suite'
+    elif [[ -z "$SOURCE_PYTHON" ]] && command -v python >/dev/null 2>&1; then
+        SOURCE_PYTHON="$(command -v python)"
+    fi
+    if [[ -z "$SOURCE_PYTHON" ]]; then
+        incomplete 'Python 3 is required to run the MAM installation smoke checks'
+        return 1
+    fi
+    if [[ ! -x "$SOURCE_PYTHON" ]]; then
+        incomplete "selected Python interpreter is not executable: $SOURCE_PYTHON"
         return 1
     fi
     if ! "$SOURCE_PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
@@ -280,29 +294,26 @@ PY
 }
 
 run_tests() {
-    # A clean checkout is tested before pipx has installed it.  Test code can
-    # start a detached service from MAM_ROOT, where cwd no longer identifies
-    # this checkout, so keep the checkout first in every test subprocess.
+    # Installation performs a bounded package/filesystem smoke.  The complete
+    # release upgrade matrix is owned by scripts/test_integration.py.
     local checkout_pythonpath="$CHECKOUT_ROOT"
     if [[ -n "${PYTHONPATH:-}" ]]; then
         checkout_pythonpath+=":$PYTHONPATH"
     fi
-    printf 'MAM proactive wakeup: running checkout tests with %s\n' "$SOURCE_PYTHON"
+    printf 'MAM installation: running checkout smoke with %s\n' "$SOURCE_PYTHON"
     if ! (
         cd -- "$CHECKOUT_ROOT"
         export PYTHONPATH="$checkout_pythonpath"
-        # This installer control value is consumed only after the source suite
-        # passes.  Keeping it out of the suite makes fixture expectations
-        # independent of a production service-start choice.
-        unset MAM_SERVICE_MANAGER
-        # The outer release install may select this archive through the
-        # environment.  Nested installer fixtures must exercise their own
-        # checkout path instead of accidentally selecting the same archive.
-        unset MAM_INSTALL_ARCHIVE
-        # Keep the fixture's pipx assertions independent of the isolated
-        # destination used by the outer release install.
-        unset PIPX_HOME PIPX_BIN_DIR
-        "$SOURCE_PYTHON" -B -m unittest discover -s tests -v
+        unset MAM_SERVICE_MANAGER MAM_INSTALL_ARCHIVE PIPX_HOME PIPX_BIN_DIR
+        "$SOURCE_PYTHON" -B -c '
+from pathlib import Path
+import multi_agent_manager.cli as cli
+import multi_agent_manager.release as release
+assert release.RELEASE_VERSION
+assert callable(cli.main)
+for relative in ("pyproject.toml", "scripts/install.sh", "multi_agent_manager/release.py"):
+    assert (Path.cwd() / relative).is_file(), relative
+'
     ); then
         incomplete 'checkout tests failed; pipx and the existing scheduler were left untouched'
         return 1
@@ -601,68 +612,69 @@ try:
     data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 except (OSError, UnicodeDecodeError, ValueError):
     raise SystemExit(1)
-if not isinstance(data, dict) or not isinstance(data.get("socket_path"), str):
+if not isinstance(data, dict) or data.get("status") != "passed":
     raise SystemExit(1)
-if not Path(data["socket_path"]).is_absolute() or not isinstance(data.get("capabilities"), dict):
+if not isinstance(data.get("stages"), list) or not isinstance(data.get("counts"), dict):
     raise SystemExit(1)
-if data["capabilities"].get("model_requests") != 0:
+if data.get("code") not in {"compatibility", "live-delivery", None}:
     raise SystemExit(1)
 PY
 }
 
-run_lightweight_probe() {
+run_compatibility_check() {
     local output="$INSTALL_TMP/compatibility.json" errors="$INSTALL_TMP/compatibility.stderr" detail
-    printf 'MAM proactive wakeup: running non-model App Server API compatibility probe\n'
+    printf 'MAM installation: running shared Codex compatibility acceptance\n'
     local probe_root="${PROJECT_ROOT:-$INSTALL_TMP}"
-    if ! (cd -- "$probe_root" && env -u CODEX_THREAD_ID "$INSTALLED_PYTHON" -B -m multi_agent_manager.wake_compat --json >"$output" 2>"$errors"); then
-        detail="$(bounded_diagnostic "$output" "$errors")"
-        incomplete "the App Server API compatibility probe failed${detail:+: $detail}"
+    if ! (cd -- "$probe_root" && env -u CODEX_THREAD_ID "$INSTALLED_PYTHON" -B -m multi_agent_manager.compatibility --output "$output" >"$INSTALL_TMP/compatibility.out" 2>"$errors"); then
+        detail="$(bounded_diagnostic "$INSTALL_TMP/compatibility.out" "$errors")"
+        incomplete "shared Codex compatibility acceptance failed${detail:+: $detail}"
         return 1
     fi
     if ! validate_compatibility_json "$output"; then
         detail="$(bounded_diagnostic "$output" "$errors")"
-        incomplete "the App Server API compatibility probe returned invalid evidence${detail:+: $detail}"
+        incomplete "shared Codex compatibility acceptance returned invalid evidence${detail:+: $detail}"
         return 1
     fi
     COMPATIBILITY_JSON="$output"
-    printf 'MAM proactive wakeup: non-model App Server API compatibility PASS\n'
+    printf 'MAM installation: shared Codex compatibility PASS\n'
 }
 
-validate_liveprobe_evidence() {
-    "$INSTALLED_PYTHON" - "$1" <<'PY'
+persist_install_evidence() {
+    local destination="$HOME/.local/share/multi-agent-manager/install-evidence" stamp summary raw
+    stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    if ! mkdir -p -- "$destination"; then
+        incomplete "cannot create persistent installation evidence directory: $destination"
+        return 1
+    fi
+    raw="$destination/${stamp}-${INSTALLED_VERSION}.compatibility.json"
+    summary="$destination/${stamp}-${INSTALLED_VERSION}.json"
+    if ! cp -p -- "$COMPATIBILITY_JSON" "$raw"; then
+        incomplete 'cannot retain compatibility evidence after installation'
+        return 1
+    fi
+    if ! "$INSTALLED_PYTHON" - "$summary" "$raw" "$INSTALLED_VERSION" "$INSTALLED_COMMIT" "$INSTALL_TEST_COUNT" <<'PY'
 import json
 from pathlib import Path
 import sys
-try:
-    data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-except (OSError, UnicodeDecodeError, ValueError):
-    raise SystemExit(1)
-checks = data.get("checks") if isinstance(data, dict) else None
-model_turns = data.get("model_turns") if isinstance(data, dict) else None
-if data.get("status") != "passed" or type(model_turns) is not int or not 6 <= model_turns <= 12 or not isinstance(checks, dict):
-    raise SystemExit(1)
-if not all(checks.get(key) is True for key in ("all_roles_baselined_before_service", "baseline_history_read_after_idle", "job_delivery", "manager_delivery", "manager_is_fixture_only", "turn_budget", "service_stopped_after_delivery", "idle_executors_received_no_turn")):
-    raise SystemExit(1)
-PY
-}
 
-run_live_delivery_probe() {
-    local output="$INSTALL_TMP/liveprobe.out" errors="$INSTALL_TMP/liveprobe.stderr"
-    local evidence="$INSTALL_TMP/liveprobe-evidence.json" detail
-    printf 'MAM proactive wakeup: running isolated real delivery acceptance\n'
-    local probe_root="${PROJECT_ROOT:-$INSTALL_TMP}"
-    if ! (cd -- "$probe_root" && env -u CODEX_THREAD_ID "$INSTALLED_PYTHON" -B -m multi_agent_manager.liveprobe \
-        --compatibility "$COMPATIBILITY_JSON" --root "$INSTALL_TMP/liveprobe" --evidence "$evidence" >"$output" 2>"$errors"); then
-        detail="$(bounded_diagnostic "$output" "$errors" "$evidence")"
-        incomplete "isolated real delivery acceptance failed${detail:+: $detail}"
+summary_path = Path(sys.argv[1])
+raw_path = Path(sys.argv[2])
+version, commit = sys.argv[3:5]
+test_count = int(sys.argv[5])
+compatibility = json.loads(raw_path.read_text(encoding="utf-8"))
+summary_path.write_text(json.dumps({
+    "version": version,
+    "commit": commit,
+    "tests": {"mode": "install-smoke", "count": test_count},
+    "compatibility": compatibility,
+    "compatibility_evidence": str(raw_path),
+}, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+    then
+        incomplete 'cannot write persistent installation summary'
         return 1
     fi
-    if ! validate_liveprobe_evidence "$evidence"; then
-        detail="$(bounded_diagnostic "$output" "$errors" "$evidence")"
-        incomplete "isolated real delivery acceptance returned invalid evidence${detail:+: $detail}"
-        return 1
-    fi
-    printf 'MAM proactive wakeup: isolated real delivery PASS\n'
+    INSTALL_EVIDENCE_PATH="$summary"
 }
 
 service_command() {
@@ -786,11 +798,11 @@ main() {
     if [[ -z "$REQUESTED_VERSION" && -z "$INSTALL_ARCHIVE" ]]; then
         # Every invocation, including one launched from a checkout, resolves
         # a release archive so local and formal installs exercise one path.
-        REQUESTED_VERSION='0.2.0'
+        REQUESTED_VERSION='0.2.1'
     fi
     MODERN_INSTALL=1
     if [[ -z "$REQUESTED_VERSION" ]]; then
-        REQUESTED_VERSION='0.2.0'
+        REQUESTED_VERSION='0.2.1'
     fi
     if ! version_is_valid "$REQUESTED_VERSION"; then
         incomplete "invalid release version: $REQUESTED_VERSION"
@@ -810,9 +822,9 @@ main() {
     if [[ -z "$INSTALL_TMP" ]]; then
         create_install_tmp
     fi
-    run_lightweight_probe
-    run_live_delivery_probe
-    printf 'MAM installation: PASS version=%s commit=%s (service start is a separate command)\n' "$INSTALLED_VERSION" "$INSTALLED_COMMIT"
+    run_compatibility_check
+    persist_install_evidence
+    printf 'MAM installation: PASS version=%s commit=%s tests=%s evidence=%s\n' "$INSTALLED_VERSION" "$INSTALLED_COMMIT" "$INSTALL_TEST_COUNT" "$INSTALL_EVIDENCE_PATH"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

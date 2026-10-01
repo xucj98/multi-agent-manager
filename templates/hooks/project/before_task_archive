@@ -13,6 +13,8 @@ for record in context["repos"]:
     entry = source / ".local" / "hooks" / "before_task_archive"
     if not entry.exists() and not entry.is_symlink():
         continue
+    if entry.resolve() == Path(__file__).resolve():
+        sys.exit("project before_task_archive hook cannot dispatch to itself")
     if entry.is_symlink() or not entry.is_file() or not os.access(entry, os.X_OK):
         sys.exit(f"repo before_task_archive hook must be an executable regular file: {entry}")
     context["repo"] = record["name"]
