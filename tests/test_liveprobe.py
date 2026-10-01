@@ -127,7 +127,7 @@ class FakeStream:
             marker = liveprobe._BASELINE_MARKERS[role]
             items.extend([
                 {"id": f"call-{turn_id}", "type": "custom_tool_call", "name": "exec", "call_id": f"call-{turn_id}", "input": f'text("{marker}");'},
-                {"id": f"output-{turn_id}", "type": "custom_tool_call_output", "call_id": f"call-{turn_id}", "output": [{"type": "input_text", "text": marker}]},
+                {"id": f"output-{turn_id}", "type": "custom_tool_call_output", "call_id": f"call-{turn_id}", "output": [{"type": "input_text", "text": f"Script completed\\n{marker}"}]},
             ])
         if assistant_text is not None:
             items.append({"id": f"answer-{turn_id}", "type": "agentMessage", "text": assistant_text})

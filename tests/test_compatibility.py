@@ -15,7 +15,7 @@ class CompatibilityTests(unittest.TestCase):
         turn = {
             "items": [
                 {"type": "custom_tool_call", "name": "exec", "call_id": "call-1", "input": 'text("READY")'},
-                {"type": "custom_tool_call_output", "call_id": "other", "output": [{"type": "input_text", "text": "READY"}]},
+                {"type": "custom_tool_call_output", "call_id": "other", "output": [{"type": "input_text", "text": "Script completed\nREADY"}]},
             ]
         }
         self.assertIsNone(liveprobe._custom_tool_execution(turn, "READY"))
@@ -49,8 +49,9 @@ class CompatibilityTests(unittest.TestCase):
             rollout.parent.mkdir(parents=True)
             rows = [
                 {"type": "session_meta", "payload": {"id": "thread-raw"}},
+                {"type": "event_msg", "payload": {"type": "task_started", "turn_id": "turn-raw", "thread_id": "thread-raw"}},
                 {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "call_id": "c1", "input": 'text("READY")'}},
-                {"type": "response_item", "payload": {"type": "custom_tool_call_output", "call_id": "c1", "output": [{"type": "input_text", "text": "READY"}], "internal_chat_message_metadata_passthrough": {"turn_id": "turn-raw"}}},
+                {"type": "response_item", "payload": {"type": "custom_tool_call_output", "call_id": "c1", "output": [{"type": "input_text", "text": "Script completed\nREADY"}], "internal_chat_message_metadata_passthrough": {"turn_id": "turn-raw"}}},
                 {"type": "event_msg", "payload": {"type": "item_completed", "thread_id": "thread-raw", "turn_id": "turn-raw"}},
             ]
             rollout.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")

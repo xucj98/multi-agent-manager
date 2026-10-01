@@ -264,7 +264,12 @@ def _custom_tool_execution(turn: Mapping[str, Any], marker: str) -> dict[str, st
         output_status = output.get("status")
         if output_status in {"failed", "error", "incomplete"}:
             continue
-        if marker in call_input and marker in output_text and "script failed" not in output_text.lower():
+        if (
+            marker in call_input
+            and marker in output_text
+            and "script completed" in output_text.lower()
+            and "script failed" not in output_text.lower()
+        ):
             return {"call_id": call_id, "name": str(call.get("name")), "marker": marker}
     return None
 
@@ -316,69 +321,56 @@ def _rollout_token_usage(thread_id: str) -> dict[str, int] | None:
     return latest
 
 
-def _rollout_tool_execution(thread_id: str, marker: str) -> dict[str, str] | None:
-    """Read the raw rollout when ``turns/list`` normalizes tools to commandExecution."""
+def _rollout_tool_execution(
+    thread_id: str, marker: str, *, target_turn_id: str | None = None
+) -> dict[str, str] | None:
+    """Read one raw rollout turn when ``turns/list`` normalizes tools."""
 
     sessions = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "sessions"
     if not sessions.is_dir() or sessions.is_symlink():
         return None
     for path in sessions.rglob(f"*{thread_id}*.jsonl"):
-        if path.is_symlink() or not path.is_file():
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 128 * 1024 * 1024:
             continue
         try:
-            if path.stat().st_size > 128 * 1024 * 1024:
-                continue
-            with path.open(encoding="utf-8") as handle:
-                first = handle.readline()
-            try:
-                session = json.loads(first)
-            except ValueError:
-                continue
-            session_payload = session.get("payload") if isinstance(session, Mapping) else None
-            if isinstance(session_payload, Mapping) and session_payload.get("id") not in {None, thread_id}:
-                continue
-            calls: dict[str, Mapping[str, Any]] = {}
-            outputs: dict[str, Mapping[str, Any]] = {}
-            completed_turns: set[str] = set()
-            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-                try:
-                    row = json.loads(line)
-                except ValueError:
-                    continue
-                if not isinstance(row, Mapping):
-                    continue
-                if row.get("type") == "event_msg":
-                    event = row.get("payload")
-                    if isinstance(event, Mapping) and event.get("type") == "item_completed" and event.get("thread_id") == thread_id:
-                        turn_id = event.get("turn_id")
-                        if isinstance(turn_id, str):
-                            completed_turns.add(turn_id)
-                    continue
-                if row.get("type") != "response_item":
-                    continue
-                item = row.get("payload")
-                if not isinstance(item, Mapping):
-                    continue
-                kind = item.get("type")
-                call_id = item.get("call_id") or item.get("callId")
-                if not isinstance(call_id, str) or not call_id:
-                    continue
-                if kind == "custom_tool_call" and item.get("name") in {"exec", "functions.exec"}:
-                    calls[call_id] = item
-                elif kind == "custom_tool_call_output":
-                    outputs[call_id] = item
-            for call_id, call in calls.items():
-                output = outputs.get(call_id)
-                if output is None or output.get("status") in {"failed", "error", "incomplete"}:
-                    continue
-                metadata = output.get("internal_chat_message_metadata_passthrough")
-                output_turn = metadata.get("turn_id") if isinstance(metadata, Mapping) else None
-                if completed_turns and isinstance(output_turn, str) and output_turn not in completed_turns:
-                    continue
-                if marker in str(call.get("input", "")) and marker in str(output.get("output", "")):
-                    return {"call_id": call_id, "name": str(call.get("name")), "marker": marker, "source": "rollout"}
-        except (OSError, UnicodeDecodeError):
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8", errors="replace").splitlines()]
+        except (OSError, UnicodeDecodeError, ValueError):
             continue
+        session = rows[0].get("payload") if rows and isinstance(rows[0], Mapping) else None
+        if isinstance(session, Mapping) and session.get("id") not in {None, thread_id}:
+            continue
+        grouped: dict[str, list[Mapping[str, Any]]] = {}
+        current: str | None = None
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            payload = row.get("payload")
+            if row.get("type") == "event_msg" and isinstance(payload, Mapping):
+                kind = payload.get("type")
+                if kind in {"task_started", "turn_context"}:
+                    value = payload.get("turn_id")
+                    current = value if isinstance(value, str) else current
+                elif kind == "item_completed" and payload.get("thread_id") == thread_id:
+                    value = payload.get("turn_id")
+                    current = value if isinstance(value, str) else current
+                continue
+            if row.get("type") != "response_item" or not isinstance(payload, Mapping):
+                continue
+            metadata = payload.get("internal_chat_message_metadata_passthrough")
+            item_turn = metadata.get("turn_id") if isinstance(metadata, Mapping) else None
+            bucket = current or (item_turn if isinstance(item_turn, str) else None)
+            if bucket:
+                grouped.setdefault(bucket, []).append(payload)
+        if target_turn_id:
+            candidates = [grouped.get(target_turn_id, [])]
+        elif len(grouped) == 1:
+            candidates = list(grouped.values())
+        else:
+            candidates = []
+        for items in candidates:
+            execution = _custom_tool_execution({"items": items}, marker)
+            if execution is not None:
+                return {**execution, "source": "rollout"}
     return None
 
 
@@ -994,7 +986,9 @@ class _LiveFixture:
         completed = next((item for item in turns if item.get("id") == turn_id), None)
         if not isinstance(completed, Mapping) or completed.get("status") != "completed":
             raise LiveProbeError(f"fixture {role} baseline did not complete under its acknowledged turn id")
-        execution = _custom_tool_execution(completed, marker) or _rollout_tool_execution(self.threads[role], marker)
+        execution = _custom_tool_execution(completed, marker) or _rollout_tool_execution(
+            self.threads[role], marker, target_turn_id=turn_id
+        )
         if execution is None:
             raise LiveProbeError(f"fixture {role} baseline lacks a matching custom exec call/output")
         self.evidence.setdefault("baseline_tool_calls", {})[role] = execution
