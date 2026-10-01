@@ -72,6 +72,16 @@ mam service status
 
 详细说明见 [install.sh](designs/install.md) 和 [mam service upgrade](designs/service.md#实例升级)。
 
+## 升级 Codex 后检查
+
+无需重装 MAM，单独运行：
+
+```bash
+mam-codex-check --output mam-compatibility.json
+```
+
+检查当前 Codex 接口及真实工具消息投递，使用两个隔离的 `gpt-6-sol/high` 会话，结束后清理。退出码 `0` 表示通过；JSON 保存诊断、耗时和 token 用量。该命令不修改现有 MAM 实例。
+
 ## 项目 hooks
 
 hooks 由项目维护，规则写在 `.local/README.md` 或各仓库的 README.md、AGENTS.md。MAM 调用项目入口，由它决定如何调用 repo hook。
