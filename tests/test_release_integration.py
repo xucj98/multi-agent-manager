@@ -83,6 +83,26 @@ class ReleaseFixtureTests(unittest.TestCase):
             self.assertIn("no real Codex delivery was exercised", delivery["error"])
             self.assertTrue(delivery["controlled_migration_allowed"])
 
+    def test_controlled_install_failure_requires_persisted_live_delivery_evidence(self):
+        from scripts import test_integration
+
+        with tempfile.TemporaryDirectory(prefix="mam install evidence ") as temporary:
+            home = Path(temporary)
+            evidence_root = home / ".local" / "share" / "multi-agent-manager" / "install-evidence"
+            evidence_root.mkdir(parents=True)
+            failed = evidence_root / "20261001T000000Z-0.2.1.compatibility-failed.json"
+            failed.write_text(json.dumps({
+                "status": "failed",
+                "stages": [{"name": "live_delivery", "status": "failed"}],
+            }), encoding="utf-8")
+            accepted = test_integration.controlled_compatibility_failure(home, "0.2.1")
+            self.assertIsNotNone(accepted)
+            failed.write_text(json.dumps({
+                "status": "failed",
+                "stages": [{"name": "non_model", "status": "failed"}],
+            }), encoding="utf-8")
+            self.assertIsNone(test_integration.controlled_compatibility_failure(home, "0.2.1"))
+
     def test_create_old_fixture_uses_archived_writer_and_refuses_reuse(self):
         with tempfile.TemporaryDirectory(prefix="mam release fixture ") as temporary:
             instance = Path(temporary) / "mam-test"
@@ -112,29 +132,31 @@ class ReleaseFixtureTests(unittest.TestCase):
             self.assertIn("already exists", reused.stderr)
 
     def test_integration_argument_validation_does_not_allocate_resources(self):
+        from scripts import test_integration
+
         with tempfile.TemporaryDirectory(prefix="mam release integration ") as temporary:
             root = Path(temporary) / "run"
-            result = subprocess.run(
-                [sys.executable, str(ROOT / "scripts" / "test_integration.py"), "--root", str(root), "--from", "0.0.1"],
-                cwd=ROOT, check=False, capture_output=True, text=True, timeout=10,
-            )
-            self.assertNotEqual(result.returncode, 0)
+            with mock.patch.object(test_integration, "run_full_unit_suite", side_effect=AssertionError("preflight ran the full suite")):
+                code, outcome = test_integration.integration(root, "0.0.1", "0.2.1", False)
+            self.assertNotEqual(code, 0)
+            self.assertIn("only the complete", outcome["error"])
             self.assertTrue((root / "integration-results" / "result.json").is_file())
             self.assertFalse((root / "mam-test").exists())
 
     def test_published_missing_tag_does_not_allocate_resources(self):
+        from scripts import test_integration
+
         if subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-dir"], check=False, capture_output=True).returncode:
             self.skipTest("published-ref preflight requires the source checkout Git repository")
         with tempfile.TemporaryDirectory(prefix="mam release missing tag ") as temporary:
             root = Path(temporary) / "run"
-            result = subprocess.run(
-                [sys.executable, str(ROOT / "scripts" / "test_integration.py"), "--root", str(root), "--to", "0.2.1"],
-                cwd=ROOT, check=False, capture_output=True, text=True, timeout=10,
-            )
-            self.assertNotEqual(result.returncode, 0)
+            with mock.patch.object(test_integration, "run_full_unit_suite", side_effect=AssertionError("preflight ran the full suite")):
+                code, outcome = test_integration.integration(root, "0.1.0", "0.2.1", False, published=True)
+            self.assertNotEqual(code, 0)
             self.assertFalse((root / "mam-test").exists())
             evidence = json.loads((root / "integration-results" / "result.json").read_text(encoding="utf-8"))
             self.assertIn("published source tag", evidence["error"])
+            self.assertIn("published source tag", outcome["error"])
 
     def test_build_archive_uses_commit_for_annotated_tag(self):
         from scripts import test_integration

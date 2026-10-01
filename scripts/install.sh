@@ -630,10 +630,16 @@ persist_compatibility_failure() {
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     mkdir -p -- "$destination" || return 0
     raw="$destination/${stamp}-${REQUESTED_VERSION}.compatibility-failed.json"
-    if [[ -f "$output" ]]; then
+    # The command's redirected output file exists even when the process only
+    # wrote diagnostics to stderr.  Prefer non-empty JSON evidence, then the
+    # bounded stderr fallback, so a failed check remains diagnosable after the
+    # temporary install directory is removed.
+    if [[ -s "$output" ]]; then
         cp -p -- "$output" "$raw" || true
-    elif [[ -f "$errors" ]]; then
+    elif [[ -s "$errors" ]]; then
         cp -p -- "$errors" "$raw" || true
+    elif [[ -f "$output" ]]; then
+        cp -p -- "$output" "$raw" || true
     fi
 }
 

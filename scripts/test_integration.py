@@ -12,6 +12,7 @@ import shlex
 import subprocess
 import sys
 import tarfile
+import time
 from typing import Any
 
 try:
@@ -187,16 +188,31 @@ def target_exists(repo: Path, target: str) -> bool:
 def run_full_unit_suite(log: Path) -> dict[str, Any]:
     """Run the complete source regression once from the release entry point."""
 
-    environment = os.environ.copy()
-    environment["MAM_SKIP_INTEGRATION_UNIT_SUITE"] = "1"
-    started = __import__("time").monotonic()
+    started = time.monotonic()
     result = run([sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
-                 cwd=root_dir(), env=environment, log=log)
-    elapsed = round(__import__("time").monotonic() - started, 3)
+                 cwd=root_dir(), log=log)
+    elapsed = round(time.monotonic() - started, 3)
     if result.returncode:
         raise IntegrationError(f"complete source unit suite failed: {result.stderr[-1500:]}")
     passed = len([line for line in result.stderr.splitlines() if line.startswith("test_") and " ... ok" in line])
     return {"status": "passed", "passed": passed, "elapsed_seconds": elapsed}
+
+
+def release_preflight(from_version: str, to_version: str, *, published: bool, log: Path) -> tuple[str, str]:
+    """Validate a release request before allocating fixtures or running gates."""
+
+    if (from_version, to_version) != ("0.1.0", "0.2.1"):
+        raise IntegrationError("only the complete 0.1.0 -> 0.2.1 chain is supported")
+    selected_ref = f"refs/tags/v{to_version}" if published else "HEAD"
+    checkout_head = git_output(root_dir(), "rev-parse", "HEAD")
+    if published:
+        selected_check = run(
+            ["git", "-C", str(root_dir()), "rev-parse", f"{selected_ref}^{{commit}}"],
+            log=log,
+        )
+        if selected_check.returncode:
+            raise IntegrationError(f"published source tag v{to_version} is not available in the local repository")
+    return selected_ref, checkout_head
 
 
 def verify_instance_data(
@@ -478,6 +494,30 @@ def terminate_owned_process(process: subprocess.Popen[bytes]) -> None:
         process.wait(timeout=3)
 
 
+def controlled_compatibility_failure(home: Path, version: str) -> dict[str, Any] | None:
+    """Return a persisted live-delivery failure eligible for controlled runs."""
+
+    evidence_root = home / ".local" / "share" / "multi-agent-manager" / "install-evidence"
+    candidates = sorted(evidence_root.glob(f"*-{version}.compatibility-failed.json"), reverse=True)
+    for path in candidates:
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        stages = value.get("stages") if isinstance(value, dict) else None
+        if not isinstance(value, dict) or value.get("status") != "failed" or not isinstance(stages, list):
+            continue
+        live_failure = any(
+            isinstance(stage, dict)
+            and stage.get("name") in {"live_delivery", "live-delivery"}
+            and stage.get("status") == "failed"
+            for stage in stages
+        )
+        if live_failure:
+            return {"path": str(path), "evidence": value}
+    return None
+
+
 def verify_job(launcher: Path, instance: Path, job_id: str, log: Path) -> dict[str, Any]:
     result = run([str(launcher), "job", "status", job_id], cwd=instance, log=log)
     if result.returncode:
@@ -526,16 +566,18 @@ def install_candidate(
         raise IntegrationError(f"candidate install failed before pipx launcher was available: {detail}")
     if result.returncode:
         transcript = (result.stdout + result.stderr)[-5000:]
-        # The real Codex session is a separately reported acceptance gate.  A
-        # candidate that completed unit tests, metadata checks and pipx
-        # installation remains usable for controlled instance migration.
-        marker = "isolated real delivery acceptance failed:"
-        if marker not in transcript:
+        # A controlled migration may continue after the expected live delivery
+        # limitation, but only when the installer persisted structured evidence
+        # naming that exact failed stage.  Generic installer failures remain
+        # fatal even when a launcher happened to be created.
+        evidence = controlled_compatibility_failure(Path(env["HOME"]), "0.2.1") if controlled else None
+        if evidence is None:
             raise IntegrationError(f"candidate install failed: {transcript[-1500:]}")
         return launcher, {
             "status": "failed",
             "kind": "real-codex-delivery",
-            "error": transcript[transcript.rfind(marker):].strip(),
+            "error": transcript[-1500:] or "installer compatibility acceptance failed",
+            "compatibility_failure": evidence,
             "controlled_migration_allowed": True,
         }
     if controlled:
@@ -633,16 +675,13 @@ def integration(
     processes: list[subprocess.Popen[bytes]] = []
     runtimes: list[RuntimeHarness] = []
     try:
-        if os.environ.get("MAM_SKIP_INTEGRATION_UNIT_SUITE") != "1":
-            outcome["unit_suite"] = run_full_unit_suite(log)
-        if (from_version, to_version) != ("0.1.0", "0.2.1"):
-            raise IntegrationError("only the complete 0.1.0 -> 0.2.1 chain is supported")
-        selected_ref = f"refs/tags/v{to_version}" if published else "HEAD"
-        checkout_head = git_output(root_dir(), "rev-parse", "HEAD")
-        if published:
-            selected_check = run(["git", "-C", str(root_dir()), "rev-parse", f"{selected_ref}^{{commit}}"], log=log)
-            if selected_check.returncode:
-                raise IntegrationError(f"published source tag v{to_version} is not available in the local repository")
+        # Reject malformed or unavailable release requests before running the
+        # complete suite.  The suite's own integration tests exercise these
+        # failures in subprocesses and inherit the internal child marker.
+        selected_ref, checkout_head = release_preflight(
+            from_version, to_version, published=published, log=log
+        )
+        outcome["unit_suite"] = run_full_unit_suite(log)
         instances: list[tuple[Path, dict[str, Any]]] = []
         for index, name in enumerate(("mam-test", "mam-test-2")):
             path = root / name
