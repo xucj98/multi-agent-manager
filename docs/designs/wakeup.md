@@ -2,11 +2,13 @@
 
 收件人空闲时，依据当前 task/job 状态即时生成并合并投递自动提醒。`blocked` 和已归档任务不产生自动提醒。
 
+空闲包括无查询错误的 `idle` 和 `notLoaded`；投递前恢复未加载的已有会话，并确认其未在工作。
+
 ## 通知条件
 
 | 类型 | 条件 | 收件人 |
 | --- | --- | --- |
-| `job exited` | 有未归档的 exited job | 执行者；由于当前 codex 版本无法直接投递，因此投递给 Manager 转达 |
+| `job exited` | 有未归档的 exited job | 执行者；原生子线程不支持直接投递时由 Manager 转达 |
 | `task pending` | 原任务与关联 review 中，未归档任务均为 pending | Manager |
 
 review 只考虑与原任务的直接关联；没有 review 时只检查本任务。状态定义见[任务状态](task.md#任务状态)。

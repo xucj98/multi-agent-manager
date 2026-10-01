@@ -1770,14 +1770,18 @@ class WakeScheduler:
                     self._resolve_event(state, event["signature"], reason="stale before delivery")
                 else:
                     self._retain_unverifiable_event(event, detail)
-            recipient_state = self._agent_states({recipient}).get(recipient, {}).get("status")
-            if recipient_state == "active":
-                current = [event for event in current if event.get("kind") == "message" and not event.get("defer")]
-            elif not self._eligible_recipient(recipient_state):
+            recipient_observation = self._agent_states({recipient}).get(recipient, {})
+            recipient_state = recipient_observation.get("status")
+            if recipient_observation.get("error") or (
+                recipient_state != "active" and not self._eligible_recipient(recipient_state)
+            ):
                 for event in current:
                     event["last_recipient_state"] = recipient_state or "unknown"
                 continue
-            elif recipient_state == "idle":
+            if recipient_state == "active":
+                current = [event for event in current if event.get("kind") == "message" and not event.get("defer")]
+            else:
+                # Both idle and notLoaded enter the targeted resume/recheck below.
                 current_signatures = {event.get("signature") for event in current}
                 for candidate in transient.get(recipient, []):
                     signature = candidate.get("signature")

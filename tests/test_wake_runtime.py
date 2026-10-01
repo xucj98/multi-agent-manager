@@ -724,14 +724,95 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(len(self.starts), 1)
         self.assertEqual(self.starts[0][0], EXECUTOR)
 
-    def test_not_loaded_job_owner_does_not_queue_an_automatic_reminder(self):
+    def test_not_loaded_job_owner_is_resumed_and_reminded_once(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
         self.statuses[EXECUTOR] = "notLoaded"
         self.resumed_statuses[EXECUTOR] = "idle"
-        self.scheduler().run_once()
-        self.assertEqual(self.starts, [])
-        self.assertEqual(self.state()["events"], {})
-        self.assertEqual(self.stream_connections, 0)
+        scheduler = self.scheduler()
+        scheduler.run_once()
+        self.assertEqual(self.resumes, [EXECUTOR])
+        self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR])
+        self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
+        self.assertEqual(next(iter(self.state()["events"].values()))["delivery"], "accepted")
+
+        scheduler.run_once()
+        self.assertEqual(len(self.starts), 1)
+        self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
+
+    def test_not_loaded_job_wake_uses_metadata_only_rpc_in_both_channels(self):
+        for channel in ("tool", "user"):
+            with self.subTest(channel=channel):
+                self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+                self.statuses[EXECUTOR] = "notLoaded"
+                state = self.state()
+                state["events"] = {}
+                wake_runtime._save_state(self.store, state)
+                wake_runtime.set_message_channel(self.config, channel)
+                websocket = mock.Mock()
+                results = [
+                    {"thread": {"id": EXECUTOR, "status": {"type": "notLoaded"}, "turns": []}},
+                    {"thread": {"id": EXECUTOR, "status": {"type": "idle"}, "turns": []}},
+                    {"data": [{"id": "previous-turn", "status": "completed"}], "nextCursor": None},
+                    {"turn": {"id": "accepted-rpc-turn", "status": "inProgress"}},
+                ]
+                websocket.receive_text.side_effect = [
+                    json.dumps({"id": index, "result": result})
+                    for index, result in enumerate(results, 1)
+                ]
+                scheduler = self.scheduler()
+                scheduler.stream_factory = lambda _: job_runtime.AppServerEventStream(websocket)
+                scheduler.run_once()
+
+                requests = [json.loads(call.args[0]) for call in websocket.send_text.call_args_list]
+                self.assertEqual([request["method"] for request in requests], [
+                    "thread/resume", "thread/read", "thread/turns/list", "turn/start",
+                ])
+                self.assertEqual(requests[0]["params"], {"threadId": EXECUTOR, "excludeTurns": True})
+                self.assertEqual(requests[1]["params"], {"threadId": EXECUTOR, "includeTurns": False})
+                self.assertEqual(requests[2]["params"], {
+                    "threadId": EXECUTOR, "limit": 1, "sortDirection": "desc", "itemsView": "notLoaded",
+                })
+                params = requests[3]["params"]
+                self.assertEqual(params["threadId"], EXECUTOR)
+                if channel == "tool":
+                    self.assertEqual(params["input"], [])
+                else:
+                    self.assertNotIn("toolOutput", params)
+                payload = params["toolOutput"]["output"] if channel == "tool" else params["input"][0]["text"]
+                self.assertIn("There are exited jobs. Check the results and archive them.", payload)
+                event = next(iter(self.state()["events"].values()))
+                self.assertEqual(event["accepted_turn_id"], "accepted-rpc-turn")
+                self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
+
+    def test_not_loaded_job_preflight_must_confirm_idle_without_a_running_turn(self):
+        for resumed_status, latest_status in (("notLoaded", None), ("active", "inProgress"), ("idle", "inProgress")):
+            with self.subTest(resumed_status=resumed_status, latest_status=latest_status):
+                self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+                self.statuses[EXECUTOR] = "notLoaded"
+                self.resumed_statuses[EXECUTOR] = resumed_status
+                if latest_status:
+                    self.turns[EXECUTOR] = {"id": "running-turn", "status": latest_status}
+                else:
+                    self.turns.pop(EXECUTOR, None)
+                self.resumes.clear()
+                self.scheduler().run_once()
+                self.assertEqual(self.resumes, [EXECUTOR])
+                self.assertEqual(self.starts, [])
+                self.assertEqual(self.state()["events"], {})
+                self.assertEqual(self.store.read(TASK_ONE).get("wake_reminder_count", 0), 0)
+
+    def test_not_loaded_manager_is_resumed_for_pending_task_once(self):
+        self.task(TASK_ONE)
+        self.statuses[MANAGER] = "notLoaded"
+        self.resumed_statuses[MANAGER] = "idle"
+        scheduler = self.scheduler()
+        scheduler.run_once()
+        self.assertEqual(self.resumes, [MANAGER])
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+        self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
+        scheduler.run_once()
+        self.assertEqual(len(self.starts), 1)
+        self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
 
     def test_not_loaded_no_job_executor_exposes_manager_work(self):
         task = self.task(TASK_ONE)
@@ -755,6 +836,24 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(self.state()["events"], {})
         self.assertTrue(any(item["kind"] == "unknown_executor" for item in self.state()["diagnostics"]))
 
+    def test_not_loaded_job_owner_with_query_error_is_not_resumed(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        self.statuses[EXECUTOR] = "notLoaded"
+        self.resumed_statuses[EXECUTOR] = "idle"
+
+        def failed_observation(agents, socket_path):
+            observations = self.agent_probe(agents, socket_path)
+            if EXECUTOR in observations:
+                observations[EXECUTOR]["error"] = "thread query failed"
+            return observations
+
+        self.scheduler(agent_probe=failed_observation).run_once()
+        self.assertEqual(self.resumes, [])
+        self.assertEqual(self.starts, [])
+        self.assertEqual(self.state()["events"], {})
+        self.assertEqual(self.store.read(TASK_ONE).get("wake_reminder_count", 0), 0)
+        self.assertTrue(any(item["kind"] == "unknown_executor" for item in self.state()["diagnostics"]))
+
     def test_saved_pending_with_unknown_executor_is_diagnostic_not_a_reminder(self):
         self.task(TASK_ONE, status="pending")
         self.statuses[EXECUTOR] = "unknown"
@@ -764,13 +863,20 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(self.state()["events"], {})
         self.assertTrue(any(item["kind"] == "unknown_executor" for item in self.state()["diagnostics"]))
 
-    def test_not_loaded_deleted_thread_stays_visible_without_creating_a_replacement(self):
-        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
-        self.statuses[EXECUTOR] = "notLoaded"
-        self.resume_failures[EXECUTOR] = job_runtime.AppServerEventError("thread missing")
-        self.scheduler().run_once()
-        self.assertEqual(self.starts, [])
-        self.assertEqual(self.state()["events"], {})
+    def test_not_loaded_missing_or_archived_thread_cannot_wake_a_replacement(self):
+        for reason in ("thread missing", "cannot resume an archived thread"):
+            with self.subTest(reason=reason):
+                self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+                self.statuses[EXECUTOR] = "notLoaded"
+                self.resume_failures[EXECUTOR] = job_runtime.AppServerRpcError(reason)
+                self.resumes.clear()
+                self.scheduler().run_once()
+                self.assertEqual(self.resumes, [EXECUTOR])
+                self.assertEqual(self.starts, [])
+                self.assertEqual(self.state()["events"], {})
+                task = self.store.read(TASK_ONE)
+                self.assertEqual(task["jobs"][0]["status"], "stopped")
+                self.assertEqual(task.get("wake_reminder_count", 0), 0)
 
     def test_running_only_job_never_wakes_manager_after_executor_ends(self):
         self.task(TASK_ONE, jobs=[self.job("still-running")])
@@ -999,6 +1105,29 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(event["delivery"], "accepted")
         self.assertNotIn("failure_kind", event)
         self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR])
+
+    def test_not_loaded_native_v2_job_falls_back_to_not_loaded_manager_once(self):
+        self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
+        self.statuses[EXECUTOR] = self.statuses[MANAGER] = "notLoaded"
+        self.resumed_statuses[EXECUTOR] = self.resumed_statuses[MANAGER] = "idle"
+        self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
+        scheduler = self.scheduler()
+        scheduler.run_once()
+        source = next(iter(self.state()["events"].values()))
+        self.assertEqual(source["delivery"], "blocked")
+        self.assertEqual(source["attempts"], 1)
+        self.assertIsNone(source["next_attempt_at"])
+        self.assertEqual(self.store.read(TASK_ONE).get("wake_reminder_count", 0), 0)
+
+        scheduler.run_once()
+        self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
+        self.assertEqual(self.resumes[:2], [EXECUTOR, MANAGER])
+        self.assertIn("Ask the executor to check the results and archive them.", self.starts[0][1])
+        self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
+        scheduler.run_once()
+        self.assertEqual(len(self.starts), 1)
+        self.assertEqual(self.state()["events"][source["signature"]]["attempts"], 1)
+        self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
 
     def test_native_v2_rejection_escalates_once_when_manager_becomes_idle_and_clears_after_archive(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped", note="native completion")])
