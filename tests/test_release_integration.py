@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import sys
@@ -113,8 +114,12 @@ class ReleaseFixtureTests(unittest.TestCase):
             (source / "20261001T000000Z-0.2.1.compatibility.json").write_text("{}", encoding="utf-8")
             (source / "20261001T000000Z-0.2.1.json").write_text("{}", encoding="utf-8")
             results = root / "results"
-            retained = test_integration.retain_install_evidence(root / "install", results)
+            try:
+                raise RuntimeError("simulated install failure")
+            except RuntimeError:
+                retained = test_integration.retain_install_evidence(root / "install", results)
             self.assertEqual(len(retained), 2)
+            shutil.rmtree(root / "install")
             self.assertTrue((results / "install-evidence" / "20261001T000000Z-0.2.1.json").is_file())
 
     def test_create_old_fixture_uses_archived_writer_and_refuses_reuse(self):

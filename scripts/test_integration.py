@@ -523,10 +523,10 @@ def retain_install_evidence(install_root: Path, results: Path) -> list[str]:
 
     source = install_root / "home" / ".local" / "share" / "multi-agent-manager" / "install-evidence"
     if not source.is_dir():
-        raise IntegrationError(f"installer evidence directory is missing: {source}")
+        return []
     files = sorted(path for path in source.iterdir() if path.is_file() and not path.is_symlink())
     if not files:
-        raise IntegrationError(f"installer produced no persistent evidence: {source}")
+        return []
     destination = results / "install-evidence"
     destination.mkdir(parents=True, exist_ok=True)
     retained: list[str] = []
@@ -693,6 +693,8 @@ def integration(
     owned: list[Path] = []
     processes: list[subprocess.Popen[bytes]] = []
     runtimes: list[RuntimeHarness] = []
+    install_root: Path | None = None
+    install_evidence_required = False
     try:
         # Reject malformed or unavailable release requests before running the
         # complete suite.  The suite's own integration tests exercise these
@@ -753,13 +755,13 @@ def integration(
             raise IntegrationError("old instance unexpectedly already contains the candidate commit")
         outcome["scenarios"].append({"name": "target-commit-missing-before-upgrade", "status": "passed", "instance": instances[0][0].name})
         install_root = root / "mam-test-install"
+        install_evidence_required = True
         owned.append(install_root)
         install_env = installer_runtime_environment(runtimes, instances)
         launcher, real_delivery = install_candidate(
             instances, archive, install_root, log, runtime_env=install_env
         )
         outcome["real_delivery"] = real_delivery
-        outcome["install_evidence"] = retain_install_evidence(install_root, results)
         outcome["installed_metadata"] = verify_installed_candidate(install_root, to_version, commit, log)
         outcome["scenarios"].append({
             "name": "pipx-install-and-update",
@@ -860,6 +862,18 @@ def integration(
         outcome["error"] = str(exc)
         outcome["scenarios"].append({"name": "integration", "status": "failed", "error": str(exc)})
     finally:
+        if install_root is not None:
+            try:
+                retained = retain_install_evidence(install_root, results)
+                if retained:
+                    outcome["install_evidence"] = retained
+                elif install_evidence_required and "error" not in outcome:
+                    outcome["error"] = "installer produced no persistent evidence"
+            except (IntegrationError, OSError) as exc:
+                if "error" in outcome:
+                    outcome.setdefault("cleanup_errors", []).append(str(exc))
+                else:
+                    outcome["error"] = str(exc)
         for runtime in runtimes:
             try:
                 runtime.close()
