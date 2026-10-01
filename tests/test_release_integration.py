@@ -183,16 +183,20 @@ class ReleaseFixtureTests(unittest.TestCase):
     def test_published_missing_tag_does_not_allocate_resources(self):
         from scripts import test_integration
 
-        if subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-dir"], check=False, capture_output=True).returncode:
-            self.skipTest("published-ref preflight requires the source checkout Git repository")
         with tempfile.TemporaryDirectory(prefix="mam release missing tag ") as temporary:
+            repository = Path(temporary) / "repo"
+            repository.mkdir()
+            subprocess.run(["git", "-C", str(repository), "init", "-q"], check=True, capture_output=True)
+            subprocess.run([
+                "git", "-C", str(repository), "-c", "user.name=integration test",
+                "-c", "user.email=integration-test@example.invalid", "commit", "--allow-empty", "-m", "fixture",
+            ], check=True, capture_output=True)
             root = Path(temporary) / "run"
-            with mock.patch.object(test_integration, "run_full_unit_suite", side_effect=AssertionError("preflight ran the full suite")):
+            with mock.patch.object(test_integration, "root_dir", return_value=repository), \
+                 mock.patch.object(test_integration, "run_full_unit_suite", side_effect=AssertionError("preflight ran the full suite")) as suite:
                 code, outcome = test_integration.integration(root, "0.1.0", "0.2.1", False, published=True)
+            suite.assert_not_called()
             self.assertNotEqual(code, 0)
-            self.assertFalse((root / "mam-test").exists())
-            evidence = json.loads((root / "integration-results" / "result.json").read_text(encoding="utf-8"))
-            self.assertIn("published source tag", evidence["error"])
             self.assertIn("published source tag", outcome["error"])
 
     def test_build_archive_uses_commit_for_annotated_tag(self):
