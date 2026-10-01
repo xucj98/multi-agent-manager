@@ -57,6 +57,28 @@ class CompatibilityTests(unittest.TestCase):
             rollout.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")
             with mock.patch.dict(os.environ, {"CODEX_HOME": str(root)}):
                 self.assertEqual(liveprobe._rollout_tool_execution("thread-raw", "READY")["call_id"], "c1")
+            rows[3]["payload"]["output"][0]["text"] = "Script failed\\nREADY"
+            rollout.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")
+            with mock.patch.dict(os.environ, {"CODEX_HOME": str(root)}):
+                self.assertIsNone(liveprobe._rollout_tool_execution("thread-raw", "READY"))
+
+    def test_rollout_tool_execution_does_not_accept_a_different_completed_turn(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rollout = root / "sessions" / "2026" / "10" / "01" / "rollout-thread-turns.jsonl"
+            rollout.parent.mkdir(parents=True)
+            rows = [
+                {"type": "session_meta", "payload": {"id": "thread-turns"}},
+                {"type": "event_msg", "payload": {"type": "task_started", "turn_id": "turn-other"}},
+                {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "call_id": "other", "input": 'text("READY")'}},
+                {"type": "response_item", "payload": {"type": "custom_tool_call_output", "call_id": "other", "output": [{"type": "input_text", "text": "Script completed\\nREADY"}]}},
+                {"type": "event_msg", "payload": {"type": "item_completed", "thread_id": "thread-turns", "turn_id": "turn-other"}},
+                {"type": "event_msg", "payload": {"type": "task_started", "turn_id": "turn-target"}},
+                {"type": "event_msg", "payload": {"type": "item_completed", "thread_id": "thread-turns", "turn_id": "turn-target"}},
+            ]
+            rollout.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")
+            with mock.patch.dict(os.environ, {"CODEX_HOME": str(root)}):
+                self.assertIsNone(liveprobe._rollout_tool_execution("thread-turns", "READY", target_turn_id="turn-target"))
 
     def test_token_usage_does_not_fill_missing_thread_fields_with_zero(self):
         fixture = object.__new__(liveprobe._LiveFixture)
