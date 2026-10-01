@@ -648,8 +648,9 @@ class WakeRuntimeTests(unittest.TestCase):
         self.statuses[replacement] = "idle"
         with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": replacement}), \
              mock.patch.object(identity, "read", return_value=identity.ThreadIdentity(replacement, "/root", replacement)), \
-             mock.patch.object(cli, "agent_observations", return_value={MANAGER: {"status": "idle"}}):
+             mock.patch.object(cli, "agent_observations", side_effect=RuntimeError("App Server unavailable")) as probe:
             wake_runtime.rebind_manager(self.store, "new root")
+            probe.assert_not_called()
         self.scheduler().run_once()
         self.assertEqual([agent for agent, _ in self.starts], [replacement])
         self.assertIn("[message | agent: " + EXECUTOR + "]", self.starts[0][1])

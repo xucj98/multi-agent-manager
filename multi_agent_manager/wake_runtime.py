@@ -320,7 +320,7 @@ def _route_messages(state: dict[str, Any], manager: str) -> None:
 
 
 def rebind_manager(store: Store, note: str) -> dict[str, Any]:
-    """Transfer a project Manager after proving the old owner has stopped."""
+    """Transfer a project Manager on the calling native root's explicit request."""
     from . import cli, identity
     if not isinstance(note, str) or not note.strip():
         raise WakeRuntimeError("--note must describe the Manager handoff")
@@ -337,12 +337,6 @@ def rebind_manager(store: Store, note: str) -> dict[str, Any]:
         old = previous["manager"] if previous else None
         if old == caller.agent:
             return {"manager": old, "unchanged": True}
-        if old is not None:
-            try:
-                states = cli.agent_observations([old])
-                cli._rebind_quiescent(old, cli.agent_state(old, states), role="current Manager")
-            except Exception as exc:
-                raise WakeRuntimeError(str(exc)) from exc
         record = {"manager": caller.agent, "source": "service rebind-manager", "recorded_at": _timestamp(),
                   "handoffs": list(previous.get("handoffs", [])) if previous else []}
         record["handoffs"].append({"from_agent": old, "to_agent": caller.agent, "at": _timestamp(), "note": note})

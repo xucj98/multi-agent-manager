@@ -816,8 +816,10 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
     def test_rebind_rejects_busy_or_unverifiable_executor_or_replacement(self):
         cases = (
             ("old-executor", "active", "current executor is active"),
+            ("old-executor", "systemError", "cannot verify current executor state"),
             ("old-executor", "unknown", "cannot verify current executor state"),
             ("new-executor", "active", "replacement agent is active"),
+            ("new-executor", "systemError", "cannot verify replacement agent state"),
             ("new-executor", "unknown", "cannot verify replacement agent state"),
             ("new-executor", "idle", "cannot verify replacement agent state"),
         )
@@ -825,7 +827,8 @@ sys.exit(subprocess.run(['bash', str(legacy), record['base'], record['branch'],
             with self.subTest(agent=agent, state=state):
                 task = self.task()
                 args, states, manager = self.prepare_rebind(task)
-                states[agent] = {"status": state, "checked_at": "test", "error": "App Server unavailable"}
+                states[agent] = {"status": state, "checked_at": "test",
+                                 "error": None if state == "systemError" else "App Server unavailable"}
                 with self.assertRaisesRegex(cli.Error, message):
                     self.rebind_direct(args, states, manager)
                 self.assertEqual(self.store.read(task)["agent"], "old-executor")
@@ -1736,46 +1739,51 @@ base=$(git rev-parse --verify "$1^{commit}")
     def test_start_handoff_requires_old_executor_quiescent(self):
         task = self.task()
         old, new, root = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
-        for agent in (old, new):
-            native = identity.ThreadIdentity(agent, f"/root/{agent[:4]}", root)
-            with patch.object(cli, "caller_identity", return_value=native), \
-                    patch.object(cli, "agent_observations", return_value={old: {"status": "active"}}):
-                if agent == old:
-                    cli.start(self.store, types.SimpleNamespace(task=task))
-                else:
-                    with self.assertRaisesRegex(cli.Error, "current executor is active"):
-                        cli.start(self.store, types.SimpleNamespace(task=task))
+        with patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(old, "/root/old", root)):
+            cli.start(self.store, types.SimpleNamespace(task=task))
+        for status, message in (("active", "current executor is active"),
+                                ("systemError", "cannot verify current executor state"),
+                                ("unknown", "cannot verify current executor state")):
+            with self.subTest(status=status), \
+                    patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(new, "/root/new", root)), \
+                    patch.object(cli, "agent_observations", return_value={old: {"status": status, "error": None}}), \
+                    self.assertRaisesRegex(cli.Error, message):
+                cli.start(self.store, types.SimpleNamespace(task=task))
+            self.assertEqual(self.store.read(task)["agent"], old)
         with patch.object(cli, "caller_identity", return_value=identity.ThreadIdentity(new, "/root/new", root)), \
                 patch.object(cli, "agent_observations", return_value={old: {"status": "idle"}}):
             cli.start(self.store, types.SimpleNamespace(task=task))
         self.assertEqual(self.store.read(task)["agent"], new)
         self.assertEqual(len(self.store.read(task)["handoffs"]), 1)
 
-    def test_manager_takeover_retires_old_delivery_and_preserves_bindings(self):
+    def test_manager_takeover_skips_old_state_and_preserves_deliveries_and_bindings(self):
         task, old = self.task_with_manager()
         new = str(uuid.uuid4())
         self.fixture_bind(task, str(uuid.uuid4()))
+        self.add(task)
+        before = self.store.read(task)
+        before["jobs"] = [{"id": "retained-job", "status": "archived", "note": "test"}]
+        self.store.write(before)
         state = wake_runtime._load_state(self.store)
         state["events"]["old-event"] = {"signature": "old-event", "recipient": old, "task": task,
                                         "delivery": "pending", "kind": "task_ready"}
         wake_runtime._save_state(self.store, state)
         with patch.dict(os.environ, {"CODEX_THREAD_ID": new}), \
                 patch.object(identity, "read", return_value=identity.ThreadIdentity(new, "/root", new)), \
-                patch.object(cli, "agent_observations", return_value={old: {"status": "active"}}):
-            with self.assertRaisesRegex(RuntimeError, "current Manager is active"):
-                wake_runtime.rebind_manager(self.store, "handoff")
-        with patch.dict(os.environ, {"CODEX_THREAD_ID": new}), \
-                patch.object(identity, "read", return_value=identity.ThreadIdentity(new, "/root", new)), \
-                patch.object(cli, "agent_observations", return_value={old: {"status": "unknown"}}):
-            with self.assertRaisesRegex(RuntimeError, "cannot verify current Manager state"):
-                wake_runtime.rebind_manager(self.store, "handoff")
-        with patch.dict(os.environ, {"CODEX_THREAD_ID": new}), \
-                patch.object(identity, "read", return_value=identity.ThreadIdentity(new, "/root", new)), \
-                patch.object(cli, "agent_observations", return_value={old: {"status": "idle"}}):
+                patch.object(cli, "agent_observations", side_effect=RuntimeError("App Server unavailable")) as probe:
             self.assertFalse(wake_runtime.rebind_manager(self.store, "handoff")["unchanged"])
+            manager_record = wake_runtime._manager_record(self.store)
+            service_state = wake_runtime._load_state(self.store)
             self.assertTrue(wake_runtime.rebind_manager(self.store, "retry")["unchanged"])
+            probe.assert_not_called()
+            self.assertEqual(wake_runtime._manager_record(self.store), manager_record)
+            self.assertEqual(wake_runtime._load_state(self.store), service_state)
+        self.assertEqual(manager_record["handoffs"], [{
+            "from_agent": old, "to_agent": new, "at": manager_record["handoffs"][0]["at"], "note": "handoff",
+        }])
         self.assertEqual(wake_runtime.recorded_manager(self.store), new)
-        self.assertEqual(self.store.read(task)["agent"] != new, True)
+        self.assertEqual(self.store.read(task), before)
+        self.assertTrue(Path(before["repos"]["multi-agent-manager"]["path"]).is_dir())
         current = wake_runtime._load_state(self.store)
         self.assertNotIn("old-event", current["events"])
         self.assertEqual(current["manager"], new)
@@ -1785,6 +1793,20 @@ base=$(git rev-parse --verify "$1^{commit}")
         desired, _, _ = scheduler._desired_events([self.store.read(task)],
                                                    {self.store.read(task)["agent"]: {"status": "idle"}})
         self.assertEqual({event["recipient"] for event in desired.values()}, {new})
+
+    def test_manager_takeover_requires_native_root_identity(self):
+        _, old = self.task_with_manager()
+        new = str(uuid.uuid4())
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": new}):
+            with patch.object(identity, "read", side_effect=identity.IdentityError("native identity unavailable")), \
+                    self.assertRaisesRegex(wake_runtime.WakeRuntimeError, "native identity unavailable"):
+                wake_runtime.rebind_manager(self.store, "handoff")
+            for native in (identity.ThreadIdentity(new, "/root/worker", old),
+                           identity.ThreadIdentity(new, "/root", old)):
+                with self.subTest(identity=native), patch.object(identity, "read", return_value=native), \
+                        self.assertRaisesRegex(wake_runtime.WakeRuntimeError, "requires a native root thread"):
+                    wake_runtime.rebind_manager(self.store, "handoff")
+        self.assertEqual(wake_runtime.recorded_manager(self.store), old)
 
     def test_legacy_task_link_is_repaired_without_overwriting_conflict(self):
         task = self.task()
