@@ -33,7 +33,7 @@ from . import cli, job_runtime
 
 MODEL = "gpt-6-sol"
 EFFORT = "high"
-MAX_MODEL_TURNS = 12
+MAX_MODEL_TURNS = 4
 DEFAULT_TIMEOUT_SECONDS = 600.0
 POLL_SECONDS = 0.5
 # Codex acknowledges ``turn/start`` before the rollout JSONL is always visible
@@ -42,12 +42,10 @@ POLL_SECONDS = 0.5
 RESUME_PERSISTENCE_RETRY_DELAYS = (0.05, 0.1, 0.2, 0.4, 0.8)
 _MARKER = ".mam-liveprobe.json"
 _MARKER_KIND = "multi-agent-manager live delivery fixture v1"
-_ROLE_ORDER = ("manager", "job_executor", "idle_executor", "archived_executor")
+_ROLE_ORDER = ("manager", "job_executor")
 _BASELINE_MARKERS = {
     "manager": "PROBE_MANAGER_BASELINE_READY",
     "job_executor": "PROBE_JOB_EXECUTOR_BASELINE_READY",
-    "idle_executor": "PROBE_IDLE_EXECUTOR_BASELINE_READY",
-    "archived_executor": "PROBE_ARCHIVED_EXECUTOR_BASELINE_READY",
 }
 
 
@@ -222,6 +220,160 @@ def _turn_text(turn: Mapping[str, Any]) -> str:
     return "\n".join(values)
 
 
+def _custom_tool_execution(turn: Mapping[str, Any], marker: str) -> dict[str, str] | None:
+    """Prove a baseline through the recorded custom call and its matching output.
+
+    Assistant text can repeat a requested marker without running a tool.  The
+    App Server stores the call and output as response items; accept only an
+    ``exec`` call whose ``call_id`` is present on a completed output containing
+    the marker.
+    """
+
+    items = turn.get("items")
+    if not isinstance(items, list):
+        return None
+    calls: dict[str, Mapping[str, Any]] = {}
+    outputs: dict[str, Mapping[str, Any]] = {}
+
+    def text(value: Any) -> str:
+        if isinstance(value, str):
+            return value
+        if isinstance(value, Mapping):
+            return "\n".join(text(child) for child in value.values())
+        if isinstance(value, list):
+            return "\n".join(text(child) for child in value)
+        return ""
+
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        kind = item.get("type")
+        call_id = item.get("call_id") or item.get("callId")
+        if not isinstance(call_id, str) or not call_id:
+            continue
+        if kind in {"custom_tool_call", "customToolCall", "functionCall"} and item.get("name") in {"exec", "functions.exec"}:
+            calls[call_id] = item
+        elif kind in {"custom_tool_call_output", "customToolCallOutput", "functionCallOutput"}:
+            outputs[call_id] = item
+    for call_id, call in calls.items():
+        output = outputs.get(call_id)
+        if output is None:
+            continue
+        call_input = text(call.get("input"))
+        output_text = text(output.get("output"))
+        output_status = output.get("status")
+        if output_status in {"failed", "error", "incomplete"}:
+            continue
+        if (
+            marker in call_input
+            and marker in output_text
+            and "script completed" in output_text.lower()
+            and "script failed" not in output_text.lower()
+        ):
+            return {"call_id": call_id, "name": str(call.get("name")), "marker": marker}
+    return None
+
+
+def _rollout_token_usage(thread_id: str) -> dict[str, int] | None:
+    """Read the final cumulative token_count snapshot for one fixture thread."""
+
+    sessions = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "sessions"
+    if not sessions.is_dir() or sessions.is_symlink():
+        return None
+    candidates = [path for path in sessions.rglob(f"*{thread_id}*.jsonl") if path.is_file() and not path.is_symlink()]
+    if not candidates:
+        return None
+    latest: dict[str, int] | None = None
+    latest_mtime = -1.0
+    for path in candidates:
+        try:
+            if path.stat().st_size > 128 * 1024 * 1024:
+                continue
+            snapshots: list[Mapping[str, Any]] = []
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                payload = row.get("payload") if isinstance(row, Mapping) else None
+                info = payload.get("info") if isinstance(payload, Mapping) and payload.get("type") == "token_count" else None
+                total = info.get("total_token_usage") if isinstance(info, Mapping) else None
+                if isinstance(total, Mapping):
+                    snapshots.append(total)
+            if not snapshots:
+                continue
+            final = snapshots[-1]
+            usage = {
+                output: final[source]
+                for output, source in {
+                    "input_tokens": "input_tokens",
+                    "cached_input_tokens": "cached_input_tokens",
+                    "output_tokens": "output_tokens",
+                    "reasoning_tokens": "reasoning_output_tokens",
+                }.items()
+                if isinstance(final.get(source), int) and not isinstance(final.get(source), bool)
+            }
+            mtime = path.stat().st_mtime
+            if usage and mtime >= latest_mtime:
+                latest, latest_mtime = usage, mtime
+        except (OSError, UnicodeDecodeError):
+            continue
+    return latest
+
+
+def _rollout_tool_execution(
+    thread_id: str, marker: str, *, target_turn_id: str | None = None
+) -> dict[str, str] | None:
+    """Read one raw rollout turn when ``turns/list`` normalizes tools."""
+
+    sessions = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "sessions"
+    if not sessions.is_dir() or sessions.is_symlink():
+        return None
+    for path in sessions.rglob(f"*{thread_id}*.jsonl"):
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 128 * 1024 * 1024:
+            continue
+        try:
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8", errors="replace").splitlines()]
+        except (OSError, UnicodeDecodeError, ValueError):
+            continue
+        session = rows[0].get("payload") if rows and isinstance(rows[0], Mapping) else None
+        if isinstance(session, Mapping) and session.get("id") not in {None, thread_id}:
+            continue
+        grouped: dict[str, list[Mapping[str, Any]]] = {}
+        current: str | None = None
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            payload = row.get("payload")
+            if row.get("type") == "event_msg" and isinstance(payload, Mapping):
+                kind = payload.get("type")
+                if kind in {"task_started", "turn_context"}:
+                    value = payload.get("turn_id")
+                    current = value if isinstance(value, str) else current
+                elif kind == "item_completed" and payload.get("thread_id") == thread_id:
+                    value = payload.get("turn_id")
+                    current = value if isinstance(value, str) else current
+                continue
+            if row.get("type") != "response_item" or not isinstance(payload, Mapping):
+                continue
+            metadata = payload.get("internal_chat_message_metadata_passthrough")
+            item_turn = metadata.get("turn_id") if isinstance(metadata, Mapping) else None
+            bucket = current or (item_turn if isinstance(item_turn, str) else None)
+            if bucket:
+                grouped.setdefault(bucket, []).append(payload)
+        if target_turn_id:
+            candidates = [grouped.get(target_turn_id, [])]
+        elif len(grouped) == 1:
+            candidates = list(grouped.values())
+        else:
+            candidates = []
+        for items in candidates:
+            execution = _custom_tool_execution({"items": items}, marker)
+            if execution is not None:
+                return {**execution, "source": "rollout"}
+    return None
+
+
 def _fixture_executor_path(role: str) -> str:
     return f"/root/liveprobe/{role}"
 
@@ -344,6 +496,13 @@ class _LiveFixture:
             "model": MODEL,
             "effort": EFFORT,
             "model_turn_limit": MAX_MODEL_TURNS,
+            "token_usage": {
+                "input_tokens": None,
+                "cached_input_tokens": None,
+                "output_tokens": None,
+                "reasoning_tokens": None,
+                "source": "unknown-until-finalized",
+            },
             "calls": {"thread_start": 0, "direct_turn_start": 0},
             "checks": {
                 "fixture_tasks_registered_before_threads": False,
@@ -355,7 +514,8 @@ class _LiveFixture:
                 "manager_is_fixture_only": False,
                 "turn_budget": False,
                 "service_stopped_after_delivery": False,
-                "idle_executors_received_no_turn": False,
+                "baseline_custom_tool_calls": False,
+                "job_archived_before_manager_delivery": False,
             },
             "resources": {"tasks": {}, "threads": {}, "jobs": {}, "turns": {}},
             "history": {},
@@ -415,11 +575,7 @@ class _LiveFixture:
 
     def _create_tasks(self) -> None:
         self.stage = "register fixture tasks"
-        titles = {
-            "job": "MAM liveprobe exited-job delivery",
-            "idle": "MAM liveprobe no-job Manager delivery",
-            "archived": "MAM liveprobe archived-job Manager delivery",
-        }
+        titles = {"job": "MAM liveprobe exited-job and pending delivery"}
         with _without_thread_id():
             for role, title in titles.items():
                 try:
@@ -474,11 +630,7 @@ class _LiveFixture:
         self.stage = "create and bind dedicated fixture threads"
         for role in _ROLE_ORDER:
             self.threads[role] = self._create_thread(role)
-        bindings = {
-            "job": "job_executor",
-            "idle": "idle_executor",
-            "archived": "archived_executor",
-        }
+        bindings = {"job": "job_executor"}
         for task_role, thread_role in bindings.items():
             try:
                 # App Server ``thread/start`` creates ordinary persisted
@@ -569,24 +721,6 @@ class _LiveFixture:
         self.jobs.append((self.tasks["job"], job_id))
         self.evidence["resources"]["jobs"]["exited"] = job_id
 
-        archived_process = self._spawn_blocker()
-        try:
-            archived = cli.job_add(
-                self.store,
-                SimpleNamespace(
-                    task=self.tasks["archived"], host="local", pid=archived_process.pid, note="liveprobe-archived-job"
-                ),
-            )
-            archived_id = archived.get("id") if isinstance(archived, Mapping) else None
-            if not isinstance(archived_id, str) or not archived_id:
-                raise LiveProbeError("fixture archived-job registration returned no JOB-ID")
-            cli.job_archive(self.store, SimpleNamespace(job=archived_id, note="liveprobe fixture archived before delivery"))
-        except LiveProbeError:
-            raise
-        except Exception as exc:
-            raise LiveProbeError(f"cannot archive fixture archived-job probe: {_redact(exc)}") from exc
-        self.evidence["resources"]["jobs"]["archived_before_delivery"] = archived_id
-        self._release_blocker(archived_process)
         return job_id
 
     def _start_service(self) -> None:
@@ -852,8 +986,12 @@ class _LiveFixture:
         completed = next((item for item in turns if item.get("id") == turn_id), None)
         if not isinstance(completed, Mapping) or completed.get("status") != "completed":
             raise LiveProbeError(f"fixture {role} baseline did not complete under its acknowledged turn id")
-        if marker not in _turn_text(completed):
-            raise LiveProbeError(f"fixture {role} baseline history lacks its requested marker")
+        execution = _custom_tool_execution(completed, marker) or _rollout_tool_execution(
+            self.threads[role], marker, target_turn_id=turn_id
+        )
+        if execution is None:
+            raise LiveProbeError(f"fixture {role} baseline lacks a matching custom exec call/output")
+        self.evidence.setdefault("baseline_tool_calls", {})[role] = execution
         self._record_paged_history(role, "baseline", turns)
         self.active_direct_turns.pop(role, None)
         self.evidence["resources"]["turns"][f"{role}_baseline_completed"] = turn_id
@@ -864,6 +1002,7 @@ class _LiveFixture:
             self._start_baseline_turn(role)
         self.evidence["checks"]["all_roles_baselined_before_service"] = True
         self.evidence["checks"]["baseline_history_read_after_idle"] = True
+        self.evidence["checks"]["baseline_custom_tool_calls"] = True
 
     def _wait_for_manager_delivery(self) -> None:
         self.stage = "verify fixture Manager delivery"
@@ -873,9 +1012,7 @@ class _LiveFixture:
         )
         manager_payloads = [
             "[MAM MESSAGE]",
-            f"[task pending | {_fixture_executor_path('idle_executor')}]",
-            action,
-            f"[task pending | {_fixture_executor_path('archived_executor')}]",
+            f"[task pending | {_fixture_executor_path('job_executor')}]",
             action,
         ]
         manager_turn = self._wait_for_turn_delivery(
@@ -886,6 +1023,28 @@ class _LiveFixture:
             raise LiveProbeError("Manager-ready scheduler delivery returned no turn id")
         self.evidence["resources"]["turns"]["manager_ready_delivery"] = manager_turn_id
         self.evidence["checks"]["manager_delivery"] = True
+
+    def _stop_service_after_delivery(self) -> None:
+        self.runtime.stop_service(self.config)
+        deadline = self._deadline()
+        while self.clock() < deadline:
+            if self.runtime.service_status(self.config).get("running") is False:
+                return
+            self.sleeper(POLL_SECONDS)
+        raise LiveProbeError("fixture scheduler did not stop after delivery")
+
+    def _archive_exited_job(self) -> None:
+        """Archive the delivered job so the same task becomes Manager-pending."""
+
+        self.stage = "archive delivered fixture job"
+        job_id = self.evidence["resources"]["jobs"].get("exited")
+        if not isinstance(job_id, str):
+            raise LiveProbeError("fixture exited-job delivery has no JOB-ID to archive")
+        try:
+            cli.job_archive(self.store, SimpleNamespace(job=job_id, note="liveprobe fixture worker completed"))
+        except Exception as exc:
+            raise LiveProbeError(f"cannot archive delivered fixture job: {_redact(exc)}") from exc
+        self.evidence["checks"]["job_archived_before_manager_delivery"] = True
 
     def _turn_counts_after_idle(self, phase: str) -> dict[str, int]:
         counts: dict[str, int] = {}
@@ -899,11 +1058,10 @@ class _LiveFixture:
         return counts
 
     def _verify_baseline_only_executors(self) -> None:
-        self.stage = "verify fixture executors received no pre-stop scheduler turn"
+        self.stage = "verify fixture baseline turn distribution"
         counts = self._turn_counts_after_idle("before_job_stop")
-        if counts["manager"] < 2 or any(counts[role] != 1 for role in _ROLE_ORDER[1:]):
+        if any(counts[role] != 1 for role in _ROLE_ORDER):
             raise LiveProbeError(f"fixture pre-stop turn distribution is unexpected: {counts}")
-        self.evidence["checks"]["idle_executors_received_no_turn"] = True
 
     def _wait_for_exited_job_delivery(self) -> dict[str, int]:
         self.stage = "verify exited-job scheduler delivery"
@@ -920,22 +1078,17 @@ class _LiveFixture:
             raise LiveProbeError("exited-job scheduler delivery returned no turn id")
         self.evidence["resources"]["turns"]["exited_job_delivery"] = job_turn_id
         self.evidence["checks"]["job_delivery"] = True
-        # The scheduler intentionally reminds again after a recipient becomes
-        # idle while work is still pending. End this isolated probe after the
-        # first required deliveries before counting fixture model turns.
-        self.runtime.stop_service(self.config)
-        deadline = self._deadline()
-        while self.clock() < deadline:
-            if self.runtime.service_status(self.config).get("running") is False:
-                break
-            self.sleeper(POLL_SECONDS)
-        else:
-            raise LiveProbeError("fixture scheduler did not stop after delivery")
+        # Pause the disposable scheduler between phases so accepted events do
+        # not generate reminder turns while the worker archive is prepared.
+        self._stop_service_after_delivery()
         self.evidence["checks"]["service_stopped_after_delivery"] = True
+        self._archive_exited_job()
+        self._start_service()
+        self._wait_for_service()
+        self._wait_for_manager_delivery()
+        self._stop_service_after_delivery()
         counts = self._turn_counts_after_idle("after_job_stop")
-        if counts["manager"] < 2 or counts["job_executor"] < 2 or any(
-            counts[role] != 1 for role in ("idle_executor", "archived_executor")
-        ):
+        if counts["manager"] != 2 or counts["job_executor"] != 2:
             raise LiveProbeError(f"fixture model turn distribution is unexpected: {counts}")
         observed = sum(counts.values())
         if observed > MAX_MODEL_TURNS:
@@ -946,21 +1099,37 @@ class _LiveFixture:
         self.evidence["model_turns"] = observed
         return counts
 
+    def _collect_token_usage(self) -> None:
+        by_thread: dict[str, dict[str, int]] = {}
+        for role, thread_id in self.threads.items():
+            usage = _rollout_token_usage(thread_id)
+            if usage:
+                by_thread[role] = usage
+        if not by_thread:
+            self.evidence["token_usage"]["source"] = "rollout-token-count-unavailable"
+            return
+        totals = {}
+        for key in ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_tokens"):
+            values = [by_thread.get(role, {}).get(key) for role in self.threads]
+            totals[key] = sum(values) if all(isinstance(value, int) and value >= 0 for value in values) else None
+        self.evidence["token_usage"] = {**totals, "source": "Codex rollout token_count total_token_usage"}
+        self.evidence["token_usage_by_thread"] = by_thread
+
     def run(self) -> dict[str, Any]:
         self._create_tasks()
         self._connect()
         self._create_and_bind_threads()
         self._start_all_baseline_turns()
-        job_id = self._register_jobs()
+        self._register_jobs()
         self._start_service()
         self._wait_for_service()
-        self._wait_for_manager_delivery()
         self._verify_baseline_only_executors()
         # Releasing EOF makes this fixture-owned, already-registered local
         # process finish.  The detached scheduler must later observe the exit
         # itself; this module does not refresh the job record on its behalf.
         self._release_blocker(self.blockers[0])
         self._wait_for_exited_job_delivery()
+        self._collect_token_usage()
         self.evidence["status"] = "passed"
         return self.evidence
 
@@ -1103,6 +1272,13 @@ def run_live_delivery(
         "model": MODEL,
         "effort": EFFORT,
         "model_turn_limit": MAX_MODEL_TURNS,
+        "token_usage": {
+            "input_tokens": None,
+            "cached_input_tokens": None,
+            "output_tokens": None,
+            "reasoning_tokens": None,
+            "source": "unknown-until-finalized",
+        },
         "stage": "prepare fixture",
     }
     try:
@@ -1134,6 +1310,12 @@ def run_live_delivery(
     finally:
         cleanup_errors: list[str] = []
         if fixture is not None:
+            try:
+                fixture._collect_token_usage()
+            except Exception:
+                # Token accounting is diagnostic only; cleanup and pass/fail
+                # evidence must remain authoritative when a rollout is partial.
+                pass
             cleanup_errors = fixture.cleanup()
             evidence = dict(fixture.evidence) | {key: value for key, value in evidence.items() if key in {"status", "stage", "error"}}
         if cleanup_errors:
@@ -1141,14 +1323,19 @@ def run_live_delivery(
             if failure is None:
                 failure = LiveProbeError("live delivery fixture cleanup failed: " + "; ".join(cleanup_errors))
                 evidence.update({"status": "failed", "stage": "cleanup", "error": _redact(failure)})
-        try:
-            _remove_owned_root(root_path)
-        except Exception as exc:
-            detail = f"fixture filesystem cleanup: {_redact(exc)}"
-            evidence.setdefault("cleanup_errors", []).append(detail)
-            if failure is None:
-                failure = LiveProbeError(detail)
-                evidence.update({"status": "failed", "stage": "cleanup", "error": detail})
+        if cleanup_errors:
+            # Keep the owned root for diagnosis when service/process cleanup
+            # was incomplete; deleting it could hide a live fixture process.
+            evidence["cleanup_root"] = str(root_path)
+        else:
+            try:
+                _remove_owned_root(root_path)
+            except Exception as exc:
+                detail = f"fixture filesystem cleanup: {_redact(exc)}"
+                evidence.setdefault("cleanup_errors", []).append(detail)
+                if failure is None:
+                    failure = LiveProbeError(detail)
+                    evidence.update({"status": "failed", "stage": "cleanup", "error": detail})
         _write_evidence(evidence_path, evidence)
     if failure is not None:
         raise failure

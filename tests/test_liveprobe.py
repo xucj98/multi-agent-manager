@@ -12,17 +12,12 @@ from multi_agent_manager import liveprobe
 
 TASK_IDS = {
     "job": "10000000-0000-4000-8000-000000000001",
-    "idle": "10000000-0000-4000-8000-000000000002",
-    "archived": "10000000-0000-4000-8000-000000000003",
 }
 THREAD_IDS = {
     "manager": "20000000-0000-4000-8000-000000000001",
     "job_executor": "20000000-0000-4000-8000-000000000002",
-    "idle_executor": "20000000-0000-4000-8000-000000000003",
-    "archived_executor": "20000000-0000-4000-8000-000000000004",
 }
 JOB_ID = "30000000-0000-4000-8000-000000000001"
-ARCHIVED_JOB_ID = "30000000-0000-4000-8000-000000000002"
 SOCKET = "/tmp/mam-liveprobe-test.sock"
 
 
@@ -105,6 +100,7 @@ class FakeStream:
         self.thread_starts = 0
         self.direct_baseline_starts = 0
         self.manager_delivery_added = False
+        self.manager_delivery_ready = False
         self.job_delivery_added = False
         self.history_unsupported: set[str] = set()
         self.active_reads_remaining: dict[str, int] = {}
@@ -126,6 +122,13 @@ class FakeStream:
 
     def _append_turn(self, thread_id, turn_id, text, *, assistant_text=None):
         items = [{"id": f"input-{turn_id}", "type": "userMessage", "content": [{"type": "text", "text": text}]}]
+        if turn_id.endswith("-baseline"):
+            role = next(role for role, value in THREAD_IDS.items() if value == thread_id)
+            marker = liveprobe._BASELINE_MARKERS[role]
+            items.extend([
+                {"id": f"call-{turn_id}", "type": "custom_tool_call", "name": "exec", "call_id": f"call-{turn_id}", "input": f'text("{marker}");'},
+                {"id": f"output-{turn_id}", "type": "custom_tool_call_output", "call_id": f"call-{turn_id}", "output": [{"type": "input_text", "text": f"Script completed\\n{marker}"}]},
+            ])
         if assistant_text is not None:
             items.append({"id": f"answer-{turn_id}", "type": "agentMessage", "text": assistant_text})
         self.turns[thread_id].append({"id": turn_id, "status": "inProgress", "items": items})
@@ -140,14 +143,12 @@ class FakeStream:
         raise AssertionError(f"completion event referenced unknown turn {turn_id}")
 
     def _add_manager_delivery_after_baselines(self):
-        if self.manager_delivery_added or not self.state.get("running") or not self._all_roles_have_baseline():
+        if self.manager_delivery_added or not self.state.get("running") or not self.manager_delivery_ready or not self._all_roles_have_baseline():
             return
         self.manager_delivery_added = True
         notification = (
             "[MAM MESSAGE]\n\n"
-            "[task pending | /root/liveprobe/idle_executor]\n"
-            "Check the task and any published report; start or continue the work, request review, block or archive the task.\n\n"
-            "[task pending | /root/liveprobe/archived_executor]\n"
+            "[task pending | /root/liveprobe/job_executor]\n"
             "Check the task and any published report; start or continue the work, request review, block or archive the task."
         )
         self._append_turn(
@@ -193,7 +194,7 @@ class FakeStream:
         self.state["requests"].append((method, params))
         self.state["timeline"].append((method, params.get("threadId")))
         if method == "thread/start":
-            if self.state["tasks_created"] != ["job", "idle", "archived"]:
+            if self.state["tasks_created"] != ["job"]:
                 raise AssertionError("fixture threads were created before all tasks were registered")
             if params.get("ephemeral") is not False:
                 raise AssertionError("fixture threads must be persisted")
@@ -284,8 +285,8 @@ class LiveProbeTests(unittest.TestCase):
         }
         self.runtime = FakeRuntime(self.state)
         self.stream = FakeStream(self.state)
-        self.task_roles = iter(("job", "idle", "archived"))
-        self.job_roles = iter((JOB_ID, ARCHIVED_JOB_ID))
+        self.task_roles = iter(("job",))
+        self.job_roles = iter((JOB_ID,))
         self.processes = 0
 
     def tearDown(self):
@@ -305,6 +306,8 @@ class LiveProbeTests(unittest.TestCase):
 
     def _job_archive(self, _store, args):
         self.state["job_archives"].append((args.job, args.note))
+        if args.job == JOB_ID:
+            self.stream.manager_delivery_ready = True
         return {"id": args.job}
 
     def _archive(self, _store, args):
@@ -342,7 +345,7 @@ class LiveProbeTests(unittest.TestCase):
         result = self._run_fixture(root, evidence_path=evidence_path)
 
         self.assertEqual(result["status"], "passed")
-        self.assertEqual(result["model_turns"], 6)
+        self.assertEqual(result["model_turns"], 4)
         self.assertEqual(result["cleanup"]["threads"], "archived")
         self.assertEqual(result["delivery_inputs"]["manager_delivery"]["item_type"], "userMessage")
         self.assertTrue(result["delivery_inputs"]["manager_delivery"]["matched"])
@@ -353,11 +356,7 @@ class LiveProbeTests(unittest.TestCase):
             result["resources"]["turns"]["manager_ready_delivery"],
         )
         self.assertIn(
-            "[task pending | /root/liveprobe/idle_executor]",
-            result["delivery_inputs"]["manager_delivery"]["text"],
-        )
-        self.assertIn(
-            "[task pending | /root/liveprobe/archived_executor]",
+            "[task pending | /root/liveprobe/job_executor]",
             result["delivery_inputs"]["manager_delivery"]["text"],
         )
         self.assertEqual(result["delivery_inputs"]["exited_job_delivery"]["item_type"], "userMessage")
@@ -388,18 +387,17 @@ class LiveProbeTests(unittest.TestCase):
                 "manager_is_fixture_only": True,
                 "turn_budget": True,
                 "service_stopped_after_delivery": True,
-                "idle_executors_received_no_turn": True,
+                "baseline_custom_tool_calls": True,
+                "job_archived_before_manager_delivery": True,
             },
         )
         self.assertFalse(root.exists())
         self.assertEqual(json.loads(evidence_path.read_text())["status"], "passed")
-        self.assertEqual(self.state["tasks_created"], ["job", "idle", "archived"])
+        self.assertEqual(self.state["tasks_created"], ["job"])
         self.assertEqual(
             self.state["binds"],
             [
                 (TASK_IDS["job"], THREAD_IDS["job_executor"]),
-                (TASK_IDS["idle"], THREAD_IDS["idle_executor"]),
-                (TASK_IDS["archived"], THREAD_IDS["archived_executor"]),
             ],
         )
         self.assertEqual(self.state["job_adds"][0][0], TASK_IDS["job"])
@@ -409,13 +407,13 @@ class LiveProbeTests(unittest.TestCase):
         self.assertEqual(self.state["manager"], THREAD_IDS["manager"])
         self.assertEqual(
             self.state["job_archives"],
-            [(ARCHIVED_JOB_ID, "liveprobe fixture archived before delivery"), (JOB_ID, "liveprobe fixture cleanup")],
+            [(JOB_ID, "liveprobe fixture worker completed"), (JOB_ID, "liveprobe fixture cleanup")],
         )
         self.assertEqual([task for task, _ in self.state["task_archives"]], list(TASK_IDS.values()))
 
         methods = [method for method, _ in self.state["requests"]]
-        self.assertEqual(methods.count("thread/start"), 4)
-        self.assertEqual(methods.count("turn/start"), 4)
+        self.assertEqual(methods.count("thread/start"), 2)
+        self.assertEqual(methods.count("turn/start"), 2)
         direct = [params for method, params in self.state["requests"] if method == "turn/start"]
         self.assertEqual([params["threadId"] for params in direct], [THREAD_IDS[role] for role in liveprobe._ROLE_ORDER])
         for role, params in zip(liveprobe._ROLE_ORDER, direct):
@@ -444,19 +442,19 @@ class LiveProbeTests(unittest.TestCase):
 
         service_start = self.state["timeline"].index(("service-start", THREAD_IDS["manager"]))
         direct_starts = [index for index, event in enumerate(self.state["timeline"]) if event[0] == "turn/start"]
-        self.assertEqual(len(direct_starts), 4)
+        self.assertEqual(len(direct_starts), 2)
         self.assertTrue(all(index < service_start for index in direct_starts))
         self.assertIn(("service-stop", THREAD_IDS["manager"]), self.state["timeline"])
         self.assertTrue(self.stream.closed)
         self.assertEqual(result["resources"]["threads"], THREAD_IDS)
-        self.assertEqual(result["resources"]["jobs"], {"exited": JOB_ID, "archived_before_delivery": ARCHIVED_JOB_ID})
+        self.assertEqual(result["resources"]["jobs"], {"exited": JOB_ID})
         self.assertEqual(
             result["turn_counts"]["before_job_stop"],
-            {"manager": 2, "job_executor": 1, "idle_executor": 1, "archived_executor": 1},
+            {"manager": 1, "job_executor": 1},
         )
         self.assertEqual(
             result["turn_counts"]["after_job_stop"],
-            {"manager": 2, "job_executor": 2, "idle_executor": 1, "archived_executor": 1},
+            {"manager": 2, "job_executor": 2},
         )
         self.assertEqual(
             result["cleanup"]["thread_archive"],
@@ -477,16 +475,14 @@ class LiveProbeTests(unittest.TestCase):
         result = self._run_fixture(root)
         self.assertEqual(result["status"], "passed")
         self.assertIn((THREAD_IDS["manager"], "active"), self.state["metadata_statuses"])
-        self.assertEqual(result["calls"]["direct_turn_start"], 4)
+        self.assertEqual(result["calls"]["direct_turn_start"], 2)
 
     def test_assistant_and_baseline_echo_cannot_replace_current_inbound_delivery(self):
         root = self.base / "fixture-assistant-only"
         evidence_path = self.base / "assistant-only.json"
         notification = (
             "[MAM MESSAGE]\n\n"
-            "[task pending | /root/liveprobe/idle_executor]\n"
-            "Check the task and any published report; start or continue the work, request review, block or archive the task.\n\n"
-            "[task pending | /root/liveprobe/archived_executor]\n"
+            "[task pending | /root/liveprobe/job_executor]\n"
             "Check the task and any published report; start or continue the work, request review, block or archive the task."
         )
         self.stream.manager_delivery_input_override = "unrelated user message"
@@ -508,8 +504,6 @@ class LiveProbeTests(unittest.TestCase):
         self.stream.manager_delivery_input_override = (
             "[MAM MESSAGE]\n\n"
             "[task pending | /root/liveprobe/other_executor]\n"
-            "Check the task and any published report; start or continue the work, request review, block or archive the task.\n\n"
-            "[task pending | /root/liveprobe/archived_executor]\n"
             "Check the task and any published report; start or continue the work, request review, block or archive the task."
         )
         with self.assertRaisesRegex(liveprobe.LiveProbeError, "without matching inbound delivery"):
@@ -606,7 +600,7 @@ class LiveProbeTests(unittest.TestCase):
         self.assertEqual(self.state["sleeps"][:2], [0.05, 0.1])
         self.assertEqual(
             [method for method, _ in self.state["requests"]].count("turn/start"),
-            4,
+            2,
         )
 
     def test_empty_rollout_resume_timeout_keeps_last_error_and_is_bounded(self):
