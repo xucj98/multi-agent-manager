@@ -227,6 +227,22 @@ exit 72
             encoding="utf-8",
         )
         path.chmod(0o755)
+        curl = self.fake_bin / "curl"
+        curl.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "args=(\"$@\")\n"
+            "if [[ -n \"${FAKE_CURL_URL:-}\" ]]; then\n"
+            "  for index in \"${!args[@]}\"; do\n"
+            "    if [[ \"${args[$index]}\" == https://github.com/xucj98/multi-agent-manager/archive/refs/tags/* ]]; then\n"
+            "      args[$index]=\"$FAKE_CURL_URL\"\n"
+            "    fi\n"
+            "  done\n"
+            "fi\n"
+            "exec /usr/bin/curl \"${args[@]}\"\n",
+            encoding="utf-8",
+        )
+        curl.chmod(0o755)
 
     @staticmethod
     def _probe_stubs() -> str:
@@ -374,7 +390,7 @@ run_compatibility_check() {
         self.addCleanup(server.shutdown)
         self.addCleanup(server.server_close)
         environment = self._fixture_environment({
-            "MAM_INSTALL_URL": f"http://127.0.0.1:{server.server_port}/candidate.tar.gz",
+            "FAKE_CURL_URL": f"http://127.0.0.1:{server.server_port}/candidate.tar.gz",
         })
         environment.pop("MAM_INSTALL_ARCHIVE", None)
         result = subprocess.run(

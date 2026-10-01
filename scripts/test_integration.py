@@ -184,6 +184,21 @@ def target_exists(repo: Path, target: str) -> bool:
     return run(["git", "-C", str(repo), "cat-file", "-e", f"{target}^{{commit}}"],).returncode == 0
 
 
+def run_full_unit_suite(log: Path) -> dict[str, Any]:
+    """Run the complete source regression once from the release entry point."""
+
+    environment = os.environ.copy()
+    environment["MAM_SKIP_INTEGRATION_UNIT_SUITE"] = "1"
+    started = __import__("time").monotonic()
+    result = run([sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+                 cwd=root_dir(), env=environment, log=log)
+    elapsed = round(__import__("time").monotonic() - started, 3)
+    if result.returncode:
+        raise IntegrationError(f"complete source unit suite failed: {result.stderr[-1500:]}")
+    passed = len([line for line in result.stderr.splitlines() if line.startswith("test_") and " ... ok" in line])
+    return {"status": "passed", "passed": passed, "elapsed_seconds": elapsed}
+
+
 def verify_instance_data(
     instance: Path,
     metadata: dict[str, Any],
@@ -618,6 +633,8 @@ def integration(
     processes: list[subprocess.Popen[bytes]] = []
     runtimes: list[RuntimeHarness] = []
     try:
+        if os.environ.get("MAM_SKIP_INTEGRATION_UNIT_SUITE") != "1":
+            outcome["unit_suite"] = run_full_unit_suite(log)
         if (from_version, to_version) != ("0.1.0", "0.2.1"):
             raise IntegrationError("only the complete 0.1.0 -> 0.2.1 chain is supported")
         selected_ref = f"refs/tags/v{to_version}" if published else "HEAD"

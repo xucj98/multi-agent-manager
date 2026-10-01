@@ -5,13 +5,9 @@ set -euo pipefail
 
 readonly PATH_BEGIN='# >>> MAM PATH >>>'
 readonly PATH_END='# <<< MAM PATH <<<'
-readonly STARTUP_WAIT_ATTEMPTS=40
-readonly STARTUP_WAIT_SECONDS=0.5
-
 CHECKOUT_ROOT=''
 REQUESTED_VERSION=''
 INSTALL_ARCHIVE="${MAM_INSTALL_ARCHIVE:-}"
-MODERN_INSTALL=0
 MAM_ROOT=''
 PROJECT_ROOT=''
 LOCAL_BIN=''
@@ -24,9 +20,10 @@ INSTALL_TMP=''
 COMPATIBILITY_JSON=''
 INSTALL_EVIDENCE_PATH=''
 INSTALL_TEST_COUNT=1
-SERVICE_ERROR=''
-SERVICE_STATE=''
-SERVICE_MANAGER_ARGS=()
+INSTALL_STARTED_EPOCH=''
+INSTALL_TEST_SECONDS=0
+INSTALL_PIPX_SECONDS=0
+INSTALL_COMPAT_SECONDS=0
 
 parse_args() {
     while (($#)); do
@@ -77,7 +74,7 @@ prepare_release_source() {
     local archive="$INSTALL_ARCHIVE" url="" source_dir="$INSTALL_TMP/source" first
     mkdir -p -- "$source_dir"
     if [[ -z "$archive" ]]; then
-        url="${MAM_INSTALL_URL:-https://github.com/xucj98/multi-agent-manager/archive/refs/tags/v${REQUESTED_VERSION}.tar.gz}"
+        url="https://github.com/xucj98/multi-agent-manager/archive/refs/tags/v${REQUESTED_VERSION}.tar.gz"
         archive="$INSTALL_TMP/source.tar.gz"
         if ! command -v curl >/dev/null 2>&1; then
             incomplete 'curl is required to download the selected MAM release'
@@ -300,6 +297,8 @@ run_tests() {
     if [[ -n "${PYTHONPATH:-}" ]]; then
         checkout_pythonpath+=":$PYTHONPATH"
     fi
+    local started
+    started="$(date +%s)"
     printf 'MAM installation: running checkout smoke with %s\n' "$SOURCE_PYTHON"
     if ! (
         cd -- "$CHECKOUT_ROOT"
@@ -318,6 +317,7 @@ for relative in ("pyproject.toml", "scripts/install.sh", "multi_agent_manager/re
         incomplete 'checkout tests failed; pipx and the existing scheduler were left untouched'
         return 1
     fi
+    INSTALL_TEST_SECONDS=$(( $(date +%s) - started ))
 }
 
 prepare_local_bin() {
@@ -339,6 +339,8 @@ install_with_pipx() {
         incomplete 'pipx is required; install it first with: sudo apt install -y pipx'
         return 1
     fi
+    local started
+    started="$(date +%s)"
     printf 'MAM proactive wakeup: installing current checkout through pipx\n'
     if ! PIPX_BIN_DIR="$LOCAL_BIN" pipx install --force "$CHECKOUT_ROOT"; then
         incomplete 'pipx could not install the current checkout; the existing scheduler was not stopped'
@@ -352,6 +354,7 @@ install_with_pipx() {
         incomplete '~/.local/bin/mam is not runnable after the pipx installation'
         return 1
     fi
+    INSTALL_PIPX_SECONDS=$(( $(date +%s) - started ))
 }
 
 update_startup_file() {
@@ -547,27 +550,6 @@ PY
     INSTALLED_COMMIT="$(sed -n '2p' <<<"$metadata")"
 }
 
-validate_explicit_manager() {
-    if [[ -z "${MAM_SERVICE_MANAGER:-}" ]]; then
-        return 0
-    fi
-    if ! "$INSTALLED_PYTHON" - "$MAM_SERVICE_MANAGER" <<'PY'
-import sys
-import uuid
-try:
-    value = sys.argv[1]
-    if str(uuid.UUID(value)) != value:
-        raise ValueError
-except (IndexError, ValueError):
-    raise SystemExit(1)
-PY
-    then
-        incomplete 'MAM_SERVICE_MANAGER must be a canonical AGENT-ID'
-        return 1
-    fi
-    SERVICE_MANAGER_ARGS=(--manager "$MAM_SERVICE_MANAGER")
-}
-
 create_install_tmp() {
     if ! INSTALL_TMP="$(mktemp -d "${TMPDIR:-/tmp}/mam-install.XXXXXX")"; then
         incomplete 'cannot create a private directory for installation acceptance'
@@ -622,21 +604,37 @@ PY
 }
 
 run_compatibility_check() {
-    local output="$INSTALL_TMP/compatibility.json" errors="$INSTALL_TMP/compatibility.stderr" detail
+    local output="$INSTALL_TMP/compatibility.json" errors="$INSTALL_TMP/compatibility.stderr" detail started
+    started="$(date +%s)"
     printf 'MAM installation: running shared Codex compatibility acceptance\n'
     local probe_root="${PROJECT_ROOT:-$INSTALL_TMP}"
     if ! (cd -- "$probe_root" && env -u CODEX_THREAD_ID "$INSTALLED_PYTHON" -B -m multi_agent_manager.compatibility --output "$output" >"$INSTALL_TMP/compatibility.out" 2>"$errors"); then
+        persist_compatibility_failure "$output" "$errors"
         detail="$(bounded_diagnostic "$INSTALL_TMP/compatibility.out" "$errors")"
         incomplete "shared Codex compatibility acceptance failed${detail:+: $detail}"
         return 1
     fi
     if ! validate_compatibility_json "$output"; then
+        persist_compatibility_failure "$output" "$errors"
         detail="$(bounded_diagnostic "$output" "$errors")"
         incomplete "shared Codex compatibility acceptance returned invalid evidence${detail:+: $detail}"
         return 1
     fi
     COMPATIBILITY_JSON="$output"
+    INSTALL_COMPAT_SECONDS=$(( $(date +%s) - started ))
     printf 'MAM installation: shared Codex compatibility PASS\n'
+}
+
+persist_compatibility_failure() {
+    local output="$1" errors="$2" destination="$HOME/.local/share/multi-agent-manager/install-evidence" stamp raw
+    stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    mkdir -p -- "$destination" || return 0
+    raw="$destination/${stamp}-${REQUESTED_VERSION}.compatibility-failed.json"
+    if [[ -f "$output" ]]; then
+        cp -p -- "$output" "$raw" || true
+    elif [[ -f "$errors" ]]; then
+        cp -p -- "$errors" "$raw" || true
+    fi
 }
 
 persist_install_evidence() {
@@ -652,7 +650,7 @@ persist_install_evidence() {
         incomplete 'cannot retain compatibility evidence after installation'
         return 1
     fi
-    if ! "$INSTALLED_PYTHON" - "$summary" "$raw" "$INSTALLED_VERSION" "$INSTALLED_COMMIT" "$INSTALL_TEST_COUNT" <<'PY'
+    if ! "$INSTALLED_PYTHON" - "$summary" "$raw" "$INSTALLED_VERSION" "$INSTALLED_COMMIT" "$INSTALL_TEST_COUNT" "$INSTALL_STARTED_EPOCH" "$INSTALL_TEST_SECONDS" "$INSTALL_PIPX_SECONDS" "$INSTALL_COMPAT_SECONDS" <<'PY'
 import json
 from pathlib import Path
 import sys
@@ -661,11 +659,19 @@ summary_path = Path(sys.argv[1])
 raw_path = Path(sys.argv[2])
 version, commit = sys.argv[3:5]
 test_count = int(sys.argv[5])
+started = int(sys.argv[6])
+stage_seconds = {
+    "install_smoke": int(sys.argv[7]),
+    "pipx_install": int(sys.argv[8]),
+    "compatibility": int(sys.argv[9]),
+}
 compatibility = json.loads(raw_path.read_text(encoding="utf-8"))
 summary_path.write_text(json.dumps({
     "version": version,
     "commit": commit,
     "tests": {"mode": "install-smoke", "count": test_count},
+    "elapsed_seconds": max(0, int(__import__("time").time()) - started),
+    "stages": stage_seconds,
     "compatibility": compatibility,
     "compatibility_evidence": str(raw_path),
 }, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -677,130 +683,15 @@ PY
     INSTALL_EVIDENCE_PATH="$summary"
 }
 
-service_command() {
-    local action="$1" output="$2" errors="$3"
-    local -a command=("$MAM_BIN" service "$action")
-    SERVICE_ERROR=''
-    if [[ "$action" == start ]] && ((${#SERVICE_MANAGER_ARGS[@]})); then
-        command+=("${SERVICE_MANAGER_ARGS[@]}")
-    fi
-    # The installer process is never implicitly selected as Manager.
-    if ! (cd -- "$PROJECT_ROOT" && env -u CODEX_THREAD_ID "${command[@]}" >"$output" 2>"$errors"); then
-        SERVICE_ERROR="$(bounded_diagnostic "$output" "$errors")"
-        return 1
-    fi
-}
-
-status_running() {
-    "$INSTALLED_PYTHON" - "$1" <<'PY'
-import json
-from pathlib import Path
-import sys
-try:
-    value = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-    raise SystemExit(2)
-if not isinstance(value, dict) or not isinstance(value.get("running"), bool):
-    raise SystemExit(2)
-raise SystemExit(0 if value["running"] else 1)
-PY
-}
-
-validated_service_state() {
-    (cd -- "$PROJECT_ROOT" && "$INSTALLED_PYTHON" -B -m multi_agent_manager.wake_compat \
-        --service-status "$1" --quiet)
-}
-
-readiness_may_arrive() {
-    "$INSTALLED_PYTHON" - "$1" <<'PY'
-import json
-from pathlib import Path
-import sys
-try:
-    status = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-    raise SystemExit(2)
-if not isinstance(status, dict):
-    raise SystemExit(2)
-if status.get("running") is True and status.get("status") in {"healthy", "pending"}:
-    raise SystemExit(0)
-raise SystemExit(1)
-PY
-}
-
-wait_for_service_readiness() {
-    local status_path="$1" errors="$2" attempt validation
-    for ((attempt = 1; attempt <= STARTUP_WAIT_ATTEMPTS; attempt++)); do
-        if ! service_command status "$status_path" "$errors"; then
-            return 1
-        fi
-        if validation="$(validated_service_state "$status_path" 2>&1)"; then
-            SERVICE_STATE="$validation"
-            return 0
-        fi
-        if readiness_may_arrive "$status_path"; then
-            sleep "$STARTUP_WAIT_SECONDS"
-            continue
-        fi
-        SERVICE_ERROR="$validation"
-        return 1
-    done
-    SERVICE_ERROR="scheduler did not become healthy within $((STARTUP_WAIT_ATTEMPTS / 2)) seconds"
-    return 1
-}
-
-start_project_service() {
-    local before="$INSTALL_TMP/status-before.json" after="$INSTALL_TMP/status-after.json" result
-    if ! service_command status "$before" "$INSTALL_TMP/status-before.stderr"; then
-        incomplete "mam service status failed before activation${SERVICE_ERROR:+: $SERVICE_ERROR}"
-        return 1
-    fi
-    if status_running "$before"; then
-        if ! service_command stop "$INSTALL_TMP/stop.json" "$INSTALL_TMP/stop.stderr"; then
-            incomplete "the existing project scheduler could not be stopped safely${SERVICE_ERROR:+: $SERVICE_ERROR}"
-            return 1
-        fi
-    else
-        result=$?
-        if ((result != 1)); then
-            incomplete 'mam service status returned an invalid running flag'
-            return 1
-        fi
-    fi
-    if ! service_command start "$INSTALL_TMP/start.json" "$INSTALL_TMP/start.stderr"; then
-        incomplete "mam service start failed${SERVICE_ERROR:+: $SERVICE_ERROR}"
-        return 1
-    fi
-    if ! wait_for_service_readiness "$after" "$INSTALL_TMP/status-after.stderr"; then
-        incomplete "mam service did not acknowledge readiness${SERVICE_ERROR:+: $SERVICE_ERROR}"
-        return 1
-    fi
-    case "$SERVICE_STATE" in
-        healthy)
-            printf 'MAM proactive wakeup installation: PASS (scheduler healthy)\n'
-            ;;
-        pending)
-            printf 'MAM proactive wakeup installation: PASS (scheduler healthy; pending delivery retained)\n'
-            ;;
-        awaiting_manager)
-            printf 'MAM proactive wakeup installation: PASS (scheduler awaiting first Manager binding)\n'
-            ;;
-        *)
-            incomplete 'mam service returned an unknown validated lifecycle status'
-            return 1
-            ;;
-    esac
-}
-
 main() {
     parse_args "$@" || return 1
+    INSTALL_STARTED_EPOCH="$(date +%s)"
     local local_checkout=''
     if [[ -z "$REQUESTED_VERSION" && -z "$INSTALL_ARCHIVE" ]]; then
         # Every invocation, including one launched from a checkout, resolves
         # a release archive so local and formal installs exercise one path.
         REQUESTED_VERSION='0.2.1'
     fi
-    MODERN_INSTALL=1
     if [[ -z "$REQUESTED_VERSION" ]]; then
         REQUESTED_VERSION='0.2.1'
     fi
