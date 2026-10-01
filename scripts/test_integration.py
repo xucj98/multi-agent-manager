@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import shlex
 import subprocess
@@ -194,8 +195,22 @@ def run_full_unit_suite(log: Path) -> dict[str, Any]:
     elapsed = round(time.monotonic() - started, 3)
     if result.returncode:
         raise IntegrationError(f"complete source unit suite failed: {result.stderr[-1500:]}")
-    passed = len([line for line in result.stderr.splitlines() if line.startswith("test_") and " ... ok" in line])
-    return {"status": "passed", "passed": passed, "elapsed_seconds": elapsed}
+    output = f"{result.stdout}\n{result.stderr}"
+    summaries = list(re.finditer(r"Ran\s+(\d+)\s+tests?\s+in\s+([0-9.]+)s", output))
+    if not summaries:
+        raise IntegrationError("complete source unit suite did not report a unittest summary")
+    summary = summaries[-1]
+    total = int(summary.group(1))
+    trailing = output[summary.end():]
+    skipped_match = re.search(r"\bOK\s+\(skipped=(\d+)\)", trailing)
+    skipped = int(skipped_match.group(1)) if skipped_match else 0
+    return {
+        "status": "passed",
+        "total": total,
+        "passed": total - skipped,
+        "skipped": skipped,
+        "elapsed_seconds": elapsed,
+    }
 
 
 def release_preflight(from_version: str, to_version: str, *, published: bool, log: Path) -> tuple[str, str]:

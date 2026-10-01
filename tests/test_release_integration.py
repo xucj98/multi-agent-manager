@@ -122,6 +122,24 @@ class ReleaseFixtureTests(unittest.TestCase):
             shutil.rmtree(root / "install")
             self.assertTrue((results / "install-evidence" / "20261001T000000Z-0.2.1.json").is_file())
 
+    def test_full_unit_suite_counts_unittest_summary_with_interleaved_fixture_output(self):
+        from scripts import test_integration
+
+        result = subprocess.CompletedProcess(
+            [sys.executable, "-m", "unittest"],
+            0,
+            "",
+            "test_first ... Preparing worktree (new branch 'fixture-installer')\n"
+            "test_second ... ok\n"
+            "Ran 3 tests in 1.250s\n\nOK (skipped=1)\n",
+        )
+        with tempfile.TemporaryDirectory(prefix="mam unit summary ") as temporary:
+            with mock.patch.object(test_integration, "run", return_value=result):
+                summary = test_integration.run_full_unit_suite(Path(temporary) / "suite.log")
+        self.assertEqual(summary["total"], 3)
+        self.assertEqual(summary["passed"], 2)
+        self.assertEqual(summary["skipped"], 1)
+
     def test_create_old_fixture_uses_archived_writer_and_refuses_reuse(self):
         with tempfile.TemporaryDirectory(prefix="mam release fixture ") as temporary:
             instance = Path(temporary) / "mam-test"
