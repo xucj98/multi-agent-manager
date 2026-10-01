@@ -328,14 +328,33 @@ def _rollout_tool_execution(thread_id: str, marker: str) -> dict[str, str] | Non
         try:
             if path.stat().st_size > 128 * 1024 * 1024:
                 continue
+            with path.open(encoding="utf-8") as handle:
+                first = handle.readline()
+            try:
+                session = json.loads(first)
+            except ValueError:
+                continue
+            session_payload = session.get("payload") if isinstance(session, Mapping) else None
+            if isinstance(session_payload, Mapping) and session_payload.get("id") not in {None, thread_id}:
+                continue
             calls: dict[str, Mapping[str, Any]] = {}
             outputs: dict[str, Mapping[str, Any]] = {}
+            completed_turns: set[str] = set()
             for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
                 try:
                     row = json.loads(line)
                 except ValueError:
                     continue
-                if not isinstance(row, Mapping) or row.get("type") != "response_item":
+                if not isinstance(row, Mapping):
+                    continue
+                if row.get("type") == "event_msg":
+                    event = row.get("payload")
+                    if isinstance(event, Mapping) and event.get("type") == "item_completed" and event.get("thread_id") == thread_id:
+                        turn_id = event.get("turn_id")
+                        if isinstance(turn_id, str):
+                            completed_turns.add(turn_id)
+                    continue
+                if row.get("type") != "response_item":
                     continue
                 item = row.get("payload")
                 if not isinstance(item, Mapping):
@@ -351,6 +370,10 @@ def _rollout_tool_execution(thread_id: str, marker: str) -> dict[str, str] | Non
             for call_id, call in calls.items():
                 output = outputs.get(call_id)
                 if output is None or output.get("status") in {"failed", "error", "incomplete"}:
+                    continue
+                metadata = output.get("internal_chat_message_metadata_passthrough")
+                output_turn = metadata.get("turn_id") if isinstance(metadata, Mapping) else None
+                if completed_turns and isinstance(output_turn, str) and output_turn not in completed_turns:
                     continue
                 if marker in str(call.get("input", "")) and marker in str(output.get("output", "")):
                     return {"call_id": call_id, "name": str(call.get("name")), "marker": marker, "source": "rollout"}
