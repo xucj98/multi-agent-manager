@@ -103,6 +103,20 @@ class ReleaseFixtureTests(unittest.TestCase):
             }), encoding="utf-8")
             self.assertIsNone(test_integration.controlled_compatibility_failure(home, "0.2.1"))
 
+    def test_install_evidence_is_copied_before_private_home_cleanup(self):
+        from scripts import test_integration
+
+        with tempfile.TemporaryDirectory(prefix="mam retained evidence ") as temporary:
+            root = Path(temporary)
+            source = root / "install" / "home" / ".local" / "share" / "multi-agent-manager" / "install-evidence"
+            source.mkdir(parents=True)
+            (source / "20261001T000000Z-0.2.1.compatibility.json").write_text("{}", encoding="utf-8")
+            (source / "20261001T000000Z-0.2.1.json").write_text("{}", encoding="utf-8")
+            results = root / "results"
+            retained = test_integration.retain_install_evidence(root / "install", results)
+            self.assertEqual(len(retained), 2)
+            self.assertTrue((results / "install-evidence" / "20261001T000000Z-0.2.1.json").is_file())
+
     def test_create_old_fixture_uses_archived_writer_and_refuses_reuse(self):
         with tempfile.TemporaryDirectory(prefix="mam release fixture ") as temporary:
             instance = Path(temporary) / "mam-test"

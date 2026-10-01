@@ -518,6 +518,25 @@ def controlled_compatibility_failure(home: Path, version: str) -> dict[str, Any]
     return None
 
 
+def retain_install_evidence(install_root: Path, results: Path) -> list[str]:
+    """Copy installer evidence out of its private HOME before cleanup."""
+
+    source = install_root / "home" / ".local" / "share" / "multi-agent-manager" / "install-evidence"
+    if not source.is_dir():
+        raise IntegrationError(f"installer evidence directory is missing: {source}")
+    files = sorted(path for path in source.iterdir() if path.is_file() and not path.is_symlink())
+    if not files:
+        raise IntegrationError(f"installer produced no persistent evidence: {source}")
+    destination = results / "install-evidence"
+    destination.mkdir(parents=True, exist_ok=True)
+    retained: list[str] = []
+    for path in files:
+        target = destination / path.name
+        shutil.copy2(path, target)
+        retained.append(str(target))
+    return retained
+
+
 def verify_job(launcher: Path, instance: Path, job_id: str, log: Path) -> dict[str, Any]:
     result = run([str(launcher), "job", "status", job_id], cwd=instance, log=log)
     if result.returncode:
@@ -740,6 +759,7 @@ def integration(
             instances, archive, install_root, log, runtime_env=install_env
         )
         outcome["real_delivery"] = real_delivery
+        outcome["install_evidence"] = retain_install_evidence(install_root, results)
         outcome["installed_metadata"] = verify_installed_candidate(install_root, to_version, commit, log)
         outcome["scenarios"].append({
             "name": "pipx-install-and-update",
