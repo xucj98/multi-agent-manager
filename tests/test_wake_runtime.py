@@ -192,6 +192,7 @@ class WakeRuntimeTests(unittest.TestCase):
             "error": None,
         }
         self.store.write(data)
+        self.store.doc(task_id, "task").parent.mkdir(parents=True, exist_ok=True)
         return data
 
     @staticmethod

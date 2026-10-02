@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class IntegrationRuntimeTests(unittest.TestCase):
     @staticmethod
-    def _delivery(input_type: str = "tool", *, recipient: str = "worker-thread", turn_id: str = "turn-current", locator: str = "/root/fixture-worker") -> dict:
+    def _delivery(input_type: str = "user", *, recipient: str = "worker-thread", turn_id: str = "turn-current", locator: str = "/root/fixture-worker") -> dict:
         message = f"[MAM MESSAGE]\n\n[job exited | {locator}]\nThere are exited jobs. Check the results and archive them."
         params = {"threadId": recipient}
         if input_type == "tool":
@@ -39,7 +39,7 @@ class IntegrationRuntimeTests(unittest.TestCase):
         return event
 
     def test_notification_matches_fixture_thread_path_input_and_current_turn(self) -> None:
-        for input_type in ("tool", "user"):
+        for input_type in ("user",):
             with self.subTest(input_type=input_type):
                 result = validate_job_notification(
                     self._delivery(input_type), self._event(), job_id="fixture-job-id",
@@ -65,17 +65,17 @@ class IntegrationRuntimeTests(unittest.TestCase):
                 validate_job_notification(
                     delivery, event, job_id="fixture-job-id", recipient="worker-thread",
                     task_id="fixture-task-id",
-                    executor_path="/root/fixture-worker", expected_input_type="tool",
+                    executor_path="/root/fixture-worker", expected_input_type="user",
                     current_turn_id="turn-current",
                 )
 
     def test_notification_rejects_wrong_input_type_and_job_id_echo(self) -> None:
         with self.assertRaisesRegex(RuntimeIntegrationError, "input type"):
             validate_job_notification(
-                self._delivery("user"), self._event(), job_id="fixture-job-id",
+                self._delivery("tool"), self._event(), job_id="fixture-job-id",
                 task_id="fixture-task-id",
                 recipient="worker-thread", executor_path="/root/fixture-worker",
-                expected_input_type="tool", current_turn_id="turn-current",
+                expected_input_type="user", current_turn_id="turn-current",
             )
 
     def test_later_turn_does_not_erase_completed_accepted_turn(self) -> None:
@@ -112,12 +112,12 @@ class IntegrationRuntimeTests(unittest.TestCase):
                 harness.close()
         delivery = self._delivery()
         delivery["message"] += " fixture-job-id"
-        delivery["params"]["toolOutput"]["output"] = delivery["message"]
+        delivery["params"]["input"][0]["text"] = delivery["message"]
         with self.assertRaisesRegex(RuntimeIntegrationError, "JOB-ID"):
             validate_job_notification(
                 delivery, self._event(), job_id="fixture-job-id", recipient="worker-thread",
                 task_id="fixture-task-id",
-                executor_path="/root/fixture-worker", expected_input_type="tool",
+                executor_path="/root/fixture-worker", expected_input_type="user",
                 current_turn_id="turn-current",
             )
 
@@ -126,7 +126,7 @@ class IntegrationRuntimeTests(unittest.TestCase):
         result = validate_job_notification(
             delivery, self._event(path=None),
             job_id="fixture-job-id", task_id="fixture-task-id", recipient="worker-thread",
-            executor_path=None, allow_task_fallback=True, expected_input_type="tool",
+            executor_path=None, allow_task_fallback=True, expected_input_type="user",
             current_turn_id="turn-current",
         )
         self.assertIsNone(result["executor_path"])
@@ -134,12 +134,12 @@ class IntegrationRuntimeTests(unittest.TestCase):
 
         duplicate = self._delivery(locator="task: fixture-task-id")
         duplicate["message"] += "\n\n" + duplicate["message"].split("\n\n", 1)[1]
-        duplicate["params"]["toolOutput"]["output"] = duplicate["message"]
+        duplicate["params"]["input"][0]["text"] = duplicate["message"]
         with self.assertRaisesRegex(RuntimeIntegrationError, "does not match"):
             validate_job_notification(
                 duplicate, self._event(path=None),
                 job_id="fixture-job-id", task_id="fixture-task-id", recipient="worker-thread",
-                executor_path=None, allow_task_fallback=True, expected_input_type="tool",
+                executor_path=None, allow_task_fallback=True, expected_input_type="user",
                 current_turn_id="turn-current",
             )
 
@@ -147,14 +147,14 @@ class IntegrationRuntimeTests(unittest.TestCase):
             validate_job_notification(
                 self._delivery(locator="task: fixture-task-id"), self._event(path=None),
                 job_id="fixture-job-id", task_id="fixture-task-id", recipient="worker-thread",
-                executor_path=None, expected_input_type="tool", current_turn_id="turn-current",
+                executor_path=None, expected_input_type="user", current_turn_id="turn-current",
             )
 
         with self.assertRaisesRegex(RuntimeIntegrationError, "path does not match"):
             validate_job_notification(
                 self._delivery(locator="task: fixture-task-id"), self._event(),
                 job_id="fixture-job-id", task_id="fixture-task-id", recipient="worker-thread",
-                executor_path=None, allow_task_fallback=True, expected_input_type="tool",
+                executor_path=None, allow_task_fallback=True, expected_input_type="user",
                 current_turn_id="turn-current",
             )
 
@@ -259,7 +259,7 @@ class IntegrationRuntimeTests(unittest.TestCase):
                 self.assertEqual(harness.wait_for_job_state(exiting_job, "exited", timeout=60)["id"], exiting_job)
                 evidence = harness.verify_notification(exiting_job)
                 self.assertEqual(evidence["recipient"], metadata["fixture"]["worker"])
-                self.assertEqual(evidence["input_type"], "tool")
+                self.assertEqual(evidence["input_type"], "user")
                 self.assertEqual(evidence["event"]["accepted_turn_id"], evidence["turn_id"])
                 self.assertIsNone(evidence["executor_path"])
                 self.assertEqual(evidence["executor_locator"], f"task: {metadata['fixture']['task']}")

@@ -545,7 +545,7 @@ class RuntimeHarness:
         job_id: str,
         expected: str = "exited",
         *,
-        expected_input_type: str = "tool",
+        expected_input_type: str = "user",
         timeout: float = 60.0,
     ) -> dict[str, Any]:
         if expected != "exited":
