@@ -83,7 +83,7 @@ class CompatibilityTests(unittest.TestCase):
     def test_token_usage_does_not_fill_missing_thread_fields_with_zero(self):
         fixture = object.__new__(liveprobe._LiveFixture)
         fixture.threads = {"manager": "m", "job_executor": "w"}
-        fixture.evidence = {"token_usage": {}}
+        fixture.evidence = {"token_usage": {}, "calls": {"compact_start": 1}}
         with mock.patch.object(liveprobe, "_rollout_token_usage", side_effect=[
             {"input_tokens": 10, "cached_input_tokens": 2, "output_tokens": 3, "reasoning_tokens": 1},
             {"input_tokens": 4},
@@ -91,6 +91,7 @@ class CompatibilityTests(unittest.TestCase):
             fixture._collect_token_usage()
         self.assertIsNone(fixture.evidence["token_usage"]["output_tokens"])
         self.assertIsNone(fixture.evidence["token_usage"]["reasoning_tokens"])
+        self.assertEqual(fixture.evidence["token_usage"]["source"], "unavailable-including-explicit-compaction")
 
     def test_run_writes_two_stage_result_and_actual_counts(self):
         delivery = {

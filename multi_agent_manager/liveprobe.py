@@ -1153,7 +1153,11 @@ class _LiveFixture:
             if usage:
                 by_thread[role] = usage
         if not by_thread:
-            self.evidence["token_usage"]["source"] = "rollout-token-count-unavailable"
+            self.evidence["token_usage"]["source"] = (
+                "unavailable-including-explicit-compaction"
+                if self.evidence.get("calls", {}).get("compact_start", 0)
+                else "rollout-token-count-unavailable"
+            )
             return
         totals = {}
         for key in ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_tokens"):
