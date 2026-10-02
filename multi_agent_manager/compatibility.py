@@ -52,6 +52,7 @@ def _counts(evidence: dict[str, Any] | None) -> dict[str, Any]:
     return {
         "sessions": sessions,
         "turns": observed_turns,
+        "compactions": calls.get("compact_start", 0) if isinstance(calls, dict) else 0,
         "tests": sum(value is True for value in checks.values()) if isinstance(checks, dict) else 0,
         "model_requests": None,
         "input_tokens": input_tokens,

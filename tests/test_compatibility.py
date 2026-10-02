@@ -97,8 +97,12 @@ class CompatibilityTests(unittest.TestCase):
             "status": "passed",
             "resources": {
                 "threads": {"manager": "m", "job_executor": "w"},
-                "turns": {"manager_baseline_completed": "1", "job_baseline_completed": "2", "job_delivery": "3", "manager_delivery": "4"},
+                "turns": {
+                    "manager_baseline_completed": "1", "job_baseline_completed": "2", "job_delivery": "3",
+                    "manager_compaction": "4", "manager_delivery": "5", "manager_user_followup": "6",
+                },
             },
+            "calls": {"direct_turn_start": 3, "compact_start": 1},
             "token_usage": {"input_tokens": 20, "cached_input_tokens": 10, "output_tokens": 8, "reasoning_tokens": 3},
         }
         with tempfile.TemporaryDirectory() as directory:
@@ -109,10 +113,24 @@ class CompatibilityTests(unittest.TestCase):
                 result = compatibility.run(output)
             self.assertEqual(result["status"], "passed")
             self.assertEqual(result["counts"], {
-                "sessions": 2, "turns": 4, "tests": 0, "model_requests": None,
+                "sessions": 2, "turns": 6, "compactions": 1, "tests": 0, "model_requests": None,
                 "input_tokens": 20, "cached_input_tokens": 10, "output_tokens": 8, "reasoning_tokens": 3,
             })
             self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["stages"][1]["status"], "passed")
+
+    def test_rollout_subtotal_cannot_claim_usage_including_compaction(self):
+        fixture = object.__new__(liveprobe._LiveFixture)
+        fixture.threads = {"manager": "m", "job_executor": "w"}
+        fixture.evidence = {"token_usage": {}, "calls": {"compact_start": 1}}
+        with mock.patch.object(liveprobe, "_rollout_token_usage", return_value={
+            "input_tokens": 10, "cached_input_tokens": 2, "output_tokens": 3, "reasoning_tokens": 1,
+        }):
+            fixture._collect_token_usage()
+        self.assertEqual(fixture.evidence["rollout_token_usage_excluding_compaction"]["input_tokens"], 20)
+        self.assertEqual(fixture.evidence["token_usage"]["source"], "unavailable-including-explicit-compaction")
+        counts = compatibility._counts(fixture.evidence)
+        for key in ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_tokens"):
+            self.assertIsNone(counts[key])
 
     def test_non_model_failure_is_saved_and_nonzero(self):
         with tempfile.TemporaryDirectory() as directory:

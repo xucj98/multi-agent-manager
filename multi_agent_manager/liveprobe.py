@@ -33,7 +33,7 @@ from . import cli, job_runtime
 
 MODEL = "gpt-6-sol"
 EFFORT = "high"
-MAX_MODEL_TURNS = 4
+MAX_MODEL_TURNS = 6
 DEFAULT_TIMEOUT_SECONDS = 600.0
 POLL_SECONDS = 0.5
 # Codex acknowledges ``turn/start`` before the rollout JSONL is always visible
@@ -47,6 +47,7 @@ _BASELINE_MARKERS = {
     "manager": "PROBE_MANAGER_BASELINE_READY",
     "job_executor": "PROBE_JOB_EXECUTOR_BASELINE_READY",
 }
+_FOLLOWUP_PROMPT = "Reply exactly PROBE_USER_AFTER_COMPACTION_READY."
 
 
 def _baseline_prompt(role: str) -> str:
@@ -483,7 +484,7 @@ class _LiveFixture:
         self.threads: dict[str, str] = {}
         self.jobs: list[tuple[str, str]] = []
         self.blockers: list[subprocess.Popen[bytes]] = []
-        # Only direct baseline turn IDs are known before their history is
+        # Only direct turn IDs are known before their history is
         # available.  Cleanup may interrupt one of these IDs if it is still
         # active; it never guesses an ID for a scheduler-started turn.
         self.active_direct_turns: dict[str, str] = {}
@@ -503,7 +504,7 @@ class _LiveFixture:
                 "reasoning_tokens": None,
                 "source": "unknown-until-finalized",
             },
-            "calls": {"thread_start": 0, "direct_turn_start": 0},
+            "calls": {"thread_start": 0, "direct_turn_start": 0, "compact_start": 0},
             "checks": {
                 "fixture_tasks_registered_before_threads": False,
                 "executor_bound_before_first_model_turn": False,
@@ -516,6 +517,8 @@ class _LiveFixture:
                 "service_stopped_after_delivery": False,
                 "baseline_custom_tool_calls": False,
                 "job_archived_before_manager_delivery": False,
+                "manager_compaction": False,
+                "manager_user_followup": False,
             },
             "resources": {"tasks": {}, "threads": {}, "jobs": {}, "turns": {}},
             "history": {},
@@ -523,6 +526,7 @@ class _LiveFixture:
             "completion_events": {},
             "resume_persistence": {},
             "turn_counts": {},
+            "phase_elapsed_seconds": {},
             "cleanup": {
                 "service": "not_started",
                 "jobs": "not_started",
@@ -560,6 +564,14 @@ class _LiveFixture:
 
     def _deadline(self) -> float:
         return self.deadline
+
+    @contextlib.contextmanager
+    def _timed_phase(self, phase: str) -> Any:
+        started = self.clock()
+        try:
+            yield
+        finally:
+            self.evidence["phase_elapsed_seconds"][phase] = round(self.clock() - started, 3)
 
     def _expired(self, deadline: float, waiting_for: str) -> None:
         if self.clock() >= deadline:
@@ -926,10 +938,13 @@ class _LiveFixture:
             ) from exc
 
     def _wait_for_turn_delivery(
-        self, role: str, expected: list[str], minimum_turns: int, label: str, phase: str
+        self, role: str, expected: list[str], minimum_turns: int, label: str, phase: str,
+        *, expected_turn_id: str | None = None,
     ) -> Mapping[str, Any]:
         deadline = self._deadline()
-        completed_id = self._wait_for_completion_event(role, label, phase, deadline=deadline)
+        completed_id = self._wait_for_completion_event(
+            role, label, phase, expected_turn_id=expected_turn_id, deadline=deadline
+        )
         self._wait_for_idle(role, label, deadline=deadline)
         turns = self._thread_turns_after_idle(role, phase)
         turn = next((item for item in turns if item.get("id") == completed_id), None)
@@ -1016,13 +1031,60 @@ class _LiveFixture:
             action,
         ]
         manager_turn = self._wait_for_turn_delivery(
-            "manager", manager_payloads, 2, "Manager-ready scheduler turn", "manager_delivery"
+            "manager", manager_payloads, 3, "Manager-ready scheduler turn", "manager_delivery"
         )
         manager_turn_id = manager_turn.get("id")
         if not isinstance(manager_turn_id, str) or not manager_turn_id:
             raise LiveProbeError("Manager-ready scheduler delivery returned no turn id")
         self.evidence["resources"]["turns"]["manager_ready_delivery"] = manager_turn_id
         self.evidence["checks"]["manager_delivery"] = True
+
+    def _compact_manager(self) -> None:
+        self.stage = "compact fixture Manager before scheduler delivery"
+        self.evidence["calls"]["compact_start"] += 1
+        self._request("thread/compact/start", {"threadId": self.threads["manager"]})
+        turn_id = self._wait_for_completion_event(
+            "manager", "fixture Manager compaction completion", "manager_compaction"
+        )
+        self._wait_for_idle("manager", "fixture Manager compaction completion")
+        turns = self._thread_turns_after_idle("manager", "manager_compaction")
+        turn = next((item for item in turns if item.get("id") == turn_id), None)
+        self._record_paged_history("manager", "manager_compaction", turns)
+        self.evidence["resources"]["turns"]["manager_compaction"] = turn_id
+        if (
+            not isinstance(turn, Mapping) or turn.get("status") != "completed"
+            or not any(
+                isinstance(item, Mapping) and item.get("type") == "contextCompaction"
+                for item in turn.get("items", [])
+            )
+        ):
+            raise LiveProbeError(f"fixture Manager compaction turn {turn_id} did not complete with contextCompaction")
+        self.evidence["checks"]["manager_compaction"] = True
+
+    def _start_manager_user_followup(self) -> None:
+        self.stage = "verify ordinary fixture Manager input after compacted notification"
+        response = _mapping(self._request(
+            "turn/start", {
+                "threadId": self.threads["manager"],
+                "input": [{"type": "text", "text": _FOLLOWUP_PROMPT}],
+                "model": MODEL, "effort": EFFORT,
+            },
+        ), "App Server turn/start")
+        turn = _mapping(response.get("turn"), "fixture Manager user followup turn/start")
+        turn_id = turn.get("id")
+        if not isinstance(turn_id, str) or not turn_id:
+            raise LiveProbeError("fixture Manager user followup turn/start returned no turn id")
+        self.evidence["calls"]["direct_turn_start"] += 1
+        self.active_direct_turns["manager"] = turn_id
+        self.evidence["resources"]["turns"]["manager_user_followup"] = turn_id
+        self._wait_for_turn_delivery(
+            "manager", [_FOLLOWUP_PROMPT], 4, "ordinary user followup turn", "manager_user_followup",
+            expected_turn_id=turn_id,
+        )
+        if self.evidence["delivery_inputs"]["manager_user_followup"]["item_type"] != "userMessage":
+            raise LiveProbeError("fixture Manager user followup has no matching ordinary user input")
+        self.active_direct_turns.pop("manager", None)
+        self.evidence["checks"]["manager_user_followup"] = True
 
     def _stop_service_after_delivery(self) -> None:
         self.runtime.stop_service(self.config)
@@ -1082,13 +1144,18 @@ class _LiveFixture:
         # not generate reminder turns while the worker archive is prepared.
         self._stop_service_after_delivery()
         self.evidence["checks"]["service_stopped_after_delivery"] = True
+        with self._timed_phase("manager_compaction"):
+            self._compact_manager()
         self._archive_exited_job()
         self._start_service()
         self._wait_for_service()
-        self._wait_for_manager_delivery()
+        with self._timed_phase("manager_delivery"):
+            self._wait_for_manager_delivery()
         self._stop_service_after_delivery()
+        with self._timed_phase("manager_user_followup"):
+            self._start_manager_user_followup()
         counts = self._turn_counts_after_idle("after_job_stop")
-        if counts["manager"] != 2 or counts["job_executor"] != 2:
+        if counts["manager"] != 4 or counts["job_executor"] != 2:
             raise LiveProbeError(f"fixture model turn distribution is unexpected: {counts}")
         observed = sum(counts.values())
         if observed > MAX_MODEL_TURNS:
@@ -1114,6 +1181,13 @@ class _LiveFixture:
             totals[key] = sum(values) if all(isinstance(value, int) and value >= 0 for value in values) else None
         self.evidence["token_usage"] = {**totals, "source": "Codex rollout token_count total_token_usage"}
         self.evidence["token_usage_by_thread"] = by_thread
+        if self.evidence.get("calls", {}).get("compact_start", 0):
+            # Rollout totals omit explicit compaction usage on current Codex.
+            # Keep the observable subtotal without claiming a complete total.
+            self.evidence["rollout_token_usage_excluding_compaction"] = self.evidence["token_usage"]
+            self.evidence["token_usage"] = {
+                **dict.fromkeys(totals), "source": "unavailable-including-explicit-compaction",
+            }
 
     def run(self) -> dict[str, Any]:
         self._create_tasks()
@@ -1134,7 +1208,7 @@ class _LiveFixture:
         return self.evidence
 
     def _interrupt_known_direct_turn(self, role: str, thread_id: str) -> None:
-        """Interrupt only a direct baseline turn whose ID this fixture recorded."""
+        """Interrupt only a direct turn whose ID this fixture recorded."""
 
         status = self._read_status(thread_id)
         if status != "active":
@@ -1148,7 +1222,7 @@ class _LiveFixture:
             self.evidence["cleanup"]["thread_interrupt"][role] = "not_attempted_unknown_active_turn"
             return
         self._request("turn/interrupt", {"threadId": thread_id, "turnId": turn_id})
-        self.evidence["cleanup"]["thread_interrupt"][role] = "interrupted_known_direct_baseline"
+        self.evidence["cleanup"]["thread_interrupt"][role] = "interrupted_known_direct_turn"
 
     def cleanup(self) -> list[str]:
         errors: list[str] = []
@@ -1375,7 +1449,7 @@ def _main(argv: list[str] | None = None) -> int:
         return 1
     print("MAM isolated live delivery: PASS")
     print(f"model turns: {result.get('model_turns', '?')}/{MAX_MODEL_TURNS}")
-    print("checks: exited-job executor delivery and fixture-Manager ready delivery")
+    print("checks: exited-job delivery, successful compaction, Manager notification, and ordinary user followup")
     return 0
 
 
