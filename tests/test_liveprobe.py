@@ -116,6 +116,8 @@ class FakeStream:
         self.manager_baseline_reply_override: str | None = None
         self.failed_turn_ids: set[str] = set()
         self.history_omitted_turn_ids: set[str] = set()
+        self.compaction_completed = False
+        self.compaction_has_item = True
 
     def _all_roles_have_baseline(self):
         return all(f"turn-{role}-baseline" in self.completed_turn_ids for role in liveprobe._ROLE_ORDER)
@@ -146,6 +148,8 @@ class FakeStream:
         if self.manager_delivery_added or not self.state.get("running") or not self.manager_delivery_ready or not self._all_roles_have_baseline():
             return
         self.manager_delivery_added = True
+        if not self.compaction_completed:
+            raise AssertionError("Manager delivery was scheduled before successful compaction")
         notification = (
             "[MAM MESSAGE]\n\n"
             "[task pending | /root/liveprobe/job_executor]\n"
@@ -227,7 +231,27 @@ class FakeStream:
                 turn for turn in reversed(self.turns[thread_id])
                 if turn["id"] not in self.history_omitted_turn_ids
             ]}
+        if method == "thread/compact/start":
+            if self.state.get("running") or thread_id != THREAD_IDS["manager"]:
+                raise AssertionError("compaction must target the idle fixture Manager while scheduler is stopped")
+            self._append_turn(thread_id, "turn-manager-compaction", "")
+            self.turns[thread_id][-1]["items"] = [{"type": "contextCompaction"}] if self.compaction_has_item else []
+            return {}
         if method == "turn/start":
+            if self.direct_baseline_starts == len(liveprobe._ROLE_ORDER):
+                if (
+                    thread_id != THREAD_IDS["manager"] or not self.compaction_completed
+                    or not self.manager_delivery_added or self.state.get("running")
+                ):
+                    raise AssertionError("ordinary user followup must follow compacted Manager delivery and scheduler stop")
+                if params.get("input") != [{"type": "text", "text": liveprobe._FOLLOWUP_PROMPT}]:
+                    raise AssertionError("ordinary user followup did not use its fixed text input")
+                self._append_turn(
+                    thread_id, "turn-manager-user-followup",
+                    liveprobe._FOLLOWUP_PROMPT,
+                    assistant_text=liveprobe._FOLLOWUP_PROMPT,
+                )
+                return {"turn": {"id": "turn-manager-user-followup"}}
             role = liveprobe._ROLE_ORDER[self.direct_baseline_starts]
             if thread_id != THREAD_IDS[role]:
                 raise AssertionError("direct baseline turns must use the four dedicated roles in order")
@@ -258,6 +282,8 @@ class FakeStream:
             return None
         self.events.pop(0)
         self._complete_turn(event["params"]["threadId"], turn_id)
+        if turn_id == "turn-manager-compaction" and turn_id not in self.failed_turn_ids:
+            self.compaction_completed = True
         return event
 
     def close(self):
@@ -345,7 +371,15 @@ class LiveProbeTests(unittest.TestCase):
         result = self._run_fixture(root, evidence_path=evidence_path)
 
         self.assertEqual(result["status"], "passed")
-        self.assertEqual(result["model_turns"], 4)
+        self.assertEqual(result["model_turns"], 6)
+        self.assertEqual(result["calls"]["compact_start"], 1)
+        self.assertEqual(result["resources"]["turns"]["manager_compaction"], "turn-manager-compaction")
+        self.assertEqual(result["resources"]["turns"]["manager_user_followup"], "turn-manager-user-followup")
+        self.assertEqual(result["delivery_inputs"]["manager_user_followup"]["item_type"], "userMessage")
+        self.assertTrue(result["delivery_inputs"]["manager_user_followup"]["matched"])
+        self.assertEqual(set(result["phase_elapsed_seconds"]), {
+            "manager_compaction", "manager_delivery", "manager_user_followup",
+        })
         self.assertEqual(result["cleanup"]["threads"], "archived")
         self.assertEqual(result["delivery_inputs"]["manager_delivery"]["item_type"], "userMessage")
         self.assertTrue(result["delivery_inputs"]["manager_delivery"]["matched"])
@@ -389,6 +423,8 @@ class LiveProbeTests(unittest.TestCase):
                 "service_stopped_after_delivery": True,
                 "baseline_custom_tool_calls": True,
                 "job_archived_before_manager_delivery": True,
+                "manager_compaction": True,
+                "manager_user_followup": True,
             },
         )
         self.assertFalse(root.exists())
@@ -413,9 +449,10 @@ class LiveProbeTests(unittest.TestCase):
 
         methods = [method for method, _ in self.state["requests"]]
         self.assertEqual(methods.count("thread/start"), 2)
-        self.assertEqual(methods.count("turn/start"), 2)
+        self.assertEqual(methods.count("turn/start"), 3)
+        self.assertEqual(methods.count("thread/compact/start"), 1)
         direct = [params for method, params in self.state["requests"] if method == "turn/start"]
-        self.assertEqual([params["threadId"] for params in direct], [THREAD_IDS[role] for role in liveprobe._ROLE_ORDER])
+        self.assertEqual([params["threadId"] for params in direct], [THREAD_IDS[role] for role in liveprobe._ROLE_ORDER] + [THREAD_IDS["manager"]])
         for role, params in zip(liveprobe._ROLE_ORDER, direct):
             self.assertEqual(params["model"], liveprobe.MODEL)
             self.assertEqual(params["effort"], liveprobe.EFFORT)
@@ -442,8 +479,11 @@ class LiveProbeTests(unittest.TestCase):
 
         service_start = self.state["timeline"].index(("service-start", THREAD_IDS["manager"]))
         direct_starts = [index for index, event in enumerate(self.state["timeline"]) if event[0] == "turn/start"]
-        self.assertEqual(len(direct_starts), 2)
-        self.assertTrue(all(index < service_start for index in direct_starts))
+        self.assertEqual(len(direct_starts), 3)
+        self.assertTrue(all(index < service_start for index in direct_starts[:2]))
+        compact = self.state["timeline"].index(("thread/compact/start", THREAD_IDS["manager"]))
+        self.assertGreater(compact, service_start)
+        self.assertLess(compact, direct_starts[-1])
         self.assertIn(("service-stop", THREAD_IDS["manager"]), self.state["timeline"])
         self.assertTrue(self.stream.closed)
         self.assertEqual(result["resources"]["threads"], THREAD_IDS)
@@ -454,7 +494,7 @@ class LiveProbeTests(unittest.TestCase):
         )
         self.assertEqual(
             result["turn_counts"]["after_job_stop"],
-            {"manager": 2, "job_executor": 2},
+            {"manager": 4, "job_executor": 2},
         )
         self.assertEqual(
             result["cleanup"]["thread_archive"],
@@ -475,7 +515,7 @@ class LiveProbeTests(unittest.TestCase):
         result = self._run_fixture(root)
         self.assertEqual(result["status"], "passed")
         self.assertIn((THREAD_IDS["manager"], "active"), self.state["metadata_statuses"])
-        self.assertEqual(result["calls"]["direct_turn_start"], 2)
+        self.assertEqual(result["calls"]["direct_turn_start"], 3)
 
     def test_assistant_and_baseline_echo_cannot_replace_current_inbound_delivery(self):
         root = self.base / "fixture-assistant-only"
@@ -528,7 +568,7 @@ class LiveProbeTests(unittest.TestCase):
         self.assertEqual(receipt["thread_id"], THREAD_IDS["manager"])
         self.assertEqual(receipt["turn_id"], "turn-manager-delivery")
         self.assertFalse(receipt["matched"])
-        self.assertEqual(receipt["observed_turns"][0]["id"], "turn-manager-baseline")
+        self.assertEqual(receipt["observed_turns"][0]["id"], "turn-manager-compaction")
         self.assertNotIn("status", receipt)
         self.assertNotIn("inbound_items", receipt)
 
@@ -565,6 +605,43 @@ class LiveProbeTests(unittest.TestCase):
         self.assertEqual(receipt["status"], "failed")
         self.assertFalse(receipt["matched"])
         self.assertEqual(receipt["inbound_items"][0]["item_type"], "userMessage")
+        evidence = json.loads(evidence_path.read_text())
+        self.assertTrue(evidence["checks"]["manager_compaction"])
+        self.assertFalse(evidence["checks"]["manager_user_followup"])
+
+    def test_compaction_acceptance_cannot_replace_successful_compaction_history(self):
+        self.stream.compaction_has_item = False
+        root = self.base / "fixture-compact-without-item"
+        evidence_path = self.base / "compact-without-item.json"
+        with self.assertRaisesRegex(liveprobe.LiveProbeError, "did not complete with contextCompaction"):
+            self._run_fixture(root, evidence_path=evidence_path)
+        evidence = json.loads(evidence_path.read_text())
+        self.assertFalse(evidence["checks"]["manager_compaction"])
+        self.assertFalse(evidence["checks"]["manager_delivery"])
+        self.assertEqual(evidence["calls"]["direct_turn_start"], 2)
+
+    def test_failed_compaction_stops_before_scheduler_notification(self):
+        self.stream.failed_turn_ids.add("turn-manager-compaction")
+        root = self.base / "fixture-failed-compact"
+        evidence_path = self.base / "failed-compact.json"
+        with self.assertRaisesRegex(liveprobe.LiveProbeError, "did not complete with contextCompaction"):
+            self._run_fixture(root, evidence_path=evidence_path)
+        evidence = json.loads(evidence_path.read_text())
+        self.assertFalse(evidence["checks"]["manager_compaction"])
+        self.assertFalse(evidence["checks"]["manager_delivery"])
+        self.assertFalse(self.stream.manager_delivery_added)
+
+    def test_failed_ordinary_user_followup_fails_after_successful_notification(self):
+        self.stream.failed_turn_ids.add("turn-manager-user-followup")
+        root = self.base / "fixture-failed-user-followup"
+        evidence_path = self.base / "failed-user-followup.json"
+        with self.assertRaisesRegex(liveprobe.LiveProbeError, "without matching inbound delivery"):
+            self._run_fixture(root, evidence_path=evidence_path)
+        evidence = json.loads(evidence_path.read_text())
+        self.assertTrue(evidence["checks"]["manager_compaction"])
+        self.assertTrue(evidence["checks"]["manager_delivery"])
+        self.assertFalse(evidence["checks"]["manager_user_followup"])
+        self.assertEqual(evidence["delivery_inputs"]["manager_user_followup"]["status"], "failed")
 
     def test_matching_mam_function_call_output_is_valid_inbound_delivery(self):
         expected = [
@@ -600,7 +677,7 @@ class LiveProbeTests(unittest.TestCase):
         self.assertEqual(self.state["sleeps"][:2], [0.05, 0.1])
         self.assertEqual(
             [method for method, _ in self.state["requests"]].count("turn/start"),
-            2,
+            3,
         )
 
     def test_empty_rollout_resume_timeout_keeps_last_error_and_is_bounded(self):
