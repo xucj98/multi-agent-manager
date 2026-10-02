@@ -399,22 +399,6 @@ def _inbound_items(turn: Mapping[str, Any]) -> list[dict[str, str]]:
                 if isinstance(part, Mapping) and part.get("type") == "text" and isinstance(part.get("text"), str)
             )
             inbound.append({"item_type": kind, "text": text})
-        elif kind == "functionCallOutput":
-            output = item.get("output")
-            if isinstance(output, str):
-                text = output
-            elif isinstance(output, list):
-                text = "".join(
-                    part["text"] for part in output
-                    if isinstance(part, Mapping) and part.get("type") == "input_text"
-                    and isinstance(part.get("text"), str)
-                )
-            else:
-                continue
-            inbound.append({
-                "item_type": kind, "text": text,
-                "name": str(item.get("name", "")), "namespace": str(item.get("namespace", "")),
-            })
     return inbound
 
 
@@ -424,10 +408,6 @@ def _delivery_input(turn: Mapping[str, Any], expected_lines: list[str]) -> dict[
     if turn.get("status") != "completed":
         return None
     for item in _inbound_items(turn):
-        if item["item_type"] == "functionCallOutput" and (
-            item["name"] != "message" or item["namespace"] != "mam"
-        ):
-            continue
         lines = item["text"].splitlines()
         if all(line in lines for line in expected_lines):
             return {"item_type": item["item_type"], "text": item["text"]}
