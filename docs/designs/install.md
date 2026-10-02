@@ -14,12 +14,12 @@ install.sh [--version VERSION]
 
 ## 指定版本
 
-`VERSION` 为发布版本号，例如 `0.2.2`。需要固定安装或升级的目标版本时，在 Bash 中执行：
+`VERSION` 为发布版本号，例如 `0.2.3`。需要固定安装或升级的目标版本时，在 Bash 中执行：
 
 ```bash
 set -o pipefail
 curl -fsSL "https://raw.githubusercontent.com/xucj98/multi-agent-manager/main/scripts/install.sh" \
-  | bash -s -- --version 0.2.2
+  | bash -s -- --version 0.2.3
 echo $?
 ```
 

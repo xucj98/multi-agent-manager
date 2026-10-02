@@ -696,10 +696,10 @@ main() {
     if [[ -z "$REQUESTED_VERSION" && -z "$INSTALL_ARCHIVE" ]]; then
         # Every invocation, including one launched from a checkout, resolves
         # a release archive so local and formal installs exercise one path.
-        REQUESTED_VERSION='0.2.2'
+        REQUESTED_VERSION='0.2.3'
     fi
     if [[ -z "$REQUESTED_VERSION" ]]; then
-        REQUESTED_VERSION='0.2.2'
+        REQUESTED_VERSION='0.2.3'
     fi
     if ! version_is_valid "$REQUESTED_VERSION"; then
         incomplete "invalid release version: $REQUESTED_VERSION"

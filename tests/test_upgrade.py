@@ -51,8 +51,8 @@ class UpgradeTests(unittest.TestCase):
         wake_runtime._write_json(wake_runtime._service_path(self.store, "state.json"), self.state)
         result = self.upgrade()
         self.assertEqual(result["status"], "upgraded")
-        self.assertEqual(result["data_version"], "0.2.2")
-        self.assertEqual(result["adaptation"], "docs/upgrades/0.2.2.md")
+        self.assertEqual(result["data_version"], "0.2.3")
+        self.assertEqual(result["adaptation"], "docs/upgrades/0.2.3.md")
         self.assertEqual(self.git("branch", "--show-current"), "instance")
         self.assertEqual(self.git("rev-parse", "HEAD"), self.target)
         self.assertEqual((self.root / ".local" / "keep.txt").read_text(), "kept\n")
@@ -91,7 +91,7 @@ class UpgradeTests(unittest.TestCase):
         self.git("gc", "--prune=now")
         with mock.patch.object(wake_runtime, "source_commit", return_value=self.target):
             result = wake_runtime.service_upgrade(self.config)
-        self.assertEqual(result["data_version"], "0.2.2")
+        self.assertEqual(result["data_version"], "0.2.3")
         self.assertEqual(self.git("rev-parse", "HEAD"), self.target)
 
     def test_git_conflict_keeps_baseline_version_and_can_be_resolved_then_retried(self):
@@ -111,11 +111,11 @@ class UpgradeTests(unittest.TestCase):
         (self.root / "code.txt").write_text("resolved\n", encoding="utf-8")
         self.git("add", "code.txt")
         self.git("commit", "-qm", "resolve upgrade conflict")
-        self.assertEqual(self.upgrade()["data_version"], "0.2.2")
+        self.assertEqual(self.upgrade()["data_version"], "0.2.3")
 
     def test_status_distinguishes_current_program_old_daemon_and_data_version(self):
         result = wake_runtime.service_status(self.config)
-        self.assertEqual(result["program_version"], "0.2.2")
+        self.assertEqual(result["program_version"], "0.2.3")
         self.assertIsNone(result["daemon_version"])
         self.assertEqual(result["data_version"], "0.1.0")
 

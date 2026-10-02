@@ -106,15 +106,15 @@ class InstallerScriptTests(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             if relative == "multi_agent_manager/release.py":
                 target.write_text(
-                    'RELEASE_VERSION = "0.2.2"\n'
-                    'RELEASE_TAG = "v0.2.2"\n'
+                    'RELEASE_VERSION = "0.2.3"\n'
+                    'RELEASE_TAG = "v0.2.3"\n'
                     'RELEASE_COMMIT = "' + "a" * 40 + '"\n',
                     encoding="utf-8",
                 )
             else:
                 shutil.copy2(self.source_root / relative, target)
         (root / "pyproject.toml").write_text(
-            "[project]\nname = 'multi-agent-manager'\nversion = '0.2.2'\n", encoding="utf-8"
+            "[project]\nname = 'multi-agent-manager'\nversion = '0.2.3'\n", encoding="utf-8"
         )
         # Git does not retain an empty directory, while the installer requires
         # a tests directory before it will run its suite.
@@ -368,7 +368,7 @@ run_compatibility_check() {
 
     def test_archive_release_commit_placeholder_is_rejected(self):
         (self.checkout / "multi_agent_manager" / "release.py").write_text(
-            'RELEASE_VERSION = "0.2.2"\nRELEASE_TAG = "v0.2.2"\nRELEASE_COMMIT = "$Format:%H$"\n',
+            'RELEASE_VERSION = "0.2.3"\nRELEASE_TAG = "v0.2.3"\nRELEASE_COMMIT = "$Format:%H$"\n',
             encoding="utf-8",
         )
         subprocess.run(["tar", "-czf", str(self.archive), "-C", str(self.checkout), "."], check=True)
@@ -394,7 +394,7 @@ run_compatibility_check() {
         })
         environment.pop("MAM_INSTALL_ARCHIVE", None)
         result = subprocess.run(
-            ["bash", "-c", 'source "$1"; INSTALL_TMP="$2"; REQUESTED_VERSION="0.2.2"; prepare_release_source; test -f "$CHECKOUT_ROOT/pyproject.toml"',
+            ["bash", "-c", 'source "$1"; INSTALL_TMP="$2"; REQUESTED_VERSION="0.2.3"; prepare_release_source; test -f "$CHECKOUT_ROOT/pyproject.toml"',
              "bash", str(self.checkout / "scripts" / "install.sh"), str(self.root / "download-tmp")],
             cwd=self.checkout, env=environment, text=True, capture_output=True, check=False,
         )
@@ -525,7 +525,7 @@ run_compatibility_check() {
         evidence = sorted((self.home / ".local" / "share" / "multi-agent-manager" / "install-evidence").glob("*.json"))
         self.assertEqual(len(evidence), 2)
         summary = json.loads(next(path for path in evidence if not path.name.endswith("compatibility.json")).read_text())
-        self.assertEqual(summary["version"], "0.2.2")
+        self.assertEqual(summary["version"], "0.2.3")
         self.assertEqual(summary["tests"]["mode"], "install-smoke")
 
 if __name__ == "__main__":

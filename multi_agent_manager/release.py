@@ -5,6 +5,6 @@ with ``export-subst`` in ``.gitattributes``.  A checkout still reports its
 current commit dynamically.
 """
 
-RELEASE_VERSION = "0.2.2"
-RELEASE_TAG = "v0.2.2"
+RELEASE_VERSION = "0.2.3"
+RELEASE_TAG = "v0.2.3"
 RELEASE_COMMIT = "$Format:%H$"

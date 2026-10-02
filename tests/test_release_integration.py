@@ -174,7 +174,7 @@ class ReleaseFixtureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="mam release integration ") as temporary:
             root = Path(temporary) / "run"
             with mock.patch.object(test_integration, "run_full_unit_suite", side_effect=AssertionError("preflight ran the full suite")):
-                code, outcome = test_integration.integration(root, "0.0.1", "0.2.2", False)
+                code, outcome = test_integration.integration(root, "0.0.1", "0.2.3", False)
             self.assertNotEqual(code, 0)
             self.assertIn("only the complete", outcome["error"])
             self.assertTrue((root / "integration-results" / "result.json").is_file())
@@ -184,7 +184,7 @@ class ReleaseFixtureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="mam current fixture ") as temporary:
             instance = Path(temporary) / "mam-test"
             created = subprocess.run(
-                [sys.executable, str(ROOT / "scripts" / "create_mam_test.py"), "--version", "0.2.2", "--root", str(instance)],
+                [sys.executable, str(ROOT / "scripts" / "create_mam_test.py"), "--version", "0.2.3", "--root", str(instance)],
                 cwd=ROOT, capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(created.returncode, 0, created.stderr)
@@ -195,8 +195,8 @@ class ReleaseFixtureTests(unittest.TestCase):
             )
             self.assertEqual(status.returncode, 0, status.stderr)
             value = json.loads(status.stdout)
-            self.assertEqual(value["program_version"], "0.2.2")
-            self.assertEqual(value["data_version"], "0.2.2")
+            self.assertEqual(value["program_version"], "0.2.3")
+            self.assertEqual(value["data_version"], "0.2.3")
 
     def test_published_missing_tag_does_not_allocate_resources(self):
         from scripts import test_integration
@@ -212,7 +212,7 @@ class ReleaseFixtureTests(unittest.TestCase):
             root = Path(temporary) / "run"
             with mock.patch.object(test_integration, "root_dir", return_value=repository), \
                  mock.patch.object(test_integration, "run_full_unit_suite", side_effect=AssertionError("preflight ran the full suite")) as suite:
-                code, outcome = test_integration.integration(root, "0.1.0", "0.2.2", False, published=True)
+                code, outcome = test_integration.integration(root, "0.1.0", "0.2.3", False, published=True)
             suite.assert_not_called()
             self.assertNotEqual(code, 0)
             self.assertIn("published source tag", outcome["error"])

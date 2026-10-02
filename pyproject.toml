@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "multi-agent-manager"
-version = "0.2.2"
+version = "0.2.3"
 description = "Local cluster task, workspace and process management"
 requires-python = ">=3.10"
 dependencies = []

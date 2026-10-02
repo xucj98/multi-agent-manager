@@ -25,13 +25,14 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(migrations.read_data_version(self.root), "0.1.0")
         result = migrations.migrate_data(self.root)
         self.assertEqual(result["from"], "0.1.0")
-        self.assertEqual(result["to"], "0.2.2")
+        self.assertEqual(result["to"], "0.2.3")
         self.assertEqual(result["steps"], [
             {"from": "0.1.0", "to": "0.2.0"},
             {"from": "0.2.0", "to": "0.2.1"},
             {"from": "0.2.1", "to": "0.2.2"},
+            {"from": "0.2.2", "to": "0.2.3"},
         ])
-        self.assertEqual(migrations.read_data_version(self.root), "0.2.2")
+        self.assertEqual(migrations.read_data_version(self.root), "0.2.3")
         old_task = json.loads(self.record.read_text())
         self.assertEqual(old_task, {"id": "kept", "jobs": [{"status": "stopped"}]})
         self.assertEqual(task_state.reminder_count(old_task), 0)
@@ -53,7 +54,7 @@ class MigrationTests(unittest.TestCase):
             self.assertFalse((self.root / ".local" / migrations.VERSION_FILE).exists())
             result = migrations.migrate_data(self.root)
         self.assertTrue(result["changed"])
-        self.assertEqual(migrations.read_data_version(self.root), "0.2.2")
+        self.assertEqual(migrations.read_data_version(self.root), "0.2.3")
 
     def test_020_to_021_is_an_explicit_noop_receipt(self):
         version_file = self.root / ".local" / migrations.VERSION_FILE
@@ -67,27 +68,27 @@ class MigrationTests(unittest.TestCase):
     def test_021_to_022_is_an_explicit_noop_receipt(self):
         migrations.write_data_version(self.root, "0.2.1")
         before = self.record.read_bytes()
-        result = migrations.migrate_data(self.root)
+        result = migrations.migrate_data(self.root, "0.2.2")
         self.assertEqual(result["from"], "0.2.1")
         self.assertEqual(result["steps"], [{"from": "0.2.1", "to": "0.2.2"}])
         self.assertEqual(migrations.read_data_version(self.root), "0.2.2")
         self.assertEqual(self.record.read_bytes(), before)
-        self.assertEqual(migrations.migrate_data(self.root)["steps"], [])
+        self.assertEqual(migrations.migrate_data(self.root, "0.2.2")["steps"], [])
 
     def test_interrupted_latest_step_keeps_021_receipt_and_retries_only_that_step(self):
-        original = migrations.MIGRATIONS[("0.2.1", "0.2.2")]
+        original = migrations.MIGRATIONS[("0.2.2", "0.2.3")]
         with mock.patch.dict(migrations.MIGRATIONS, {
-            ("0.2.1", "0.2.2"): mock.Mock(side_effect=migrations.MigrationError("latest step interruption"))
+            ("0.2.2", "0.2.3"): mock.Mock(side_effect=migrations.MigrationError("latest step interruption"))
         }):
             with self.assertRaisesRegex(migrations.MigrationError, "interruption"):
                 migrations.migrate_data(self.root)
-        self.assertEqual(migrations.read_data_version(self.root), "0.2.1")
+        self.assertEqual(migrations.read_data_version(self.root), "0.2.2")
         with mock.patch.dict(migrations.MIGRATIONS, {
-            ("0.2.1", "0.2.2"): mock.Mock(wraps=original)
+            ("0.2.2", "0.2.3"): mock.Mock(wraps=original)
         }):
             result = migrations.migrate_data(self.root)
-        self.assertEqual(result["steps"], [{"from": "0.2.1", "to": "0.2.2"}])
-        self.assertEqual(migrations.read_data_version(self.root), "0.2.2")
+        self.assertEqual(result["steps"], [{"from": "0.2.2", "to": "0.2.3"}])
+        self.assertEqual(migrations.read_data_version(self.root), "0.2.3")
 
     def test_backup_copies_only_local_and_never_overwrites_existing_backup(self):
         (self.root / "outside.txt").write_text("outside", encoding="utf-8")
