@@ -229,8 +229,7 @@ class EventStreamTests(unittest.TestCase):
             self.assertEqual(started["method"], "turn/start")
             self.assertEqual(
                 started["params"],
-                {"threadId": "existing-agent", "input": [],
-                 "toolOutput": {"name": "message", "namespace": "mam", "output": "JOB-ID job-1 stopped"}},
+                {"threadId": "existing-agent", "input": [{"type": "text", "text": "JOB-ID job-1 stopped"}]},
             )
             fixture.send_json(connection, {"id": started["id"], "result": {"turn": {"id": "new-turn"}}})
 
@@ -241,6 +240,13 @@ class EventStreamTests(unittest.TestCase):
             finally:
                 stream.close()
         self.assertEqual(result, {"turn": {"id": "new-turn"}})
+
+    def test_tool_channel_is_rejected_before_request(self) -> None:
+        websocket = mock.Mock()
+        stream = runtime.AppServerEventStream(websocket)
+        with self.assertRaisesRegex(runtime.AppServerEventError, "unsupported message channel: tool"):
+            stream.start_turn("existing-agent", "notification", message_channel="tool")
+        websocket.send_text.assert_not_called()
 
     def test_user_channel_uses_text_input_and_active_turn_steer(self) -> None:
         def handler(fixture: AppServerFixture, connection: socket.socket) -> None:

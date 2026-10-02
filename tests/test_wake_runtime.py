@@ -62,7 +62,7 @@ class FakeStream:
     def latest_turn(self, agent):
         return self.turns.get(agent)
 
-    def start_turn(self, agent, text, *, message_channel="tool"):
+    def start_turn(self, agent, text, *, message_channel="user"):
         if self.channels is not None:
             self.channels.append((agent, message_channel))
         if self.failure is not None:
@@ -79,6 +79,13 @@ class FakeStream:
     def steer_turn(self, agent, turn_id, text):
         if self.channels is not None:
             self.channels.append((agent, "user-steer"))
+        if self.failure is not None:
+            failure, self.failure = self.failure, None
+            if isinstance(failure, AcceptedThenLost):
+                self.calls.append((agent, text))
+                self.turns[agent] = {"id": failure.turn_id, "status": "completed"}
+                raise failure.error
+            raise failure
         self.calls.append((agent, text))
         return {"turnId": turn_id}
 
@@ -271,7 +278,7 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(queued["service"], "disabled")
 
         self.scheduler().run_once()
-        self.assertEqual(self.channels, [(MANAGER, "tool")])
+        self.assertEqual(self.channels, [(MANAGER, "user-steer")])
         self.assertIn("[message | /root/worker]\ninspect output", self.starts[0][1])
         self.assertFalse(self.state()["events"])
         self.scheduler().run_once()
@@ -362,7 +369,7 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(self.starts, [], "stale idle metadata must not inject into an active turn")
         self.turns[MANAGER] = {"id": "manager-turn", "status": "completed"}
         self.scheduler().run_once()
-        self.assertEqual(self.channels, [(MANAGER, "tool")])
+        self.assertEqual(self.channels, [(MANAGER, "user")])
         self.assertFalse(self.state()["events"])
 
     def test_user_channel_steers_timely_message_and_idle_copy_uses_user_input(self):
@@ -371,8 +378,14 @@ class WakeRuntimeTests(unittest.TestCase):
         self.statuses[MANAGER] = "active"
         self.turns[MANAGER] = {"id": "manager-turn", "status": "inProgress"}
         self.cli_message("urgent", immediate=True)
+        legacy = self.state()
+        legacy["message_channel"] = "tool"
+        wake_runtime._write_json(wake_runtime._service_path(self.store, "state.json"), legacy)
         self.scheduler().run_once()
         self.assertEqual(self.channels, [(MANAGER, "user-steer")])
+        receipt = self.state()["history"][-1]
+        self.assertEqual(receipt["accepted_turn_id"], "manager-turn")
+        self.assertEqual(receipt["acknowledgement"], "turn/steer RPC response")
         self.cli_message("copy")
         self.statuses[MANAGER] = "idle"
         self.turns[MANAGER] = {"id": "manager-turn", "status": "completed"}
@@ -384,14 +397,14 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(self.channels[-1], (MANAGER, "user"))
         self.assertIn("idle urgent", self.starts[-1][1])
 
-    def test_tool_failure_remains_visible_without_user_fallback(self):
-        self.message("keep tool channel")
-        self.stream_failure = job_runtime.AppServerRpcError("tool output rejected")
+    def test_user_delivery_failure_remains_visible(self):
+        self.message("report rejected input")
+        self.stream_failure = job_runtime.AppServerRpcError("user input rejected")
         self.scheduler().run_once()
         event = next(iter(self.state()["events"].values()))
         self.assertEqual(event["delivery"], "rejected")
-        self.assertIn("tool output rejected", event["last_error"])
-        self.assertEqual(self.channels, [(MANAGER, "tool")])
+        self.assertIn("user input rejected", event["last_error"])
+        self.assertEqual(self.channels, [(MANAGER, "user")])
 
     def test_timely_message_response_loss_is_ambiguous_even_with_same_turn_id(self):
         self.statuses[MANAGER] = "active"
@@ -443,7 +456,7 @@ class WakeRuntimeTests(unittest.TestCase):
             stream = original_factory(socket_path)
             start = stream.start_turn
 
-            def start_without_turn_id(agent, text, *, message_channel="tool"):
+            def start_without_turn_id(agent, text, *, message_channel="user"):
                 start(agent, text, message_channel=message_channel)
                 return {"accepted": True}
 
@@ -740,15 +753,18 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(len(self.starts), 1)
         self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
 
-    def test_not_loaded_job_wake_uses_metadata_only_rpc_in_both_channels(self):
-        for channel in ("tool", "user"):
-            with self.subTest(channel=channel):
+    def test_not_loaded_job_wake_uses_user_rpc_with_default_and_legacy_channel(self):
+        for channel in (None, "tool", "user"):
+            with self.subTest(stored_channel=channel):
                 self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
                 self.statuses[EXECUTOR] = "notLoaded"
                 state = self.state()
                 state["events"] = {}
-                wake_runtime._save_state(self.store, state)
-                wake_runtime.set_message_channel(self.config, channel)
+                if channel is None:
+                    state.pop("message_channel", None)
+                else:
+                    state["message_channel"] = channel
+                wake_runtime._write_json(wake_runtime._service_path(self.store, "state.json"), state)
                 websocket = mock.Mock()
                 results = [
                     {"thread": {"id": EXECUTOR, "status": {"type": "notLoaded"}, "turns": []}},
@@ -775,15 +791,15 @@ class WakeRuntimeTests(unittest.TestCase):
                 })
                 params = requests[3]["params"]
                 self.assertEqual(params["threadId"], EXECUTOR)
-                if channel == "tool":
-                    self.assertEqual(params["input"], [])
-                else:
-                    self.assertNotIn("toolOutput", params)
-                payload = params["toolOutput"]["output"] if channel == "tool" else params["input"][0]["text"]
+                self.assertEqual(set(params), {"threadId", "input"})
+                self.assertEqual(params["input"][0]["type"], "text")
+                payload = params["input"][0]["text"]
                 self.assertIn("There are exited jobs. Check the results and archive them.", payload)
                 event = next(iter(self.state()["events"].values()))
                 self.assertEqual(event["accepted_turn_id"], "accepted-rpc-turn")
                 self.assertEqual(self.store.read(TASK_ONE)["wake_reminder_count"], 1)
+                persisted = wake_runtime._read_json(wake_runtime._service_path(self.store, "state.json"))
+                self.assertEqual(persisted["message_channel"], "user")
 
     def test_not_loaded_job_preflight_must_confirm_idle_without_a_running_turn(self):
         for resumed_status, latest_status in (("notLoaded", None), ("active", "inProgress"), ("idle", "inProgress")):
@@ -1273,7 +1289,7 @@ class WakeRuntimeTests(unittest.TestCase):
         scheduler.run_once()
         self.assertEqual([recipient for recipient, _ in self.starts], [MANAGER])
 
-    def test_native_v2_escalation_is_stale_after_rebind(self):
+    def test_native_v2_escalation_is_stale_after_start_handoff(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
         self.stream_failure = job_runtime.AppServerRpcError(wake_runtime._NATIVE_V2_DIRECT_INPUT_REJECTION)
         scheduler = self.scheduler()
@@ -1282,14 +1298,13 @@ class WakeRuntimeTests(unittest.TestCase):
         scheduler.run_once()
         self.assertFalse(any(event["kind"] == wake_runtime._MANAGER_NATIVE_FOLLOWUP for event in self.state()["events"].values()))
 
-        args = types.SimpleNamespace(task=TASK_ONE, agent=EXECUTOR_TWO, note="native parent handed off executor work")
+        args = types.SimpleNamespace(task=TASK_ONE)
         states = {
-            EXECUTOR: {"status": "idle", "checked_at": "rebind", "error": None},
-            EXECUTOR_TWO: {"status": "idle", "checked_at": "rebind", "error": None},
+            EXECUTOR: {"status": "idle", "checked_at": "handoff", "error": None},
         }
-        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": MANAGER}, clear=False), \
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": EXECUTOR_TWO}, clear=False), \
              mock.patch.object(cli, "agent_observations", return_value=states):
-            cli.rebind(self.store, args)
+            cli.start(self.store, args)
 
         scheduler.run_once()
         self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR_TWO])
@@ -1393,11 +1408,11 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertEqual(self.starts, [])
         self.assertEqual(self.store.read(TASK_ONE)["jobs"][0]["status"], "archived")
 
-    def test_rebind_waits_for_scheduler_cycle_then_routes_stopped_job_to_replacement(self):
+    def test_start_waits_for_scheduler_cycle_then_routes_stopped_job_to_replacement(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
         scheduler_entered = threading.Event()
         allow_scheduler = threading.Event()
-        scheduler_errors, rebind_errors, rebind_results = [], [], []
+        scheduler_errors, start_errors, start_results = [], [], []
 
         def blocked_agent_probe(agents, socket_path):
             self.assertEqual(socket_path, "/tmp/fake-app-server.sock")
@@ -1421,23 +1436,22 @@ class WakeRuntimeTests(unittest.TestCase):
         cycle.start()
         self.assertTrue(scheduler_entered.wait(2))
 
-        def run_rebind():
-            args = types.SimpleNamespace(task=TASK_ONE, agent=EXECUTOR_TWO, note="old executor completed")
+        def run_start():
+            args = types.SimpleNamespace(task=TASK_ONE)
             states = {
-                EXECUTOR: {"status": "idle", "checked_at": "rebind", "error": None},
-                EXECUTOR_TWO: {"status": "idle", "checked_at": "rebind", "error": None},
+                EXECUTOR: {"status": "idle", "checked_at": "handoff", "error": None},
             }
             try:
-                with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": MANAGER}, clear=False), \
+                with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": EXECUTOR_TWO}, clear=False), \
                      mock.patch.object(cli, "agent_observations", return_value=states):
-                    rebind_results.append(cli.rebind(self.store, args))
+                    start_results.append(cli.start(self.store, args))
             except BaseException as exc:  # Preserve errors raised in the helper thread.
-                rebind_errors.append(exc)
+                start_errors.append(exc)
 
-        handoff = threading.Thread(target=run_rebind)
+        handoff = threading.Thread(target=run_start)
         handoff.start()
         self.assertEqual(self.store.read(TASK_ONE)["agent"], EXECUTOR)
-        self.assertFalse(rebind_results, "rebind must wait for the in-flight service cycle")
+        self.assertFalse(start_results, "task start must wait for the in-flight service cycle")
 
         allow_scheduler.set()
         cycle.join(5)
@@ -1445,8 +1459,8 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertFalse(cycle.is_alive())
         self.assertFalse(handoff.is_alive())
         self.assertFalse(scheduler_errors)
-        self.assertFalse(rebind_errors)
-        self.assertEqual(rebind_results[0]["agent"], EXECUTOR_TWO)
+        self.assertFalse(start_errors)
+        self.assertEqual(start_results[0]["agent"], EXECUTOR_TWO)
         self.assertEqual(self.starts, [], "the old active recipient was never awakened")
 
         # The first cycle retained an old-recipient stopped-job event.  The
@@ -1461,20 +1475,19 @@ class WakeRuntimeTests(unittest.TestCase):
         self.assertTrue(any(event.get("recipient") == EXECUTOR_TWO for event in state["events"].values()))
         self.assertEqual(self.store.read(TASK_ONE)["jobs"][0]["id"], "stopped")
 
-    def test_rebind_invalidates_accepted_old_stopped_job_delivery_before_new_delivery(self):
+    def test_start_invalidates_accepted_old_stopped_job_delivery_before_new_delivery(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
         self.scheduler().run_once()
         old_event = next(iter(self.state()["events"].values()))
         self.assertEqual((old_event["recipient"], old_event["delivery"]), (EXECUTOR, "accepted"))
 
-        args = types.SimpleNamespace(task=TASK_ONE, agent=EXECUTOR_TWO, note="old executor completed")
+        args = types.SimpleNamespace(task=TASK_ONE)
         states = {
-            EXECUTOR: {"status": "idle", "checked_at": "rebind", "error": None},
-            EXECUTOR_TWO: {"status": "idle", "checked_at": "rebind", "error": None},
+            EXECUTOR: {"status": "idle", "checked_at": "handoff", "error": None},
         }
-        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": MANAGER}, clear=False), \
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": EXECUTOR_TWO}, clear=False), \
              mock.patch.object(cli, "agent_observations", return_value=states):
-            cli.rebind(self.store, args)
+            cli.start(self.store, args)
 
         self.scheduler().run_once()
         self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR, EXECUTOR_TWO])
@@ -1488,21 +1501,20 @@ class WakeRuntimeTests(unittest.TestCase):
             for event in state["events"].values()
         ))
 
-    def test_rebind_invalidates_uncertain_old_stopped_job_delivery_before_new_delivery(self):
+    def test_start_invalidates_uncertain_old_stopped_job_delivery_before_new_delivery(self):
         self.task(TASK_ONE, jobs=[self.job("stopped", status="stopped")])
         self.stream_failure = AcceptedThenLost(RuntimeError("lost turn/start response"))
         self.scheduler().run_once()
         old_event = next(iter(self.state()["events"].values()))
         self.assertEqual((old_event["recipient"], old_event["delivery"]), (EXECUTOR, "uncertain"))
 
-        args = types.SimpleNamespace(task=TASK_ONE, agent=EXECUTOR_TWO, note="old executor completed")
+        args = types.SimpleNamespace(task=TASK_ONE)
         states = {
-            EXECUTOR: {"status": "idle", "checked_at": "rebind", "error": None},
-            EXECUTOR_TWO: {"status": "idle", "checked_at": "rebind", "error": None},
+            EXECUTOR: {"status": "idle", "checked_at": "handoff", "error": None},
         }
-        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": MANAGER}, clear=False), \
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": EXECUTOR_TWO}, clear=False), \
              mock.patch.object(cli, "agent_observations", return_value=states):
-            cli.rebind(self.store, args)
+            cli.start(self.store, args)
 
         self.scheduler().run_once()
         self.assertEqual([recipient for recipient, _ in self.starts], [EXECUTOR, EXECUTOR_TWO])

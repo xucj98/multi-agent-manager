@@ -167,12 +167,7 @@ class WakeCompatibilityTests(unittest.TestCase):
             requests[3]["params"],
             {
                 "threadId": thread_ids[0],
-                "input": [],
-                "toolOutput": {
-                    "name": "message",
-                    "namespace": "mam",
-                    "output": "MAM compatibility probe; unknown thread only.",
-                },
+                "input": [{"type": "text", "text": "MAM compatibility probe; unknown thread only."}],
             },
         )
         self.assertNotIn("model", requests[3]["params"])

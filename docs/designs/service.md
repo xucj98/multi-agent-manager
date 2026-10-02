@@ -9,7 +9,7 @@
 | `mam service start [--manager AGENT-ID]` | Manager、安装者 | 启动或复用当前实例的服务，返回 JSON 状态；可显式指定首次绑定的 Manager。 |
 | `mam service stop` | Manager、安装者 | 停止当前实例的服务；job 继续运行，任务和 workspace 保留。 |
 | `mam service status` | 所有人 | 返回服务是否运行、健康状态、Manager、待办和错误信息。 |
-| `mam service set message-channel tool\|user` | Manager、安装者 | 设置本实例的消息渠道，立即生效并保存。 |
+| `mam service set message-channel user` | Manager、安装者 | 保存本实例的用户消息渠道；工具渠道已停用。 |
 | `mam service rebind-manager --note NOTE` | 新 Manager | 从 CODEX_THREAD_ID 确认原生根线程身份，接管本实例 Manager 并记录交接理由。 |
 
 新实例尚未绑定 Manager 时显示 awaiting_manager。Manager 首次 create 任务时可自动登记；已有任务但无法确认 Manager 时，使用 start 的 `--manager` 参数。当前 start 不能替换已绑定的 Manager。
@@ -22,7 +22,7 @@
 
 1. 备份 `MAM_ROOT/.local/`。
 2. 将已安装 `mam` 对应的发布 tag 或 commit 合并到 `MAM_BRANCH`；本地缺少该版本时，从 `MAM_ROOT` 已配置的 `origin` 获取。
-3. 按版本顺序执行数据迁移，输出升级结果、备份位置和各版升级适配说明的位置。
+3. 按版本顺序执行数据迁移，并把旧消息渠道保存为 `user`，输出升级结果、备份位置和各版升级适配说明的位置。
 
 新版程序保留自 0.1.0 起的完整迁移链，从实例记录的版本依次迁移到目标版本。每步迁移成功后再记录版本；中断或失败后可重试。测试在 [install.sh](install.md#安装与测试) 中完成，实例升级直接执行合并与迁移。
 
@@ -49,17 +49,20 @@
 ## 消息渠道
 
 ```text
-mam service set message-channel tool
 mam service set message-channel user
 ```
 
-默认 `tool`，以工具输出投递；`user` 以可见的用户消息投递，便于验收。设置作用于本实例全部 MAM 消息，运行中的服务无需重启，重启后继续沿用。`mam service status` 的 `message_channel` 显示当前选择。
+全部 MAM 通知使用可见的用户消息：收件人空闲时启动新 turn，正在运行的 turn 只接收 `--immediate` 主动消息。`mam service status` 的 `message_channel` 固定为 `user`。
+
+工具渠道已停用，`message-channel tool` 会被拒绝。新版服务读取旧 `tool` 设置时使用 `user`；`service upgrade` 在备份后将旧设置保存为 `user`。更新程序后需重启 daemon，使新的投递行为生效。
+
+原工具通知在 HTTP 会话压缩后可能因缺少 `call_id` 被拒绝。切换消息渠道避免新增这类结果，但不会移除已保存的错误工具结果或修复已污染的 Codex 线程。
 
 主动消息的发送方式见 [mam message](message.md)。
 
 ## 消息格式
 
-一次投递使用一个 `[MAM MESSAGE]` 总标题。每条消息以 `[类型 | 来源]` 开头，正文另起一行，条目之间空一行；两种投递渠道使用相同格式。
+一次投递使用一个 `[MAM MESSAGE]` 总标题。每条消息以 `[类型 | 来源]` 开头，正文另起一行，条目之间空一行。
 
 消息共三类：`message` 为主动消息，来源是发送者；`job exited` 为进程退出通知，`task pending` 为任务待处理提醒，来源均为对应任务的执行者。
 

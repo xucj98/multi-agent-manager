@@ -60,7 +60,7 @@ IDS=(--root "$FIXTURE_ROOT" --task "$TASK_ID" --job "$JOB_ID" --manager "$ROOT_M
 "${MAM[@]}" service start --manager "$ROOT_MANAGER"
 ```
 
-需要在客户端看见消息时，可对 fixture 执行 `service set message-channel user`；默认工具渠道由 Manager 在上下文中核对消息。
+全部通知使用用户消息渠道，Manager 在客户端核对收到的 MAM 消息。
 
 ## 拒绝与重启
 

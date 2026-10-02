@@ -98,7 +98,7 @@ def _service_start_lock(store: Store):
 
 
 @contextlib.contextmanager
-def task_rebind_lock(store: Store, task: str):
+def task_start_lock(store: Store, task: str):
     """Serialize a task handoff with every scheduler delivery edge.
 
     Keep this lock order aligned with :meth:`WakeScheduler.run_once`: service
@@ -185,7 +185,7 @@ def _default_state(config: ProjectConfig) -> dict[str, Any]:
         "enabled": False,
         "mode": "disabled",
         "manager": None,
-        "message_channel": "tool",
+        "message_channel": "user",
         "pid": None,
         "identity": None,
         "token": None,
@@ -217,6 +217,9 @@ def _load_state(store: Store) -> dict[str, Any]:
         raise WakeRuntimeError("service state belongs to another MAM project or has an unsupported version")
     for key, value in _default_state(store.config).items():
         state.setdefault(key, value)
+    # Old standalone tool outputs have no corresponding call ID and can
+    # poison HTTP history after compaction. Never reuse that persisted choice.
+    state["message_channel"] = "user"
     if not isinstance(state.get("events"), dict) or not isinstance(state.get("history"), list):
         raise WakeRuntimeError("service state has invalid delivery bookkeeping")
     if not isinstance(state.get("job_schedule"), dict) or not isinstance(state.get("counters"), dict):
@@ -425,7 +428,7 @@ def _status_mapping(store: Store, state: dict[str, Any]) -> dict[str, Any]:
         "program_version": program_info()["version"],
         "daemon_version": state.get("daemon_version"),
         "data_version": data_version,
-        "message_channel": state.get("message_channel", "tool"),
+        "message_channel": state.get("message_channel", "user"),
         "running": alive,
         "healthy": bool(alive and state.get("healthy") and not state.get("error")),
         "manager": recorded_manager(store),
@@ -455,8 +458,8 @@ def service_status(config: ProjectConfig) -> dict[str, Any]:
 
 
 def set_message_channel(config: ProjectConfig, value: str) -> dict[str, Any]:
-    if value not in {"tool", "user"}:
-        raise WakeRuntimeError("message-channel must be tool or user")
+    if value != "user":
+        raise WakeRuntimeError("message-channel must be user; tool delivery is disabled")
     store = Store(config)
     with _service_start_lock(store), store.lock("service-cycle"):
         state = _load_state(store)
@@ -851,6 +854,7 @@ def service_upgrade(config: ProjectConfig) -> dict[str, Any]:
         try:
             merge = _merge_release(store, target)
             migrations = migrate_data(store.root, DATA_VERSION)
+            _save_state(store, _load_state(store))
         except (MigrationError, WakeRuntimeError) as exc:
             raise WakeRuntimeError(f"service upgrade incomplete; backup retained at {backup}: {exc}") from exc
         return {
@@ -864,6 +868,7 @@ def service_upgrade(config: ProjectConfig) -> dict[str, Any]:
             "migrations": migrations,
             "adaptation": ADAPTATION_DOCUMENT,
             "daemon_running": False,
+            "message_channel": "user",
         }
 
 
@@ -1227,7 +1232,7 @@ class WakeScheduler:
         The source event itself remains durable and blocked.  The escalation's
         signature contains that source signature, so an unchanged condition is
         retained across cycles and daemon restarts instead of creating another
-        Manager turn.  A changed job, archive, or rebind removes the source
+        Manager turn.  A changed job, archive, or executor handoff removes the source
         from ``desired`` and therefore also retires its escalation.
         """
 
@@ -1854,9 +1859,8 @@ class WakeScheduler:
                 payload = self._payload(current)
                 if not payload:
                     continue
-                channel = state.get("message_channel", "tool")
                 in_progress = before_turn_status == "inProgress"
-                if channel == "user" and in_progress and (
+                if in_progress and (
                     not isinstance(before_turn_id, str) or
                     (hasattr(stream, "start_turn") and not hasattr(stream, "steer_turn"))
                 ):
@@ -1882,19 +1886,17 @@ class WakeScheduler:
                 _save_state(self.store, state)
                 sent = True
                 if hasattr(stream, "start_turn"):
-                    if channel == "user" and in_progress:
+                    if in_progress:
                         response = stream.steer_turn(recipient, before_turn_id, payload)
                     else:
-                        response = stream.start_turn(recipient, payload, message_channel=channel)
-                elif channel == "user" and in_progress:
+                        response = stream.start_turn(recipient, payload, message_channel="user")
+                elif in_progress:
                     response = stream.request("turn/steer", {"threadId": recipient, "expectedTurnId": before_turn_id,
                                                               "input": [{"type": "text", "text": payload}]})
                 else:
-                    params = {"threadId": recipient, "input": [{"type": "text", "text": payload}]} if channel == "user" else {
-                        "threadId": recipient, "input": [],
-                        "toolOutput": {"name": "message", "namespace": "mam", "output": payload},
-                    }
-                    response = stream.request("turn/start", params)
+                    response = stream.request("turn/start", {
+                        "threadId": recipient, "input": [{"type": "text", "text": payload}],
+                    })
             except Exception as exc:
                 if sent:
                     self._delivery_failure(current, exc)
@@ -1909,16 +1911,19 @@ class WakeScheduler:
             else:
                 turn = response.get("turn") if isinstance(response, Mapping) else None
                 accepted_turn = turn.get("id") if isinstance(turn, Mapping) else None
+                method = "turn/steer" if in_progress else "turn/start"
+                if in_progress and isinstance(response, Mapping):
+                    accepted_turn = response.get("turnId")
                 for event in current:
                     event.update({
                         "delivery": "accepted",
                         "accepted_at": _timestamp(),
                         "accepted_turn_id": accepted_turn if isinstance(accepted_turn, str) and accepted_turn else None,
-                        "acknowledgement": "turn/start RPC response",
+                        "acknowledgement": f"{method} RPC response",
                         "last_error": None,
                     })
                     if not isinstance(accepted_turn, str) or not accepted_turn:
-                        detail = "turn/start was acknowledged without a turn ID; completion cannot be verified safely"
+                        detail = f"{method} was acknowledged without a turn ID; completion cannot be verified safely"
                         event["turn_completion_error"] = detail
                         event["last_condition_error"] = detail
                         state.setdefault("diagnostics", []).append({

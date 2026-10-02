@@ -47,6 +47,8 @@ class UpgradeTests(unittest.TestCase):
             return wake_runtime.service_upgrade(self.config)
 
     def test_upgrade_merges_into_instance_and_preserves_local_data(self):
+        self.state["message_channel"] = "tool"
+        wake_runtime._write_json(wake_runtime._service_path(self.store, "state.json"), self.state)
         result = self.upgrade()
         self.assertEqual(result["status"], "upgraded")
         self.assertEqual(result["data_version"], "0.2.2")
@@ -55,6 +57,9 @@ class UpgradeTests(unittest.TestCase):
         self.assertEqual(self.git("rev-parse", "HEAD"), self.target)
         self.assertEqual((self.root / ".local" / "keep.txt").read_text(), "kept\n")
         self.assertTrue((Path(result["backup"]) / "service" / "state.json").is_file())
+        self.assertEqual(json.loads((Path(result["backup"]) / "service" / "state.json").read_text())["message_channel"], "tool")
+        self.assertEqual(json.loads(wake_runtime._service_path(self.store, "state.json").read_text())["message_channel"], "user")
+        self.assertEqual(result["message_channel"], "user")
         again = self.upgrade()
         self.assertEqual(again["status"], "up-to-date")
         self.assertEqual(again["migrations"]["steps"], [])

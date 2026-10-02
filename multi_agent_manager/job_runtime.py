@@ -520,7 +520,7 @@ class AppServerEventStream:
             raise AppServerEventError("App Server thread/turns/list returned an invalid turn")
         return turn
 
-    def start_turn(self, thread_id: str, text: str, *, message_channel: str = "tool") -> Any:
+    def start_turn(self, thread_id: str, text: str, *, message_channel: str = "user") -> Any:
         """Deliver one message on an already-resumed existing thread.
 
         The caller supplies no model, effort, cwd, sandbox, or workspace
@@ -532,14 +532,9 @@ class AppServerEventStream:
             raise AppServerEventError("App Server turn/start requires a thread id")
         if not isinstance(text, str) or not text:
             raise AppServerEventError("App Server turn/start requires non-empty text")
-        if message_channel == "tool":
-            params = {"threadId": thread_id, "input": [],
-                      "toolOutput": {"name": "message", "namespace": "mam", "output": text}}
-        elif message_channel == "user":
-            params = {"threadId": thread_id, "input": [{"type": "text", "text": text}]}
-        else:
+        if message_channel != "user":
             raise AppServerEventError(f"unsupported message channel: {message_channel}")
-        return self.request("turn/start", params)
+        return self.request("turn/start", {"threadId": thread_id, "input": [{"type": "text", "text": text}]})
 
     def steer_turn(self, thread_id: str, turn_id: str, text: str) -> Any:
         return self.request("turn/steer", {"threadId": thread_id, "expectedTurnId": turn_id,

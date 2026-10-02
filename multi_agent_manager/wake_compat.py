@@ -124,7 +124,8 @@ def _api_rejection_probe(socket_path: Path) -> tuple[str, ...]:
             ("thread/turns/list", lambda: stream.latest_turn(unknown_thread)),
             (
                 "turn/start",
-                lambda: stream.start_turn(unknown_thread, "MAM compatibility probe; unknown thread only."),
+                lambda: stream.start_turn(unknown_thread, "MAM compatibility probe; unknown thread only.",
+                                          message_channel="user"),
             ),
         )
         for method, operation in operations:

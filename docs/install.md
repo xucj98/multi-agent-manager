@@ -80,7 +80,7 @@ mam service status
 mam-codex-check --output mam-compatibility.json
 ```
 
-检查当前 Codex 接口及真实工具消息投递，使用两个隔离的 `gpt-6-sol/high` 会话，结束后清理。退出码 `0` 表示通过；JSON 保存诊断、耗时和 token 用量。该命令不修改现有 MAM 实例。
+检查当前 Codex 接口及真实 MAM 消息投递，使用两个隔离的 `gpt-6-sol/high` 会话，结束后清理。退出码 `0` 表示通过；JSON 保存诊断、耗时和 token 用量。该命令不修改现有 MAM 实例。
 
 ## 项目 hooks
 

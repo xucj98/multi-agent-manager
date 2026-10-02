@@ -445,7 +445,7 @@ def start(store, args):
         raise Error("task start requires a native subagent executor")
     from . import wake_runtime
     task = task_target(store, args.task)
-    with wake_runtime.task_rebind_lock(store, task):
+    with wake_runtime.task_start_lock(store, task):
         if wake_runtime.recorded_manager(store) == identity.agent:
             raise Error("the recorded Manager cannot become a task executor")
         data = store.read(task, writable=True)
@@ -458,7 +458,7 @@ def start(store, args):
         current = data.get("agent")
         if current and current != identity.agent:
             states = agent_observations([current])
-            _rebind_quiescent(current, agent_state(current, states), role="current executor")
+            _executor_quiescent(current, agent_state(current, states), role="current executor")
             data.setdefault("handoffs", []).append({
                 "from_agent": current, "to_agent": identity.agent, "at": now(),
                 "note": "replacement executor started", "manager": wake_runtime.recorded_manager(store),
@@ -480,121 +480,17 @@ def start(store, args):
             "unchanged": not changed}
 
 
-def rebind_agent(value, *, field="--agent"):
-    """Return one well-formed Agent identity for a task handoff."""
-
-    if not isinstance(value, str) or not value or value != value.strip() or any(character in value for character in "\r\n\t"):
-        raise Error(f"{field} must be a non-empty single-line AGENT-ID")
-    return value
-
-
-def rebind_note(value):
-    if not isinstance(value, str) or not value.strip():
-        raise Error("--note must describe the executor handoff")
-    return value
-
-
-def _rebind_quiescent(agent, state, *, role):
+def _executor_quiescent(agent, state, *, role):
     status = state.get("status") if isinstance(state, dict) else None
     detail = state.get("error") if isinstance(state, dict) and isinstance(state.get("error"), str) else None
     if status in {"idle", "notLoaded"} and not detail:
         return
     if status == "active":
-        if role == "replacement agent":
-            raise Error("replacement agent is active; finish its read-only preparation before rebind")
-        raise Error(f"{role} is active; wait for its current turn to end before rebind")
+        raise Error(f"{role} is active; wait for its current turn to end before handoff")
     message = f"cannot verify {role} state ({status or 'unknown'})"
     if detail:
         message += f": {detail}"
     raise Error(message + "; retry after the App Server can confirm the thread")
-
-
-def rebind(store, args):
-    """Atomically hand an existing task and its retained workspace to an agent.
-
-    The manager must prove both threads are dormant while the binding is replaced.
-    """
-
-    task = task_target(store, args.task)
-    replacement = rebind_agent(args.agent)
-    note = rebind_note(args.note)
-    caller = rebind_agent(os.environ.get("CODEX_THREAD_ID"), field="CODEX_THREAD_ID")
-    try:
-        from . import wake_runtime
-    except ImportError as exc:
-        raise Error("multi_agent_manager.wake_runtime is required for task rebind") from exc
-
-    # The scheduler owns these first two locks for a complete cycle.  Taking
-    # them before bindings prevents a delivery to the old executor between its
-    # final quiescence observation and the durable binding replacement.
-    with wake_runtime.task_rebind_lock(store, task):
-        try:
-            manager = wake_runtime.resolve_manager(store)
-        except RuntimeError as exc:
-            raise Error(str(exc)) from exc
-        if manager is None:
-            raise Error("task rebind requires a recorded Manager; run mam service start --manager AGENT-ID first")
-        if caller != manager:
-            raise Error("task rebind must be called by the recorded Manager")
-        from . import identity as thread_identity
-        try:
-            manager_identity = thread_identity.read(caller)
-        except thread_identity.IdentityError as exc:
-            raise Error(str(exc)) from exc
-        if manager_identity.path != "/root" or manager_identity.tree_root != caller:
-            raise Error("task rebind requires the recorded native root Manager")
-        if replacement == manager:
-            raise Error("replacement agent is the recorded Manager")
-        try:
-            replacement_identity = thread_identity.read(replacement)
-        except thread_identity.IdentityError as exc:
-            raise Error(str(exc)) from exc
-        if replacement_identity.path == "/root" or replacement_identity.tree_root == replacement:
-            raise Error("replacement executor must be a native subagent")
-
-        data = store.read(task, writable=True)
-        current = data.get("agent")
-        if not current:
-            raise Error("task has no current executor; use task bind instead")
-        current = rebind_agent(current, field="current task executor")
-        conflicts = [
-            item["id"]
-            for item in store.all()
-            if item.get("id") != task and item.get("status") != "archived" and item.get("agent") == replacement
-        ]
-        if conflicts:
-            raise Error("replacement agent is already bound to another task: " + ", ".join(conflicts))
-
-        # A repeated Manager command is safe after a lost CLI response.  It
-        # does not re-probe a newly active replacement or append another audit
-        # row; the previous handoff remains the durable result.
-        if current == replacement:
-            return {**data, "unchanged": True}
-
-        try:
-            observations = agent_observations([current, replacement])
-        except Exception as exc:
-            raise Error(f"cannot verify executor thread states: {exc}") from exc
-        _rebind_quiescent(current, agent_state(current, observations), role="current executor")
-        _rebind_quiescent(replacement, agent_state(replacement, observations), role="replacement agent")
-        handoffs = data.get("handoffs")
-        if handoffs is None:
-            handoffs = []
-            data["handoffs"] = handoffs
-        if not isinstance(handoffs, list):
-            raise Error("task handoff audit is invalid")
-        handoffs.append({
-            "from_agent": current,
-            "to_agent": replacement,
-            "at": now(),
-            "note": note,
-            "manager": caller,
-        })
-        data["agent"] = replacement
-        data["identity"] = {"path": replacement_identity.path, "tree_root": replacement_identity.tree_root}
-        data["status"] = "working"
-        store.write(data)
-    return data
 
 
 def workspace_add(store, args):
@@ -1411,11 +1307,6 @@ def parser():
     p = command(sub, "start", "register or resume the calling executor")
     p.add_argument("task", nargs="?", metavar="TASK-ID", help="required for first registration or handoff")
     p.set_defaults(func=start)
-    p = command(sub, "rebind", "hand an existing task to a dormant replacement agent")
-    p.add_argument("task", metavar="TASK-ID", help="registered task with a current executor")
-    p.add_argument("--agent", required=True, metavar="AGENT-ID", help="dormant replacement AGENT-ID")
-    p.add_argument("--note", required=True, metavar="NOTE", help="short Manager handoff reason")
-    p.set_defaults(func=rebind)
     p = command(sub, "show", "read a published document")
     p.add_argument("task", nargs="?", metavar="TASK-ID|AGENT-PATH", help="TASK-ID or native collaboration path; defaults to caller task")
     p.add_argument("--file", choices=("task", "report"), default="task", metavar="FILE", help="published document: task or report (default: task)")
@@ -1473,7 +1364,7 @@ def parser():
     p.set_defaults(func=service_status)
     p = command(service, "set", "set an instance service option")
     p.add_argument("setting", choices=("message-channel",))
-    p.add_argument("value", choices=("tool", "user"))
+    p.add_argument("value", choices=("user",))
     p.set_defaults(func=service_set)
     p = command(service, "rebind-manager", "transfer this instance to the calling native Manager")
     p.add_argument("--note", required=True, metavar="NOTE", help="reason for Manager handoff")

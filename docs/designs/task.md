@@ -29,7 +29,7 @@ mam task block TASK-ID|AGENT-PATH --note NOTE
 | `mam task start [TASK-ID]` | 执行者从 CODEX_THREAD_ID 登记原生路径与树根；首次登记和换人时指定 TASK-ID，后续继续工作无需重复调用。重复调用幂等。 |
 | `mam task list [--archived\|--all]` | 默认列出未归档任务，选项查看归档或全部；表格包含任务、状态、TASK-ID、执行者路径或旧记录的 AGENT-ID、线程状态，空列表仍有表头。 |
 
-Manager 用原生工具创建或通知 subagent。换人前让旧执行者结束 turn；旧执行者活跃或状态无法确认时，start 拒绝交接。新执行者正在调用 start 属于正常状态。接手保留 TASK-ID、workspace、worktree、环境、分支、job 和发布记录，并记录交接。一个执行者只绑定一个未归档任务。原有 bind 仅允许当前执行者自绑定并走 start 校验；rebind 仍可供 Manager 兼容调用，但必须确认双方空闲及身份。start 不创建 Codex agent，不接受 model、effort 或 fork 参数。
+Manager 用原生工具创建或通知 subagent。换人前让旧执行者结束 turn；旧执行者活跃或状态无法确认时，start 拒绝交接。新执行者正在调用 start 属于正常状态。接手保留 TASK-ID、workspace、worktree、环境、分支、job 和发布记录，并记录交接。一个执行者只绑定一个未归档任务。原有 bind 仅允许当前执行者自绑定并走 start 校验。start 不创建 Codex agent，不接受 model、effort 或 fork 参数。
 
 ## 编辑、发布与查看
 
