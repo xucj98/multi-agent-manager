@@ -643,7 +643,7 @@ class LiveProbeTests(unittest.TestCase):
         self.assertFalse(evidence["checks"]["manager_user_followup"])
         self.assertEqual(evidence["delivery_inputs"]["manager_user_followup"]["status"], "failed")
 
-    def test_matching_mam_function_call_output_is_valid_inbound_delivery(self):
+    def test_mam_function_call_output_is_not_valid_inbound_delivery(self):
         expected = [
             "[MAM MESSAGE]", "[job exited | /root/liveprobe/job_executor]",
             "There are exited jobs. Check the results and archive them.",
@@ -656,8 +656,6 @@ class LiveProbeTests(unittest.TestCase):
             "type": "functionCallOutput", "name": "message", "namespace": "mam",
             "output": [{"type": "input_text", "text": payload}],
         }]}
-        self.assertEqual(liveprobe._delivery_input(turn, expected), {"item_type": "functionCallOutput", "text": payload})
-        turn["items"][0]["namespace"] = "unrelated"
         self.assertIsNone(liveprobe._delivery_input(turn, expected))
 
     def test_empty_rollout_resume_retries_without_replaying_turn(self):
